@@ -1,0 +1,1061 @@
+---
+title: 'Get User Profile'
+api: 'GET https://api.awo-platform.com/v1/users/profile'
+description: 'Retrieve the authenticated user profile information and settings'
+---
+
+## Overview
+
+The user profile endpoint returns comprehensive information about the authenticated user, including personal details, account status, preferences, and financial summary. This is typically one of the first API calls made after user authentication.
+
+The profile includes:
+- Personal information (name, demographics, contact details)
+- Account status and verification levels
+- User preferences and settings
+- Financial overview and DIVA score summary
+- Connected services and integrations
+
+<Info>
+Profile data is returned with different levels of detail based on the user's KYC verification status and account permissions.
+</Info>
+
+## Request
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for the authenticated user
+  
+  **Format**: `Bearer {access_token}`
+</ParamField>
+
+<ParamField header="X-API-Key" type="string" required>
+  Your AWO API key from the developer dashboard
+</ParamField>
+
+<ParamField header="Accept" type="string">
+  Response format preference
+  
+  **Default**: `application/json`
+</ParamField>
+
+<ParamField header="X-Request-ID" type="string">
+  Optional unique identifier for request tracking and debugging
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="include" type="string">
+  Comma-separated list of additional data to include in response
+  
+  **Options**: 
+  - `financial_summary` - Include DIVA score and account balances
+  - `connected_accounts` - Include linked bank accounts summary
+  - `preferences` - Include user preferences and settings
+  - `kyc_status` - Include detailed KYC verification status
+  - `referral_info` - Include referral code and statistics
+  
+  **Example**: `?include=financial_summary,connected_accounts`
+</ParamField>
+
+<ParamField query="locale" type="string">
+  Language/locale for response content
+  
+  **Default**: User's preferred language or `en`
+  **Supported**: `en`, `sw`, `zu`, `af`, `fr`
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="User Profile Object">
+    <ResponseField name="id" type="string">
+      Unique user identifier
+    </ResponseField>
+    <ResponseField name="phoneNumber" type="string">
+      User's phone number (partially masked for security)
+    </ResponseField>
+    <ResponseField name="email" type="string">
+      User's email address (if provided)
+    </ResponseField>
+    <ResponseField name="firstName" type="string">
+      User's first name
+    </ResponseField>
+    <ResponseField name="lastName" type="string">
+      User's last name
+    </ResponseField>
+    <ResponseField name="dateOfBirth" type="string">
+      User's date of birth (ISO 8601 format)
+    </ResponseField>
+    <ResponseField name="gender" type="string">
+      User's gender (`F`, `M`, or `O`)
+    </ResponseField>
+    <ResponseField name="country" type="string">
+      User's country code (ISO 3166-1 alpha-2)
+    </ResponseField>
+    <ResponseField name="city" type="string">
+      User's city of residence
+    </ResponseField>
+    <ResponseField name="profileImageUrl" type="string">
+      URL to user's profile image (if uploaded)
+    </ResponseField>
+    <ResponseField name="accountStatus" type="object">
+      <Expandable title="accountStatus object">
+        <ResponseField name="status" type="string">
+          Account status: `ACTIVE`, `INACTIVE`, `SUSPENDED`, `PENDING_VERIFICATION`
+        </ResponseField>
+        <ResponseField name="verified" type="boolean">
+          Whether the account is verified
+        </ResponseField>
+        <ResponseField name="kycLevel" type="number">
+          KYC verification level (1-3)
+        </ResponseField>
+        <ResponseField name="phoneVerified" type="boolean">
+          Whether phone number is verified
+        </ResponseField>
+        <ResponseField name="emailVerified" type="boolean">
+          Whether email is verified
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="createdAt" type="string">
+      Account creation timestamp (ISO 8601)
+    </ResponseField>
+    <ResponseField name="updatedAt" type="string">
+      Profile last updated timestamp (ISO 8601)
+    </ResponseField>
+    <ResponseField name="lastLoginAt" type="string">
+      Last login timestamp (ISO 8601)
+    </ResponseField>
+    <ResponseField name="financialSummary" type="object">
+      <Expandable title="financialSummary object (if included)">
+        <ResponseField name="divaScore" type="object">
+          <Expandable title="divaScore object">
+            <ResponseField name="overallScore" type="number">
+              Overall DIVA score (0-1000)
+            </ResponseField>
+            <ResponseField name="lastCalculated" type="string">
+              Last calculation timestamp
+            </ResponseField>
+            <ResponseField name="trend" type="string">
+              Score trend: `improving`, `declining`, `stable`
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+        <ResponseField name="totalSavings" type="object">
+          <Expandable title="totalSavings object">
+            <ResponseField name="amount" type="number">
+              Total savings amount
+            </ResponseField>
+            <ResponseField name="currency" type="string">
+              Currency code
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+        <ResponseField name="connectedAccountsCount" type="number">
+          Number of connected bank accounts
+        </ResponseField>
+        <ResponseField name="activeChamasCount" type="number">
+          Number of active Chama memberships
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="connectedAccounts" type="array">
+      <Expandable title="connectedAccounts array (if included)">
+        <ResponseField name="accountId" type="string">
+          Account identifier
+        </ResponseField>
+        <ResponseField name="bankName" type="string">
+          Name of the bank
+        </ResponseField>
+        <ResponseField name="accountType" type="string">
+          Account type (e.g., `checking`, `savings`)
+        </ResponseField>
+        <ResponseField name="masked AccountNumber" type="string">
+          Partially masked account number
+        </ResponseField>
+        <ResponseField name="connectedAt" type="string">
+          Connection timestamp
+        </ResponseField>
+        <ResponseField name="status" type="string">
+          Connection status: `active`, `inactive`, `error`
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="preferences" type="object">
+      <Expandable title="preferences object (if included)">
+        <ResponseField name="language" type="string">
+          Preferred language
+        </ResponseField>
+        <ResponseField name="currency" type="string">
+          Preferred currency
+        </ResponseField>
+        <ResponseField name="timezone" type="string">
+          User's timezone
+        </ResponseField>
+        <ResponseField name="notifications" type="object">
+          Notification preferences
+        </ResponseField>
+        <ResponseField name="privacy" type="object">
+          Privacy settings
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="referralInfo" type="object">
+      <Expandable title="referralInfo object (if included)">
+        <ResponseField name="referralCode" type="string">
+          User's unique referral code
+        </ResponseField>
+        <ResponseField name="referredBy" type="string">
+          Referral code of user who referred this user
+        </ResponseField>
+        <ResponseField name="referralCount" type="number">
+          Number of successful referrals
+        </ResponseField>
+        <ResponseField name="referralEarnings" type="object">
+          Total earnings from referrals
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="requestId" type="string">
+  Unique request identifier for support and debugging
+</ResponseField>
+
+## Code Examples
+
+<CodeGroup>
+
+```javascript JavaScript
+const getUserProfile = async (includeOptions = []) => {
+  const token = localStorage.getItem('awo_access_token');
+  
+  const queryParams = new URLSearchParams();
+  if (includeOptions.length > 0) {
+    queryParams.append('include', includeOptions.join(','));
+  }
+  
+  const response = await fetch(
+    `https://api.awo-platform.com/v1/users/profile?${queryParams}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-API-Key': process.env.AWO_API_KEY,
+        'Accept': 'application/json',
+        'X-Request-ID': crypto.randomUUID()
+      }
+    }
+  );
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch profile');
+  }
+  
+  return data;
+};
+
+// Usage examples
+try {
+  // Basic profile
+  const basicProfile = await getUserProfile();
+  console.log(`Welcome, ${basicProfile.data.firstName}!`);
+  
+  // Profile with financial summary
+  const fullProfile = await getUserProfile([
+    'financial_summary', 
+    'connected_accounts', 
+    'preferences'
+  ]);
+  console.log(`DIVA Score: ${fullProfile.data.financialSummary.divaScore.overallScore}`);
+  console.log(`Connected Accounts: ${fullProfile.data.connectedAccounts.length}`);
+  
+} catch (error) {
+  console.error('Profile fetch error:', error.message);
+}
+
+// React component example
+const ProfileHeader = () => {
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const result = await getUserProfile(['financial_summary']);
+        setProfile(result.data);
+      } catch (error) {
+        console.error('Failed to load profile:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  if (loading) return <div>Loading profile...</div>;
+  if (!profile) return <div>Failed to load profile</div>;
+
+  return (
+    <div className="profile-header">
+      <div className="user-info">
+        <h1>Welcome, {profile.firstName}!</h1>
+        <p>{profile.email}</p>
+        <span className={`status ${profile.accountStatus.status.toLowerCase()}`}>
+          {profile.accountStatus.status}
+        </span>
+      </div>
+      
+      {profile.financialSummary && (
+        <div className="financial-summary">
+          <div className="diva-score">
+            <h3>DIVA Score</h3>
+            <span className="score">
+              {profile.financialSummary.divaScore.overallScore}
+            </span>
+          </div>
+          <div className="savings">
+            <h3>Total Savings</h3>
+            <span className="amount">
+              {profile.financialSummary.totalSavings.currency} {
+                profile.financialSummary.totalSavings.amount.toLocaleString()
+              }
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+```python Python
+import requests
+from datetime import datetime
+
+class AWOUserProfile:
+    def __init__(self, access_token, api_key):
+        self.access_token = access_token
+        self.api_key = api_key
+        self.base_url = 'https://api.awo-platform.com/v1'
+    
+    def get_profile(self, include=None, locale='en'):
+        headers = {
+            'Authorization': f'Bearer {self.access_token}',
+            'X-API-Key': self.api_key,
+            'Accept': 'application/json'
+        }
+        
+        params = {'locale': locale}
+        if include:
+            params['include'] = ','.join(include)
+        
+        response = requests.get(
+            f'{self.base_url}/users/profile',
+            headers=headers,
+            params=params
+        )
+        
+        data = response.json()
+        
+        if not response.ok:
+            raise Exception(data.get('message', 'Failed to fetch profile'))
+        
+        return data['data']
+    
+    def get_basic_info(self):
+        """Get basic user information only"""
+        profile = self.get_profile()
+        return {
+            'id': profile['id'],
+            'name': f"{profile['firstName']} {profile['lastName']}",
+            'phone': profile['phoneNumber'],
+            'email': profile.get('email'),
+            'country': profile['country'],
+            'verified': profile['accountStatus']['verified']
+        }
+    
+    def get_financial_summary(self):
+        """Get user's financial overview"""
+        profile = self.get_profile(include=['financial_summary'])
+        return profile.get('financialSummary', {})
+    
+    def get_connected_accounts(self):
+        """Get user's connected bank accounts"""
+        profile = self.get_profile(include=['connected_accounts'])
+        return profile.get('connectedAccounts', [])
+
+# Usage
+try:
+    user_profile = AWOUserProfile(access_token, api_key)
+    
+    # Get basic profile
+    basic_info = user_profile.get_basic_info()
+    print(f"User: {basic_info['name']} ({basic_info['phone']})")
+    print(f"Verified: {basic_info['verified']}")
+    
+    # Get financial summary
+    financial = user_profile.get_financial_summary()
+    if financial:
+        diva_score = financial.get('divaScore', {})
+        print(f"DIVA Score: {diva_score.get('overallScore', 'N/A')}")
+        
+        savings = financial.get('totalSavings', {})
+        print(f"Total Savings: {savings.get('currency', '')} {savings.get('amount', 0):,.2f}")
+    
+    # Get connected accounts
+    accounts = user_profile.get_connected_accounts()
+    print(f"Connected Accounts: {len(accounts)}")
+    for account in accounts:
+        print(f"  - {account['bankName']}: {account['maskedAccountNumber']}")
+        
+except Exception as error:
+    print(f"Profile error: {error}")
+```
+
+```php PHP
+<?php
+class AWOUserProfile {
+    private $accessToken;
+    private $apiKey;
+    private $baseUrl = 'https://api.awo-platform.com/v1';
+    
+    public function __construct($accessToken, $apiKey) {
+        $this->accessToken = $accessToken;
+        $this->apiKey = $apiKey;
+    }
+    
+    public function getProfile($include = null, $locale = 'en') {
+        $url = $this->baseUrl . '/users/profile';
+        
+        $params = ['locale' => $locale];
+        if ($include) {
+            $params['include'] = implode(',', $include);
+        }
+        
+        $url .= '?' . http_build_query($params);
+        
+        $options = [
+            'http' => [
+                'header' => [
+                    'Authorization: Bearer ' . $this->accessToken,
+                    'X-API-Key: ' . $this->apiKey,
+                    'Accept: application/json'
+                ],
+                'method' => 'GET'
+            ]
+        ];
+        
+        $context = stream_context_create($options);
+        $response = file_get_contents($url, false, $context);
+        
+        if ($response === false) {
+            throw new Exception('Failed to fetch profile');
+        }
+        
+        $data = json_decode($response, true);
+        
+        if (!isset($data['success']) || !$data['success']) {
+            throw new Exception($data['message'] ?? 'Profile fetch failed');
+        }
+        
+        return $data['data'];
+    }
+    
+    public function getBasicInfo() {
+        $profile = $this->getProfile();
+        
+        return [
+            'id' => $profile['id'],
+            'name' => $profile['firstName'] . ' ' . $profile['lastName'],
+            'phone' => $profile['phoneNumber'],
+            'email' => $profile['email'] ?? null,
+            'country' => $profile['country'],
+            'verified' => $profile['accountStatus']['verified']
+        ];
+    }
+    
+    public function getFinancialSummary() {
+        $profile = $this->getProfile(['financial_summary']);
+        return $profile['financialSummary'] ?? [];
+    }
+}
+
+// Usage
+try {
+    $userProfile = new AWOUserProfile($accessToken, $apiKey);
+    
+    // Get basic info
+    $basicInfo = $userProfile->getBasicInfo();
+    echo "User: " . $basicInfo['name'] . " (" . $basicInfo['phone'] . ")\n";
+    echo "Verified: " . ($basicInfo['verified'] ? 'Yes' : 'No') . "\n";
+    
+    // Get financial summary
+    $financial = $userProfile->getFinancialSummary();
+    if (!empty($financial)) {
+        $divaScore = $financial['divaScore']['overallScore'] ?? 'N/A';
+        echo "DIVA Score: $divaScore\n";
+        
+        $savings = $financial['totalSavings'] ?? [];
+        if (!empty($savings)) {
+            echo "Total Savings: " . $savings['currency'] . " " . 
+                 number_format($savings['amount'], 2) . "\n";
+        }
+    }
+    
+} catch (Exception $e) {
+    echo "Profile error: " . $e->getMessage() . "\n";
+}
+?>
+```
+
+```curl cURL
+# Basic profile
+curl -X GET https://api.awo-platform.com/v1/users/profile \
+  -H "Authorization: Bearer your_access_token_here" \
+  -H "X-API-Key: your_api_key_here" \
+  -H "Accept: application/json"
+
+# Profile with additional data
+curl -X GET "https://api.awo-platform.com/v1/users/profile?include=financial_summary,connected_accounts,preferences" \
+  -H "Authorization: Bearer your_access_token_here" \
+  -H "X-API-Key: your_api_key_here" \
+  -H "Accept: application/json"
+
+# Profile in different language
+curl -X GET "https://api.awo-platform.com/v1/users/profile?locale=sw" \
+  -H "Authorization: Bearer your_access_token_here" \
+  -H "X-API-Key: your_api_key_here" \
+  -H "Accept: application/json"
+```
+
+</CodeGroup>
+
+## Response Examples
+
+<CodeGroup>
+
+```json Basic Profile Response
+{
+  "success": true,
+  "data": {
+    "id": "usr_01H8X9Y2Z3A4B5C6D7E8F9G0H1",
+    "phoneNumber": "+27***456789",
+    "email": "thandi@example.com",
+    "firstName": "Thandi",
+    "lastName": "Mthembu",
+    "dateOfBirth": "1985-06-15",
+    "gender": "F",
+    "country": "ZA",
+    "city": "Johannesburg",
+    "profileImageUrl": "https://cdn.awo-platform.com/profiles/usr_01H8X9Y2Z3A4B5C6D7E8F9G0H1.jpg",
+    "accountStatus": {
+      "status": "ACTIVE",
+      "verified": true,
+      "kycLevel": 2,
+      "phoneVerified": true,
+      "emailVerified": true
+    },
+    "createdAt": "2023-06-01T10:30:00Z",
+    "updatedAt": "2023-06-25T14:22:30Z",
+    "lastLoginAt": "2023-06-28T09:15:45Z"
+  },
+  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H1"
+}
+```
+
+```json Full Profile Response
+{
+  "success": true,
+  "data": {
+    "id": "usr_01H8X9Y2Z3A4B5C6D7E8F9G0H1",
+    "phoneNumber": "+27***456789",
+    "email": "thandi@example.com",
+    "firstName": "Thandi",
+    "lastName": "Mthembu",
+    "dateOfBirth": "1985-06-15",
+    "gender": "F",
+    "country": "ZA",
+    "city": "Johannesburg",
+    "profileImageUrl": "https://cdn.awo-platform.com/profiles/usr_01H8X9Y2Z3A4B5C6D7E8F9G0H1.jpg",
+    "accountStatus": {
+      "status": "ACTIVE",
+      "verified": true,
+      "kycLevel": 2,
+      "phoneVerified": true,
+      "emailVerified": true
+    },
+    "createdAt": "2023-06-01T10:30:00Z",
+    "updatedAt": "2023-06-25T14:22:30Z",
+    "lastLoginAt": "2023-06-28T09:15:45Z",
+    "financialSummary": {
+      "divaScore": {
+        "overallScore": 750,
+        "lastCalculated": "2023-06-28T06:00:00Z",
+        "trend": "improving"
+      },
+      "totalSavings": {
+        "amount": 25000.50,
+        "currency": "ZAR"
+      },
+      "connectedAccountsCount": 2,
+      "activeChamasCount": 3
+    },
+    "connectedAccounts": [
+      {
+        "accountId": "acc_01H8X9Y2Z3A4B5C6D7E8F9G0H2",
+        "bankName": "Standard Bank",
+        "accountType": "checking",
+        "maskedAccountNumber": "****1234",
+        "connectedAt": "2023-06-05T14:30:00Z",
+        "status": "active"
+      },
+      {
+        "accountId": "acc_01H8X9Y2Z3A4B5C6D7E8F9G0H3",
+        "bankName": "FNB",
+        "accountType": "savings",
+        "maskedAccountNumber": "****5678",
+        "connectedAt": "2023-06-12T11:45:00Z",
+        "status": "active"
+      }
+    ],
+    "preferences": {
+      "language": "en",
+      "currency": "ZAR",
+      "timezone": "Africa/Johannesburg",
+      "notifications": {
+        "email": true,
+        "sms": true,
+        "push": true,
+        "marketing": false
+      },
+      "privacy": {
+        "profileVisibility": "private",
+        "dataSharing": false
+      }
+    },
+    "referralInfo": {
+      "referralCode": "THANDI123",
+      "referredBy": "MERCY456",
+      "referralCount": 5,
+      "referralEarnings": {
+        "amount": 250.00,
+        "currency": "ZAR"
+      }
+    }
+  },
+  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H1"
+}
+```
+
+```json Unverified User Response
+{
+  "success": true,
+  "data": {
+    "id": "usr_01H8X9Y2Z3A4B5C6D7E8F9G0H4",
+    "phoneNumber": "+254***234567",
+    "email": null,
+    "firstName": "Grace",
+    "lastName": "Wanjiku",
+    "dateOfBirth": "1980-03-20",
+    "gender": "F",
+    "country": "KE",
+    "city": null,
+    "profileImageUrl": null,
+    "accountStatus": {
+      "status": "PENDING_VERIFICATION",
+      "verified": false,
+      "kycLevel": 1,
+      "phoneVerified": true,
+      "emailVerified": false
+    },
+    "createdAt": "2023-06-27T16:45:00Z",
+    "updatedAt": "2023-06-27T16:45:00Z",
+    "lastLoginAt": "2023-06-28T08:30:00Z"
+  },
+  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H4"
+}
+```
+
+```json Error Response - Unauthorized
+{
+  "success": false,
+  "message": "Access token is invalid or expired",
+  "error": {
+    "code": "INVALID_TOKEN",
+    "details": "Please refresh your token or log in again"
+  },
+  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H5"
+}
+```
+
+</CodeGroup>
+
+## Profile Completion Levels
+
+AWO profiles have different completion levels based on provided information and verification status:
+
+<Tabs>
+  <Tab title="Basic Profile (25%)">
+    **Required Information:**
+    - Phone number (verified)
+    - First and last name
+    - Date of birth
+    - Gender
+    - Country
+    
+    **Access Level:**
+    - Basic app features
+    - Financial education content
+    - Simple savings tracking
+  </Tab>
+  
+  <Tab title="Standard Profile (50%)">
+    **Additional Information:**
+    - Email address (verified)
+    - City of residence
+    - Profile image
+    - Basic preferences
+    
+    **Access Level:**
+    - Bank account connection
+    - DIVA score calculation
+    - Chama participation
+    - Basic investment options
+  </Tab>
+  
+  <Tab title="Complete Profile (75%)">
+    **Additional Information:**
+    - KYC Level 2 verification
+    - Employment information
+    - Financial goals
+    - Complete preferences
+    
+    **Access Level:**
+    - Full investment marketplace
+    - Advanced savings products
+    - Premium features
+    - Higher transaction limits
+  </Tab>
+  
+  <Tab title="Premium Profile (100%)">
+    **Additional Information:**
+    - KYC Level 3 verification
+    - Income verification
+    - Address verification
+    - Enhanced security setup
+    
+    **Access Level:**
+    - All platform features
+    - Priority support
+    - Advanced analytics
+    - Custom investment options
+  </Tab>
+</Tabs>
+
+## Account Status Types
+
+<Accordion title="ACTIVE">
+Account is fully functional with all features available based on verification level.
+</Accordion>
+
+<Accordion title="PENDING_VERIFICATION">
+Account created but requires phone or email verification to activate features.
+</Accordion>
+
+<Accordion title="INACTIVE">
+Account has been inactive for an extended period. May require re-verification to reactivate.
+</Accordion>
+
+<Accordion title="SUSPENDED">
+Account temporarily suspended due to security concerns or policy violations. Contact support required.
+</Accordion>
+
+<Accordion title="CLOSED">
+Account permanently closed at user request or due to policy violations.
+</Accordion>
+
+## KYC Verification Levels
+
+| Level | Requirements | Features Unlocked |
+|-------|-------------|-------------------|
+| **Level 1** | Phone verification, Basic personal info | Basic savings, Financial education |
+| **Level 2** | Email verification, ID document, Address proof | Bank connections, Investments up to $1000, Chama creation |
+| **Level 3** | Income verification, Enhanced due diligence | Full investment access, Higher limits, Premium features |
+
+## Error Handling
+
+<ResponseField name="HTTP Status Codes" type="object">
+  <Expandable title="Status Codes">
+    <ResponseField name="200" type="Success">
+      Profile retrieved successfully
+    </ResponseField>
+    <ResponseField name="401" type="Unauthorized">
+      Invalid or expired access token
+    </ResponseField>
+    <ResponseField name="403" type="Forbidden">
+      Insufficient permissions for requested data
+    </ResponseField>
+    <ResponseField name="404" type="Not Found">
+      User profile not found
+    </ResponseField>
+    <ResponseField name="429" type="Too Many Requests">
+      Rate limit exceeded
+    </ResponseField>
+    <ResponseField name="500" type="Internal Server Error">
+      Server error occurred
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Common Error Codes
+
+| Code | Description | Resolution |
+|------|-------------|------------|
+| `INVALID_TOKEN` | Access token is invalid | Refresh token or login again |
+| `TOKEN_EXPIRED` | Access token has expired | Use refresh token to get new access token |
+| `PROFILE_NOT_FOUND` | User profile doesn't exist | Verify user account exists |
+| `INSUFFICIENT_PERMISSIONS` | User lacks permission for requested data | Upgrade verification level |
+| `ACCOUNT_SUSPENDED` | User account is suspended | Contact support |
+| `RATE_LIMITED` | Too many requests | Wait before retrying |
+
+## Data Privacy & Security
+
+<Warning>
+**Sensitive Data**: Profile endpoints return sensitive personal information. Ensure proper data handling and storage practices in your application.
+</Warning>
+
+### Privacy Controls
+
+<Accordion title="Data Minimization">
+Only request the data you need using the `include` parameter. This reduces bandwidth usage and improves privacy.
+</Accordion>
+
+<Accordion title="Masked Information">
+Sensitive data like phone numbers and account numbers are partially masked in responses for security.
+</Accordion>
+
+<Accordion title="User Consent">
+Users control what information is shared through privacy preferences. Respect these settings in your application.
+</Accordion>
+
+## Caching Strategy
+
+Profile data can be cached to improve performance, but consider these guidelines:
+
+<CodeGroup>
+
+```javascript Client-Side Caching
+class ProfileCache {
+  constructor() {
+    this.cache = new Map();
+    this.cacheDuration = 5 * 60 * 1000; // 5 minutes
+  }
+  
+  get(userId, includeOptions = []) {
+    const key = `${userId}_${includeOptions.sort().join(',')}`;
+    const cached = this.cache.get(key);
+    
+    if (cached && Date.now() - cached.timestamp < this.cacheDuration) {
+      return cached.data;
+    }
+    
+    return null;
+  }
+  
+  set(userId, data, includeOptions = []) {
+    const key = `${userId}_${includeOptions.sort().join(',')}`;
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
+  }
+  
+  invalidate(userId) {
+    // Remove all cached entries for user
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(userId)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+}
+
+const profileCache = new ProfileCache();
+
+const getCachedProfile = async (includeOptions = []) => {
+  const userId = getCurrentUserId();
+  
+  // Check cache first
+  let profile = profileCache.get(userId, includeOptions);
+  
+  if (!profile) {
+    // Fetch from API
+    const result = await getUserProfile(includeOptions);
+    profile = result.data;
+    
+    // Cache the result
+    profileCache.set(userId, profile, includeOptions);
+  }
+  
+  return profile;
+};
+```
+
+```python Server-Side Caching
+import redis
+import json
+from datetime import timedelta
+
+class ProfileCache:
+    def __init__(self, redis_client):
+        self.redis = redis_client
+        self.cache_duration = timedelta(minutes=5)
+    
+    def get_cache_key(self, user_id, include_options=None):
+        include_str = ','.join(sorted(include_options or []))
+        return f"profile:{user_id}:{include_str}"
+    
+    def get(self, user_id, include_options=None):
+        key = self.get_cache_key(user_id, include_options)
+        cached_data = self.redis.get(key)
+        
+        if cached_data:
+            return json.loads(cached_data)
+        
+        return None
+    
+    def set(self, user_id, profile_data, include_options=None):
+        key = self.get_cache_key(user_id, include_options)
+        self.redis.setex(
+            key,
+            self.cache_duration,
+            json.dumps(profile_data)
+        )
+    
+    def invalidate(self, user_id):
+        # Get all keys for this user
+        pattern = f"profile:{user_id}:*"
+        keys = self.redis.keys(pattern)
+        
+        if keys:
+            self.redis.delete(*keys)
+
+# Usage
+cache = ProfileCache(redis.Redis())
+
+def get_cached_profile(user_id, include_options=None):
+    # Try cache first
+    profile = cache.get(user_id, include_options)
+    
+    if not profile:
+        # Fetch from API
+        profile_api = AWOUserProfile(access_token, api_key)
+        profile = profile_api.get_profile(include=include_options)
+        
+        # Cache the result
+        cache.set(user_id, profile, include_options)
+    
+    return profile
+```
+
+</CodeGroup>
+
+## Testing
+
+<CodeGroup>
+
+```javascript Jest Tests
+describe('User Profile API', () => {
+  beforeEach(() => {
+    localStorage.setItem('awo_access_token', 'valid_token');
+    fetch.resetMocks();
+  });
+
+  test('should fetch basic profile successfully', async () => {
+    const mockProfile = {
+      success: true,
+      data: {
+        id: 'usr_123',
+        firstName: 'Test',
+        lastName: 'User',
+        phoneNumber: '+27***456789',
+        accountStatus: { status: 'ACTIVE', verified: true }
+      }
+    };
+    
+    fetch.mockResponseOnce(JSON.stringify(mockProfile));
+    
+    const profile = await getUserProfile();
+    
+    expect(profile.success).toBe(true);
+    expect(profile.data.firstName).toBe('Test');
+    expect(profile.data.accountStatus.status).toBe('ACTIVE');
+  });
+
+  test('should include additional data when requested', async () => {
+    const mockProfile = {
+      success: true,
+      data: {
+        id: 'usr_123',
+        firstName: 'Test',
+        lastName: 'User',
+        financialSummary: {
+          divaScore: { overallScore: 750 },
+          totalSavings: { amount: 1000, currency: 'ZAR' }
+        }
+      }
+    };
+    
+    fetch.mockResponseOnce(JSON.stringify(mockProfile));
+    
+    const profile = await getUserProfile(['financial_summary']);
+    
+    expect(profile.data.financialSummary).toBeDefined();
+    expect(profile.data.financialSummary.divaScore.overallScore).toBe(750);
+  });
+
+  test('should handle unauthorized error', async () => {
+    fetch.mockResponseOnce(
+      JSON.stringify({
+        success: false,
+        error: { code: 'INVALID_TOKEN' }
+      }),
+      { status: 401 }
+    );
+
+    await expect(getUserProfile()).rejects.toThrow();
+  });
+});
+```
+
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Update Profile" icon="user-edit" href="/api-reference/users/update">
+    Update user profile information and preferences
+  </Card>
+  <Card title="KYC Verification" icon="id-card" href="/api-reference/users/kyc">
+    Complete identity verification process
+  </Card>
+  <Card title="DIVA Score Details" icon="chart-line" href="/api-reference/diva-score/get-score">
+    Get detailed financial health scoring
+  </Card>
+  <Card title="Connected Accounts" icon="bank" href="/api-reference/accounts/list">
+    Manage connected bank accounts
+  </Card>
+</CardGroup>
+
+<Note>
+The profile endpoint is typically called after login to initialize the user interface. Consider caching the response appropriately and invalidating when profile updates occur.
+</Note>

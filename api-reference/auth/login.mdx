@@ -1,0 +1,426 @@
+---
+title: 'User Login'
+api: 'POST https://api.awo-platform.com/v1/auth/login'
+description: 'Initiate user login flow with phone number and send OTP verification code'
+---
+
+## Overview
+
+The login endpoint initiates the authentication flow for existing AWO users. This is a two-step process:
+
+1. **Request OTP**: Send phone number to receive verification code
+2. **Verify OTP**: Submit verification code to receive access tokens
+
+<Note>
+AWO uses phone-based authentication as the primary method, as it's most accessible across African markets with varying smartphone adoption rates.
+</Note>
+
+## Request
+
+### Headers
+
+<ParamField header="X-API-Key" type="string" required>
+  Your AWO API key from the developer dashboard
+</ParamField>
+
+<ParamField header="Content-Type" type="string" required>
+  Must be `application/json`
+</ParamField>
+
+<ParamField header="X-Request-ID" type="string">
+  Optional unique identifier for request tracking and debugging
+</ParamField>
+
+### Body Parameters
+
+<ParamField body="phoneNumber" type="string" required>
+  User's phone number in international format (E.164)
+  
+  **Example**: `+27123456789`, `+254701234567`, `+263771234567`
+</ParamField>
+
+<ParamField body="deviceInfo" type="object">
+  Optional device information for security and analytics
+  
+  <Expandable title="deviceInfo object">
+    <ParamField body="deviceId" type="string">
+      Unique device identifier
+    </ParamField>
+    <ParamField body="platform" type="string">
+      Platform type: `ios`, `android`, `web`
+    </ParamField>
+    <ParamField body="appVersion" type="string">
+      Application version
+    </ParamField>
+    <ParamField body="osVersion" type="string">
+      Operating system version
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="locale" type="string">
+  Preferred language for OTP message. Defaults to `en`
+  
+  **Supported**: `en`, `sw` (Swahili), `zu` (Zulu), `af` (Afrikaans), `fr` (French)
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the OTP was sent successfully
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable response message
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="data object">
+    <ResponseField name="otpSent" type="boolean">
+      Confirms OTP was dispatched
+    </ResponseField>
+    <ResponseField name="expiresIn" type="number">
+      OTP expiration time in seconds (default: 300)
+    </ResponseField>
+    <ResponseField name="retryAfter" type="number">
+      Seconds to wait before requesting new OTP
+    </ResponseField>
+    <ResponseField name="maskedPhone" type="string">
+      Partially masked phone number for confirmation
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="requestId" type="string">
+  Unique request identifier for support and debugging
+</ResponseField>
+
+## Code Examples
+
+<CodeGroup>
+
+```javascript JavaScript
+const loginUser = async (phoneNumber) => {
+  const response = await fetch('https://api.awo-platform.com/v1/auth/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': process.env.AWO_API_KEY,
+      'X-Request-ID': crypto.randomUUID()
+    },
+    body: JSON.stringify({
+      phoneNumber,
+      deviceInfo: {
+        deviceId: localStorage.getItem('deviceId'),
+        platform: 'web',
+        appVersion: '1.0.0',
+        osVersion: navigator.userAgent
+      },
+      locale: 'en'
+    })
+  });
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.message || 'Login failed');
+  }
+  
+  return data;
+};
+
+// Usage
+try {
+  const result = await loginUser('+27123456789');
+  console.log(`OTP sent to ${result.data.maskedPhone}`);
+  console.log(`Expires in ${result.data.expiresIn} seconds`);
+} catch (error) {
+  console.error('Login error:', error.message);
+}
+```
+
+```python Python
+import requests
+import uuid
+
+def login_user(phone_number, locale='en'):
+    response = requests.post(
+        'https://api.awo-platform.com/v1/auth/login',
+        headers={
+            'Content-Type': 'application/json',
+            'X-API-Key': os.getenv('AWO_API_KEY'),
+            'X-Request-ID': str(uuid.uuid4())
+        },
+        json={
+            'phoneNumber': phone_number,
+            'deviceInfo': {
+                'platform': 'python-sdk',
+                'appVersion': '1.0.0'
+            },
+            'locale': locale
+        }
+    )
+    
+    data = response.json()
+    
+    if not response.ok:
+        raise Exception(data.get('message', 'Login failed'))
+    
+    return data
+
+# Usage
+try:
+    result = login_user('+27123456789')
+    print(f"OTP sent to {result['data']['maskedPhone']}")
+    print(f"Expires in {result['data']['expiresIn']} seconds")
+except Exception as error:
+    print(f"Login error: {error}")
+```
+
+```php PHP
+<?php
+function loginUser($phoneNumber, $locale = 'en') {
+    $data = [
+        'phoneNumber' => $phoneNumber,
+        'deviceInfo' => [
+            'platform' => 'php-sdk',
+            'appVersion' => '1.0.0'
+        ],
+        'locale' => $locale
+    ];
+    
+    $options = [
+        'http' => [
+            'header' => [
+                'Content-Type: application/json',
+                'X-API-Key: ' . getenv('AWO_API_KEY'),
+                'X-Request-ID: ' . uniqid()
+            ],
+            'method' => 'POST',
+            'content' => json_encode($data)
+        ]
+    ];
+    
+    $context = stream_context_create($options);
+    $response = file_get_contents(
+        'https://api.awo-platform.com/v1/auth/login',
+        false,
+        $context
+    );
+    
+    return json_decode($response, true);
+}
+
+// Usage
+try {
+    $result = loginUser('+27123456789');
+    echo "OTP sent to " . $result['data']['maskedPhone'] . "\n";
+    echo "Expires in " . $result['data']['expiresIn'] . " seconds\n";
+} catch (Exception $e) {
+    echo "Login error: " . $e->getMessage() . "\n";
+}
+?>
+```
+
+```curl cURL
+curl -X POST https://api.awo-platform.com/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your_api_key_here" \
+  -H "X-Request-ID: $(uuidgen)" \
+  -d '{
+    "phoneNumber": "+27123456789",
+    "deviceInfo": {
+      "platform": "curl",
+      "appVersion": "1.0.0"
+    },
+    "locale": "en"
+  }'
+```
+
+</CodeGroup>
+
+## Response Examples
+
+<CodeGroup>
+
+```json Success Response
+{
+  "success": true,
+  "message": "OTP sent successfully",
+  "data": {
+    "otpSent": true,
+    "expiresIn": 300,
+    "retryAfter": 60,
+    "maskedPhone": "+27***456789"
+  },
+  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H1"
+}
+```
+
+```json Error Response - Invalid Phone
+{
+  "success": false,
+  "message": "Invalid phone number format",
+  "error": {
+    "code": "INVALID_PHONE_FORMAT",
+    "details": "Phone number must be in international format (E.164)",
+    "field": "phoneNumber"
+  },
+  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H2"
+}
+```
+
+```json Error Response - User Not Found
+{
+  "success": false,
+  "message": "User not found",
+  "error": {
+    "code": "USER_NOT_FOUND",
+    "details": "No account found with this phone number. Please register first."
+  },
+  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H3"
+}
+```
+
+```json Error Response - Rate Limited
+{
+  "success": false,
+  "message": "Too many requests",
+  "error": {
+    "code": "RATE_LIMITED",
+    "details": "Please wait before requesting another OTP",
+    "retryAfter": 45
+  },
+  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H4"
+}
+```
+
+</CodeGroup>
+
+## Error Handling
+
+<ResponseField name="HTTP Status Codes" type="object">
+  <Expandable title="Status Codes">
+    <ResponseField name="200" type="Success">
+      OTP sent successfully
+    </ResponseField>
+    <ResponseField name="400" type="Bad Request">
+      Invalid request format or missing required fields
+    </ResponseField>
+    <ResponseField name="404" type="Not Found">
+      User account not found
+    </ResponseField>
+    <ResponseField name="429" type="Too Many Requests">
+      Rate limit exceeded
+    </ResponseField>
+    <ResponseField name="500" type="Internal Server Error">
+      Server error occurred
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Common Error Codes
+
+| Code | Description | Resolution |
+|------|-------------|------------|
+| `INVALID_PHONE_FORMAT` | Phone number format is incorrect | Use E.164 international format |
+| `USER_NOT_FOUND` | No account exists for this phone | Direct user to registration |
+| `RATE_LIMITED` | Too many OTP requests | Wait for `retryAfter` seconds |
+| `OTP_SEND_FAILED` | SMS delivery failed | Try again or contact support |
+| `ACCOUNT_SUSPENDED` | User account is suspended | Contact support |
+| `COUNTRY_NOT_SUPPORTED` | Phone number from unsupported country | Check supported countries |
+
+## Next Steps
+
+After successfully initiating login, you need to:
+
+1. **Collect OTP**: Prompt user to enter the verification code received via SMS
+2. **Verify OTP**: Call the [OTP Verification endpoint](/api-reference/auth/verify-otp) 
+3. **Handle Tokens**: Store the returned access and refresh tokens securely
+
+<CardGroup cols={2}>
+  <Card title="Verify OTP" icon="shield-check" href="/api-reference/auth/verify-otp">
+    Complete login by verifying the OTP code
+  </Card>
+  <Card title="Registration" icon="user-plus" href="/api-reference/auth/register">
+    Register new users who don't have accounts
+  </Card>
+</CardGroup>
+
+## Security Considerations
+
+<Warning>
+**Rate Limiting**: This endpoint is heavily rate-limited to prevent abuse. Implement proper retry logic with exponential backoff.
+</Warning>
+
+<Note>
+**SMS Costs**: Each OTP request incurs SMS costs. Implement client-side validation to minimize unnecessary requests.
+</Note>
+
+### Best Practices
+
+1. **Validate Phone Numbers**: Use client-side validation before API calls
+2. **Handle Errors Gracefully**: Provide clear error messages to users
+3. **Implement Retry Logic**: Respect rate limits and retry after specified delays
+4. **Store Request IDs**: Log request IDs for debugging and support
+5. **Monitor Usage**: Track OTP success rates and delivery times
+
+## Testing
+
+### Sandbox Testing
+
+Use these test phone numbers in sandbox mode:
+
+| Phone Number | Behavior |
+|--------------|----------|
+| `+27123456789` | Always succeeds, OTP: `123456` |
+| `+27123456788` | Simulates SMS delivery failure |
+| `+27123456787` | Simulates rate limiting |
+| `+27123456786` | Simulates user not found |
+
+### Integration Testing
+
+<CodeGroup>
+
+```javascript Jest Test
+describe('AWO Login API', () => {
+  test('should send OTP successfully', async () => {
+    const result = await loginUser('+27123456789');
+    
+    expect(result.success).toBe(true);
+    expect(result.data.otpSent).toBe(true);
+    expect(result.data.expiresIn).toBe(300);
+    expect(result.data.maskedPhone).toContain('***');
+  });
+  
+  test('should handle invalid phone number', async () => {
+    await expect(loginUser('invalid-phone'))
+      .rejects
+      .toThrow('Invalid phone number format');
+  });
+});
+```
+
+```python Pytest
+import pytest
+
+def test_login_success():
+    result = login_user('+27123456789')
+    
+    assert result['success'] == True
+    assert result['data']['otpSent'] == True
+    assert result['data']['expiresIn'] == 300
+    assert '***' in result['data']['maskedPhone']
+
+def test_login_invalid_phone():
+    with pytest.raises(Exception) as exc_info:
+        login_user('invalid-phone')
+    
+    assert 'Invalid phone number format' in str(exc_info.value)
+```
+
+</CodeGroup>
+
+<Note>
+Remember to test with actual phone numbers in your staging environment to verify SMS delivery in your target countries.
+</Note>

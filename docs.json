@@ -86,6 +86,14 @@
             ]
           },
           {
+            "group": "Accounts",
+            "pages": [
+              "api-reference/accounts/connect"
+              
+            
+            ]
+          },
+          {
             "group": "Users",
             "pages": [
               "api-reference/users/profile",

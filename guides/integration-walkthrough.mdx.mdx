@@ -1,0 +1,671 @@
+---
+title: 'Integration Walkthrough'
+description: 'Get up and running with AWO APIs in under 10 minutes'
+---
+
+# AWO Integration Walkthrough
+
+This guide will walk you through integrating with the AWO platform, from initial setup to implementing core features. By the end, you'll have a working integration that can authenticate users, fetch their financial data, and calculate DIVA scores.
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+<CardGroup cols={2}>
+  <Card title="Developer Account" icon="user-check">
+    Sign up at developer.awo-platform.com for API credentials
+  </Card>
+  <Card title="API Keys" icon="key">
+    Generate your API keys from the developer dashboard
+  </Card>
+</CardGroup>
+
+## Step 1: Environment Setup
+
+### Base Configuration
+
+Set up your environment with the AWO API base URLs:
+
+<CodeGroup>
+```javascript JavaScript
+const AWO_CONFIG = {
+  baseURL: 'https://api.awo-platform.com/v1',
+  authURL: 'https://auth.awo-platform.com',
+  sandboxURL: 'https://sandbox-api.awo-platform.com/v1'
+};
+```
+
+```python Python
+AWO_CONFIG = {
+    'base_url': 'https://api.awo-platform.com/v1',
+    'auth_url': 'https://auth.awo-platform.com',
+    'sandbox_url': 'https://sandbox-api.awo-platform.com/v1'
+}
+```
+
+```php PHP
+<?php
+$awoConfig = [
+    'baseURL' => 'https://api.awo-platform.com/v1',
+    'authURL' => 'https://auth.awo-platform.com',
+    'sandboxURL' => 'https://sandbox-api.awo-platform.com/v1'
+];
+?>
+```
+</CodeGroup>
+
+### Install SDK (Optional)
+
+<Tabs>
+  <Tab title="JavaScript/Node.js">
+    ```bash
+    npm install @awo-platform/javascript-sdk
+    ```
+  </Tab>
+  <Tab title="React Native">
+    ```bash
+    npm install @awo-platform/react-native-sdk
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```bash
+    pip install awo-platform-python
+    ```
+  </Tab>
+</Tabs>
+
+## Step 2: Authentication Implementation
+
+### User Registration
+
+First, implement user registration to create AWO accounts:
+
+<CodeGroup>
+```javascript JavaScript
+const registerUser = async (userData) => {
+  const response = await fetch(`${AWO_CONFIG.baseURL}/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': process.env.AWO_API_KEY
+    },
+    body: JSON.stringify({
+      phoneNumber: userData.phoneNumber,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      country: userData.country,
+      dateOfBirth: userData.dateOfBirth,
+      gender: userData.gender
+    })
+  });
+  
+  return await response.json();
+};
+```
+
+```python Python
+import requests
+
+def register_user(user_data):
+    response = requests.post(
+        f"{AWO_CONFIG['base_url']}/auth/register",
+        headers={
+            'Content-Type': 'application/json',
+            'X-API-Key': os.getenv('AWO_API_KEY')
+        },
+        json={
+            'phoneNumber': user_data['phone_number'],
+            'firstName': user_data['first_name'],
+            'lastName': user_data['last_name'],
+            'country': user_data['country'],
+            'dateOfBirth': user_data['date_of_birth'],
+            'gender': user_data['gender']
+        }
+    )
+    return response.json()
+```
+</CodeGroup>
+
+### User Login
+
+Implement the login flow with OTP verification:
+
+<CodeGroup>
+```javascript JavaScript
+// Step 1: Request OTP
+const requestOTP = async (phoneNumber) => {
+  const response = await fetch(`${AWO_CONFIG.baseURL}/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': process.env.AWO_API_KEY
+    },
+    body: JSON.stringify({ phoneNumber })
+  });
+  
+  return await response.json();
+};
+
+// Step 2: Verify OTP and get tokens
+const verifyOTP = async (phoneNumber, otpCode) => {
+  const response = await fetch(`${AWO_CONFIG.baseURL}/auth/verify-otp`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': process.env.AWO_API_KEY
+    },
+    body: JSON.stringify({ 
+      phoneNumber, 
+      otpCode 
+    })
+  });
+  
+  const data = await response.json();
+  
+  // Store tokens securely
+  localStorage.setItem('awo_access_token', data.accessToken);
+  localStorage.setItem('awo_refresh_token', data.refreshToken);
+  
+  return data;
+};
+```
+
+```python Python
+def request_otp(phone_number):
+    response = requests.post(
+        f"{AWO_CONFIG['base_url']}/auth/login",
+        headers={
+            'Content-Type': 'application/json',
+            'X-API-Key': os.getenv('AWO_API_KEY')
+        },
+        json={'phoneNumber': phone_number}
+    )
+    return response.json()
+
+def verify_otp(phone_number, otp_code):
+    response = requests.post(
+        f"{AWO_CONFIG['base_url']}/auth/verify-otp",
+        headers={
+            'Content-Type': 'application/json',
+            'X-API-Key': os.getenv('AWO_API_KEY')
+        },
+        json={
+            'phoneNumber': phone_number,
+            'otpCode': otp_code
+        }
+    )
+    return response.json()
+```
+</CodeGroup>
+
+## Step 3: User Profile Management
+
+### Fetch User Profile
+
+Once authenticated, retrieve the user's profile information:
+
+<CodeGroup>
+```javascript JavaScript
+const getUserProfile = async () => {
+  const token = localStorage.getItem('awo_access_token');
+  
+  const response = await fetch(`${AWO_CONFIG.baseURL}/users/profile`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'X-API-Key': process.env.AWO_API_KEY
+    }
+  });
+  
+  return await response.json();
+};
+```
+
+```python Python
+def get_user_profile(access_token):
+    response = requests.get(
+        f"{AWO_CONFIG['base_url']}/users/profile",
+        headers={
+            'Authorization': f'Bearer {access_token}',
+            'X-API-Key': os.getenv('AWO_API_KEY')
+        }
+    )
+    return response.json()
+```
+</CodeGroup>
+
+### Update User Profile
+
+Allow users to update their profile information:
+
+<CodeGroup>
+```javascript JavaScript
+const updateUserProfile = async (updates) => {
+  const token = localStorage.getItem('awo_access_token');
+  
+  const response = await fetch(`${AWO_CONFIG.baseURL}/users/profile`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'X-API-Key': process.env.AWO_API_KEY
+    },
+    body: JSON.stringify(updates)
+  });
+  
+  return await response.json();
+};
+```
+</CodeGroup>
+
+## Step 4: Bank Account Integration
+
+### Connect Bank Account
+
+Implement Open Banking integration to connect user bank accounts:
+
+<CodeGroup>
+```javascript JavaScript
+const connectBankAccount = async (bankId) => {
+  const token = localStorage.getItem('awo_access_token');
+  
+  const response = await fetch(`${AWO_CONFIG.baseURL}/accounts/connect`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'X-API-Key': process.env.AWO_API_KEY
+    },
+    body: JSON.stringify({ 
+      bankId,
+      redirectUri: 'https://yourapp.com/bank-callback'
+    })
+  });
+  
+  const data = await response.json();
+  
+  // Redirect user to bank authorization page
+  window.location.href = data.authorizationUrl;
+  
+  return data;
+};
+```
+
+```python Python
+def connect_bank_account(access_token, bank_id):
+    response = requests.post(
+        f"{AWO_CONFIG['base_url']}/accounts/connect",
+        headers={
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json',
+            'X-API-Key': os.getenv('AWO_API_KEY')
+        },
+        json={
+            'bankId': bank_id,
+            'redirectUri': 'https://yourapp.com/bank-callback'
+        }
+    )
+    return response.json()
+```
+</CodeGroup>
+
+### List Connected Accounts
+
+Retrieve all connected bank accounts for a user:
+
+<CodeGroup>
+```javascript JavaScript
+const getConnectedAccounts = async () => {
+  const token = localStorage.getItem('awo_access_token');
+  
+  const response = await fetch(`${AWO_CONFIG.baseURL}/accounts/list`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'X-API-Key': process.env.AWO_API_KEY
+    }
+  });
+  
+  return await response.json();
+};
+```
+</CodeGroup>
+
+## Step 5: DIVA Score Integration
+
+### Fetch DIVA Score
+
+Get the user's current DIVA score and components:
+
+<CodeGroup>
+```javascript JavaScript
+const getDIVAScore = async () => {
+  const token = localStorage.getItem('awo_access_token');
+  
+  const response = await fetch(`${AWO_CONFIG.baseURL}/diva-score/get-score`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'X-API-Key': process.env.AWO_API_KEY
+    }
+  });
+  
+  const data = await response.json();
+  
+  return {
+    overallScore: data.overallScore,
+    components: {
+      discipline: data.disciplineScore,
+      income: data.incomeScore,
+      velocity: data.velocityScore,
+      assets: data.assetsScore
+    },
+    insights: data.insights,
+    recommendations: data.recommendations
+  };
+};
+```
+
+```python Python
+def get_diva_score(access_token):
+    response = requests.get(
+        f"{AWO_CONFIG['base_url']}/diva-score/get-score",
+        headers={
+            'Authorization': f'Bearer {access_token}',
+            'X-API-Key': os.getenv('AWO_API_KEY')
+        }
+    )
+    return response.json()
+```
+</CodeGroup>
+
+### Display DIVA Score
+
+Create a visual representation of the DIVA score:
+
+<CodeGroup>
+```javascript React
+import React, { useState, useEffect } from 'react';
+
+const DIVAScoreWidget = () => {
+  const [divaScore, setDivaScore] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchScore = async () => {
+      try {
+        const score = await getDIVAScore();
+        setDivaScore(score);
+      } catch (error) {
+        console.error('Error fetching DIVA score:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchScore();
+  }, []);
+
+  if (loading) return <div>Loading DIVA Score...</div>;
+
+  return (
+    <div className="diva-score-widget">
+      <h2>Your DIVA Score</h2>
+      <div className="score-circle">
+        <span className="score-value">{divaScore.overallScore}</span>
+        <span className="score-max">/1000</span>
+      </div>
+      
+      <div className="score-components">
+        <div className="component">
+          <span>Discipline</span>
+          <span>{divaScore.components.discipline}</span>
+        </div>
+        <div className="component">
+          <span>Income</span>
+          <span>{divaScore.components.income}</span>
+        </div>
+        <div className="component">
+          <span>Velocity</span>
+          <span>{divaScore.components.velocity}</span>
+        </div>
+        <div className="component">
+          <span>Assets</span>
+          <span>{divaScore.components.assets}</span>
+        </div>
+      </div>
+
+      <div className="recommendations">
+        <h3>Recommendations</h3>
+        {divaScore.recommendations.map((rec, index) => (
+          <div key={index} className="recommendation">
+            {rec.message}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+```
+</CodeGroup>
+
+## Step 6: Transaction Data
+
+### Fetch Transactions
+
+Retrieve and display user transaction history:
+
+<CodeGroup>
+```javascript JavaScript
+const getTransactions = async (params = {}) => {
+  const token = localStorage.getItem('awo_access_token');
+  const queryParams = new URLSearchParams({
+    page: params.page || 1,
+    limit: params.limit || 50,
+    startDate: params.startDate || '',
+    endDate: params.endDate || '',
+    category: params.category || ''
+  }).toString();
+  
+  const response = await fetch(
+    `${AWO_CONFIG.baseURL}/transactions/list?${queryParams}`, 
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-API-Key': process.env.AWO_API_KEY
+      }
+    }
+  );
+  
+  return await response.json();
+};
+```
+</CodeGroup>
+
+## Step 7: Error Handling
+
+Implement robust error handling for all API calls:
+
+<CodeGroup>
+```javascript JavaScript
+class AWOError extends Error {
+  constructor(message, status, code) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+const handleAPIResponse = async (response) => {
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new AWOError(
+      data.message || 'API request failed',
+      response.status,
+      data.code
+    );
+  }
+  
+  return data;
+};
+
+// Usage example
+const safeAPICall = async (apiFunction) => {
+  try {
+    return await apiFunction();
+  } catch (error) {
+    if (error instanceof AWOError) {
+      switch (error.status) {
+        case 401:
+          // Handle authentication error
+          await refreshToken();
+          return await apiFunction();
+        case 429:
+          // Handle rate limiting
+          console.warn('Rate limited, retrying after delay');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return await apiFunction();
+        default:
+          console.error('AWO API Error:', error.message);
+          throw error;
+      }
+    }
+    throw error;
+  }
+};
+```
+</CodeGroup>
+
+## Step 8: Token Management
+
+Implement automatic token refresh:
+
+<CodeGroup>
+```javascript JavaScript
+const refreshToken = async () => {
+  const refreshToken = localStorage.getItem('awo_refresh_token');
+  
+  const response = await fetch(`${AWO_CONFIG.baseURL}/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': process.env.AWO_API_KEY
+    },
+    body: JSON.stringify({ refreshToken })
+  });
+  
+  const data = await response.json();
+  
+  localStorage.setItem('awo_access_token', data.accessToken);
+  localStorage.setItem('awo_refresh_token', data.refreshToken);
+  
+  return data;
+};
+
+// Automatic token refresh interceptor
+const apiCallWithAuth = async (url, options = {}) => {
+  const token = localStorage.getItem('awo_access_token');
+  
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`,
+      'X-API-Key': process.env.AWO_API_KEY
+    }
+  });
+  
+  if (response.status === 401) {
+    await refreshToken();
+    const newToken = localStorage.getItem('awo_access_token');
+    
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${newToken}`,
+        'X-API-Key': process.env.AWO_API_KEY
+      }
+    });
+  }
+  
+  return response;
+};
+```
+</CodeGroup>
+
+## Testing Your Integration
+
+### Using Sandbox Environment
+
+Test your integration using our sandbox environment:
+
+```javascript
+// Switch to sandbox for testing
+const AWO_CONFIG = {
+  baseURL: 'https://sandbox-api.awo-platform.com/v1',
+  authURL: 'https://sandbox-auth.awo-platform.com'
+};
+
+// Use test credentials
+const testUser = {
+  phoneNumber: '+27123456789',
+  firstName: 'Test',
+  lastName: 'User',
+  country: 'ZA',
+  dateOfBirth: '1990-01-01',
+  gender: 'F'
+};
+```
+
+### Test Scenarios
+
+<Accordion title="Authentication Flow">
+1. Register a new user
+2. Request OTP for login
+3. Verify OTP and receive tokens
+4. Test token refresh
+5. Test logout
+</Accordion>
+
+<Accordion title="Bank Integration">
+1. Connect to sandbox bank account
+2. Retrieve account list
+3. Fetch transaction history
+4. Test transaction categorization
+</Accordion>
+
+<Accordion title="DIVA Score">
+1. Calculate initial DIVA score
+2. Simulate transactions to change score
+3. Fetch updated score and insights
+4. Test score history retrieval
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Implement Chamas" icon="users" href="/guides/chama-management">
+    Add community savings group functionality
+  </Card>
+  <Card title="Add Investments" icon="chart-line" href="/api-reference/investments/portfolio">
+    Integrate investment marketplace features
+  </Card>
+  <Card title="Payment Processing" icon="credit-card" href="/guides/payment-processing">
+    Enable deposits, withdrawals, and transfers
+  </Card>
+  <Card title="Advanced Features" icon="cog" href="/guides/best-practices">
+    Implement webhooks, notifications, and analytics
+  </Card>
+</CardGroup>
+
+## Support
+
+If you encounter any issues during integration:
+
+- Check our [Troubleshooting Guide](/guides/troubleshooting)
+- Review the complete [API Reference](/api-reference/auth/login)
+- Contact developer support: developers@awo-platform.com
+- Join our developer community on GitHub
+
+<Note>
+Remember to never expose your API keys in client-side code. Always use environment variables and secure server-side storage for sensitive credentials.
+</Note>

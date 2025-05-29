@@ -1,0 +1,1414 @@
+---
+title: 'Connect Bank Account'
+api: 'POST https://api.awo-platform.com/v1/accounts/connect'
+description: 'Initiate secure bank account connection via Open Banking APIs'
+---
+
+## Overview
+
+The bank account connection endpoint enables users to securely link their existing bank accounts to the AWO platform using Open Banking protocols. This connection is essential for DIVA score calculation, transaction analysis, and automated financial insights.
+
+AWO supports connections to major banks across SADC countries through partnerships with leading Open Banking providers like Stitch, Mono, and Plaid. The connection process uses OAuth 2.0 authentication to ensure user data security and consent.
+
+**Key Benefits:**
+- Real-time transaction data for DIVA score calculation
+- Automated expense categorization and insights
+- Balance monitoring and alerts
+- Enhanced financial planning capabilities
+
+<Info>
+Bank connections use read-only access and cannot initiate transactions. Users maintain full control over their bank accounts and can disconnect at any time.
+</Info>
+
+## Supported Banks
+
+<Tabs>
+  <Tab title="South Africa">
+    **Major Banks:**
+    - Standard Bank
+    - First National Bank (FNB)
+    - ABSA Bank
+    - Nedbank
+    - Capitec Bank
+    - African Bank
+    - Investec
+    - Discovery Bank
+    
+    **Provider:** Stitch API
+  </Tab>
+  
+  <Tab title="Kenya">
+    **Major Banks:**
+    - Kenya Commercial Bank (KCB)
+    - Equity Bank
+    - Cooperative Bank
+    - Standard Chartered
+    - Barclays Bank Kenya
+    - NCBA Bank
+    - I&M Bank
+    - Diamond Trust Bank
+    
+    **Provider:** Mono API
+  </Tab>
+  
+  <Tab title="Zimbabwe">
+    **Major Banks:**
+    - CBZ Bank
+    - FBC Bank
+    - Standard Chartered Zimbabwe
+    - Barclays Bank Zimbabwe
+    - NMB Bank
+    - Steward Bank
+    - Ecobank Zimbabwe
+    
+    **Provider:** Custom integrations
+  </Tab>
+</Tabs>
+
+## Request
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for the authenticated user
+  
+  **Format**: `Bearer {access_token}`
+</ParamField>
+
+<ParamField header="X-API-Key" type="string" required>
+  Your AWO API key from the developer dashboard
+</ParamField>
+
+<ParamField header="Content-Type" type="string" required>
+  Must be `application/json`
+</ParamField>
+
+<ParamField header="X-Request-ID" type="string">
+  Optional unique identifier for request tracking and debugging
+</ParamField>
+
+### Body Parameters
+
+<ParamField body="bankId" type="string" required>
+  Unique identifier for the bank to connect to
+  
+  **Format**: Use bank IDs from the supported banks list
+  **Example**: `standard_bank_za`, `kcb_bank_ke`, `cbz_bank_zw`
+</ParamField>
+
+<ParamField body="accountTypes" type="array">
+  Types of accounts to connect (optional, defaults to all available)
+  
+  **Options**: `["checking", "savings", "credit", "investment"]`
+  **Default**: `["checking", "savings"]`
+</ParamField>
+
+<ParamField body="redirectUri" type="string" required>
+  URL to redirect user after bank authentication
+  
+  **Format**: Must be HTTPS URL registered in your developer dashboard
+  **Example**: `https://yourapp.com/bank-callback`
+</ParamField>
+
+<ParamField body="consentDuration" type="number">
+  Duration of consent in days (90-365 days)
+  
+  **Default**: 365 days
+  **Range**: 90-365 days
+</ParamField>
+
+<ParamField body="dataAccess" type="object">
+  Specific data access permissions requested
+  
+  <Expandable title="dataAccess object">
+    <ParamField body="transactions" type="boolean">
+      Access to transaction history (required for DIVA score)
+      **Default**: `true`
+    </ParamField>
+    <ParamField body="balances" type="boolean">
+      Access to account balances
+      **Default**: `true`
+    </ParamField>
+    <ParamField body="accountInfo" type="boolean">
+      Access to account details and metadata
+      **Default**: `true`
+    </ParamField>
+    <ParamField body="standingOrders" type="boolean">
+      Access to standing orders and direct debits
+      **Default**: `false`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="historicalData" type="object">
+  Historical data retrieval preferences
+  
+  <Expandable title="historicalData object">
+    <ParamField body="months" type="number">
+      Number of months of historical data to retrieve (1-24)
+      **Default**: 12 months
+    </ParamField>
+    <ParamField body="includeScheduled" type="boolean">
+      Include future scheduled transactions
+      **Default**: `false`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="webhookUrl" type="string">
+  URL to receive webhook notifications for account updates
+  
+  **Format**: HTTPS URL
+  **Events**: account updates, new transactions, connection status changes
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Additional metadata for tracking and analytics
+  
+  <Expandable title="metadata object">
+    <ParamField body="source" type="string">
+      Source of the connection request (e.g., "onboarding", "settings")
+    </ParamField>
+    <ParamField body="userAgent" type="string">
+      User agent string for analytics
+    </ParamField>
+    <ParamField body="deviceInfo" type="object">
+      Device information for security tracking
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the connection initiation was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable response message
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="Connection Response Data">
+    <ResponseField name="connectionId" type="string">
+      Unique identifier for this connection attempt
+    </ResponseField>
+    <ResponseField name="authorizationUrl" type="string">
+      URL where user should be redirected for bank authentication
+    </ResponseField>
+    <ResponseField name="state" type="string">
+      State parameter for OAuth flow security
+    </ResponseField>
+    <ResponseField name="expiresAt" type="string">
+      Expiry time for the authorization URL (ISO 8601)
+    </ResponseField>
+    <ResponseField name="bankInfo" type="object">
+      <Expandable title="bankInfo object">
+        <ResponseField name="bankId" type="string">
+          Bank identifier
+        </ResponseField>
+        <ResponseField name="bankName" type="string">
+          Display name of the bank
+        </ResponseField>
+        <ResponseField name="country" type="string">
+          Country code where bank operates
+        </ResponseField>
+        <ResponseField name="logoUrl" type="string">
+          URL to bank's logo image
+        </ResponseField>
+        <ResponseField name="supportedFeatures" type="array">
+          List of supported features for this bank
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="provider" type="object">
+      <Expandable title="provider object">
+        <ResponseField name="name" type="string">
+          Open Banking provider name (e.g., "Stitch", "Mono")
+        </ResponseField>
+        <ResponseField name="version" type="string">
+          API version being used
+        </ResponseField>
+        <ResponseField name="capabilities" type="array">
+          Supported capabilities for this connection
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="consentDetails" type="object">
+      <Expandable title="consentDetails object">
+        <ResponseField name="duration" type="number">
+          Consent duration in days
+        </ResponseField>
+        <ResponseField name="dataAccess" type="array">
+          List of data access permissions granted
+        </ResponseField>
+        <ResponseField name="canBeRevoked" type="boolean">
+          Whether user can revoke consent
+        </ResponseField>
+        <ResponseField name="autoRenewal" type="boolean">
+          Whether consent auto-renews
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="estimatedConnectionTime" type="string">
+      Expected time to complete connection process
+    </ResponseField>
+    <ResponseField name="nextSteps" type="array">
+      Instructions for completing the connection
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="requestId" type="string">
+  Unique request identifier for support and debugging
+</ResponseField>
+
+## Code Examples
+
+<CodeGroup>
+
+```javascript JavaScript
+const connectBankAccount = async (bankId, redirectUri, options = {}) => {
+  const token = localStorage.getItem('awo_access_token');
+  
+  const requestBody = {
+    bankId,
+    redirectUri,
+    accountTypes: options.accountTypes || ['checking', 'savings'],
+    consentDuration: options.consentDuration || 365,
+    dataAccess: {
+      transactions: true,
+      balances: true,
+      accountInfo: true,
+      standingOrders: options.includeStandingOrders || false
+    },
+    historicalData: {
+      months: options.historicalMonths || 12,
+      includeScheduled: options.includeScheduled || false
+    },
+    webhookUrl: options.webhookUrl,
+    metadata: {
+      source: options.source || 'manual',
+      userAgent: navigator.userAgent,
+      deviceInfo: {
+        platform: 'web',
+        timestamp: new Date().toISOString()
+      }
+    }
+  };
+  
+  const response = await fetch('https://api.awo-platform.com/v1/accounts/connect', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'X-API-Key': process.env.AWO_API_KEY,
+      'Content-Type': 'application/json',
+      'X-Request-ID': crypto.randomUUID()
+    },
+    body: JSON.stringify(requestBody)
+  });
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to initiate bank connection');
+  }
+  
+  return data;
+};
+
+// Usage example
+const handleBankConnection = async (selectedBankId) => {
+  try {
+    const result = await connectBankAccount(
+      selectedBankId,
+      'https://yourapp.com/bank-callback',
+      {
+        historicalMonths: 12,
+        source: 'onboarding',
+        webhookUrl: 'https://yourapp.com/webhooks/bank-updates'
+      }
+    );
+    
+    console.log(`Connection initiated: ${result.data.connectionId}`);
+    console.log(`Bank: ${result.data.bankInfo.bankName}`);
+    console.log(`Provider: ${result.data.provider.name}`);
+    
+    // Store connection details for callback handling
+    localStorage.setItem('bankConnectionId', result.data.connectionId);
+    localStorage.setItem('bankConnectionState', result.data.state);
+    
+    // Redirect user to bank for authentication
+    window.location.href = result.data.authorizationUrl;
+    
+  } catch (error) {
+    console.error('Bank connection error:', error.message);
+    showError('Failed to connect to bank. Please try again.');
+  }
+};
+
+// Callback handling after bank authentication
+const handleBankCallback = async (urlParams) => {
+  const authCode = urlParams.get('code');
+  const state = urlParams.get('state');
+  const storedState = localStorage.getItem('bankConnectionState');
+  const connectionId = localStorage.getItem('bankConnectionId');
+  
+  if (state !== storedState) {
+    throw new Error('Invalid state parameter - possible security issue');
+  }
+  
+  if (!authCode) {
+    const error = urlParams.get('error');
+    throw new Error(`Bank authentication failed: ${error}`);
+  }
+  
+  try {
+    // Complete the connection process
+    const result = await completeBankConnection(connectionId, authCode);
+    console.log('Bank connection completed successfully!');
+    
+    // Clean up stored data
+    localStorage.removeItem('bankConnectionId');
+    localStorage.removeItem('bankConnectionState');
+    
+    // Redirect to success page or refresh account list
+    window.location.href = '/dashboard?connected=true';
+    
+  } catch (error) {
+    console.error('Connection completion error:', error.message);
+  }
+};
+
+// React component for bank connection
+const BankConnectionFlow = () => {
+  const [banks, setBanks] = useState([]);
+  const [selectedBank, setSelectedBank] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Load available banks
+  useEffect(() => {
+    const loadBanks = async () => {
+      try {
+        const response = await fetch('/api/banks/supported');
+        const data = await response.json();
+        setBanks(data.banks);
+      } catch (err) {
+        setError('Failed to load supported banks');
+      }
+    };
+    
+    loadBanks();
+  }, []);
+
+  const handleConnect = async () => {
+    if (!selectedBank) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await handleBankConnection(selectedBank.id);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bank-connection-flow">
+      <h2>Connect Your Bank Account</h2>
+      <p>Choose your bank to securely connect your account and unlock your DIVA score.</p>
+      
+      {error && <div className="error">{error}</div>}
+      
+      <div className="bank-grid">
+        {banks.map(bank => (
+          <div 
+            key={bank.id}
+            className={`bank-card ${selectedBank?.id === bank.id ? 'selected' : ''}`}
+            onClick={() => setSelectedBank(bank)}
+          >
+            <img src={bank.logoUrl} alt={bank.name} className="bank-logo" />
+            <h3>{bank.name}</h3>
+            <p>{bank.country}</p>
+          </div>
+        ))}
+      </div>
+      
+      {selectedBank && (
+        <div className="connection-details">
+          <h3>Connection Details</h3>
+          <ul>
+            <li>✓ Read-only access to account information</li>
+            <li>✓ Transaction history for DIVA score calculation</li>
+            <li>✓ Account balances for financial insights</li>
+            <li>✓ No ability to initiate transactions</li>
+            <li>✓ You can disconnect at any time</li>
+          </ul>
+          
+          <button 
+            className="connect-button"
+            onClick={handleConnect}
+            disabled={loading}
+          >
+            {loading ? 'Connecting...' : `Connect to ${selectedBank.name}`}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+```python Python
+import requests
+import uuid
+from urllib.parse import urlencode, parse_qs, urlparse
+from typing import Dict, Any, Optional, List
+
+class AWOBankConnection:
+    def __init__(self, access_token: str, api_key: str):
+        self.access_token = access_token
+        self.api_key = api_key
+        self.base_url = 'https://api.awo-platform.com/v1'
+    
+    def connect_bank_account(self,
+                           bank_id: str,
+                           redirect_uri: str,
+                           account_types: Optional[List[str]] = None,
+                           historical_months: int = 12,
+                           webhook_url: Optional[str] = None,
+                           metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Initiate bank account connection
+        
+        Args:
+            bank_id: Identifier for the bank to connect
+            redirect_uri: URL to redirect after authentication
+            account_types: Types of accounts to connect
+            historical_months: Months of historical data to retrieve
+            webhook_url: URL for webhook notifications
+            metadata: Additional tracking information
+        
+        Returns:
+            Dictionary containing connection details and authorization URL
+        """
+        url = f'{self.base_url}/accounts/connect'
+        
+        headers = {
+            'Authorization': f'Bearer {self.access_token}',
+            'X-API-Key': self.api_key,
+            'Content-Type': 'application/json',
+            'X-Request-ID': str(uuid.uuid4())
+        }
+        
+        payload = {
+            'bankId': bank_id,
+            'redirectUri': redirect_uri,
+            'accountTypes': account_types or ['checking', 'savings'],
+            'consentDuration': 365,
+            'dataAccess': {
+                'transactions': True,
+                'balances': True,
+                'accountInfo': True,
+                'standingOrders': False
+            },
+            'historicalData': {
+                'months': historical_months,
+                'includeScheduled': False
+            },
+            'metadata': metadata or {}
+        }
+        
+        if webhook_url:
+            payload['webhookUrl'] = webhook_url
+        
+        response = requests.post(url, headers=headers, json=payload)
+        result = response.json()
+        
+        if not response.ok:
+            raise Exception(result.get('message', 'Failed to initiate bank connection'))
+        
+        return result['data']
+    
+    def get_supported_banks(self, country: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get list of supported banks"""
+        url = f'{self.base_url}/banks/supported'
+        
+        headers = {
+            'Authorization': f'Bearer {self.access_token}',
+            'X-API-Key': self.api_key
+        }
+        
+        params = {}
+        if country:
+            params['country'] = country
+        
+        response = requests.get(url, headers=headers, params=params)
+        result = response.json()
+        
+        if not response.ok:
+            raise Exception(result.get('message', 'Failed to get supported banks'))
+        
+        return result['data']['banks']
+    
+    def complete_connection(self, connection_id: str, auth_code: str) -> Dict[str, Any]:
+        """Complete bank connection after user authentication"""
+        url = f'{self.base_url}/accounts/connect/{connection_id}/complete'
+        
+        headers = {
+            'Authorization': f'Bearer {self.access_token}',
+            'X-API-Key': self.api_key,
+            'Content-Type': 'application/json'
+        }
+        
+        payload = {
+            'authorizationCode': auth_code
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        result = response.json()
+        
+        if not response.ok:
+            raise Exception(result.get('message', 'Failed to complete bank connection'))
+        
+        return result['data']
+    
+    def handle_callback(self, callback_url: str, expected_state: str) -> Dict[str, Any]:
+        """
+        Handle callback from bank authentication
+        
+        Args:
+            callback_url: Full callback URL with parameters
+            expected_state: Expected state parameter for security
+        
+        Returns:
+            Dictionary with connection results
+        """
+        parsed_url = urlparse(callback_url)
+        params = parse_qs(parsed_url.query)
+        
+        # Extract parameters
+        code = params.get('code', [None])[0]
+        state = params.get('state', [None])[0]
+        error = params.get('error', [None])[0]
+        
+        # Validate state parameter
+        if state != expected_state:
+            raise Exception('Invalid state parameter - possible security issue')
+        
+        # Check for authentication errors
+        if error:
+            error_description = params.get('error_description', ['Unknown error'])[0]
+            raise Exception(f'Bank authentication failed: {error} - {error_description}')
+        
+        if not code:
+            raise Exception('No authorization code received from bank')
+        
+        return {
+            'authorization_code': code,
+            'state': state
+        }
+    
+    def get_connection_status(self, connection_id: str) -> Dict[str, Any]:
+        """Get status of a bank connection"""
+        url = f'{self.base_url}/accounts/connect/{connection_id}/status'
+        
+        headers = {
+            'Authorization': f'Bearer {self.access_token}',
+            'X-API-Key': self.api_key
+        }
+        
+        response = requests.get(url, headers=headers)
+        result = response.json()
+        
+        if not response.ok:
+            raise Exception(result.get('message', 'Failed to get connection status'))
+        
+        return result['data']
+
+# Usage example
+def main():
+    bank_connection = AWOBankConnection(access_token, api_key)
+    
+    try:
+        # Get supported banks
+        banks = bank_connection.get_supported_banks(country='ZA')
+        print("Supported banks in South Africa:")
+        for bank in banks:
+            print(f"  - {bank['name']} ({bank['id']})")
+        
+        # Initiate connection to Standard Bank
+        connection_result = bank_connection.connect_bank_account(
+            bank_id='standard_bank_za',
+            redirect_uri='https://yourapp.com/bank-callback',
+            historical_months=12,
+            webhook_url='https://yourapp.com/webhooks/bank',
+            metadata={
+                'source': 'onboarding',
+                'user_agent': 'Python SDK'
+            }
+        )
+        
+        print(f"Connection initiated: {connection_result['connectionId']}")
+        print(f"Bank: {connection_result['bankInfo']['bankName']}")
+        print(f"Authorization URL: {connection_result['authorizationUrl']}")
+        
+        # In a real application, you would redirect the user to the authorization URL
+        # and handle the callback to complete the connection
+        
+        # Example callback handling (this would be in your callback endpoint)
+        # callback_url = "https://yourapp.com/bank-callback?code=AUTH_CODE&state=STATE"
+        # callback_data = bank_connection.handle_callback(callback_url, connection_result['state'])
+        # completion_result = bank_connection.complete_connection(
+        #     connection_result['connectionId'], 
+        #     callback_data['authorization_code']
+        # )
+        
+    except Exception as error:
+        print(f"Bank connection error: {error}")
+
+if __name__ == "__main__":
+    main()
+```
+
+```php PHP
+<?php
+class AWOBankConnection {
+    private $accessToken;
+    private $apiKey;
+    private $baseUrl = 'https://api.awo-platform.com/v1';
+    
+    public function __construct($accessToken, $apiKey) {
+        $this->accessToken = $accessToken;
+        $this->apiKey = $apiKey;
+    }
+    
+    public function connectBankAccount($bankId, $redirectUri, $options = []) {
+        $url = $this->baseUrl . '/accounts/connect';
+        
+        $defaultOptions = [
+            'accountTypes' => ['checking', 'savings'],
+            'historicalMonths' => 12,
+            'webhookUrl' => null,
+            'metadata' => []
+        ];
+        
+        $options = array_merge($defaultOptions, $options);
+        
+        $payload = [
+            'bankId' => $bankId,
+            'redirectUri' => $redirectUri,
+            'accountTypes' => $options['accountTypes'],
+            'consentDuration' => 365,
+            'dataAccess' => [
+                'transactions' => true,
+                'balances' => true,
+                'accountInfo' => true,
+                'standingOrders' => false
+            ],
+            'historicalData' => [
+                'months' => $options['historicalMonths'],
+                'includeScheduled' => false
+            ],
+            'metadata' => $options['metadata']
+        ];
+        
+        if ($options['webhookUrl']) {
+            $payload['webhookUrl'] = $options['webhookUrl'];
+        }
+        
+        $curl = curl_init();
+        
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $this->accessToken,
+                'X-API-Key: ' . $this->apiKey,
+                'Content-Type: application/json',
+                'X-Request-ID: ' . uniqid()
+            ]
+        ]);
+        
+        $response = curl_exec($curl);
+        $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        
+        if (curl_errno($curl)) {
+            throw new Exception('cURL error: ' . curl_error($curl));
+        }
+        
+        curl_close($curl);
+        
+        $data = json_decode($response, true);
+        
+        if ($httpCode !== 200) {
+            throw new Exception($data['message'] ?? 'Failed to initiate bank connection');
+        }
+        
+        return $data['data'];
+    }
+    
+    public function getSupportedBanks($country = null) {
+        $url = $this->baseUrl . '/banks/supported';
+        
+        if ($country) {
+            $url .= '?country=' . urlencode($country);
+        }
+        
+        $curl = curl_init();
+        
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $this->accessToken,
+                'X-API-Key: ' . $this->apiKey
+            ]
+        ]);
+        
+        $response = curl_exec($curl);
+        $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        
+        curl_close($curl);
+        
+        $data = json_decode($response, true);
+        
+        if ($httpCode !== 200) {
+            throw new Exception($data['message'] ?? 'Failed to get supported banks');
+        }
+        
+        return $data['data']['banks'];
+    }
+    
+    public function completeConnection($connectionId, $authCode) {
+        $url = $this->baseUrl . "/accounts/connect/{$connectionId}/complete";
+        
+        $payload = [
+            'authorizationCode' => $authCode
+        ];
+        
+        $curl = curl_init();
+        
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $this->accessToken,
+                'X-API-Key: ' . $this->apiKey,
+                'Content-Type: application/json'
+            ]
+        ]);
+        
+        $response = curl_exec($curl);
+        $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        
+        curl_close($curl);
+        
+        $data = json_decode($response, true);
+        
+        if ($httpCode !== 200) {
+            throw new Exception($data['message'] ?? 'Failed to complete bank connection');
+        }
+        
+        return $data['data'];
+    }
+    
+    public function handleCallback($callbackUrl, $expectedState) {
+        $parsedUrl = parse_url($callbackUrl);
+        parse_str($parsedUrl['query'] ?? '', $params);
+        
+        $code = $params['code'] ?? null;
+        $state = $params['state'] ?? null;
+        $error = $params['error'] ?? null;
+        
+        // Validate state parameter
+        if ($state !== $expectedState) {
+            throw new Exception('Invalid state parameter - possible security issue');
+        }
+        
+        // Check for authentication errors
+        if ($error) {
+            $errorDescription = $params['error_description'] ?? 'Unknown error';
+            throw new Exception("Bank authentication failed: {$error} - {$errorDescription}");
+        }
+        
+        if (!$code) {
+            throw new Exception('No authorization code received from bank');
+        }
+        
+        return [
+            'authorization_code' => $code,
+            'state' => $state
+        ];
+    }
+}
+
+// Usage example
+try {
+    $bankConnection = new AWOBankConnection($accessToken, $apiKey);
+    
+    // Get supported banks
+    $banks = $bankConnection->getSupportedBanks('ZA');
+    echo "Supported banks in South Africa:\n";
+    foreach ($banks as $bank) {
+        echo "  - {$bank['name']} ({$bank['id']})\n";
+    }
+    
+    // Initiate connection
+    $connectionResult = $bankConnection->connectBankAccount(
+        'standard_bank_za',
+        'https://yourapp.com/bank-callback',
+        [
+            'historicalMonths' => 12,
+            'webhookUrl' => 'https://yourapp.com/webhooks/bank',
+            'metadata' => [
+                'source' => 'onboarding',
+                'user_agent' => 'PHP SDK'
+            ]
+        ]
+    );
+    
+    echo "Connection initiated: {$connectionResult['connectionId']}\n";
+    echo "Bank: {$connectionResult['bankInfo']['bankName']}\n";
+    echo "Authorization URL: {$connectionResult['authorizationUrl']}\n";
+    
+    // Store connection details for callback handling
+    $_SESSION['bank_connection_id'] = $connectionResult['connectionId'];
+    $_SESSION['bank_connection_state'] = $connectionResult['state'];
+    
+    // Redirect user to bank for authentication
+    header("Location: {$connectionResult['authorizationUrl']}");
+    exit;
+    
+} catch (Exception $e) {
+    echo "Bank connection error: " . $e->getMessage() . "\n";
+}
+?>
+```
+
+```curl cURL
+# Initiate bank connection
+curl -X POST https://api.awo-platform.com/v1/accounts/connect \
+  -H "Authorization: Bearer your_access_token_here" \
+  -H "X-API-Key: your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bankId": "standard_bank_za",
+    "redirectUri": "https://yourapp.com/bank-callback",
+    "accountTypes": ["checking", "savings"],
+    "consentDuration": 365,
+    "dataAccess": {
+      "transactions": true,
+      "balances": true,
+      "accountInfo": true,
+      "standingOrders": false
+    },
+    "historicalData": {
+      "months": 12,
+      "includeScheduled": false
+    },
+    "webhookUrl": "https://yourapp.com/webhooks/bank",
+    "metadata": {
+      "source": "onboarding",
+      "userAgent": "curl/7.68.0"
+    }
+  }'
+
+# Get supported banks
+curl -X GET "https://api.awo-platform.com/v1/banks/supported?country=ZA" \
+  -H "Authorization: Bearer your_access_token_here" \
+  -H "X-API-Key: your_api_key_here"
+
+# Complete connection (after callback)
+curl -X POST "https://api.awo-platform.com/v1/accounts/connect/{connectionId}/complete" \
+  -H "Authorization: Bearer your_access_token_here" \
+  -H "X-API-Key: your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "authorizationCode": "received_auth_code_from_callback"
+  }'
+```
+
+</CodeGroup>
+
+## Response Examples
+
+<CodeGroup>
+
+```json Success Response
+{
+  "success": true,
+  "message": "Bank connection initiated successfully",
+  "data": {
+    "connectionId": "conn_01H8X9Y2Z3A4B5C6D7E8F9G0H1",
+    "authorizationUrl": "https://auth.stitch.money/connect?client_id=...&redirect_uri=...&state=...",
+    "state": "secure_random_state_string_12345",
+    "expiresAt": "2023-06-28T15:30:00Z",
+    "bankInfo": {
+      "bankId": "standard_bank_za",
+      "bankName": "Standard Bank South Africa",
+      "country": "ZA",
+      "logoUrl": "https://cdn.awo-platform.com/banks/standard_bank_za.png",
+      "supportedFeatures": [
+        "transactions",
+        "balances",
+        "account_info",
+        "real_time_notifications"
+      ]
+    },
+    "provider": {
+      "name": "Stitch",
+      "version": "2023-06-01",
+      "capabilities": [
+        "oauth2_authorization",
+        "webhook_notifications",
+        "historical_data",
+        "real_time_updates"
+      ]
+    },
+    "consentDetails": {
+      "duration": 365,
+      "dataAccess": [
+        "account_information",
+        "transaction_history",
+        "account_balances"
+      ],
+      "canBeRevoked": true,
+      "autoRenewal": false
+    },
+    "estimatedConnectionTime": "2-5 minutes",
+    "nextSteps": [
+      "Click the authorization URL to authenticate with your bank",
+      "Complete the authentication process on the bank's website",
+      "You will be redirected back to your application",
+      "Account connection will be completed automatically"
+    ]
+  },
+  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H1"
+}
+```
+
+```json Error Response - Unsupported Bank
+{
+  "success": false,
+  "message": "Bank not supported",
+  "error": {
+    "code": "BANK_NOT_SUPPORTED",
+    "details": "The specified bank is not currently supported in this region",
+    "field": "bankId",
+    "supportedBanks": [
+      "standard_bank_za",
+      "fnb_bank_za",
+      "absa_bank_za",
+      "nedbank_za",
+      "capitec_bank_za"
+    ]
+  },
+  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H2"
+}
+```
+
+```json Error Response - Invalid Redirect URI
+{
+  "success": false,
+  "message": "Invalid redirect URI",
+  "error": {
+    "code": "INVALID_REDIRECT_URI",
+    "details": "Redirect URI must be HTTPS and registered in your developer dashboard",
+    "field": "redirectUri",
+    "requirements": [
+      "Must use HTTPS protocol",
+      "Must be registered in developer dashboard",
+      "Must not contain fragments or query parameters",
+      "Must be a valid URL format"
+    ]
+  },
+  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H3"
+}
+```
+
+```json Connection Completion Response
+{
+  "success": true,
+  "message": "Bank account connected successfully",
+  "data": {
+    "connectionId": "conn_01H8X9Y2Z3A4B5C6D7E8F9G0H1",
+    "status": "connected",
+    "connectedAt": "2023-06-28T14:25:30Z",
+    "accounts": [
+      {
+        "accountId": "acc_01H8X9Y2Z3A4B5C6D7E8F9G0H4",
+        "accountName": "Primary Checking",
+        "accountType": "checking",
+        "accountNumber": "****1234",
+        "currency": "ZAR",
+        "balance": {
+          "available": 15750.50,
+          "current": 15750.50,
+          "lastUpdated": "2023-06-28T14:20:00Z"
+        }
+      },
+      {
+        "accountId": "acc_01H8X9Y2Z3A4B5C6D7E8F9G0H5",
+        "accountName": "Savings Account",
+        "accountType": "savings",
+        "accountNumber": "****5678",
+        "currency": "ZAR",
+        "balance": {
+          "available": 35000.00,
+          "current": 35000.00,
+          "lastUpdated": "2023-06-28T14:20:00Z"
+        }
+      }
+    ],
+    "dataSync": {
+      "status": "in_progress",
+      "transactionsExpected": 450,
+      "transactionsProcessed": 125,
+      "estimatedCompletion": "2023-06-28T16:00:00Z"
+    },
+    "nextActions": [
+      "Transaction history is being synchronized",
+      "DIVA score calculation will begin after sync completion",
+      "You will receive a notification when ready"
+    ]
+  },
+  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H1"
+}
+```
+
+</CodeGroup>
+
+## Connection Flow
+
+The bank connection process follows these steps:
+
+<Steps>
+  <Step title="Initiate Connection">
+    Your application calls the `/accounts/connect` endpoint with bank details and gets an authorization URL.
+  </Step>
+  <Step title="User Authentication">
+    User is redirected to the bank's secure authentication portal to log in and grant consent.
+  </Step>
+  <Step title="Authorization Callback">
+    Bank redirects user back to your application with an authorization code.
+  </Step>
+  <Step title="Complete Connection">
+    Your application exchanges the authorization code for account access tokens.
+  </Step>
+  <Step title="Data Synchronization">
+    AWO begins synchronizing transaction history and account information.
+  </Step>
+  <Step title="DIVA Score Calculation">
+    Once sufficient data is available, DIVA score calculation begins automatically.
+  </Step>
+</Steps>
+
+## Security Considerations
+
+<Warning>
+**OAuth Security**: Always validate the `state` parameter in callbacks to prevent CSRF attacks. Store connection state securely and verify it matches the returned value.
+</Warning>
+
+### Data Access Permissions
+
+<Accordion title="Read-Only Access">
+Bank connections use read-only permissions and cannot:
+- Initiate payments or transfers
+- Modify account settings
+- Access other users' data
+- Perform any write operations on bank accounts
+</Accordion>
+
+<Accordion title="Consent Management">
+- Users can revoke consent at any time through their bank's portal
+- Consent automatically expires after the specified duration
+- Regular consent renewal notifications are sent to users
+- Clear explanations of data usage are provided
+</Accordion>
+
+<Accordion title="Data Encryption">
+- All data transmission uses TLS 1.3 encryption
+- Account data encrypted at rest using AES-256
+- API keys and tokens stored securely
+- Regular security audits and penetration testing
+</Accordion>
+
+## Error Handling
+
+### HTTP Status Codes
+
+<ResponseField name="HTTP Status Codes" type="object">
+  <Expandable title="Status Codes">
+    <ResponseField name="200" type="Success">
+      Connection initiated successfully
+    </ResponseField>
+    <ResponseField name="400" type="Bad Request">
+      Invalid request parameters or format
+    </ResponseField>
+    <ResponseField name="401" type="Unauthorized">
+      Invalid or expired access token
+    </ResponseField>
+    <ResponseField name="403" type="Forbidden">
+      Insufficient permissions or account limitations
+    </ResponseField>
+    <ResponseField name="422" type="Unprocessable Entity">
+      Business logic validation failed
+    </ResponseField>
+    <ResponseField name="429" type="Too Many Requests">
+      Rate limit exceeded
+    </ResponseField>
+    <ResponseField name="500" type="Internal Server Error">
+      Server error occurred
+    </ResponseField>
+    <ResponseField name="502" type="Bad Gateway">
+      Upstream provider error
+    </ResponseField>
+    <ResponseField name="503" type="Service Unavailable">
+      Bank or provider temporarily unavailable
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Common Error Codes
+
+| Code | Description | Resolution |
+|------|-------------|------------|
+| `BANK_NOT_SUPPORTED` | Bank not available in region | Choose a supported bank |
+| `INVALID_REDIRECT_URI` | Redirect URI not registered | Register URI in developer dashboard |
+| `INVALID_BANK_ID` | Bank identifier not recognized | Use valid bank ID from supported list |
+| `ACCOUNT_ALREADY_CONNECTED` | Bank account already linked | Disconnect existing connection first |
+| `PROVIDER_UNAVAILABLE` | Open Banking provider down | Try again later or use different bank |
+| `INSUFFICIENT_PERMISSIONS` | User account lacks required permissions | Complete KYC verification |
+| `RATE_LIMITED` | Too many connection attempts | Wait before retrying |
+| `CONSENT_DENIED` | User denied bank consent | User must grant consent to proceed |
+
+### Callback Error Handling
+
+<CodeGroup>
+
+```javascript Callback Error Handling
+const handleBankCallback = (urlParams) => {
+  const error = urlParams.get('error');
+  const errorDescription = urlParams.get('error_description');
+  
+  if (error) {
+    const errorMessages = {
+      'access_denied': 'You cancelled the bank connection process. You can try again anytime.',
+      'invalid_request': 'There was an issue with the connection request. Please try again.',
+      'server_error': 'The bank is experiencing technical difficulties. Please try again later.',
+      'temporarily_unavailable': 'Bank services are temporarily unavailable. Please try again in a few minutes.'
+    };
+    
+    const userMessage = errorMessages[error] || `Bank connection failed: ${error}`;
+    throw new Error(userMessage);
+  }
+  
+  const code = urlParams.get('code');
+  const state = urlParams.get('state');
+  
+  if (!code) {
+    throw new Error('Bank authentication was not completed successfully.');
+  }
+  
+  return { code, state };
+};
+```
+
+```python Callback Error Handling
+def handle_bank_callback(callback_url: str, expected_state: str) -> Dict[str, str]:
+    """Handle callback with comprehensive error handling"""
+    parsed_url = urlparse(callback_url)
+    params = parse_qs(parsed_url.query)
+    
+    # Check for OAuth errors
+    error = params.get('error', [None])[0]
+    if error:
+        error_descriptions = {
+            'access_denied': 'You cancelled the bank connection process.',
+            'invalid_request': 'There was an issue with the connection request.',
+            'server_error': 'The bank is experiencing technical difficulties.',
+            'temporarily_unavailable': 'Bank services are temporarily unavailable.'
+        }
+        
+        user_message = error_descriptions.get(error, f'Bank connection failed: {error}')
+        raise Exception(user_message)
+    
+    # Validate required parameters
+    code = params.get('code', [None])[0]
+    state = params.get('state', [None])[0]
+    
+    if not code:
+        raise Exception('Bank authentication was not completed successfully.')
+    
+    if state != expected_state:
+        raise Exception('Security validation failed. Please try connecting again.')
+    
+    return {'code': code, 'state': state}
+```
+
+</CodeGroup>
+
+## Testing
+
+### Sandbox Testing
+
+Use test bank credentials in sandbox mode:
+
+<CodeGroup>
+
+```javascript Test Banks
+// Test bank configuration for sandbox
+const testBanks = {
+  // Always successful connection
+  test_bank_success: {
+    bankId: 'test_bank_success',
+    credentials: {
+      username: 'testuser',
+      password: 'testpass123',
+      pin: '1234'
+    },
+    accounts: [
+      { type: 'checking', balance: 5000.00 },
+      { type: 'savings', balance: 15000.00 }
+    ]
+  },
+  
+  // Simulates authentication failure
+  test_bank_auth_fail: {
+    bankId: 'test_bank_auth_fail',
+    error: 'invalid_credentials'
+  },
+  
+  // Simulates temporary unavailability
+  test_bank_unavailable: {
+    bankId: 'test_bank_unavailable',
+    error: 'temporarily_unavailable'
+  }
+};
+
+// Test connection flow
+const testBankConnection = async (testBankId) => {
+  try {
+    const result = await connectBankAccount(
+      testBankId,
+      'https://localhost:3000/test-callback'
+    );
+    
+    console.log('Test connection initiated:', result.data.connectionId);
+    
+    // Simulate callback for testing
+    const callbackUrl = `https://localhost:3000/test-callback?code=TEST_CODE&state=${result.data.state}`;
+    const callbackData = handleBankCallback(new URLSearchParams(callbackUrl.split('?')[1]));
+    
+    console.log('Test callback handled successfully');
+    
+  } catch (error) {
+    console.error('Test connection error:', error.message);
+  }
+};
+```
+
+```python Test Scenarios
+import pytest
+from unittest.mock import patch, Mock
+
+def test_successful_bank_connection():
+    """Test successful bank connection flow"""
+    bank_connection = AWOBankConnection(access_token, api_key)
+    
+    mock_response = Mock()
+    mock_response.ok = True
+    mock_response.json.return_value = {
+        'success': True,
+        'data': {
+            'connectionId': 'conn_test_123',
+            'authorizationUrl': 'https://test.bank.com/auth',
+            'state': 'test_state_123',
+            'bankInfo': {
+                'bankId': 'test_bank',
+                'bankName': 'Test Bank'
+            }
+        }
+    }
+    
+    with patch('requests.post', return_value=mock_response):
+        result = bank_connection.connect_bank_account(
+            'test_bank',
+            'https://test.app.com/callback'
+        )
+        
+        assert result['connectionId'] == 'conn_test_123'
+        assert 'authorizationUrl' in result
+
+def test_unsupported_bank_error():
+    """Test handling of unsupported bank error"""
+    bank_connection = AWOBankConnection(access_token, api_key)
+    
+    mock_response = Mock()
+    mock_response.ok = False
+    mock_response.status_code = 400
+    mock_response.json.return_value = {
+        'success': False,
+        'error': {'code': 'BANK_NOT_SUPPORTED'}
+    }
+    
+    with patch('requests.post', return_value=mock_response):
+        with pytest.raises(Exception) as exc_info:
+            bank_connection.connect_bank_account(
+                'unsupported_bank',
+                'https://test.app.com/callback'
+            )
+        
+        assert 'not supported' in str(exc_info.value).lower()
+
+def test_callback_error_handling():
+    """Test callback error scenarios"""
+    bank_connection = AWOBankConnection(access_token, api_key)
+    
+    # Test access denied error
+    callback_url = 'https://test.app.com/callback?error=access_denied&state=test_state'
+    
+    with pytest.raises(Exception) as exc_info:
+        bank_connection.handle_callback(callback_url, 'test_state')
+    
+    assert 'cancelled' in str(exc_info.value).lower()
+    
+    # Test invalid state
+    callback_url = 'https://test.app.com/callback?code=test_code&state=wrong_state'
+    
+    with pytest.raises(Exception) as exc_info:
+        bank_connection.handle_callback(callback_url, 'correct_state')
+    
+    assert 'security' in str(exc_info.value).lower()
+```
+
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="List Connected Accounts" icon="list" href="/api-reference/accounts/list">
+    View all connected bank accounts and their status
+  </Card>
+  <Card title="Account Transactions" icon="receipt" href="/api-reference/transactions/list">
+    Retrieve transaction history from connected accounts
+  </Card>
+  <Card title="DIVA Score" icon="chart-line" href="/api-reference/diva-score/get-score">
+    Calculate financial health score from connected data
+  </Card>
+  <Card title="Webhooks Setup" icon="webhook" href="/api-reference/webhooks/overview">
+    Configure webhooks for real-time account updates
+  </Card>
+</CardGroup>
+
+<Note>
+Bank connections typically take 2-5 minutes to complete and up to 24 hours for full transaction synchronization. DIVA scores become available once sufficient transaction data (3+ months) has been processed.
+</Note>
