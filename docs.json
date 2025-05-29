@@ -1,0 +1,244 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "AWO Platform",
+  "theme": "mint",
+  "logo": {
+    "dark": "/logo/awo.svg",
+    "light": "/logo/awo.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+   "primary": "#bc9b25",
+    "light": "#bc9b25",
+    "dark": "#010101"
+    
+  },
+  "topbarLinks": [
+    {
+      "name": "Support",
+      "url": "mailto:developers@awo-platform.com"
+    },
+    {
+      "name": "Status",
+      "url": "https://status.awo-platform.com"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "https://awo-platform.com/signup"
+  },
+  "anchors": [
+    {
+      "name": "Community",
+      "icon": "discord",
+      "url": "https://discord.gg/awo-platform"
+    },
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/awo-platform/awo-core"
+    },
+    {
+      "name": "API Reference",
+      "icon": "square-terminal",
+      "url": "api-reference"
+    },
+    {
+      "name": "Blog",
+      "icon": "newspaper",
+      "url": "https://blog.awo-platform.com"
+    }
+  ],
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "introduction",
+          "quickstart",
+          "development"
+        ]
+      },
+      {
+        "group": "Essentials",
+        "pages": [
+          "essentials/architecture",
+          "essentials/design-system",
+          "essentials/code",
+          "essentials/navigation",
+          "essentials/markdown",
+          "essentials/settings",
+          "essentials/images",
+          "essentials/reusable-snippets",
+          "essentials/faq"
+        ]
+      },
+      {
+        "group": "API Reference",
+        "pages": [
+          "api-reference/introduction",
+          {
+            "group": "Authentication",
+            "pages": [
+              "api-reference/auth/login",
+              "api-reference/auth/register",
+              "api-reference/auth/refresh"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "api-reference/users/profile",
+              "api-reference/users/update",
+              "api-reference/users/kyc"
+            ]
+          },
+          {
+            "group": "DIVA Score",
+            "pages": [
+              "api-reference/diva-score/get-score",
+              "api-reference/diva-score/history",
+              "api-reference/diva-score/insights",
+              "api-reference/diva-score/refresh"
+            ]
+          },
+          {
+            "group": "Financial Data",
+            "pages": [
+              "api-reference/accounts/list",
+              "api-reference/accounts/connect",
+              "api-reference/transactions/list",
+              "api-reference/transactions/categorize"
+            ]
+          },
+          {
+            "group": "Chamas",
+            "pages": [
+              "api-reference/chamas/list",
+              "api-reference/chamas/create",
+              "api-reference/chamas/details",
+              "api-reference/chamas/contribute",
+              "api-reference/chamas/members"
+            ]
+          },
+          {
+            "group": "Savings & Goals",
+            "pages": [
+              "api-reference/savings/goals",
+              "api-reference/savings/create-goal",
+              "api-reference/savings/update-goal",
+              "api-reference/savings/progress"
+            ]
+          },
+          {
+            "group": "Investments",
+            "pages": [
+              "api-reference/investments/portfolio",
+              "api-reference/investments/products",
+              "api-reference/investments/buy",
+              "api-reference/investments/sell"
+            ]
+          },
+          {
+            "group": "Payments",
+            "pages": [
+              "api-reference/payments/initiate",
+              "api-reference/payments/status",
+              "api-reference/payments/history"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "api-reference/webhooks/overview",
+              "api-reference/webhooks/events",
+              "api-reference/webhooks/verification"
+            ]
+          }
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "guides/integration-walkthrough",
+          "guides/diva-score-implementation",
+          "guides/chama-management",
+          "guides/bank-integration",
+          "guides/payment-processing",
+          "guides/mobile-app-setup",
+          "guides/web-app-setup",
+          "guides/testing-strategies",
+          "guides/deployment",
+          "guides/monitoring",
+          "guides/troubleshooting",
+          "guides/best-practices"
+        ]
+      },
+      {
+        "group": "SDKs & Libraries",
+        "pages": [
+          "sdks/overview",
+          {
+            "group": "JavaScript/TypeScript",
+            "pages": [
+              "sdks/javascript/installation",
+              "sdks/javascript/quickstart",
+              "sdks/javascript/api-reference"
+            ]
+          },
+          {
+            "group": "React Native",
+            "pages": [
+              "sdks/react-native/installation",
+              "sdks/react-native/quickstart",
+              "sdks/react-native/components"
+            ]
+          },
+          {
+            "group": "Python",
+            "pages": [
+              "sdks/python/installation",
+              "sdks/python/quickstart",
+              "sdks/python/api-reference"
+            ]
+          }
+        ]
+      },
+      {
+        "group": "Resources",
+        "pages": [
+          "resources/examples",
+          "resources/postman-collection",
+          "resources/openapi-spec",
+          "resources/status-codes",
+          "resources/rate-limits",
+          "resources/webhooks-reference",
+          "resources/glossary",
+          "resources/changelog"
+        ]
+      }
+    ]
+  },
+  "footerSocials": {
+    "twitter": "https://twitter.com/awo_platform",
+    "linkedin": "https://linkedin.com/company/awo-platform",
+    "github": "https://github.com/awo-platform"
+  },
+  "openapi": "https://api.awo-platform.com/openapi.json",
+  "analytics": {
+    "ga4": {
+      "measurementId": "G-XXXXXXXXXX"
+    }
+  },
+  "feedback": {
+    "suggestEdit": true,
+    "raiseIssue": true
+  },
+  "search": {
+    "prompt": "Search AWO documentation..."
+  },
+  "modeToggle": {
+    "default": "dark"
+  },
+  "backgroundImage": "/images/background.png"
+}

@@ -1,0 +1,982 @@
+---
+title: "AWO Code Standards & Guidelines"
+---
+
+# Code Standards & Guidelines
+
+This document outlines the coding standards, best practices, and conventions used across the AWO platform to ensure consistency, maintainability, and quality.
+
+## Code Quality Principles
+
+<CardGroup cols={2}>
+  <Card title="Readability First" icon="eye">
+    Code should be self-documenting and easy to understand
+  </Card>
+  <Card title="Consistency" icon="check-circle">
+    Follow established patterns and conventions
+  </Card>
+  <Card title="Simplicity" icon="minimize">
+    Prefer simple solutions over complex ones
+  </Card>
+  <Card title="Testability" icon="test-tube">
+    Write code that's easy to test and debug
+  </Card>
+</CardGroup>
+
+## General Coding Standards
+
+### File Naming Conventions
+
+<Tabs>
+  <Tab title="TypeScript/JavaScript">
+    ```
+    // Components (PascalCase)
+    UserProfile.tsx
+    DivaScoreCard.tsx
+    ChamaManagement.tsx
+    
+    // Utilities/Services (camelCase)
+    apiService.ts
+    dateUtils.ts
+    validationHelpers.ts
+    
+    // Constants (camelCase with descriptive names)
+    apiConstants.ts
+    themeConstants.ts
+    routeConstants.ts
+    
+    // Types (PascalCase, suffix with Type/Interface)
+    UserType.ts
+    ApiResponseInterface.ts
+    ```
+  </Tab>
+  <Tab title="Python">
+    ```
+    # Modules (snake_case)
+    diva_score_calculator.py
+    chama_service.py
+    user_repository.py
+    
+    # Classes (PascalCase)
+    class DivaScoreCalculator:
+    class UserService:
+    class ChamaRepository:
+    
+    # Functions and variables (snake_case)
+    def calculate_diva_score():
+    user_profile = get_user_profile()
+    ```
+  </Tab>
+  <Tab title="Directories">
+    ```
+    src/
+    ├── components/          # Reusable UI components
+    │   ├── common/         # Generic components
+    │   ├── forms/          # Form-specific components
+    │   └── charts/         # Data visualization
+    ├── screens/            # Screen/Page components
+    ├── services/           # API and business logic
+    ├── utils/              # Helper functions
+    ├── types/              # Type definitions
+    ├── constants/          # Application constants
+    └── __tests__/          # Test files
+    ```
+  </Tab>
+</Tabs>
+
+### Code Formatting
+
+AWO uses **Prettier** for consistent code formatting across all projects:
+
+```json
+// .prettierrc
+{
+  "semi": true,
+  "trailingComma": "es5",
+  "singleQuote": true,
+  "printWidth": 80,
+  "tabWidth": 2,
+  "useTabs": false,
+  "bracketSpacing": true,
+  "arrowParens": "avoid"
+}
+```
+
+### Linting Rules
+
+**ESLint** configuration for TypeScript/JavaScript:
+
+```json
+// .eslintrc.js
+module.exports = {
+  extends: [
+    '@react-native-community',
+    'plugin:@typescript-eslint/recommended',
+    'plugin:react-hooks/recommended'
+  ],
+  rules: {
+    // Enforce explicit return types for functions
+    '@typescript-eslint/explicit-function-return-type': 'warn',
+    
+    // Prevent unused variables
+    '@typescript-eslint/no-unused-vars': 'error',
+    
+    // Enforce consistent naming conventions
+    '@typescript-eslint/naming-convention': [
+      'error',
+      {
+        'selector': 'interface',
+        'format': ['PascalCase'],
+        'prefix': ['I']
+      },
+      {
+        'selector': 'type',
+        'format': ['PascalCase']
+      }
+    ],
+    
+    // React specific rules
+    'react/prop-types': 'off',
+    'react-hooks/exhaustive-deps': 'warn',
+    'react/jsx-uses-react': 'off',
+    'react/react-in-jsx-scope': 'off'
+  }
+};
+```
+
+## TypeScript Standards
+
+### Type Definitions
+
+<Tabs>
+  <Tab title="Interface Definitions">
+    ```typescript
+    // Prefix interfaces with 'I'
+    interface IUser {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email?: string; // Optional properties with ?
+      phoneNumber: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }
+    
+    // Use specific types instead of 'any'
+    interface IDivaScore {
+      overallScore: number;
+      components: {
+        discipline: number;
+        income: number;
+        velocity: number;
+        assets: number;
+      };
+      lastCalculated: Date;
+      insights: IDivaScoreInsight[];
+    }
+    
+    // Generic interfaces for reusability
+    interface IApiResponse<T> {
+      success: boolean;
+      data: T;
+      message?: string;
+      errors?: string[];
+    }
+    ```
+  </Tab>
+  <Tab title="Type Unions & Enums">
+    ```typescript
+    // Use union types for limited options
+    type KYCStatus = 'pending' | 'verified' | 'rejected';
+    type ChamaType = 'rotating' | 'fixed' | 'investment' | 'lending';
+    
+    // Use enums for related constants
+    enum TransactionCategory {
+      FOOD_DINING = 'food_dining',
+      TRANSPORT = 'transport',
+      SHOPPING = 'shopping',
+      UTILITIES = 'utilities',
+      HEALTHCARE = 'healthcare',
+      EDUCATION = 'education',
+      ENTERTAINMENT = 'entertainment',
+      OTHER = 'other'
+    }
+    
+    // Use const assertions for readonly objects
+    const API_ENDPOINTS = {
+      USERS: '/users',
+      DIVA_SCORE: '/diva-score',
+      TRANSACTIONS: '/transactions',
+      CHAMAS: '/chamas'
+    } as const;
+    ```
+  </Tab>
+  <Tab title="Function Types">
+    ```typescript
+    // Explicit function return types
+    function calculateDivaScore(transactions: ITransaction[]): IDivaScore {
+      // Implementation
+      return {
+        overallScore: 750,
+        components: {
+          discipline: 800,
+          income: 700,
+          velocity: 750,
+          assets: 750
+        },
+        lastCalculated: new Date(),
+        insights: []
+      };
+    }
+    
+    // Async function types
+    async function fetchUserProfile(userId: string): Promise<IUser> {
+      const response = await api.get(`/users/${userId}`);
+      return response.data;
+    }
+    
+    // Higher-order function types
+    type EventHandler<T> = (event: T) => void;
+    type AsyncEventHandler<T> = (event: T) => Promise<void>;
+    
+    const handleUserUpdate: EventHandler<IUser> = (user) => {
+      console.log('User updated:', user.id);
+    };
+    ```
+  </Tab>
+</Tabs>
+
+### Error Handling
+
+```typescript
+// Custom error classes
+class APIError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number,
+    public code: string
+  ) {
+    super(message);
+    this.name = 'APIError';
+  }
+}
+
+class ValidationError extends Error {
+  constructor(
+    message: string,
+    public field: string,
+    public value: any
+  ) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
+// Error handling utility
+type Result<T, E = Error> = {
+  success: true;
+  data: T;
+} | {
+  success: false;
+  error: E;
+};
+
+async function safeApiCall<T>(
+  apiCall: () => Promise<T>
+): Promise<Result<T, APIError>> {
+  try {
+    const data = await apiCall();
+    return { success: true, data };
+  } catch (error) {
+    if (error instanceof APIError) {
+      return { success: false, error };
+    }
+    return { 
+      success: false, 
+      error: new APIError('Unknown API error', 500, 'UNKNOWN_ERROR')
+    };
+  }
+}
+
+// Usage
+const result = await safeApiCall(() => fetchUserProfile(userId));
+if (result.success) {
+  console.log('User:', result.data);
+} else {
+  console.error('Error:', result.error.message);
+}
+```
+
+## React/React Native Standards
+
+### Component Structure
+
+```typescript
+// Standard component structure
+interface DivaScoreCardProps {
+  score: number;
+  trend: 'up' | 'down' | 'stable';
+  onPress?: () => void;
+  testID?: string;
+}
+
+export const DivaScoreCard: React.FC<DivaScoreCardProps> = ({
+  score,
+  trend,
+  onPress,
+  testID = 'diva-score-card'
+}) => {
+  // Hooks at the top
+  const { colors, spacing } = useTheme();
+  const { t } = useTranslation();
+  
+  // Event handlers
+  const handlePress = useCallback(() => {
+    onPress?.();
+  }, [onPress]);
+
+  // Render helpers (if complex)
+  const renderTrendIcon = useMemo(() => {
+    switch (trend) {
+      case 'up':
+        return <TrendUpIcon color={colors.success} />;
+      case 'down':
+        return <TrendDownIcon color={colors.error} />;
+      default:
+        return <TrendNeutralIcon color={colors.neutral} />;
+    }
+  }, [trend, colors]);
+
+  return (
+    <TouchableOpacity
+      style={[styles.container, { backgroundColor: colors.surface }]}
+      onPress={handlePress}
+      testID={testID}
+      accessible={true}
+      accessibilityLabel={t('divaScore.accessibilityLabel', { score })}
+    >
+      <Text style={[styles.score, { color: colors.primary }]}>
+        {score}
+      </Text>
+      {renderTrendIcon}
+    </TouchableOpacity>
+  );
+};
+
+// Styles at the bottom
+const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  score: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+});
+```
+
+### Custom Hooks
+
+```typescript
+// Custom hook for API data fetching
+function useApiData<T>(
+  endpoint: string,
+  dependencies: any[] = []
+): {
+  data: T | null;
+  loading: boolean;
+  error: string | null;
+  refetch: () => void;
+} {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await api.get(endpoint);
+      setData(response.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  }, [endpoint]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData, ...dependencies]);
+
+  return {
+    data,
+    loading,
+    error,
+    refetch: fetchData,
+  };
+}
+
+// Usage
+const UserProfile: React.FC = () => {
+  const { data: user, loading, error, refetch } = useApiData<IUser>('/users/profile');
+
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error} onRetry={refetch} />;
+  if (!user) return <EmptyState />;
+
+  return <UserProfileView user={user} />;
+};
+```
+
+## Backend Standards (Node.js/NestJS)
+
+### Service Layer
+
+```typescript
+@Injectable()
+export class DivaScoreService {
+  private readonly logger = new Logger(DivaScoreService.name);
+
+  constructor(
+    @InjectRepository(User)
+    private usersRepository: Repository<User>,
+    @InjectRepository(Transaction)
+    private transactionsRepository: Repository<Transaction>,
+    private cacheService: CacheService,
+  ) {}
+
+  async calculateDivaScore(userId: string): Promise<IDivaScore> {
+    // Input validation
+    if (!userId || typeof userId !== 'string') {
+      throw new ValidationError('Invalid user ID', 'userId', userId);
+    }
+
+    try {
+      // Check cache first
+      const cached = await this.cacheService.get(`diva-score:${userId}`);
+      if (cached) {
+        this.logger.debug(`Retrieved cached DIVA score for user ${userId}`);
+        return cached;
+      }
+
+      // Fetch required data
+      const [user, transactions] = await Promise.all([
+        this.usersRepository.findOne({ where: { id: userId } }),
+        this.transactionsRepository.find({
+          where: { userId },
+          order: { transactionDate: 'DESC' },
+          take: 1000, // Last 1000 transactions
+        }),
+      ]);
+
+      if (!user) {
+        throw new APIError('User not found', 404, 'USER_NOT_FOUND');
+      }
+
+      // Calculate score components
+      const components = {
+        discipline: this.calculateDisciplineScore(transactions),
+        income: this.calculateIncomeScore(transactions),
+        velocity: this.calculateVelocityScore(transactions),
+        assets: this.calculateAssetsScore(user, transactions),
+      };
+
+      // Calculate overall score
+      const overallScore = this.calculateOverallScore(components);
+
+      const divaScore: IDivaScore = {
+        overallScore,
+        components,
+        lastCalculated: new Date(),
+        insights: await this.generateInsights(components, transactions),
+      };
+
+      // Cache result for 1 hour
+      await this.cacheService.set(`diva-score:${userId}`, divaScore, 3600);
+
+      this.logger.log(`Calculated DIVA score for user ${userId}: ${overallScore}`);
+      return divaScore;
+
+    } catch (error) {
+      this.logger.error(`Failed to calculate DIVA score for user ${userId}:`, error);
+      
+      if (error instanceof ValidationError || error instanceof APIError) {
+        throw error;
+      }
+      
+      throw new APIError(
+        'Failed to calculate DIVA score',
+        500,
+        'DIVA_CALCULATION_ERROR'
+      );
+    }
+  }
+
+  private calculateDisciplineScore(transactions: ITransaction[]): number {
+    // Implementation details...
+    return 750;
+  }
+
+  private calculateOverallScore(components: IDivaScoreComponents): number {
+    const weights = {
+      discipline: 0.3,
+      income: 0.25,
+      velocity: 0.25,
+      assets: 0.2,
+    };
+
+    return Math.round(
+      components.discipline * weights.discipline +
+      components.income * weights.income +
+      components.velocity * weights.velocity +
+      components.assets * weights.assets
+    );
+  }
+}
+```
+
+### Controller Layer
+
+```typescript
+@Controller('diva-score')
+@ApiTags('DIVA Score')
+@UseGuards(JwtAuthGuard)
+export class DivaScoreController {
+  constructor(private readonly divaScoreService: DivaScoreService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Get user DIVA score' })
+  @ApiResponse({ status: 200, type: DivaScoreResponseDto })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getDivaScore(@GetUser() user: IUser): Promise<DivaScoreResponseDto> {
+    const divaScore = await this.divaScoreService.calculateDivaScore(user.id);
+    return new DivaScoreResponseDto(divaScore);
+  }
+
+  @Post('refresh')
+  @ApiOperation({ summary: 'Refresh DIVA score calculation' })
+  @ApiResponse({ status: 200, type: DivaScoreResponseDto })
+  async refreshDivaScore(@GetUser() user: IUser): Promise<DivaScoreResponseDto> {
+    // Clear cache to force recalculation
+    await this.cacheService.delete(`diva-score:${user.id}`);
+    
+    const divaScore = await this.divaScoreService.calculateDivaScore(user.id);
+    return new DivaScoreResponseDto(divaScore);
+  }
+
+  @Get('history')
+  @ApiOperation({ summary: 'Get DIVA score history' })
+  @ApiResponse({ status: 200, type: [DivaScoreHistoryDto] })
+  async getDivaScoreHistory(
+    @GetUser() user: IUser,
+    @Query() query: DivaScoreHistoryQueryDto,
+  ): Promise<DivaScoreHistoryDto[]> {
+    return this.divaScoreService.getDivaScoreHistory(user.id, query);
+  }
+}
+```
+
+## Testing Standards
+
+### Unit Testing
+
+```typescript
+// Service testing example
+describe('DivaScoreService', () => {
+  let service: DivaScoreService;
+  let usersRepository: Repository<User>;
+  let transactionsRepository: Repository<Transaction>;
+  let cacheService: CacheService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        DivaScoreService,
+        {
+          provide: getRepositoryToken(User),
+          useValue: createMockRepository(),
+        },
+        {
+          provide: getRepositoryToken(Transaction),
+          useValue: createMockRepository(),
+        },
+        {
+          provide: CacheService,
+          useValue: createMockCacheService(),
+        },
+      ],
+    }).compile();
+
+    service = module.get<DivaScoreService>(DivaScoreService);
+    usersRepository = module.get<Repository<User>>(getRepositoryToken(User));
+    transactionsRepository = module.get<Repository<Transaction>>(
+      getRepositoryToken(Transaction)
+    );
+    cacheService = module.get<CacheService>(CacheService);
+  });
+
+  describe('calculateDivaScore', () => {
+    it('should calculate DIVA score correctly', async () => {
+      // Arrange
+      const userId = 'test-user-id';
+      const mockUser = createMockUser({ id: userId });
+      const mockTransactions = createMockTransactions(10);
+
+      jest.spyOn(usersRepository, 'findOne').mockResolvedValue(mockUser);
+      jest.spyOn(transactionsRepository, 'find').mockResolvedValue(mockTransactions);
+      jest.spyOn(cacheService, 'get').mockResolvedValue(null);
+      jest.spyOn(cacheService, 'set').mockResolvedValue();
+
+      // Act
+      const result = await service.calculateDivaScore(userId);
+
+      // Assert
+      expect(result).toBeDefined();
+      expect(result.overallScore).toBeGreaterThan(0);
+      expect(result.overallScore).toBeLessThanOrEqual(1000);
+      expect(result.components).toBeDefined();
+      expect(result.lastCalculated).toBeInstanceOf(Date);
+    });
+
+    it('should throw ValidationError for invalid userId', async () => {
+      // Act & Assert
+      await expect(service.calculateDivaScore('')).rejects.toThrow(ValidationError);
+    });
+
+    it('should return cached result when available', async () => {
+      // Arrange
+      const userId = 'test-user-id';
+      const cachedScore = createMockDivaScore();
+      jest.spyOn(cacheService, 'get').mockResolvedValue(cachedScore);
+
+      // Act
+      const result = await service.calculateDivaScore(userId);
+
+      // Assert
+      expect(result).toEqual(cachedScore);
+      expect(usersRepository.findOne).not.toHaveBeenCalled();
+    });
+  });
+});
+```
+
+### Component Testing
+
+```typescript
+// React Native component testing
+describe('DivaScoreCard', () => {
+  const defaultProps = {
+    score: 750,
+    trend: 'up' as const,
+  };
+
+  it('renders correctly', () => {
+    const tree = renderer.create(<DivaScoreCard {...defaultProps} />).toJSON();
+    expect(tree).toMatchSnapshot();
+  });
+
+  it('displays score correctly', () => {
+    render(<DivaScoreCard {...defaultProps} />);
+    expect(screen.getByText('750')).toBeOnTheScreen();
+  });
+
+  it('calls onPress when tapped', () => {
+    const mockOnPress = jest.fn();
+    render(<DivaScoreCard {...defaultProps} onPress={mockOnPress} />);
+    
+    fireEvent.press(screen.getByTestId('diva-score-card'));
+    expect(mockOnPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows correct trend icon', () => {
+    const { rerender } = render(<DivaScoreCard {...defaultProps} trend="up" />);
+    expect(screen.getByTestId('trend-up-icon')).toBeOnTheScreen();
+
+    rerender(<DivaScoreCard {...defaultProps} trend="down" />);
+    expect(screen.getByTestId('trend-down-icon')).toBeOnTheScreen();
+  });
+
+  it('has proper accessibility attributes', () => {
+    render(<DivaScoreCard {...defaultProps} />);
+    
+    const card = screen.getByTestId('diva-score-card');
+    expect(card).toHaveAccessibilityLabel(expect.stringContaining('750'));
+    expect(card).toBeAccessible();
+  });
+});
+```
+
+## Documentation Standards
+
+### Code Comments
+
+````typescript
+/**
+ * Calculates the DIVA score for a user based on their transaction history
+ * 
+ * @param userId - The unique identifier for the user
+ * @param options - Optional parameters for score calculation
+ * @returns Promise that resolves to the calculated DIVA score
+ * 
+ * @throws {ValidationError} When userId is invalid
+ * @throws {APIError} When user is not found or calculation fails
+ * 
+ * @example
+ * ```typescript
+ * const score = await divaScoreService.calculateDivaScore('user-123');
+ * console.log(`DIVA Score: ${score.overallScore}`);
+ * ```
+ */
+async function calculateDivaScore(
+  userId: string,
+  options?: DivaScoreOptions
+): Promise<IDivaScore> {
+  // Validate input parameters
+  if (!userId || typeof userId !== 'string') {
+    throw new ValidationError('User ID must be a non-empty string', 'userId', userId);
+  }
+
+  // TODO: Implement caching mechanism for better performance
+  // FIXME: Handle edge case when user has no transactions
+  // NOTE: Score calculation takes into account last 12 months of data
+
+  const transactions = await this.getTransactionHistory(userId);
+  
+  // Calculate individual components
+  const discipline = this.calculateDisciplineScore(transactions);
+  const income = this.calculateIncomeScore(transactions);
+  const velocity = this.calculateVelocityScore(transactions);
+  const assets = this.calculateAssetsScore(transactions);
+
+  return {
+    overallScore: this.weightedAverage([discipline, income, velocity, assets]),
+    components: { discipline, income, velocity, assets },
+    lastCalculated: new Date(),
+    insights: this.generateInsights(transactions)
+  };
+}
+````
+
+### README Templates
+
+````markdown
+# Component/Service Name
+
+Brief description of what this component/service does.
+
+## Usage
+
+```typescript
+import { ComponentName } from './ComponentName';
+
+const Example = () => {
+  return <ComponentName prop1="value" prop2={123} />;
+};
+````
+
+## Props/Parameters
+
+| Name  | Type   | Required | Default | Description          |
+| ----- | ------ | -------- | ------- | -------------------- |
+| prop1 | string | Yes      | -       | Description of prop1 |
+| prop2 | number | No       | 0       | Description of prop2 |
+
+## Examples
+
+### Basic Usage
+
+```typescript
+// Example code here
+```
+
+### Advanced Usage
+
+```typescript
+// More complex example
+```
+
+## API Reference
+
+### Methods
+
+#### methodName(param1, param2)
+
+Description of what the method does.
+
+**Parameters:**
+
+- `param1` (string): Description
+- `param2` (number): Description
+
+**Returns:** Description of return value
+
+**Throws:** List of possible exceptions
+
+## Testing
+
+```bash
+npm test ComponentName
+```
+
+## Contributing
+
+Guidelines for contributing to this component/service.
+
+````
+
+## Performance Guidelines
+
+### Database Queries
+
+```typescript
+// ✅ Good: Use specific fields and proper indexing
+async function getRecentTransactions(userId: string): Promise<ITransaction[]> {
+  return this.transactionsRepository
+    .createQueryBuilder('transaction')
+    .select(['transaction.id', 'transaction.amount', 'transaction.date'])
+    .where('transaction.userId = :userId', { userId })
+    .andWhere('transaction.date >= :startDate', { 
+      startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) 
+    })
+    .orderBy('transaction.date', 'DESC')
+    .limit(100)
+    .getMany();
+}
+
+// ❌ Bad: Fetching all data without limits
+async function getAllTransactions(userId: string): Promise<ITransaction[]> {
+  return this.transactionsRepository.find({ where: { userId } });
+}
+````
+
+### React Performance
+
+```typescript
+// ✅ Good: Memoized component with proper dependencies
+const DivaScoreChart = React.memo<DivaScoreChartProps>(({ 
+  data, 
+  width, 
+  height 
+}) => {
+  const chartConfig = useMemo(() => ({
+    width,
+    height,
+    data: data.map(item => ({ x: item.date, y: item.score }))
+  }), [data, width, height]);
+
+  return <Chart config={chartConfig} />;
+});
+
+// ❌ Bad: Recreating objects on every render
+const DivaScoreChart: React.FC<DivaScoreChartProps> = ({ data, width, height }) => {
+  return (
+    <Chart 
+      config={{
+        width,
+        height,
+        data: data.map(item => ({ x: item.date, y: item.score }))
+      }} 
+    />
+  );
+};
+```
+
+## Code Review Checklist
+
+Before submitting code for review, ensure:
+
+<AccordionGroup>
+  <Accordion title="Code Quality">
+    - Code follows established naming conventions
+    - Functions are small and focused (\< 50 lines)
+    - No magic numbers or hardcoded values
+    - Proper error handling implemented
+    - Code is self-documenting with clear variable names
+  </Accordion>
+  <Accordion title="TypeScript">
+    - No use of `any` type
+    - All functions have explicit return types
+    - Interfaces are properly defined
+    - Enums used where appropriate
+    - Proper null/undefined handling
+  </Accordion>
+  <Accordion title="Testing">
+    - Unit tests written for new functionality
+    - Edge cases are tested
+    - Test coverage above 80%
+    - Integration tests for API endpoints
+    - E2E tests for critical user flows
+  </Accordion>
+  <Accordion title="Performance">
+    - Database queries are optimized
+    - Unnecessary re-renders avoided
+    - Large lists are virtualized
+    - Images are optimized
+    - Bundle size impact considered
+  </Accordion>
+  <Accordion title="Security">
+    - Input validation implemented
+    - No sensitive data in logs
+    - Proper authentication checks
+    - SQL injection prevention
+    - XSS prevention measures
+  </Accordion>
+</AccordionGroup>
+
+## Tools & Configuration
+
+### VS Code Settings
+
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true,
+    "source.organizeImports": true
+  },
+  "typescript.preferences.organizeImports": true,
+  "eslint.validate": ["javascript", "typescript", "javascriptreact", "typescriptreact"],
+  "emmet.includeLanguages": {
+    "typescript": "html",
+    "typescriptreact": "html"
+  }
+}
+```
+
+### Husky Pre-commit Hooks
+
+```json
+// package.json
+{
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
+    }
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write",
+      "git add"
+    ],
+    "*.{json,md}": [
+      "prettier --write",
+      "git add"
+    ]
+  }
+}
+```
+
+<Tip>
+  **Consistency is Key**: The most important aspect of coding standards is consistency. When in doubt, follow the existing patterns in the codebase.
+</Tip>
+
+---
+
+**Questions about our coding standards?** Reach out to the development team or create an issue in our GitHub repository.

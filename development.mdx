@@ -1,0 +1,1127 @@
+---
+title: "AWO Development"
+description: "Preview changes locally to update your docs"
+---
+
+# Development Guide
+
+This comprehensive guide covers everything you need to know about developing on the AWO platform, from initial setup to advanced development workflows.
+
+## Development Principles
+
+AWO development follows these core principles:
+
+<CardGroup cols={2}>
+  <Card title="User-Centric Development" icon="heart">
+    Prioritize features based on core user journey and needs
+  </Card>
+  <Card title="Component-First Approach" icon="puzzle-piece">
+    Build reusable components before implementing screens
+  </Card>
+  <Card title="Progressive Enhancement" icon="arrow-up">
+    Start with core functionality, then add refinements
+  </Card>
+  <Card title="Continuous Integration" icon="rotate">
+    Regular integration with thorough testing at every step
+  </Card>
+</CardGroup>
+
+## Project Structure
+
+```
+awo-platform/
+├── backend/                 # NestJS backend services
+│   ├── src/
+│   │   ├── auth/           # Authentication module
+│   │   ├── users/          # User management
+│   │   ├── diva-score/     # DIVA scoring engine
+│   │   ├── chama/          # Chama management
+│   │   ├── transactions/   # Transaction processing
+│   │   ├── payments/       # Payment integration
+│   │   └── common/         # Shared utilities
+│   ├── test/               # E2E tests
+│   └── docs/               # API documentation
+├── mobile/                 # React Native mobile app
+│   ├── src/
+│   │   ├── components/     # Reusable components
+│   │   ├── screens/        # Screen components
+│   │   ├── navigation/     # Navigation configuration
+│   │   ├── services/       # API services
+│   │   ├── store/          # Redux store
+│   │   └── utils/          # Utility functions
+│   ├── android/            # Android-specific code
+│   ├── ios/                # iOS-specific code
+│   └── __tests__/          # Mobile tests
+├── web/                    # React web application
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   ├── pages/          # Page components
+│   │   ├── hooks/          # Custom hooks
+│   │   ├── services/       # API services
+│   │   └── utils/          # Utility functions
+│   └── public/             # Static assets
+├── shared/                 # Shared packages
+│   ├── types/              # TypeScript definitions
+│   ├── utils/              # Common utilities
+│   └── constants/          # Shared constants
+├── infrastructure/         # Infrastructure as Code
+│   ├── terraform/          # Terraform configurations
+│   ├── k8s/                # Kubernetes manifests
+│   └── docker/             # Docker configurations
+└── docs/                   # Documentation
+```
+
+## Development Environment Setup
+
+### System Requirements
+
+<Tabs>
+  <Tab title="macOS">
+    ```bash
+    # Install Homebrew
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    
+    # Install Node.js
+    brew install node@18
+    
+    # Install Docker Desktop
+    brew install --cask docker
+    
+    # Install React Native CLI
+    npm install -g @react-native-community/cli
+    
+    # For iOS development
+    brew install cocoapods
+    sudo xcode-select --install
+    ```
+  </Tab>
+  <Tab title="Linux (Ubuntu)">
+    ```bash
+    # Update package index
+    sudo apt update
+    
+    # Install Node.js 18
+    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+    
+    # Install Docker
+    sudo apt-get install docker.io docker-compose
+    sudo usermod -aG docker $USER
+    
+    # Install React Native dependencies
+    sudo apt-get install openjdk-11-jdk
+    npm install -g @react-native-community/cli
+    ```
+  </Tab>
+  <Tab title="Windows">
+    ```powershell
+    # Install Chocolatey
+    Set-ExecutionPolicy Bypass -Scope Process -Force
+    iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+    
+    # Install Node.js
+    choco install nodejs --version=18.16.0
+    
+    # Install Docker Desktop
+    choco install docker-desktop
+    
+    # Install React Native CLI
+    npm install -g @react-native-community/cli
+    
+    # Install Windows Subsystem for Linux (recommended)
+    wsl --install
+    ```
+  </Tab>
+</Tabs>
+
+### IDE Configuration
+
+We recommend **Visual Studio Code** with the following extensions:
+
+<AccordionGroup>
+  <Accordion title="Essential Extensions">
+    - **ESLint**: JavaScript/TypeScript linting
+    - **Prettier**: Code formatting
+    - **TypeScript Importer**: Auto import management
+    - **Auto Rename Tag**: Paired tag renaming
+    - **Bracket Pair Colorizer**: Better bracket visibility
+    - **GitLens**: Enhanced Git integration
+  </Accordion>
+  <Accordion title="React Native Extensions">
+    - **React Native Tools**: Debugging and IntelliSense
+    - **React Native Snippet**: Code snippets
+    - **ES7\+ React/Redux/React-Native snippets**: Additional snippets
+    - **React-Native/React/Redux snippets**: More code shortcuts
+  </Accordion>
+  <Accordion title="Backend Development Extensions">
+    - **Thunder Client**: API testing (alternative to Postman)
+    - **PostgreSQL**: Database management
+    - **Docker**: Container management
+    - **Kubernetes**: K8s manifest support
+  </Accordion>
+</AccordionGroup>
+
+## Backend Development
+
+### NestJS Application Structure
+
+```typescript
+// src/app.module.ts
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validationSchema: Joi.object({
+        NODE_ENV: Joi.string().valid('development', 'production', 'test'),
+        DATABASE_URL: Joi.string().required(),
+        JWT_SECRET: Joi.string().required(),
+      }),
+    }),
+    TypeOrmModule.forRootAsync({
+      useFactory: (configService: ConfigService) => ({
+        type: 'postgres',
+        url: configService.get('DATABASE_URL'),
+        autoLoadEntities: true,
+        synchronize: configService.get('NODE_ENV') === 'development',
+      }),
+      inject: [ConfigService],
+    }),
+    AuthModule,
+    UsersModule,
+    DivaScoreModule,
+    ChamaModule,
+    TransactionsModule,
+    PaymentsModule,
+  ],
+})
+export class AppModule {}
+```
+
+### API Development Standards
+
+<Tabs>
+  <Tab title="Controller Example">
+    ```typescript
+    @Controller('users')
+    @ApiTags('Users')
+    @UseGuards(JwtAuthGuard)
+    export class UsersController {
+      constructor(private readonly usersService: UsersService) {}
+    
+      @Get('profile')
+      @ApiOperation({ summary: 'Get user profile' })
+      @ApiResponse({ status: 200, type: UserProfileDto })
+      async getProfile(@GetUser() user: User): Promise<UserProfileDto> {
+        return this.usersService.getProfile(user.id);
+      }
+    
+      @Put('profile')
+      @ApiOperation({ summary: 'Update user profile' })
+      @ApiResponse({ status: 200, type: UserProfileDto })
+      async updateProfile(
+        @GetUser() user: User,
+        @Body() updateDto: UpdateUserProfileDto,
+      ): Promise<UserProfileDto> {
+        return this.usersService.updateProfile(user.id, updateDto);
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Service Example">
+    ```typescript
+    @Injectable()
+    export class UsersService {
+      constructor(
+        @InjectRepository(User)
+        private usersRepository: Repository<User>,
+        private logger: Logger,
+      ) {}
+    
+      async getProfile(userId: string): Promise<UserProfileDto> {
+        try {
+          const user = await this.usersRepository.findOne({
+            where: { id: userId },
+            relations: ['financialProfile', 'chamas'],
+          });
+    
+          if (!user) {
+            throw new NotFoundException('User not found');
+          }
+    
+          return this.mapToProfileDto(user);
+        } catch (error) {
+          this.logger.error(`Failed to get user profile: ${error.message}`);
+          throw error;
+        }
+      }
+    
+      private mapToProfileDto(user: User): UserProfileDto {
+        return {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          kycStatus: user.kycStatus,
+          divaScore: user.financialProfile?.divaScore,
+          chamasCount: user.chamas?.length || 0,
+        };
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="DTO Example">
+    ```typescript
+    export class UpdateUserProfileDto {
+      @ApiProperty({ description: 'User first name' })
+      @IsString()
+      @Length(2, 50)
+      @IsOptional()
+      firstName?: string;
+    
+      @ApiProperty({ description: 'User last name' })
+      @IsString()
+      @Length(2, 50)
+      @IsOptional()
+      lastName?: string;
+    
+      @ApiProperty({ description: 'User email address' })
+      @IsEmail()
+      @IsOptional()
+      email?: string;
+    
+      @ApiProperty({ description: 'User date of birth' })
+      @IsDateString()
+      @IsOptional()
+      dateOfBirth?: string;
+    
+      @ApiProperty({ description: 'User city' })
+      @IsString()
+      @IsOptional()
+      city?: string;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Database Migrations
+
+```bash
+# Generate a new migration
+npm run migration:generate -- --name=AddUserPreferences
+
+# Run migrations
+npm run migration:run
+
+# Revert last migration
+npm run migration:revert
+
+# Show migration status
+npm run migration:show
+```
+
+Example migration:
+
+```typescript
+export class AddUserPreferences1685123456789 implements MigrationInterface {
+  name = 'AddUserPreferences1685123456789';
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
+      CREATE TABLE "user_preferences" (
+        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "userId" uuid NOT NULL,
+        "language" character varying NOT NULL DEFAULT 'en',
+        "currency" character varying NOT NULL DEFAULT 'USD',
+        "notifications" jsonb NOT NULL DEFAULT '{}',
+        "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+        "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+        CONSTRAINT "PK_user_preferences" PRIMARY KEY ("id"),
+        CONSTRAINT "FK_user_preferences_user" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE
+      )
+    `);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP TABLE "user_preferences"`);
+  }
+}
+```
+
+## Frontend Development
+
+### Mobile Development (React Native)
+
+<Tabs>
+  <Tab title="Component Structure">
+    ```typescript
+    // src/components/DivaScoreCard/DivaScoreCard.tsx
+    interface DivaScoreCardProps {
+      score: number;
+      trend: 'up' | 'down' | 'stable';
+      lastUpdated: Date;
+      onPress?: () => void;
+    }
+    
+    export const DivaScoreCard: React.FC<DivaScoreCardProps> = ({
+      score,
+      trend,
+      lastUpdated,
+      onPress,
+    }) => {
+      const { colors, spacing } = useTheme();
+      const { t } = useTranslation();
+    
+      return (
+        <TouchableOpacity
+          style={[styles.container, { backgroundColor: colors.surface }]}
+          onPress={onPress}
+          accessible={true}
+          accessibilityLabel={t('divaScore.cardAccessibilityLabel', { score })}
+        >
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.onSurface }]}>
+              {t('divaScore.title')}
+            </Text>
+            <TrendIndicator trend={trend} />
+          </View>
+          
+          <View style={styles.scoreContainer}>
+            <Text style={[styles.score, { color: colors.primary }]}>
+              {score}
+            </Text>
+            <Text style={[styles.maxScore, { color: colors.onSurfaceVariant }]}>
+              / 1000
+            </Text>
+          </View>
+          
+          <Text style={[styles.lastUpdated, { color: colors.onSurfaceVariant }]}>
+            {t('divaScore.lastUpdated', { 
+              date: formatDistanceToNow(lastUpdated, { addSuffix: true }) 
+            })}
+          </Text>
+        </TouchableOpacity>
+      );
+    };
+    ```
+  </Tab>
+  <Tab title="Redux Setup">
+    ```typescript
+    // src/store/slices/divaScore.slice.ts
+    interface DivaScoreState {
+      score: number | null;
+      components: DivaScoreComponents | null;
+      history: DivaScoreHistoryItem[];
+      insights: DivaScoreInsight[];
+      loading: boolean;
+      error: string | null;
+      lastUpdated: string | null;
+    }
+    
+    const initialState: DivaScoreState = {
+      score: null,
+      components: null,
+      history: [],
+      insights: [],
+      loading: false,
+      error: null,
+      lastUpdated: null,
+    };
+    
+    export const divaScoreSlice = createSlice({
+      name: 'divaScore',
+      initialState,
+      reducers: {
+        setLoading: (state, action) => {
+          state.loading = action.payload;
+        },
+        setError: (state, action) => {
+          state.error = action.payload;
+          state.loading = false;
+        },
+        setScore: (state, action) => {
+          state.score = action.payload.score;
+          state.components = action.payload.components;
+          state.lastUpdated = new Date().toISOString();
+          state.loading = false;
+          state.error = null;
+        },
+        addHistoryItem: (state, action) => {
+          state.history.unshift(action.payload);
+        },
+      },
+    });
+    ```
+  </Tab>
+  <Tab title="API Integration">
+    ```typescript
+    // src/services/api/divaScore.api.ts
+    export const divaScoreApi = createApi({
+      reducerPath: 'divaScoreApi',
+      baseQuery: fetchBaseQuery({
+        baseUrl: '/api/diva-score',
+        prepareHeaders: (headers, { getState }) => {
+          const token = (getState() as RootState).auth.token;
+          if (token) {
+            headers.set('authorization', `Bearer ${token}`);
+          }
+          return headers;
+        },
+      }),
+      tagTypes: ['DivaScore', 'DivaScoreHistory', 'DivaScoreInsights'],
+      endpoints: (builder) => ({
+        getDivaScore: builder.query<DivaScoreResponse, void>({
+          query: () => '',
+          providesTags: ['DivaScore'],
+        }),
+        getDivaScoreHistory: builder.query<DivaScoreHistoryResponse, { period: string }>({
+          query: ({ period }) => `history?period=${period}`,
+          providesTags: ['DivaScoreHistory'],
+        }),
+        getDivaScoreInsights: builder.query<DivaScoreInsightsResponse, void>({
+          query: () => 'insights',
+          providesTags: ['DivaScoreInsights'],
+        }),
+        refreshDivaScore: builder.mutation<DivaScoreResponse, void>({
+          query: () => ({
+            url: 'refresh',
+            method: 'POST',
+          }),
+          invalidatesTags: ['DivaScore', 'DivaScoreHistory', 'DivaScoreInsights'],
+        }),
+      }),
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### Testing Strategy
+
+<Tabs>
+  <Tab title="Unit Tests">
+    ```typescript
+    // __tests__/components/DivaScoreCard.test.tsx
+    describe('DivaScoreCard', () => {
+      const defaultProps = {
+        score: 750,
+        trend: 'up' as const,
+        lastUpdated: new Date('2025-05-29T10:00:00Z'),
+      };
+    
+      it('renders score correctly', () => {
+        render(<DivaScoreCard {...defaultProps} />);
+        
+        expect(screen.getByText('750')).toBeOnTheScreen();
+        expect(screen.getByText('/ 1000')).toBeOnTheScreen();
+      });
+    
+      it('shows correct trend indicator', () => {
+        render(<DivaScoreCard {...defaultProps} trend="up" />);
+        
+        const trendIcon = screen.getByTestId('trend-indicator');
+        expect(trendIcon).toHaveProp('name', 'trend-up');
+      });
+    
+      it('calls onPress when tapped', () => {
+        const mockOnPress = jest.fn();
+        render(<DivaScoreCard {...defaultProps} onPress={mockOnPress} />);
+        
+        fireEvent.press(screen.getByRole('button'));
+        expect(mockOnPress).toHaveBeenCalledTimes(1);
+      });
+    
+      it('has proper accessibility label', () => {
+        render(<DivaScoreCard {...defaultProps} />);
+        
+        const card = screen.getByRole('button');
+        expect(card).toHaveAccessibilityLabel('DIVA Score: 750 out of 1000');
+      });
+    });
+    ```
+  </Tab>
+  <Tab title="Integration Tests">
+    ```typescript
+    // __tests__/integration/divaScore.integration.test.tsx
+    describe('DIVA Score Integration', () => {
+      beforeEach(() => {
+        server.use(
+          rest.get('/api/diva-score', (req, res, ctx) => {
+            return res(
+              ctx.json({
+                score: 750,
+                components: {
+                  discipline: 800,
+                  income: 700,
+                  velocity: 750,
+                  assets: 750,
+                },
+                insights: [
+                  {
+                    type: 'improvement',
+                    message: 'Your savings consistency has improved',
+                    category: 'discipline',
+                  },
+                ],
+              })
+            );
+          })
+        );
+      });
+    
+      it('loads and displays DIVA score data', async () => {
+        render(
+          <Provider store={store}>
+            <DivaScoreScreen />
+          </Provider>
+        );
+    
+        expect(screen.getByText('Loading...')).toBeOnTheScreen();
+    
+        await waitFor(() => {
+          expect(screen.getByText('750')).toBeOnTheScreen();
+        });
+    
+        expect(screen.getByText('Discipline: 800')).toBeOnTheScreen();
+        expect(screen.getByText('Income: 700')).toBeOnTheScreen();
+      });
+    });
+    ```
+  </Tab>
+  <Tab title="E2E Tests">
+    ```typescript
+    // e2e/divaScore.e2e.ts
+    describe('DIVA Score Flow', () => {
+      beforeAll(async () => {
+        await device.launchApp();
+      });
+    
+      beforeEach(async () => {
+        await device.reloadReactNative();
+      });
+    
+      it('should display DIVA score on dashboard', async () => {
+        // Login
+        await element(by.id('phone-input')).typeText('+27123456789');
+        await element(by.id('login-button')).tap();
+    
+        // Navigate to dashboard
+        await expect(element(by.id('dashboard-screen'))).toBeVisible();
+    
+        // Check DIVA score card
+        await expect(element(by.id('diva-score-card'))).toBeVisible();
+        await expect(element(by.text('750'))).toBeVisible();
+      });
+    
+      it('should navigate to detailed DIVA score view', async () => {
+        await element(by.id('diva-score-card')).tap();
+    
+        await expect(element(by.id('diva-score-detail-screen'))).toBeVisible();
+        await expect(element(by.text('Score Breakdown'))).toBeVisible();
+        await expect(element(by.text('Discipline'))).toBeVisible();
+        await expect(element(by.text('Income'))).toBeVisible();
+      });
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Development Workflow
+
+### Git Workflow
+
+We follow the **GitFlow** branching model:
+
+```
+main
+├── develop
+│   ├── feature/user-profile-enhancement
+│   ├── feature/diva-score-improvements
+│   └── feature/chama-blockchain-integration
+├── release/v1.1.0
+└── hotfix/critical-security-patch
+```
+
+### Branch Naming Convention
+
+- `feature/feature-name` - New features
+- `bugfix/bug-description` - Bug fixes
+- `hotfix/critical-issue` - Critical production fixes
+- `release/version-number` - Release preparation
+- `chore/task-description` - Maintenance tasks
+
+### Commit Message Format
+
+```
+type(scope): brief description
+
+Longer description if needed
+
+- List of changes
+- More details about the change
+
+Closes #123
+```
+
+**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+
+**Examples**:
+
+```
+feat(diva-score): add historical trend analysis
+
+- Implement 6-month trend calculation
+- Add trend visualization component
+- Update API to include historical data
+
+Closes #456
+
+fix(auth): resolve token refresh infinite loop
+
+The token refresh was causing an infinite loop when
+the refresh token was expired.
+
+- Add expiry check before refresh attempt
+- Implement proper error handling
+- Add unit tests for edge cases
+
+Closes #789
+```
+
+### Code Review Process
+
+<Steps>
+  <Step title="Create Pull Request">
+    - Use the PR template
+    - Link related issues
+    - Add comprehensive description
+    - Include screenshots/videos for UI changes
+  </Step>
+  <Step title="Automated Checks">
+    - Linting and formatting checks
+    - Unit and integration tests
+    - Security vulnerability scanning
+    - Build verification
+  </Step>
+  <Step title="Manual Review">
+    - At least 2 reviewers required
+    - Focus on code quality, architecture, and business logic
+    - Security review for sensitive changes
+    - Performance impact assessment
+  </Step>
+  <Step title="Merge & Deploy">
+    - Squash and merge to develop
+    - Automated deployment to staging
+    - Manual promotion to production
+  </Step>
+</Steps>
+
+## Performance Optimization
+
+### Backend Performance
+
+<Tabs>
+  <Tab title="Database Optimization">
+    ```typescript
+    // Efficient queries with proper indexing
+    @Entity()
+    @Index(['userId', 'transactionDate'])
+    export class Transaction {
+      @PrimaryGeneratedColumn('uuid')
+      id: string;
+    
+      @Column()
+      @Index()
+      userId: string;
+    
+      @Column('decimal', { precision: 10, scale: 2 })
+      amount: number;
+    
+      @Column()
+      @Index()
+      transactionDate: Date;
+    
+      @Column()
+      category: string;
+    }
+    
+    // Optimized repository queries
+    async findUserTransactions(
+      userId: string,
+      options: FindTransactionsOptions
+    ): Promise<Transaction[]> {
+      return this.transactionRepository
+        .createQueryBuilder('transaction')
+        .where('transaction.userId = :userId', { userId })
+        .andWhere('transaction.transactionDate >= :startDate', {
+          startDate: options.startDate,
+        })
+        .orderBy('transaction.transactionDate', 'DESC')
+        .limit(options.limit)
+        .offset(options.offset)
+        .getMany();
+    }
+    ```
+  </Tab>
+  <Tab title="Caching Strategy">
+    ```typescript
+    // Redis caching implementation
+    @Injectable()
+    export class DivaScoreService {
+      constructor(
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
+        private transactionsService: TransactionsService,
+      ) {}
+    
+      async calculateDivaScore(userId: string): Promise<DivaScore> {
+        const cacheKey = `diva-score:${userId}`;
+        
+        // Check cache first
+        const cachedScore = await this.cacheManager.get<DivaScore>(cacheKey);
+        if (cachedScore) {
+          return cachedScore;
+        }
+    
+        // Calculate score if not cached
+        const transactions = await this.transactionsService.findRecentTransactions(userId);
+        const score = this.performScoreCalculation(transactions);
+    
+        // Cache for 1 hour
+        await this.cacheManager.set(cacheKey, score, 3600);
+        
+        return score;
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Background Jobs">
+    ```typescript
+    // Queue-based background processing
+    @Processor('diva-score-calculation')
+    export class DivaScoreProcessor {
+      private readonly logger = new Logger(DivaScoreProcessor.name);
+    
+      @Process('calculate-score')
+      async handleScoreCalculation(job: Job<{ userId: string }>) {
+        const { userId } = job.data;
+        
+        try {
+          this.logger.log(`Starting DIVA score calculation for user ${userId}`);
+          
+          const score = await this.divaScoreService.calculateDivaScore(userId);
+          
+          // Update user's score in database
+          await this.usersService.updateDivaScore(userId, score);
+          
+          // Send notification if score improved significantly
+          if (score.overallScore > job.data.previousScore + 50) {
+            await this.notificationService.sendScoreImprovementNotification(userId, score);
+          }
+          
+          this.logger.log(`Completed DIVA score calculation for user ${userId}`);
+        } catch (error) {
+          this.logger.error(`Failed to calculate DIVA score for user ${userId}:`, error);
+          throw error;
+        }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Mobile Performance
+
+<AccordionGroup>
+  <Accordion title="Bundle Optimization">
+    ```javascript
+    // Metro configuration for React Native
+    module.exports = {
+      transformer: {
+        minifierConfig: {
+          mangle: {
+            keep_fnames: true,
+          },
+          output: {
+            ascii_only: true,
+            quote_keys: true,
+            wrap_iife: true,
+          },
+          sourceMap: {
+            includeSources: false,
+          },
+          toplevel: false,
+          warnings: false,
+        },
+      },
+      resolver: {
+        alias: {
+          '@': './src',
+          '@components': './src/components',
+          '@screens': './src/screens',
+          '@services': './src/services',
+        },
+      },
+    };
+    ```
+  </Accordion>
+  <Accordion title="Image Optimization">
+    ```typescript
+    // Optimized image loading component
+    interface OptimizedImageProps {
+      uri: string;
+      width: number;
+      height: number;
+      placeholder?: string;
+    }
+    
+    export const OptimizedImage: React.FC<OptimizedImageProps> = ({
+      uri,
+      width,
+      height,
+      placeholder,
+    }) => {
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(false);
+    
+      const optimizedUri = useMemo(() => {
+        // Generate optimized image URL based on device density
+        const scale = PixelRatio.get();
+        const optimizedWidth = width * scale;
+        const optimizedHeight = height * scale;
+        
+        return `${uri}?w=${optimizedWidth}&h=${optimizedHeight}&format=webp&quality=80`;
+      }, [uri, width, height]);
+    
+      return (
+        <View style={{ width, height }}>
+          {loading && placeholder && (
+            <Image source={{ uri: placeholder }} style={{ width, height }} />
+          )}
+          <Image
+            source={{ uri: optimizedUri }}
+            style={{ width, height }}
+            onLoad={() => setLoading(false)}
+            onError={() => setError(true)}
+            resizeMode="cover"
+          />
+        </View>
+      );
+    };
+    ```
+  </Accordion>
+  <Accordion title="List Performance">
+    ```typescript
+    // Virtualized list for large datasets
+    interface TransactionListProps {
+      transactions: Transaction[];
+      onLoadMore: () => void;
+    }
+    
+    export const TransactionList: React.FC<TransactionListProps> = ({
+      transactions,
+      onLoadMore,
+    }) => {
+      const renderTransaction = useCallback(({ item }: { item: Transaction }) => (
+        <TransactionItem
+          key={item.id}
+          transaction={item}
+          onPress={() => navigateToTransaction(item.id)}
+        />
+      ), []);
+    
+      const keyExtractor = useCallback((item: Transaction) => item.id, []);
+    
+      const getItemLayout = useCallback(
+        (data: any, index: number) => ({
+          length: TRANSACTION_ITEM_HEIGHT,
+          offset: TRANSACTION_ITEM_HEIGHT * index,
+          index,
+        }),
+        []
+      );
+    
+      return (
+        <FlatList
+          data={transactions}
+          renderItem={renderTransaction}
+          keyExtractor={keyExtractor}
+          getItemLayout={getItemLayout}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={10}
+          onEndReached={onLoadMore}
+          onEndReachedThreshold={0.5}
+        />
+      );
+    };
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Debugging & Troubleshooting
+
+### Common Issues & Solutions
+
+<AccordionGroup>
+  <Accordion title="Database Connection Issues">
+    **Problem**: Cannot connect to PostgreSQL database
+
+    **Solutions**:
+
+    ```bash
+    # Check if PostgreSQL is running
+    docker-compose ps postgres
+    
+    # Restart PostgreSQL container
+    docker-compose restart postgres
+    
+    # Check PostgreSQL logs
+    docker-compose logs postgres
+    
+    # Verify connection string
+    echo $DATABASE_URL
+    
+    # Test connection manually
+    psql $DATABASE_URL -c "SELECT version();"
+    ```
+  </Accordion>
+  <Accordion title="React Native Build Failures">
+    **Problem**: Mobile app fails to build
+
+    **Solutions**:
+
+    ```bash
+    # Clean React Native cache
+    npx react-native start --reset-cache
+    
+    # Clean and rebuild Android
+    cd android
+    ./gradlew clean
+    cd ..
+    npx react-native run-android
+    
+    # Clean and rebuild iOS
+    cd ios
+    rm -rf build/
+    pod install
+    cd ..
+    npx react-native run-ios
+    
+    # Reset Metro cache
+    rm -rf $TMPDIR/react-*
+    ```
+  </Accordion>
+  <Accordion title="API Integration Issues">
+    **Problem**: Third-party API calls failing
+
+    **Solutions**:
+
+    ```typescript
+    // Add comprehensive error handling
+    async function callExternalAPI(endpoint: string, data: any) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(data),
+          timeout: 30000, // 30 second timeout
+        });
+    
+        if (!response.ok) {
+          throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+        }
+    
+        return await response.json();
+      } catch (error) {
+        // Log error for debugging
+        console.error('API call failed:', {
+          endpoint,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        });
+    
+        // Implement retry logic
+        if (error.code === 'NETWORK_ERROR' && retryCount < 3) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+          return callExternalAPI(endpoint, data, retryCount + 1);
+        }
+    
+        throw error;
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Debugging Tools
+
+<CardGroup cols={2}>
+  <Card title="Backend Debugging" icon="server">
+    - **VS Code Debugger**: Attach to Node.js process
+    - **Winston Logging**: Structured logging with levels
+    - **APM Tools**: New Relic or Datadog for production
+    - **Database Query Logging**: TypeORM query logging
+  </Card>
+  <Card title="Mobile Debugging" icon="mobile-phone">
+    - **React Native Debugger**: Standalone debugging app
+    - **Flipper**: Mobile app debugger by Facebook
+    - **Reactotron**: Debug React and React Native apps
+    - **Chrome DevTools**: Debug JavaScript remotely
+  </Card>
+</CardGroup>
+
+## Deployment
+
+### Staging Deployment
+
+```bash
+# Build and deploy to staging
+npm run build:staging
+npm run deploy:staging
+
+# Run smoke tests
+npm run test:smoke:staging
+
+# Check deployment status
+kubectl get pods -n awo-staging
+```
+
+### Production Deployment
+
+```bash
+# Create production build
+npm run build:production
+
+# Run full test suite
+npm run test:full
+
+# Deploy with blue-green strategy
+npm run deploy:production:blue-green
+
+# Monitor deployment
+npm run monitor:deployment
+```
+
+<Warning>
+  **Production Deployment**: Always ensure all tests pass and get approval from at least two senior developers before deploying to production.
+</Warning>
+
+## Next Steps
+
+Once you're comfortable with the basics:
+
+1. **Explore Advanced Topics**: Learn about our microservices architecture
+2. **Contribute to Open Source**: Help improve our shared components
+3. **Join the Community**: Participate in our developer Discord
+4. **Mentor Others**: Help onboard new team members
+
+<Tip>
+  **Pro Tip**: Set up your development environment with our recommended tools and configurations for the best experience. Don't hesitate to ask questions in our developer channels\!
+</Tip>
+
+---
+
+Happy coding\! 🚀

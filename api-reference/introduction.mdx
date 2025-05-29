@@ -1,0 +1,662 @@
+---
+title: "Introduction"
+description: "AWO Platform API documentation"
+---
+
+# API Reference
+
+Welcome to the AWO Platform API documentation. Our API provides comprehensive access to all platform features, enabling you to build powerful financial applications for African women.
+
+## API Overview
+
+The AWO API is built on modern REST principles with GraphQL support for complex queries. It provides secure, scalable access to user data, financial insights, and community features.
+
+<CardGroup cols={2}>
+  <Card title="REST API" icon="api" href="/api-reference/rest">
+    Traditional REST endpoints for standard operations
+  </Card>
+  <Card title="GraphQL API" icon="graphql" href="/api-reference/graphql">
+    Flexible queries and real-time subscriptions
+  </Card>
+  <Card title="WebSocket API" icon="websocket" href="/api-reference/websocket">
+    Real-time updates for live features
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/api-reference/webhooks">
+    Event notifications for external systems
+  </Card>
+</CardGroup>
+
+## Base URLs
+
+<Tabs>
+  <Tab title="Production">
+    ```
+    REST API: https://api.awo-platform.com/v1
+    GraphQL: https://api.awo-platform.com/graphql
+    WebSocket: wss://api.awo-platform.com/ws
+    ```
+  </Tab>
+  <Tab title="Staging">
+    ```
+    REST API: https://api-staging.awo-platform.com/v1
+    GraphQL: https://api-staging.awo-platform.com/graphql
+    WebSocket: wss://api-staging.awo-platform.com/ws
+    ```
+  </Tab>
+  <Tab title="Development">
+    ```
+    REST API: http://localhost:3000/api/v1
+    GraphQL: http://localhost:3000/graphql
+    WebSocket: ws://localhost:3000/ws
+    ```
+  </Tab>
+</Tabs>
+
+## Authentication
+
+AWO API uses **OAuth 2.0** with **JWT tokens** for authentication. All authenticated requests must include a valid bearer token.
+
+### Getting Access Tokens
+
+<CodeGroup>
+
+```javascript JavaScript
+const response = await fetch('https://api.awo-platform.com/v1/auth/login', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    phoneNumber: '+27123456789',
+    password: 'your-password'
+  })
+});
+
+const { accessToken, refreshToken } = await response.json();
+```
+
+
+```python Python
+import requests
+
+response = requests.post('https://api.awo-platform.com/v1/auth/login', {
+    'phoneNumber': '+27123456789',
+    'password': 'your-password'
+})
+
+tokens = response.json()
+access_token = tokens['accessToken']
+```
+
+
+```curl cURL
+curl -X POST https://api.awo-platform.com/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phoneNumber": "+27123456789",
+    "password": "your-password"
+  }'
+```
+
+</CodeGroup>
+
+### Using Access Tokens
+
+Include the access token in the `Authorization` header for all authenticated requests:
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+### Token Refresh
+
+Access tokens expire after 24 hours. Use the refresh token to get a new access token:
+
+<CodeGroup>
+
+```javascript JavaScript
+const response = await fetch('https://api.awo-platform.com/v1/auth/refresh', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    refreshToken: 'your-refresh-token'
+  })
+});
+
+const { accessToken } = await response.json();
+```
+
+
+```curl cURL
+curl -X POST https://api.awo-platform.com/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken": "your-refresh-token"}'
+```
+
+</CodeGroup>
+
+## Rate Limiting
+
+To ensure fair usage and system stability, the AWO API implements rate limiting:
+
+| Endpoint Category     | Rate Limit   | Window   |
+| --------------------- | ------------ | -------- |
+| Authentication        | 10 requests  | 1 minute |
+| User Operations       | 100 requests | 1 minute |
+| Financial Data        | 50 requests  | 1 minute |
+| Chama Operations      | 30 requests  | 1 minute |
+| External Integrations | 20 requests  | 1 minute |
+
+Rate limit information is included in response headers:
+
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 87
+X-RateLimit-Reset: 1685123456
+```
+
+<Warning>
+  When rate limits are exceeded, the API returns a `429 Too Many Requests` status code. Implement exponential backoff in your applications.
+</Warning>
+
+## Request/Response Format
+
+### Request Format
+
+All API requests should use JSON format with appropriate content type headers:
+
+```json
+{
+  "Content-Type": "application/json",
+  "Accept": "application/json",
+  "Authorization": "Bearer <access_token>"
+}
+```
+
+### Response Format
+
+All API responses follow a consistent structure:
+
+<Tabs>
+  <Tab title="Success Response">
+    ```json
+    {
+      "success": true,
+      "data": {
+        "id": "123e4567-e89b-12d3-a456-426614174000",
+        "firstName": "Amara",
+        "lastName": "Okafor",
+        "email": "amara@example.com"
+      },
+      "meta": {
+        "timestamp": "2025-05-29T10:30:00Z",
+        "version": "1.0.0"
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Error Response">
+    ```json
+    {
+      "success": false,
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Invalid phone number format",
+        "details": {
+          "field": "phoneNumber",
+          "value": "123456789",
+          "expected": "E.164 format (+27XXXXXXXXX)"
+        }
+      },
+      "meta": {
+        "timestamp": "2025-05-29T10:30:00Z",
+        "version": "1.0.0",
+        "requestId": "req_123abc456def"
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Paginated Response">
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "id": "txn_001",
+          "amount": 150.00,
+          "description": "Grocery shopping"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 156,
+        "totalPages": 8,
+        "hasNext": true,
+        "hasPrev": false
+      },
+      "meta": {
+        "timestamp": "2025-05-29T10:30:00Z",
+        "version": "1.0.0"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Error Handling
+
+The AWO API uses standard HTTP status codes and provides detailed error information:
+
+### HTTP Status Codes
+
+| Code | Meaning               | Description                             |
+| ---- | --------------------- | --------------------------------------- |
+| 200  | OK                    | Request successful                      |
+| 201  | Created               | Resource created successfully           |
+| 204  | No Content            | Request successful, no content returned |
+| 400  | Bad Request           | Invalid request data                    |
+| 401  | Unauthorized          | Authentication required                 |
+| 403  | Forbidden             | Insufficient permissions                |
+| 404  | Not Found             | Resource not found                      |
+| 409  | Conflict              | Resource conflict                       |
+| 422  | Unprocessable Entity  | Validation error                        |
+| 429  | Too Many Requests     | Rate limit exceeded                     |
+| 500  | Internal Server Error | Server error                            |
+| 503  | Service Unavailable   | Service temporarily unavailable         |
+
+### Error Codes
+
+AWO API provides specific error codes for better error handling:
+
+<AccordionGroup>
+  <Accordion title="Authentication Errors">
+    - `AUTH_TOKEN_MISSING`: No authorization token provided
+    - `AUTH_TOKEN_INVALID`: Invalid or malformed token
+    - `AUTH_TOKEN_EXPIRED`: Token has expired
+    - `AUTH_INSUFFICIENT_PERMISSIONS`: User lacks required permissions
+  </Accordion>
+  <Accordion title="Validation Errors">
+    - `VALIDATION_ERROR`: Request data validation failed
+    - `PHONE_NUMBER_INVALID`: Invalid phone number format
+    - `EMAIL_INVALID`: Invalid email address format
+    - `AMOUNT_INVALID`: Invalid monetary amount
+  </Accordion>
+  <Accordion title="Business Logic Errors">
+    - `DIVA_SCORE_NOT_READY`: DIVA score calculation in progress
+    - `INSUFFICIENT_FUNDS`: Not enough balance for operation
+    - `CHAMA_FULL`: Maximum members reached for Chama
+    - `KYC_REQUIRED`: KYC verification required for operation
+  </Accordion>
+  <Accordion title="External Service Errors">
+    - `BANK_CONNECTION_FAILED`: Unable to connect to bank
+    - `PAYMENT_PROVIDER_ERROR`: Payment processing failed
+    - `KYC_VERIFICATION_FAILED`: Identity verification failed
+  </Accordion>
+</AccordionGroup>
+
+## Core API Endpoints
+
+### Authentication & Users
+
+<CardGroup cols={2}>
+  <Card title="Register User" href="/api-reference/auth#register">
+    `POST /auth/register`
+    Create new user account
+  </Card>
+  <Card title="Login" href="/api-reference/auth#login">
+    `POST /auth/login`
+    Authenticate user and get tokens
+  </Card>
+  <Card title="User Profile" href="/api-reference/users#profile">
+    `GET /users/profile`
+    Get current user profile
+  </Card>
+  <Card title="Update Profile" href="/api-reference/users#update-profile">
+    `PUT /users/profile`
+    Update user profile information
+  </Card>
+</CardGroup>
+
+### DIVA Score
+
+<CardGroup cols={2}>
+  <Card title="Get DIVA Score" href="/api-reference/diva-score#get-score">
+    `GET /diva-score`
+    Get current DIVA score and components
+  </Card>
+  <Card title="Score History" href="/api-reference/diva-score#history">
+    `GET /diva-score/history`
+    Get historical DIVA score data
+  </Card>
+  <Card title="Score Insights" href="/api-reference/diva-score#insights">
+    `GET /diva-score/insights`
+    Get personalized financial insights
+  </Card>
+  <Card title="Refresh Score" href="/api-reference/diva-score#refresh">
+    `POST /diva-score/refresh`
+    Trigger DIVA score recalculation
+  </Card>
+</CardGroup>
+
+### Financial Data
+
+<CardGroup cols={2}>
+  <Card title="Bank Accounts" href="/api-reference/accounts#list">
+    `GET /accounts`
+    List connected bank accounts
+  </Card>
+  <Card title="Transactions" href="/api-reference/transactions#list">
+    `GET /transactions`
+    Get transaction history
+  </Card>
+  <Card title="Savings Goals" href="/api-reference/savings#goals">
+    `GET /savings/goals`
+    List user's savings goals
+  </Card>
+  <Card title="Investment Portfolio" href="/api-reference/investments#portfolio">
+    `GET /investments/portfolio`
+    Get investment holdings
+  </Card>
+</CardGroup>
+
+### Chama Management
+
+<CardGroup cols={2}>
+  <Card title="List Chamas" href="/api-reference/chamas#list">
+    `GET /chamas`
+    Get user's Chama memberships
+  </Card>
+  <Card title="Create Chama" href="/api-reference/chamas#create">
+    `POST /chamas`
+    Create new Chama group
+  </Card>
+  <Card title="Chama Details" href="/api-reference/chamas#details">
+    `GET /chamas/{id}`
+    Get detailed Chama information
+  </Card>
+  <Card title="Make Contribution" href="/api-reference/chamas#contribute">
+    `POST /chamas/{id}/contributions`
+    Make contribution to Chama
+  </Card>
+</CardGroup>
+
+## GraphQL API
+
+For more complex queries and real-time features, use our GraphQL endpoint:
+
+### Example Query
+
+```graphql
+query GetUserDashboard($userId: ID!) {
+  user(id: $userId) {
+    id
+    firstName
+    lastName
+    divaScore {
+      overallScore
+      components {
+        discipline
+        income
+        velocity
+        assets
+      }
+      lastUpdated
+    }
+    savingsGoals {
+      id
+      name
+      targetAmount
+      currentAmount
+      progress
+    }
+    chamas {
+      id
+      name
+      memberCount
+      nextContributionDate
+    }
+  }
+}
+```
+
+### Example Mutation
+
+```graphql
+mutation CreateSavingsGoal($input: CreateSavingsGoalInput!) {
+  createSavingsGoal(input: $input) {
+    id
+    name
+    targetAmount
+    targetDate
+    monthlyContribution
+  }
+}
+```
+
+### Subscriptions
+
+Subscribe to real-time updates:
+
+```graphql
+subscription DivaScoreUpdates($userId: ID!) {
+  divaScoreUpdated(userId: $userId) {
+    overallScore
+    lastUpdated
+    insights {
+      type
+      message
+      category
+    }
+  }
+}
+```
+
+## SDK & Libraries
+
+We provide official SDKs for popular programming languages:
+
+<CardGroup cols={3}>
+  <Card title="JavaScript/TypeScript" icon="javascript" href="/sdks/javascript">
+    ```bash
+    npm install @awo-platform/js-sdk
+    ```
+  </Card>
+  <Card title="Python" icon="python" href="/sdks/python">
+    ```bash
+    pip install awo-platform-sdk
+    ```
+  </Card>
+  <Card title="React Native" icon="react" href="/sdks/react-native">
+    ```bash
+    npm install @awo-platform/react-native-sdk
+    ```
+  </Card>
+</CardGroup>
+
+### JavaScript SDK Example
+
+```javascript
+import { AWOClient } from '@awo-platform/js-sdk';
+
+const client = new AWOClient({
+  apiKey: 'your-api-key',
+  environment: 'production'
+});
+
+// Get user's DIVA score
+const divaScore = await client.divaScore.get();
+console.log(`Your DIVA score is ${divaScore.overallScore}`);
+
+// Create savings goal
+const goal = await client.savings.createGoal({
+  name: 'Emergency Fund',
+  targetAmount: 10000,
+  targetDate: '2025-12-31'
+});
+```
+
+## Testing Your Integration
+
+### Sandbox Environment
+
+Use our sandbox environment for testing:
+
+```
+Base URL: https://api-sandbox.awo-platform.com/v1
+```
+
+### Test Data
+
+The sandbox includes realistic test data:
+
+- **Test Users**: Pre-created users with various financial profiles
+- **Mock Bank Data**: Simulated transaction histories
+- **Test Chamas**: Sample Chama groups for testing
+- **Fake Payments**: Simulated payment processing
+
+### Test Cards
+
+For payment testing, use these test card numbers:
+
+| Card Number      | Type       | Result   |
+| ---------------- | ---------- | -------- |
+| 4111111111111111 | Visa       | Success  |
+| 4000000000000002 | Visa       | Declined |
+| 5555555555554444 | Mastercard | Success  |
+| 2223003122003222 | Mastercard | Success  |
+
+## Webhooks
+
+AWO can send webhook events to your application for real-time notifications:
+
+### Available Events
+
+- `user.created` - New user registration
+- `diva_score.updated` - DIVA score recalculated
+- `transaction.created` - New transaction processed
+- `chama.contribution.made` - Chama contribution received
+- `savings_goal.achieved` - Savings goal reached
+
+### Webhook Example
+
+```json
+{
+  "event": "diva_score.updated",
+  "data": {
+    "userId": "123e4567-e89b-12d3-a456-426614174000",
+    "previousScore": 720,
+    "newScore": 750,
+    "improvement": 30
+  },
+  "timestamp": "2025-05-29T10:30:00Z",
+  "signature": "sha256=abc123def456..."
+}
+```
+
+## API Versioning
+
+The AWO API uses URL-based versioning:
+
+- **Current Version**: `v1`
+- **Deprecation Notice**: 6 months before breaking changes
+- **Sunset Period**: 12 months support for deprecated versions
+
+### Version Headers
+
+Include version information in requests:
+
+```
+API-Version: 2025-05-29
+Accept: application/vnd.awo.v1+json
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Error Handling">
+    Always implement proper error handling:
+
+    ```javascript
+    try {
+      const response = await awoClient.divaScore.get();
+      return response.data;
+    } catch (error) {
+      if (error.status === 429) {
+        // Rate limited - implement exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return retryRequest();
+      } else if (error.code === 'DIVA_SCORE_NOT_READY') {
+        // Score still calculating - show loading state
+        return { loading: true };
+      } else {
+        // Handle other errors appropriately
+        throw error;
+      }
+    }
+    ```
+  </Accordion>
+  <Accordion title="Data Caching">
+    Cache API responses to improve performance:
+
+    ```javascript
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+    
+    async function getCachedDivaScore(userId) {
+      const cacheKey = `diva-score-${userId}`;
+      const cached = localStorage.getItem(cacheKey);
+      
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < CACHE_DURATION) {
+          return data;
+        }
+      }
+      
+      const freshData = await awoClient.divaScore.get();
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data: freshData,
+        timestamp: Date.now()
+      }));
+      
+      return freshData;
+    }
+    ```
+  </Accordion>
+  <Accordion title="Security">
+    Follow security best practices:
+
+    - Store API keys securely (never in client-side code)
+    - Use HTTPS for all requests
+    - Validate webhook signatures
+    - Implement proper token refresh logic
+    - Log security events appropriately
+  </Accordion>
+</AccordionGroup>
+
+## Support & Resources
+
+<CardGroup cols={2}>
+  <Card title="API Status" icon="monitor" href="https://status.awo-platform.com">
+    Check real-time API status and incidents
+  </Card>
+  <Card title="Postman Collection" icon="postman" href="/resources/postman">
+    Import our complete API collection
+  </Card>
+  <Card title="OpenAPI Spec" icon="file-code" href="/api-reference/openapi.json">
+    Download OpenAPI 3.0 specification
+  </Card>
+  <Card title="Developer Support" icon="envelope" href="mailto:developers@awo-platform.com">
+    Get help from our developer team
+  </Card>
+</CardGroup>
+
+<Note>
+  This API documentation is automatically generated from our OpenAPI specification and is always up-to-date with the latest API changes.
+</Note>
+
+---
+
+[**Ready to build amazing financial experiences? Start with our Quick Start Guide or explore specific endpoints in the navigation sidebar.**](/quickstart)

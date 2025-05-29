@@ -1,0 +1,340 @@
+---
+title: "AWO Quickstart"
+description: "This guide will help you set up your development environment and start building on the AWO platform."
+---
+
+# Quick Start Guide
+
+Get AWO up and running in under 10 minutes\! This guide will help you set up your development environment and start building on the AWO platform.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+<CardGroup cols={2}>
+  <Card title="Node.js 18+" icon="node-js">
+    Download from [nodejs.org](https://nodejs.org)
+  </Card>
+  <Card title="Docker Desktop" icon="docker">
+    Download from [docker.com](https://docker.com)
+  </Card>
+  <Card title="Git" icon="git">
+    Download from [git-scm.com](https://git-scm.com)
+  </Card>
+  <Card title="VS Code" icon="code">
+    Recommended IDE with AWO extensions
+  </Card>
+</CardGroup>
+
+## Step 1: Clone the Repository
+
+```bash
+# Clone the main repository
+git clone https://github.com/awo-platform/awo-core.git
+cd awo-core
+
+# Clone the frontend repository
+git clone https://github.com/awo-platform/awo-mobile.git ../awo-mobile
+git clone https://github.com/awo-platform/awo-web.git ../awo-web
+```
+
+## Step 2: Environment Setup
+
+<Tabs>
+  <Tab title="Backend Setup">
+    ```bash
+    # Navigate to backend directory
+    cd awo-core
+    
+    # Install dependencies
+    npm install
+    
+    # Copy environment template
+    cp .env.example .env
+    
+    # Edit environment variables
+    nano .env
+    ```
+
+    <Accordion title="Required Environment Variables">
+      ```bash
+      # Database Configuration
+      DATABASE_URL=postgresql://awo:password@localhost:5432/awo_dev
+      REDIS_URL=redis://localhost:6379
+      
+      # JWT Configuration
+      JWT_SECRET=your-super-secret-jwt-key
+      JWT_EXPIRES_IN=24h
+      
+      # AWS Configuration (for local development, use LocalStack)
+      AWS_REGION=us-east-1
+      AWS_ACCESS_KEY_ID=test
+      AWS_SECRET_ACCESS_KEY=test
+      AWS_S3_BUCKET=awo-dev-bucket
+      
+      # Third-party API Keys
+      STITCH_API_KEY=your-stitch-api-key
+      MONO_API_KEY=your-mono-api-key
+      FLUTTERWAVE_API_KEY=your-flutterwave-api-key
+      
+      # Development Settings
+      NODE_ENV=development
+      PORT=3000
+      LOG_LEVEL=debug
+      ```
+    </Accordion>
+  </Tab>
+  <Tab title="Mobile Setup">
+    ```bash
+    # Navigate to mobile directory
+    cd ../awo-mobile
+    
+    # Install dependencies
+    npm install
+    
+    # Install iOS dependencies (Mac only)
+    cd ios && pod install && cd ..
+    
+    # Copy environment template
+    cp .env.example .env
+    ```
+
+    <Note>
+      For mobile development, you'll also need:
+
+      - **Android**: Android Studio with SDK 29\+
+      - **iOS**: Xcode 14\+ (Mac only)
+      - **React Native CLI**: `npm install -g @react-native-community/cli`
+    </Note>
+  </Tab>
+  <Tab title="Web Setup">
+    ```bash
+    # Navigate to web directory
+    cd ../awo-web
+    
+    # Install dependencies
+    npm install
+    
+    # Copy environment template
+    cp .env.example .env.local
+    ```
+  </Tab>
+</Tabs>
+
+## Step 3: Start Development Services
+
+```bash
+# Start all services with Docker Compose
+docker-compose up -d
+
+# This starts:
+# - PostgreSQL database (port 5432)
+# - Redis cache (port 6379)
+# - LocalStack for AWS services (port 4566)
+# - Mailhog for email testing (port 8025)
+```
+
+<Warning>
+  Wait for all services to be healthy before proceeding. You can check status with:
+
+  ```bash
+  docker-compose ps
+  ```
+</Warning>
+
+## Step 4: Database Setup
+
+```bash
+# Run database migrations
+npm run db:migrate
+
+# Seed development data
+npm run db:seed
+
+# (Optional) Reset database
+npm run db:reset
+```
+
+## Step 5: Start the Applications
+
+<Tabs>
+  <Tab title="Backend API">
+    ```bash
+    # Start the backend server
+    npm run start:dev
+    
+    # Server will start on http://localhost:3000
+    # API documentation available at http://localhost:3000/api
+    # GraphQL playground at http://localhost:3000/graphql
+    ```
+  </Tab>
+  <Tab title="Mobile App">
+    ```bash
+    # Start Metro bundler
+    npm run start
+    
+    # In separate terminals:
+    # For Android
+    npm run android
+    
+    # For iOS (Mac only)
+    npm run ios
+    ```
+  </Tab>
+  <Tab title="Web App">
+    ```bash
+    # Start development server
+    npm run dev
+    
+    # Web app available at http://localhost:3001
+    ```
+  </Tab>
+</Tabs>
+
+## Step 6: Verify Installation
+
+<Steps>
+  <Step title="Check API Health">
+    Visit http://localhost:3000/health - should return `{"status": "ok"}`
+  </Step>
+  <Step title="Test Authentication">
+    ```bash
+    curl -X POST http://localhost:3000/auth/register \
+      -H "Content-Type: application/json" \
+      -d '{"phoneNumber": "+27123456789", "firstName": "Test", "lastName": "User"}'
+    ```
+  </Step>
+  <Step title="Check Database Connection">
+    ```bash
+    npm run db:check
+    ```
+  </Step>
+  <Step title="Test Mobile App">
+    Launch the app on simulator/emulator - you should see the AWO welcome screen
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Development Guide" icon="hammer" href="/development">
+    Comprehensive development setup and workflows
+  </Card>
+  <Card title="API Reference" icon="api" href="/api-reference/introduction">
+    Complete API documentation and examples
+  </Card>
+  <Card title="Architecture" icon="building" href="/essentials/architecture">
+    System architecture and design patterns
+  </Card>
+  <Card title="Contributing" icon="users" href="/essentials/contributing">
+    Guidelines for contributing to AWO
+  </Card>
+</CardGroup>
+
+## Common Issues & Solutions
+
+<AccordionGroup>
+  <Accordion title="Port 3000 already in use">
+    ```bash
+    # Find and kill the process using port 3000
+    lsof -ti:3000 | xargs kill -9
+    
+    # Or use a different port
+    PORT=3001 npm run start:dev
+    ```
+  </Accordion>
+  <Accordion title="Database connection failed">
+    ```bash
+    # Check if PostgreSQL is running
+    docker-compose ps postgres
+    
+    # Reset database container
+    docker-compose restart postgres
+    
+    # Check database logs
+    docker-compose logs postgres
+    ```
+  </Accordion>
+  <Accordion title="Node modules installation issues">
+    ```bash
+    # Clear npm cache
+    npm cache clean --force
+    
+    # Delete node_modules and reinstall
+    rm -rf node_modules package-lock.json
+    npm install
+    ```
+  </Accordion>
+  <Accordion title="Mobile app build failures">
+    ```bash
+    # Clean React Native cache
+    npx react-native start --reset-cache
+    
+    # Clean and rebuild (Android)
+    cd android && ./gradlew clean && cd ..
+    npx react-native run-android
+    
+    # Clean and rebuild (iOS)
+    cd ios && xcodebuild clean && cd ..
+    npx react-native run-ios
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Development Tools
+
+<Note>
+  Install these VS Code extensions for the best development experience:
+
+  - **ESLint**: Code linting
+  - **Prettier**: Code formatting
+  - **Thunder Client**: API testing
+  - **GitLens**: Git integration
+  - **Auto Import**: Automatic imports
+  - **Bracket Pair Colorizer**: Better code readability
+</Note>
+
+## Useful Commands
+
+```bash
+# Code formatting
+npm run format
+
+# Linting
+npm run lint
+
+# Type checking
+npm run type-check
+
+# Run tests
+npm run test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate API documentation
+npm run docs:generate
+
+# Database commands
+npm run db:migrate    # Run migrations
+npm run db:rollback   # Rollback last migration
+npm run db:seed       # Seed development data
+npm run db:reset      # Reset and reseed database
+```
+
+## Getting Help
+
+If you encounter any issues:
+
+1. [**Check our FAQ**](/essentials/faq) for common solutions
+2. [**Search existing GitHub Issues**](https://github.com/awo-platform/awo-core/issues)
+3. [**Join our Discord Community**](https://discord.gg/awo-platform)
+4. **Contact support**: [developers@awo-platform.com](mailto:developers@awo-platform.com)
+
+<Tip>
+  **Pro Tip**: Use `npm run dev:all` to start all services (backend, web, and mobile) simultaneously in development mode\!
+</Tip>
+
+---
+
+**Ready to build amazing financial experiences for African women? Let's go\! 🚀**

@@ -1,0 +1,867 @@
+---
+title: "Navigation"
+description: "The navigation field in docs.json defines the pages that go in the navigation menu"
+icon: "map"
+---
+
+# Navigation Structure
+
+This document outlines the navigation architecture for the AWO platform, covering both mobile app navigation and documentation site navigation patterns.
+
+## Mobile App Navigation
+
+### Navigation Architecture
+
+AWO uses **React Navigation 6** with a nested navigation structure that supports deep linking and state persistence.
+
+<Tabs>
+  <Tab title="Navigation Hierarchy">
+    ```
+    Root Navigator (Stack)
+    ├── Auth Navigator (Stack)
+    │   ├── Welcome Screen
+    │   ├── Phone Verification
+    │   ├── OTP Verification
+    │   └── Profile Setup
+    ├── Main Navigator (Tab)
+    │   ├── Dashboard Tab
+    │   │   ├── Dashboard Screen
+    │   │   ├── DIVA Score Details
+    │   │   └── Financial Insights
+    │   ├── Savings Tab
+    │   │   ├── Savings Overview
+    │   │   ├── Goals Management
+    │   │   └── Goal Details
+    │   ├── Chama Tab
+    │   │   ├── Chama List
+    │   │   ├── Chama Details
+    │   │   └── Create Chama
+    │   ├── Invest Tab
+    │   │   ├── Investment Dashboard
+    │   │   ├── Products Catalog
+    │   │   └── Portfolio Details
+    │   └── Profile Tab
+    │       ├── User Profile
+    │       ├── Settings
+    │       └── Support
+    └── Modal Navigator (Stack)
+        ├── Transaction Details
+        ├── Payment Flow
+        └── KYC Verification
+    ```
+  </Tab>
+  <Tab title="Navigation Configuration">
+    ```typescript
+    // src/navigation/RootNavigator.tsx
+    import { NavigationContainer } from '@react-navigation/native';
+    import { createNativeStackNavigator } from '@react-navigation/native-stack';
+    
+    const Stack = createNativeStackNavigator<RootStackParamList>();
+    
+    export const RootNavigator: React.FC = () => {
+      const { isAuthenticated, isLoading } = useAuth();
+      
+      if (isLoading) {
+        return <SplashScreen />;
+      }
+      
+      return (
+        <NavigationContainer
+          linking={linkingConfig}
+          theme={navigationTheme}
+          onStateChange={handleNavigationStateChange}
+        >
+          <Stack.Navigator
+            screenOptions={{
+              headerShown: false,
+              gestureEnabled: true,
+              animation: 'slide_from_right',
+            }}
+          >
+            {isAuthenticated ? (
+              <>
+                <Stack.Screen 
+                  name="Main" 
+                  component={MainTabNavigator} 
+                />
+                <Stack.Group screenOptions={{ presentation: 'modal' }}>
+                  <Stack.Screen 
+                    name="TransactionDetails" 
+                    component={TransactionDetailsScreen} 
+                  />
+                  <Stack.Screen 
+                    name="PaymentFlow" 
+                    component={PaymentFlowNavigator} 
+                  />
+                </Stack.Group>
+              </>
+            ) : (
+              <Stack.Screen 
+                name="Auth" 
+                component={AuthNavigator} 
+              />
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+      );
+    };
+    ```
+  </Tab>
+  <Tab title="Type Definitions">
+    ```typescript
+    // src/navigation/types.ts
+    import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+    import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+    import type { CompositeScreenProps } from '@react-navigation/native';
+    
+    export type RootStackParamList = {
+      Auth: undefined;
+      Main: undefined;
+      TransactionDetails: { transactionId: string };
+      PaymentFlow: { amount: number; recipient?: string };
+      KYCVerification: { level: number };
+    };
+    
+    export type MainTabParamList = {
+      Dashboard: undefined;
+      Savings: undefined;
+      Chama: undefined;
+      Invest: undefined;
+      Profile: undefined;
+    };
+    
+    export type DashboardStackParamList = {
+      DashboardHome: undefined;
+      DivaScoreDetails: undefined;
+      FinancialInsights: { category?: string };
+    };
+    
+    // Screen prop types
+    export type RootStackScreenProps<Screen extends keyof RootStackParamList> = 
+      NativeStackScreenProps<RootStackParamList, Screen>;
+    
+    export type MainTabScreenProps<Screen extends keyof MainTabParamList> = 
+      CompositeScreenProps<
+        BottomTabScreenProps<MainTabParamList, Screen>,
+        NativeStackScreenProps<RootStackParamList>
+      >;
+    
+    // Navigation hook types
+    declare global {
+      namespace ReactNavigation {
+        interface RootParamList extends RootStackParamList {}
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Tab Navigation Configuration
+
+```typescript
+// src/navigation/MainTabNavigator.tsx
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const Tab = createBottomTabNavigator<MainTabParamList>();
+
+export const MainTabNavigator: React.FC = () => {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
+
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          const iconName = getTabIconName(route.name, focused);
+          return <Icon name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.onSurfaceVariant,
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.outline,
+          paddingBottom: insets.bottom,
+          height: 60 + insets.bottom,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
+        },
+        headerShown: false,
+      })}
+    >
+      <Tab.Screen
+        name="Dashboard"
+        component={DashboardStackNavigator}
+        options={{
+          title: t('navigation.dashboard'),
+          tabBarBadge: getUnreadNotificationsCount(),
+        }}
+      />
+      <Tab.Screen
+        name="Savings"
+        component={SavingsStackNavigator}
+        options={{
+          title: t('navigation.savings'),
+        }}
+      />
+      <Tab.Screen
+        name="Chama"
+        component={ChamaStackNavigator}
+        options={{
+          title: t('navigation.chama'),
+          tabBarBadge: getPendingChamaActions(),
+        }}
+      />
+      <Tab.Screen
+        name="Invest"
+        component={InvestStackNavigator}
+        options={{
+          title: t('navigation.invest'),
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileStackNavigator}
+        options={{
+          title: t('navigation.profile'),
+        }}
+      />
+    </Tab.Navigator>
+  );
+};
+
+function getTabIconName(routeName: string, focused: boolean): string {
+  const iconMap = {
+    Dashboard: focused ? 'home' : 'home-outline',
+    Savings: focused ? 'piggy-bank' : 'piggy-bank-outline',
+    Chama: focused ? 'account-group' : 'account-group-outline',
+    Invest: focused ? 'chart-line' : 'chart-line-variant',
+    Profile: focused ? 'account' : 'account-outline',
+  };
+  
+  return iconMap[routeName as keyof typeof iconMap] || 'help-circle';
+}
+```
+
+### Deep Linking Configuration
+
+<Tabs>
+  <Tab title="Linking Config">
+    ```typescript
+    // src/navigation/linkingConfiguration.ts
+    import { LinkingOptions } from '@react-navigation/native';
+    import * as Linking from 'expo-linking';
+    
+    const prefix = Linking.createURL('/');
+    
+    export const linkingConfig: LinkingOptions<RootStackParamList> = {
+      prefixes: [prefix, 'https://app.awo-platform.com', 'awo://'],
+      config: {
+        screens: {
+          Auth: {
+            screens: {
+              Welcome: 'welcome',
+              PhoneVerification: 'verify-phone',
+              OTPVerification: 'verify-otp/:phoneNumber',
+              ProfileSetup: 'setup-profile',
+            },
+          },
+          Main: {
+            screens: {
+              Dashboard: {
+                screens: {
+                  DashboardHome: 'dashboard',
+                  DivaScoreDetails: 'diva-score',
+                  FinancialInsights: 'insights/:category?',
+                },
+              },
+              Savings: {
+                screens: {
+                  SavingsOverview: 'savings',
+                  GoalsManagement: 'savings/goals',
+                  GoalDetails: 'savings/goals/:goalId',
+                },
+              },
+              Chama: {
+                screens: {
+                  ChamaList: 'chamas',
+                  ChamaDetails: 'chamas/:chamaId',
+                  CreateChama: 'chamas/create',
+                },
+              },
+              Invest: {
+                screens: {
+                  InvestmentDashboard: 'invest',
+                  ProductsCatalog: 'invest/products',
+                  ProductDetails: 'invest/products/:productId',
+                },
+              },
+              Profile: {
+                screens: {
+                  UserProfile: 'profile',
+                  Settings: 'settings',
+                  Support: 'support',
+                },
+              },
+            },
+          },
+          TransactionDetails: 'transactions/:transactionId',
+          PaymentFlow: 'pay/:amount/:recipient?',
+          KYCVerification: 'kyc/:level',
+        },
+      },
+    };
+    ```
+  </Tab>
+  <Tab title="Navigation Helpers">
+    ```typescript
+    // src/navigation/navigationHelpers.ts
+    import { createNavigationContainerRef } from '@react-navigation/native';
+    
+    export const navigationRef = createNavigationContainerRef<RootStackParamList>();
+    
+    export function navigate(name: string, params?: any) {
+      if (navigationRef.isReady()) {
+        navigationRef.navigate(name as any, params);
+      }
+    }
+    
+    export function goBack() {
+      if (navigationRef.isReady()) {
+        navigationRef.goBack();
+      }
+    }
+    
+    export function reset(routes: any[]) {
+      if (navigationRef.isReady()) {
+        navigationRef.reset({
+          index: routes.length - 1,
+          routes,
+        });
+      }
+    }
+    
+    // Typed navigation helpers
+    export const NavigationHelpers = {
+      goToDivaScore: () => navigate('Main', { 
+        screen: 'Dashboard', 
+        params: { screen: 'DivaScoreDetails' } 
+      }),
+      
+      goToChama: (chamaId: string) => navigate('Main', {
+        screen: 'Chama',
+        params: { screen: 'ChamaDetails', params: { chamaId } }
+      }),
+      
+      goToTransaction: (transactionId: string) => 
+        navigate('TransactionDetails', { transactionId }),
+      
+      goToPayment: (amount: number, recipient?: string) =>
+        navigate('PaymentFlow', { amount, recipient }),
+      
+      goToKYC: (level: number) =>
+        navigate('KYCVerification', { level }),
+    };
+    ```
+  </Tab>
+  <Tab title="Navigation State">
+    ```typescript
+    // src/navigation/navigationState.ts
+    import AsyncStorage from '@react-native-async-storage/async-storage';
+    import { NavigationState } from '@react-navigation/native';
+    
+    const NAVIGATION_STATE_KEY = '@AWO:navigation_state';
+    
+    export const saveNavigationState = async (state: NavigationState) => {
+      try {
+        await AsyncStorage.setItem(NAVIGATION_STATE_KEY, JSON.stringify(state));
+      } catch (error) {
+        console.warn('Failed to save navigation state:', error);
+      }
+    };
+    
+    export const loadNavigationState = async (): Promise<NavigationState | undefined> => {
+      try {
+        const stateJson = await AsyncStorage.getItem(NAVIGATION_STATE_KEY);
+        return stateJson ? JSON.parse(stateJson) : undefined;
+      } catch (error) {
+        console.warn('Failed to load navigation state:', error);
+        return undefined;
+      }
+    };
+    
+    export const clearNavigationState = async () => {
+      try {
+        await AsyncStorage.removeItem(NAVIGATION_STATE_KEY);
+      } catch (error) {
+        console.warn('Failed to clear navigation state:', error);
+      }
+    };
+    
+    // Navigation state persistence hook
+    export const useNavigationStatePersistence = () => {
+      const [isReady, setIsReady] = useState(false);
+      const [initialState, setInitialState] = useState<NavigationState | undefined>();
+    
+      useEffect(() => {
+        const restoreState = async () => {
+          try {
+            const savedState = await loadNavigationState();
+            if (savedState) {
+              setInitialState(savedState);
+            }
+          } finally {
+            setIsReady(true);
+          }
+        };
+    
+        if (!isReady) {
+          restoreState();
+        }
+      }, [isReady]);
+    
+      return { isReady, initialState, saveNavigationState };
+    };
+    ```
+  </Tab>
+</Tabs>
+
+### Navigation Guards & Middleware
+
+```typescript
+// src/navigation/navigationGuards.ts
+import { useEffect } from 'react';
+import { useNavigation } from '@react-navigation/native';
+
+export const useAuthGuard = () => {
+  const navigation = useNavigation();
+  const { isAuthenticated, user } = useAuth();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Auth' }],
+      });
+    }
+  }, [isAuthenticated, navigation]);
+};
+
+export const useKYCGuard = (requiredLevel: number) => {
+  const navigation = useNavigation();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user && user.kycLevel < requiredLevel) {
+      navigation.navigate('KYCVerification', { level: requiredLevel });
+    }
+  }, [user, requiredLevel, navigation]);
+};
+
+export const useOnboardingGuard = () => {
+  const navigation = useNavigation();
+  const { user, isOnboardingComplete } = useAuth();
+
+  useEffect(() => {
+    if (user && !isOnboardingComplete) {
+      navigation.navigate('Auth', { screen: 'ProfileSetup' });
+    }
+  }, [user, isOnboardingComplete, navigation]);
+};
+
+// Navigation middleware for analytics and logging
+export const useNavigationMiddleware = () => {
+  const { track } = useAnalytics();
+
+  const handleNavigationStateChange = useCallback((state: NavigationState | undefined) => {
+    if (state) {
+      const currentRoute = getCurrentRoute(state);
+      
+      // Track screen views
+      track('Screen View', {
+        screen_name: currentRoute.name,
+        screen_params: currentRoute.params,
+      });
+
+      // Log navigation for debugging
+      if (__DEV__) {
+        console.log('Navigation:', currentRoute.name, currentRoute.params);
+      }
+    }
+  }, [track]);
+
+  return { handleNavigationStateChange };
+};
+
+function getCurrentRoute(state: NavigationState): { name: string; params?: any } {
+  const route = state.routes[state.index];
+  
+  if (route.state) {
+    return getCurrentRoute(route.state as NavigationState);
+  }
+  
+  return { name: route.name, params: route.params };
+}
+```
+
+## Documentation Navigation
+
+### Documentation Structure
+
+The AWO documentation follows a hierarchical structure optimized for discoverability and learning progression:
+
+```yaml
+# mint.json navigation configuration
+navigation:
+  - group: "Getting Started"
+    pages:
+      - "introduction"
+      - "quickstart"
+      - "development"
+  
+  - group: "API Reference"
+    pages:
+      - "api-reference/introduction"
+      - "api-reference/authentication"
+      - "api-reference/users"
+      - "api-reference/diva-score"
+      - "api-reference/transactions"
+      - "api-reference/chamas"
+      - "api-reference/investments"
+      - "api-reference/payments"
+  
+  - group: "Essentials"
+    pages:
+      - "essentials/architecture"
+      - "essentials/design-system"
+      - "essentials/code-standards"
+      - "essentials/testing"
+      - "essentials/deployment"
+  
+  - group: "Guides"
+    pages:
+      - "guides/integration"
+      - "guides/customization"
+      - "guides/troubleshooting"
+      - "guides/best-practices"
+  
+  - group: "Resources"
+    pages:
+      - "resources/examples"
+      - "resources/sdks"
+      - "resources/postman"
+      - "resources/changelog"
+```
+
+### Navigation Patterns
+
+<Tabs>
+  <Tab title="Breadcrumb Navigation">
+    ```mdx
+    <Breadcrumb>
+      <BreadcrumbItem href="/">Home</BreadcrumbItem>
+      <BreadcrumbItem href="/api-reference">API Reference</BreadcrumbItem>
+      <BreadcrumbItem>DIVA Score</BreadcrumbItem>
+    </Breadcrumb>
+    ```
+  </Tab>
+  <Tab title="Cross-References">
+    ```mdx
+    ## Related Topics
+    
+    <CardGroup cols={2}>
+      <Card title="Authentication" href="/api-reference/authentication">
+        Learn how to authenticate API requests
+      </Card>
+      <Card title="User Management" href="/api-reference/users">
+        Manage user profiles and preferences
+      </Card>
+    </CardGroup>
+    
+    ## See Also
+    
+    - [DIVA Score Calculation](/guides/diva-score-calculation)
+    - [Financial Insights API](/api-reference/insights)
+    - [Best Practices](/guides/best-practices#diva-score)
+    ```
+  </Tab>
+  <Tab title="Next Steps">
+    ```mdx
+    ## Next Steps
+    
+    <Steps>
+      <Step title="Set Up Authentication">
+        Configure OAuth 2.0 authentication for your application
+      </Step>
+      <Step title="Connect Bank Accounts">
+        Integrate Open Banking APIs to access transaction data
+      </Step>
+      <Step title="Calculate DIVA Score">
+        Use the DIVA Score API to analyze financial health
+      </Step>
+      <Step title="Build User Interface">
+        Create engaging UI components for score visualization
+      </Step>
+    </Steps>
+    ```
+  </Tab>
+</Tabs>
+
+### Search & Discovery
+
+```json
+{
+  "search": {
+    "enabled": true,
+    "indexing": {
+      "strategy": "auto",
+      "excludePaths": ["/internal/*", "/.git/*"],
+      "includeCodeBlocks": true,
+      "includeApiEndpoints": true
+    },
+    "suggestions": {
+      "enabled": true,
+      "popularQueries": [
+        "authentication",
+        "diva score",
+        "chama api",
+        "quick start",
+        "error codes"
+      ]
+    },
+    "shortcuts": {
+      "cmd+k": "open search",
+      "cmd+/": "toggle search",
+      "/": "focus search"
+    }
+  }
+}
+```
+
+## Navigation Best Practices
+
+### Mobile Navigation Guidelines
+
+<AccordionGroup>
+  <Accordion title="Navigation Depth">
+    **Keep navigation shallow (max 3-4 levels deep)**
+
+    ```
+    ✅ Good: Tab → Screen → Modal
+    ❌ Bad: Tab → Stack → Stack → Stack → Modal
+    ```
+
+    **Use modals for complex flows**
+
+    ```typescript
+    // Payment flow as modal instead of deep navigation
+    <Stack.Group screenOptions={{ presentation: 'modal' }}>
+      <Stack.Screen name="PaymentFlow" component={PaymentFlowNavigator} />
+    </Stack.Group>
+    ```
+  </Accordion>
+  <Accordion title="Gesture Support">
+    **Enable intuitive gestures**
+
+    ```typescript
+    const screenOptions = {
+      gestureEnabled: true,
+      gestureDirection: 'horizontal',
+      cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+    };
+    ```
+
+    **Swipe gestures for tabs**
+
+    ```typescript
+    <Tab.Navigator
+      screenOptions={{
+        swipeEnabled: true,
+        tabBarScrollEnabled: true,
+      }}
+    />
+    ```
+  </Accordion>
+  <Accordion title="State Management">
+    **Persist navigation state**
+
+    ```typescript
+    const [initialState, setInitialState] = useState();
+    
+    useEffect(() => {
+      const restoreState = async () => {
+        const savedState = await loadNavigationState();
+        setInitialState(savedState);
+      };
+      restoreState();
+    }, []);
+    
+    return (
+      <NavigationContainer
+        initialState={initialState}
+        onStateChange={saveNavigationState}
+      >
+        {/* Navigation content */}
+      </NavigationContainer>
+    );
+    ```
+  </Accordion>
+  <Accordion title="Accessibility">
+    **Screen reader support**
+
+    ```typescript
+    <Tab.Screen
+      name="Dashboard"
+      component={DashboardScreen}
+      options={{
+        tabBarAccessibilityLabel: 'Dashboard, tab 1 of 5',
+        tabBarIcon: ({ color, size }) => (
+          <Icon 
+            name="home" 
+            size={size} 
+            color={color}
+            accessibilityLabel="Dashboard icon"
+          />
+        ),
+      }}
+    />
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Documentation Navigation Guidelines
+
+<AccordionGroup>
+  <Accordion title="Progressive Disclosure">
+    **Start with high-level concepts, then dive deeper**
+
+    ```
+    Getting Started → Quick Start → Detailed Guides → API Reference
+    ```
+
+    **Use expandable sections for complex topics**
+
+    ```mdx
+    <AccordionGroup>
+      <Accordion title="Basic Usage">
+        Simple examples and common use cases
+      </Accordion>
+      <Accordion title="Advanced Configuration">
+        Complex scenarios and edge cases
+      </Accordion>
+    </AccordionGroup>
+    ```
+  </Accordion>
+  <Accordion title="Contextual Navigation">
+    **Provide relevant next steps**
+
+    ```mdx
+    ## What's Next?
+    
+    Now that you've set up authentication, you might want to:
+    
+    - [Connect bank accounts](/guides/bank-integration)
+    - [Calculate DIVA scores](/api-reference/diva-score)
+    - [Create your first Chama](/guides/chama-creation)
+    ```
+  </Accordion>
+  <Accordion title="Visual Hierarchy">
+    **Use consistent heading levels**
+
+    ```markdown
+    # Page Title (H1)
+    ## Major Section (H2)
+    ### Subsection (H3)
+    #### Details (H4)
+    ```
+
+    **Group related content**
+
+    ```mdx
+    <CardGroup cols={2}>
+      <Card title="Related Topic 1" href="/path1">
+        Brief description
+      </Card>
+      <Card title="Related Topic 2" href="/path2">
+        Brief description
+      </Card>
+    </CardGroup>
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Navigation Testing
+
+### Mobile Navigation Tests
+
+```typescript
+// __tests__/navigation/NavigationFlow.test.tsx
+describe('Navigation Flow', () => {
+  it('should navigate to DIVA score from dashboard', async () => {
+    const { getByTestId } = render(<AppNavigator />);
+    
+    // Navigate to dashboard
+    fireEvent.press(getByTestId('dashboard-tab'));
+    await waitFor(() => {
+      expect(getByTestId('dashboard-screen')).toBeOnTheScreen();
+    });
+    
+    // Navigate to DIVA score
+    fireEvent.press(getByTestId('diva-score-card'));
+    await waitFor(() => {
+      expect(getByTestId('diva-score-details-screen')).toBeOnTheScreen();
+    });
+  });
+
+  it('should handle deep linking correctly', async () => {
+    const initialUrl = 'awo://chamas/chama-123';
+    
+    const { getByTestId } = render(
+      <NavigationContainer 
+        linking={{ ...linkingConfig, initialURL: initialUrl }}
+      >
+        <AppNavigator />
+      </NavigationContainer>
+    );
+    
+    await waitFor(() => {
+      expect(getByTestId('chama-details-screen')).toBeOnTheScreen();
+      expect(getByTestId('chama-id')).toHaveTextContent('chama-123');
+    });
+  });
+});
+```
+
+### Documentation Navigation Tests
+
+```javascript
+// tests/navigation.test.js
+describe('Documentation Navigation', () => {
+  it('should have working breadcrumb navigation', () => {
+    cy.visit('/api-reference/diva-score');
+    
+    cy.get('[data-testid="breadcrumb"]').should('contain', 'API Reference');
+    cy.get('[data-testid="breadcrumb-link"]').first().click();
+    
+    cy.url().should('include', '/api-reference');
+  });
+
+  it('should provide relevant next steps', () => {
+    cy.visit('/quickstart');
+    
+    cy.get('[data-testid="next-steps"]').should('be.visible');
+    cy.get('[data-testid="next-step-link"]').should('have.length.greaterThan', 0);
+  });
+});
+```
+
+<Tip>
+  **Navigation Testing**: Always test critical navigation paths, especially authentication flows and deep linking. Use both unit tests and E2E tests to ensure reliability.
+</Tip>
+
+---
+
+**Need help with navigation implementation?** Check out our [development guide](/development) or reach out to the team on Discord.

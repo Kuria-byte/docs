@@ -1,0 +1,360 @@
+---
+title: "African Wealth Oasis (AWO) Documentation"
+description: "Comprehensive documentation for the AWO platform - a mobile-first wealth management solution for African women"
+---
+
+# AWO Platform Documentation
+
+<img
+  src="/logo/awo.svg"
+  alt="AWO Platform"
+  style={{ width:"100%",maxWidth:"600px",margin:"0 auto",display:"block" }}
+/>
+
+Welcome to the **African Wealth Oasis (AWO) Platform** - a revolutionary wealth management platform designed specifically for African women in the SADC region. This documentation will guide you through every aspect of building, deploying, and contributing to the AWO ecosystem.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running with AWO in under 10 minutes
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    Complete API documentation with examples
+  </Card>
+  <Card title="Development Guide" icon="wrench" href="/development">
+    Comprehensive development setup and workflows
+  </Card>
+  <Card title="Architecture" icon="building" href="/essentials/architecture">
+    System architecture and design patterns
+  </Card>
+</CardGroup>
+
+## What is AWO?
+
+AWO is a **mobile-first wealth management platform** that combines behavioral financial analysis with culturally relevant community features. Our mission is to democratize access to savings, investment, and financial education for African women.
+
+### Key Innovation: DIVA Scoring System
+
+Our proprietary **DIVA Score** (Discipline, Income, Velocity, Assets) analyzes real bank transaction data to provide personalized financial health assessments and recommendations.
+
+<Tabs>
+  <Tab title="For Users">
+    - **Personalized Insights**: Based on actual spending patterns
+    - **Financial Goal Setting**: AI-powered recommendations
+    - **Community Savings**: Digital Chama/Stokvel management
+    - **Financial Education**: Gamified learning modules
+    - **Investment Opportunities**: Curated investment marketplace
+  </Tab>
+  <Tab title="For Developers">
+    - **Modern Tech Stack**: Node.js, React Native, PostgreSQL
+    - **Cloud-Native**: AWS with Kubernetes orchestration
+    - **API-First**: GraphQL and REST with OpenAPI docs
+    - **Microservices**: Scalable, maintainable architecture
+    - **Comprehensive Testing**: Unit, integration, and E2E tests
+  </Tab>
+  <Tab title="For Business">
+    - **Multi-Country**: SADC region coverage
+    - **Regulatory Compliant**: KYC/AML and data protection
+    - **Scalable**: Built for millions of users
+    - **Revenue Streams**: Multiple monetization channels
+    - **Social Impact**: Financial inclusion for underserved markets
+  </Tab>
+</Tabs>
+
+## Platform Overview
+
+<Steps>
+  <Step title="User Onboarding">
+    Streamlined registration with progressive KYC verification
+  </Step>
+  <Step title="Bank Connection">
+    Secure Open Banking integration for transaction analysis
+  </Step>
+  <Step title="DIVA Score Analysis">
+    Real-time financial health assessment and recommendations
+  </Step>
+  <Step title="Savings & Investment">
+    Goal-based savings and curated investment opportunities
+  </Step>
+  <Step title="Community Features">
+    Digital Chama management with blockchain transparency
+  </Step>
+  <Step title="Financial Education">
+    Gamified learning modules for financial literacy
+  </Step>
+</Steps>
+
+## Target Markets
+
+<CardGroup cols={3}>
+  <Card title="Phase 1 Markets" icon="flag">
+    **Launch Countries (Q3 2025)**
+
+    - South Africa
+    - Kenya (optional testin)
+   
+  </Card>
+  <Card title="Phase 2 Markets" icon="globe">
+    **Expansion (Q4 2025)**
+
+    - Zambia
+    - Botswana
+    - Tanzania
+
+  </Card>
+  <Card title="Phase 3 Markets" icon="world">
+    **Further Expansion (2026)**
+
+    - Uganda
+    - Ghana
+    - Additional SADC countries
+  </Card>
+</CardGroup>
+
+## Core Features
+
+### 1. DIVA Scoring System
+
+Our proprietary financial health scoring system that analyzes:
+
+- **Discipline**: Payment punctuality and consistency
+- **Income**: Stability, growth, and diversification
+- **Velocity**: Cash flow patterns and efficiency
+- **Assets**: Accumulation, protection, and optimization
+
+### 2. Digital Chama/Stokvel Management
+
+Modernized traditional savings groups with:
+
+- Blockchain-backed transparency
+- Automated contribution tracking
+- Smart contract-based payouts
+- Group communication tools
+
+### 3. Financial Education Hub
+
+Gamified learning platform featuring:
+
+- Bite-sized educational modules
+- Progress tracking and certifications
+- Community discussions
+- Localized content for each market
+
+### 4. Investment Marketplace
+
+Curated investment opportunities including:
+
+- Micro-investment options
+- Risk-appropriate product matching
+- Performance tracking
+- Educational content for each investment type
+
+## Technology Stack
+
+<Tabs>
+  <Tab title="Backend">
+    ```json
+    {
+      "runtime": "Node.js 18 LTS",
+      "framework": "NestJS 10+",
+      "language": "TypeScript 5+",
+      "database": "PostgreSQL + MongoDB + Redis",
+      "api": "GraphQL + REST",
+      "documentation": "OpenAPI 3.0"
+    }
+    ```
+  </Tab>
+  <Tab title="Frontend">
+    ```json
+    {
+      "mobile": {
+        "framework": "React Native 0.72+",
+        "state": "Redux Toolkit + RTK Query",
+        "navigation": "React Navigation 6",
+        "testing": "Jest + React Native Testing Library"
+      },
+      "web": {
+        "framework": "React 18+",
+        "state": "Redux Toolkit",
+        "ui": "Material-UI v5",
+        "testing": "Jest + React Testing Library"
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Infrastructure">
+    ```json
+    {
+      "cloud": "AWS (EKS, RDS, S3, CloudFront)",
+      "containers": "Docker + Kubernetes",
+      "ci_cd": "GitHub Actions",
+      "monitoring": "Prometheus + Grafana",
+      "logging": "ELK Stack",
+      "security": "OAuth 2.0 + JWT + AES-256"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Getting Started
+
+<CardGroup cols={2}>
+  <Card title="I'm a Developer" icon="code" href="/quickstart">
+    **Quick Start Guide**
+    Set up your development environment and start building
+
+    → Clone repositories\
+    → Install dependencies\
+    → Start development servers\
+    → Begin coding\!
+  </Card>
+  <Card title="I'm a Product Manager" icon="chart-line" href="/essentials/product-overview">
+    **Product Overview**
+    Understand the platform's vision, features, and roadmap
+
+    → Product requirements\
+    → User personas\
+    → Feature specifications\
+    → Success metrics
+  </Card>
+  <Card title="I'm a Designer" icon="palette" href="/essentials/design-system">
+    **Design System**
+    Explore our design principles and component library
+
+    → Design tokens\
+    → Component library\
+    → UI guidelines\
+    → Accessibility standards
+  </Card>
+  <Card title="I'm a Business Stakeholder" icon="briefcase" href="/essentials/business-overview">
+    **Business Overview**
+    Learn about our market approach and business model
+
+    → Market analysis\
+    → Revenue streams\
+    → Compliance framework\
+    → Growth strategy
+  </Card>
+</CardGroup>
+
+## Key Integrations
+
+<AccordionGroup>
+  <Accordion title="Open Banking APIs">
+    **Supported Providers:**
+
+    - Stitch (South Africa, Nigeria)
+    - Mono (Nigeria, Kenya, Ghana)
+    - Plaid (Global)
+    - TrueLayer (UK for diaspora)
+
+    **Features:**
+
+    - Account information access
+    - Transaction history retrieval
+    - Real-time balance monitoring
+    - Income verification
+  </Accordion>
+  <Accordion title="Payment Gateways">
+    **Supported Providers:**
+
+    - Flutterwave (Pan-African)
+    - Paystack (South Africa, Nigeria, Ghana)
+    - Mobile money providers (M-Pesa, MTN MoMo, Orange Money)
+
+    **Features:**
+
+    - Card payments
+    - Bank transfers
+    - Mobile wallet integration
+    - Cross-border transfers
+  </Accordion>
+  <Accordion title="KYC & Compliance">
+    **Supported Providers:**
+
+    - Smile ID (Identity verification)
+    - Onfido (Document verification)
+    - Custom verification workflows
+
+    **Features:**
+
+    - Tiered KYC verification
+    - Document processing
+    - Biometric verification
+    - Compliance reporting
+  </Accordion>
+</AccordionGroup>
+
+## Architecture Highlights
+
+AWO is built with a **cloud-native, microservices architecture** that ensures:
+
+- **Scalability**: Handle millions of users across multiple countries
+- **Reliability**: 99.9% uptime with fault-tolerant design
+- **Security**: Bank-grade security with end-to-end encryption
+- **Compliance**: Built-in regulatory compliance for all markets
+- **Performance**: Sub-300ms API response times globally
+
+<Tip>
+  **New to the codebase?** Start with our [Architecture Overview](/essentials/architecture) to understand how all the pieces fit together.
+</Tip>
+
+## Success Metrics
+
+<CardGroup cols={4}>
+  <Card title="100K+" icon="users">
+    Active users by end of Year 1
+  </Card>
+  <Card title="$5M+" icon="dollar-sign">
+    Assets under management
+  </Card>
+  <Card title="5K+" icon="handshake">
+    Active Chama groups
+  </Card>
+  <Card title="3+" icon="globe">
+    Countries at launch
+  </Card>
+</CardGroup>
+
+## Community & Support
+
+<CardGroup cols={3}>
+  <Card title="GitHub" icon="github" href="https://github.com/awo-platform">
+    Source code, issues, and contributions
+  </Card>
+  <Card title="Discord" icon="discord" href="https://discord.gg/awo-platform">
+    Developer community and real-time support
+  </Card>
+  <Card title="Email" icon="envelope" href="mailto:developers@awo-platform.com">
+    Direct support for complex issues
+  </Card>
+</CardGroup>
+
+## What's Next?
+
+<Steps>
+  <Step title="Set Up Development Environment">
+    Follow our [Quick Start Guide](/quickstart) to get your local environment running
+  </Step>
+  <Step title="Explore the API">
+    Check out our [API Reference](/api-reference/introduction) with interactive examples
+  </Step>
+  <Step title="Understand the Architecture">
+    Read through our [Architecture Documentation](/essentials/architecture)
+  </Step>
+  <Step title="Start Contributing">
+    Review our [Contributing Guidelines](/essentials/contributing) and make your first contribution
+  </Step>
+</Steps>
+
+<Note>
+  **Stay Updated**: This documentation is actively maintained and updated with each release. Last updated: May 29, 2025.
+</Note>
+
+---
+
+<div style={{ textAlign:"center",marginTop:"3rem",padding:"2rem",backgroundColor:"#f8f9fa",borderRadius:"8px" }}>
+**Built with ❤️ for African women's financial empowerment**
+
+_AWO Platform - Democratizing wealth management across Africa_
+
+</div>

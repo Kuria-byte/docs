@@ -1,0 +1,1512 @@
+---
+title: "Images & Assets Guidelines"
+description: "This guide covers best practices for handling AWO images and assets"
+---
+
+# Images & Assets Guidelines
+
+This guide covers best practices for handling images, icons, and other visual assets across the AWO platform, including optimization, formats, and implementation patterns.
+
+## Image Strategy Overview
+
+<CardGroup cols={2}>
+  <Card title="Performance First" icon="zap">
+    Optimized images for fast loading across all devices
+  </Card>
+  <Card title="Responsive Design" icon="mobile-phone">
+    Adaptive images that work on any screen size
+  </Card>
+  <Card title="Cultural Relevance" icon="globe">
+    Visuals that resonate with African women
+  </Card>
+  <Card title="Accessibility" icon="eye">
+    Images with proper alt text and semantic meaning
+  </Card>
+</CardGroup>
+
+## Image Formats & Specifications
+
+### Format Guidelines
+
+<Tabs>
+  <Tab title="Web Images">
+    ```markdown
+    ## Primary Formats (in order of preference)
+    
+    1. **WebP** - Modern format with excellent compression
+       - Use for: Photos, complex graphics
+       - Browser support: 95%+
+       - Fallback: JPEG/PNG
+    
+    2. **AVIF** - Next-generation format
+       - Use for: Hero images, high-quality photos
+       - Browser support: 85%+
+       - Fallback: WebP → JPEG
+    
+    3. **JPEG** - Universal photo format
+       - Use for: Photographs, gradients
+       - Quality: 80-85% for web
+       - Progressive loading enabled
+    
+    4. **PNG** - Lossless format
+       - Use for: Logos, icons with transparency
+       - Optimize with tools like TinyPNG
+    
+    5. **SVG** - Vector format
+       - Use for: Icons, simple illustrations, logos
+       - Always optimize and sanitize
+    ```
+  </Tab>
+  <Tab title="Mobile Images">
+    ```typescript
+    // React Native image format priorities
+    const imageFormats = {
+      // iOS preferred formats
+      ios: ['HEIC', 'JPEG', 'PNG', 'WebP'],
+      
+      // Android preferred formats
+      android: ['WebP', 'JPEG', 'PNG'],
+      
+      // Universal fallback
+      universal: ['JPEG', 'PNG']
+    };
+    
+    // Image sizing for different densities
+    const imageDensities = {
+      '@1x': 1,    // mdpi (160dpi)
+      '@1.5x': 1.5, // hdpi (240dpi)
+      '@2x': 2,    // xhdpi (320dpi)
+      '@3x': 3,    // xxhdpi (480dpi)
+      '@4x': 4,    // xxxhdpi (640dpi)
+    };
+    ```
+  </Tab>
+  <Tab title="Documentation Images">
+    ```markdown
+    ## Documentation Standards
+    
+    **Screenshots:**
+    - Format: PNG for UI screenshots
+    - Resolution: 2x device resolution
+    - Annotations: Use consistent colors and fonts
+    
+    **Diagrams:**
+    - Format: SVG (preferred) or PNG
+    - Tools: Figma, Lucidchart, or Mermaid
+    - Style: Consistent with brand guidelines
+    
+    **Charts & Graphs:**
+    - Format: SVG for scalability
+    - Colors: Use AWO color palette
+    - Accessibility: Include data tables for screen readers
+    ```
+  </Tab>
+</Tabs>
+
+### Size Specifications
+
+<Tabs>
+  <Tab title="Mobile App Images">
+    ```typescript
+    // Image size guidelines for mobile
+    export const ImageSizes = {
+      // Profile and user images
+      avatar: {
+        small: { width: 32, height: 32 },
+        medium: { width: 64, height: 64 },
+        large: { width: 128, height: 128 },
+      },
+      
+      // Card and thumbnail images
+      thumbnail: {
+        small: { width: 80, height: 80 },
+        medium: { width: 120, height: 120 },
+        large: { width: 200, height: 200 },
+      },
+      
+      // Banner and hero images
+      banner: {
+        mobile: { width: 375, height: 200 },
+        tablet: { width: 768, height: 300 },
+      },
+      
+      // Icons
+      icon: {
+        small: { width: 16, height: 16 },
+        medium: { width: 24, height: 24 },
+        large: { width: 32, height: 32 },
+        xl: { width: 48, height: 48 },
+      },
+      
+      // App store assets
+      appStore: {
+        icon: { width: 1024, height: 1024 },
+        screenshot: { width: 1290, height: 2796 }, // iPhone 14 Pro Max
+        featureGraphic: { width: 1024, height: 500 },
+      }
+    };
+    ```
+  </Tab>
+  <Tab title="Web Images">
+    ```css
+    /* CSS custom properties for consistent sizing */
+    :root {
+      /* Avatar sizes */
+      --avatar-xs: 24px;
+      --avatar-sm: 32px;
+      --avatar-md: 48px;
+      --avatar-lg: 64px;
+      --avatar-xl: 96px;
+      
+      /* Card image sizes */
+      --card-image-sm: 120px;
+      --card-image-md: 200px;
+      --card-image-lg: 300px;
+      
+      /* Hero image sizes */
+      --hero-mobile: 375px;
+      --hero-tablet: 768px;
+      --hero-desktop: 1200px;
+      
+      /* Icon sizes */
+      --icon-xs: 12px;
+      --icon-sm: 16px;
+      --icon-md: 20px;
+      --icon-lg: 24px;
+      --icon-xl: 32px;
+    }
+    
+    /* Responsive image classes */
+    .img-responsive {
+      max-width: 100%;
+      height: auto;
+    }
+    
+    .img-avatar {
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    
+    .img-card {
+      border-radius: 8px;
+      object-fit: cover;
+    }
+    
+    .img-hero {
+      width: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+    ```
+  </Tab>
+  <Tab title="Social Media">
+    ```markdown
+    ## Social Media Image Specifications
+    
+    **Profile Images:**
+    - Facebook: 180x180px
+    - Twitter: 400x400px
+    - LinkedIn: 400x400px
+    - Instagram: 320x320px
+    
+    **Cover Images:**
+    - Facebook: 1200x630px
+    - Twitter: 1500x500px
+    - LinkedIn: 1584x396px
+    
+    **Post Images:**
+    - Instagram: 1080x1080px (square), 1080x1350px (portrait)
+    - Facebook: 1200x630px
+    - Twitter: 1200x675px
+    - LinkedIn: 1200x627px
+    
+    **Story Images:**
+    - Instagram/Facebook: 1080x1920px
+    - Twitter: 1080x1920px
+    ```
+  </Tab>
+</Tabs>
+
+## Image Optimization
+
+### Automated Optimization Pipeline
+
+<Tabs>
+  <Tab title="Build-time Optimization">
+    ```javascript
+    // webpack.config.js - Image optimization
+    const path = require('path');
+    const ImageMinimizerPlugin = require('image-minimizer-webpack-plugin');
+    
+    module.exports = {
+      module: {
+        rules: [
+          {
+            test: /\.(jpe?g|png|gif|svg)$/i,
+            type: 'asset/resource',
+            generator: {
+              filename: 'images/[name].[hash:8][ext]'
+            },
+          },
+        ],
+      },
+      optimization: {
+        minimizer: [
+          new ImageMinimizerPlugin({
+            minimizer: {
+              implementation: ImageMinimizerPlugin.sharpMinify,
+              options: {
+                encodeOptions: {
+                  jpeg: {
+                    quality: 80,
+                    progressive: true,
+                  },
+                  webp: {
+                    quality: 80,
+                  },
+                  avif: {
+                    quality: 50,
+                  },
+                  png: {
+                    compressionLevel: 9,
+                    adaptiveFiltering: true,
+                  },
+                },
+              },
+            },
+            generator: [
+              {
+                preset: 'webp-custom-name',
+                implementation: ImageMinimizerPlugin.sharpGenerate,
+                options: {
+                  encodeOptions: {
+                    webp: {
+                      quality: 80,
+                    },
+                  },
+                },
+              },
+            ],
+          }),
+        ],
+      },
+    };
+    ```
+  </Tab>
+  <Tab title="Runtime Optimization">
+    ```typescript
+    // Image optimization service
+    import Sharp from 'sharp';
+    
+    interface ImageOptimizationOptions {
+      width?: number;
+      height?: number;
+      quality?: number;
+      format?: 'jpeg' | 'png' | 'webp' | 'avif';
+      progressive?: boolean;
+    }
+    
+    export class ImageOptimizationService {
+      async optimizeImage(
+        buffer: Buffer,
+        options: ImageOptimizationOptions = {}
+      ): Promise<Buffer> {
+        const {
+          width,
+          height,
+          quality = 80,
+          format = 'webp',
+          progressive = true
+        } = options;
+    
+        let pipeline = Sharp(buffer);
+    
+        // Resize if dimensions provided
+        if (width || height) {
+          pipeline = pipeline.resize(width, height, {
+            fit: 'cover',
+            position: 'center',
+          });
+        }
+    
+        // Apply format-specific optimizations
+        switch (format) {
+          case 'jpeg':
+            pipeline = pipeline.jpeg({
+              quality,
+              progressive,
+              mozjpeg: true,
+            });
+            break;
+          case 'png':
+            pipeline = pipeline.png({
+              compressionLevel: 9,
+              adaptiveFiltering: true,
+            });
+            break;
+          case 'webp':
+            pipeline = pipeline.webp({
+              quality,
+              effort: 6,
+            });
+            break;
+          case 'avif':
+            pipeline = pipeline.avif({
+              quality: Math.max(quality - 20, 30), // AVIF can use lower quality
+              effort: 9,
+            });
+            break;
+        }
+    
+        return pipeline.toBuffer();
+      }
+    
+      async generateResponsiveImages(
+        buffer: Buffer,
+        sizes: number[] = [320, 640, 960, 1280, 1920]
+      ): Promise<{ size: number; buffer: Buffer }[]> {
+        const results = await Promise.all(
+          sizes.map(async (size) => ({
+            size,
+            buffer: await this.optimizeImage(buffer, { width: size }),
+          }))
+        );
+    
+        return results;
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="CDN Integration">
+    ```typescript
+    // CDN-based image optimization
+    export class CDNImageService {
+      private cdnBaseUrl = 'https://cdn.awo-platform.com';
+    
+      generateImageUrl(
+        imagePath: string,
+        options: {
+          width?: number;
+          height?: number;
+          quality?: number;
+          format?: string;
+          dpr?: number;
+        } = {}
+      ): string {
+        const params = new URLSearchParams();
+    
+        if (options.width) params.set('w', options.width.toString());
+        if (options.height) params.set('h', options.height.toString());
+        if (options.quality) params.set('q', options.quality.toString());
+        if (options.format) params.set('f', options.format);
+        if (options.dpr) params.set('dpr', options.dpr.toString());
+    
+        const queryString = params.toString();
+        return `${this.cdnBaseUrl}/${imagePath}${queryString ? `?${queryString}` : ''}`;
+      }
+    
+      generateResponsiveImageSet(
+        imagePath: string,
+        sizes: number[] = [320, 640, 960, 1280]
+      ): string {
+        return sizes
+          .map(size => `${this.generateImageUrl(imagePath, { width: size })} ${size}w`)
+          .join(', ');
+      }
+    
+      generatePictureElement(
+        imagePath: string,
+        alt: string,
+        sizes: string = '(max-width: 768px) 100vw, 50vw'
+      ): string {
+        return `
+          <picture>
+            <source 
+              srcset="${this.generateImageUrl(imagePath, { format: 'avif' })}" 
+              type="image/avif"
+            >
+            <source 
+              srcset="${this.generateImageUrl(imagePath, { format: 'webp' })}" 
+              type="image/webp"
+            >
+            <img 
+              src="${this.generateImageUrl(imagePath)}" 
+              srcset="${this.generateResponsiveImageSet(imagePath)}"
+              sizes="${sizes}"
+              alt="${alt}"
+              loading="lazy"
+            >
+          </picture>
+        `;
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Responsive Image Implementation
+
+### Web Implementation
+
+<Tabs>
+  <Tab title="React Component">
+    ```typescript
+    // OptimizedImage.tsx
+    import React, { useState, useCallback } from 'react';
+    
+    interface OptimizedImageProps {
+      src: string;
+      alt: string;
+      width?: number;
+      height?: number;
+      className?: string;
+      sizes?: string;
+      priority?: boolean;
+      placeholder?: 'blur' | 'empty';
+      onLoad?: () => void;
+      onError?: () => void;
+    }
+    
+    export const OptimizedImage: React.FC<OptimizedImageProps> = ({
+      src,
+      alt,
+      width,
+      height,
+      className = '',
+      sizes = '100vw',
+      priority = false,
+      placeholder = 'blur',
+      onLoad,
+      onError,
+    }) => {
+      const [isLoaded, setIsLoaded] = useState(false);
+      const [hasError, setHasError] = useState(false);
+    
+      const handleLoad = useCallback(() => {
+        setIsLoaded(true);
+        onLoad?.();
+      }, [onLoad]);
+    
+      const handleError = useCallback(() => {
+        setHasError(true);
+        onError?.();
+      }, [onError]);
+    
+      const generateSrcSet = (baseSrc: string) => {
+        const sizes = [320, 640, 960, 1280, 1920];
+        return sizes
+          .map(size => `${baseSrc}?w=${size}&q=80 ${size}w`)
+          .join(', ');
+      };
+    
+      if (hasError) {
+        return (
+          <div 
+            className={`bg-gray-200 flex items-center justify-center ${className}`}
+            style={{ width, height }}
+          >
+            <span className="text-gray-500 text-sm">Image failed to load</span>
+          </div>
+        );
+      }
+    
+      return (
+        <div className={`relative overflow-hidden ${className}`}>
+          {placeholder === 'blur' && !isLoaded && (
+            <div 
+              className="absolute inset-0 bg-gray-200 animate-pulse"
+              style={{ width, height }}
+            />
+          )}
+          
+          <picture>
+            <source 
+              srcSet={`${src}?f=avif&q=80`}
+              type="image/avif"
+            />
+            <source 
+              srcSet={`${src}?f=webp&q=80`}
+              type="image/webp"
+            />
+            <img
+              src={`${src}?q=80`}
+              srcSet={generateSrcSet(src)}
+              sizes={sizes}
+              alt={alt}
+              width={width}
+              height={height}
+              loading={priority ? 'eager' : 'lazy'}
+              onLoad={handleLoad}
+              onError={handleError}
+              className={`transition-opacity duration-300 ${
+                isLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
+          </picture>
+        </div>
+      );
+    };
+    
+    // Usage example
+    export const UserProfile = ({ user }: { user: User }) => (
+      <div className="flex items-center space-x-4">
+        <OptimizedImage
+          src={user.profileImage}
+          alt={`${user.firstName} ${user.lastName}'s profile`}
+          width={64}
+          height={64}
+          className="rounded-full"
+          sizes="64px"
+        />
+        <div>
+          <h3>{user.firstName} {user.lastName}</h3>
+          <p>DIVA Score: {user.divaScore}</p>
+        </div>
+      </div>
+    );
+    ```
+  </Tab>
+  <Tab title="React Native Component">
+    ```typescript
+    // OptimizedImage.tsx (React Native)
+    import React, { useState, useCallback } from 'react';
+    import { 
+      Image, 
+      View, 
+      ActivityIndicator, 
+      Text, 
+      PixelRatio,
+      Dimensions 
+    } from 'react-native';
+    import FastImage, { FastImageProps } from 'react-native-fast-image';
+    
+    interface OptimizedImageProps extends Omit<FastImageProps, 'source'> {
+      uri: string;
+      width: number;
+      height: number;
+      placeholder?: string;
+      fallback?: string;
+      quality?: 'low' | 'normal' | 'high';
+    }
+    
+    export const OptimizedImage: React.FC<OptimizedImageProps> = ({
+      uri,
+      width,
+      height,
+      placeholder,
+      fallback,
+      quality = 'normal',
+      style,
+      ...props
+    }) => {
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(false);
+    
+      const pixelRatio = PixelRatio.get();
+      const screenData = Dimensions.get('window');
+    
+      const getOptimizedUri = useCallback((originalUri: string) => {
+        if (!originalUri.includes('cdn.awo-platform.com')) {
+          return originalUri;
+        }
+    
+        const params = new URLSearchParams();
+        params.set('w', Math.round(width * pixelRatio).toString());
+        params.set('h', Math.round(height * pixelRatio).toString());
+        
+        switch (quality) {
+          case 'low':
+            params.set('q', '60');
+            break;
+          case 'high':
+            params.set('q', '90');
+            break;
+          default:
+            params.set('q', '80');
+        }
+    
+        // Use WebP for Android, JPEG for iOS (better compatibility)
+        if (Platform.OS === 'android') {
+          params.set('f', 'webp');
+        }
+    
+        return `${originalUri}?${params.toString()}`;
+      }, [width, height, pixelRatio, quality]);
+    
+      const handleLoad = useCallback(() => {
+        setLoading(false);
+      }, []);
+    
+      const handleError = useCallback(() => {
+        setError(true);
+        setLoading(false);
+      }, []);
+    
+      const imageSource = {
+        uri: getOptimizedUri(error && fallback ? fallback : uri),
+        priority: FastImage.priority.normal,
+        cache: FastImage.cacheControl.immutable,
+      };
+    
+      return (
+        <View style={[{ width, height, position: 'relative' }, style]}>
+          {placeholder && loading && (
+            <FastImage
+              source={{ uri: placeholder }}
+              style={{
+                position: 'absolute',
+                width,
+                height,
+                opacity: 0.3,
+              }}
+              resizeMode={FastImage.resizeMode.cover}
+            />
+          )}
+          
+          {loading && (
+            <View
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: 'rgba(0,0,0,0.1)',
+              }}
+            >
+              <ActivityIndicator size="small" color="#E63946" />
+            </View>
+          )}
+    
+          {error ? (
+            <View
+              style={{
+                width,
+                height,
+                backgroundColor: '#f3f4f6',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#6b7280', fontSize: 12 }}>
+                Failed to load
+              </Text>
+            </View>
+          ) : (
+            <FastImage
+              source={imageSource}
+              style={{ width, height }}
+              onLoad={handleLoad}
+              onError={handleError}
+              resizeMode={FastImage.resizeMode.cover}
+              {...props}
+            />
+          )}
+        </View>
+      );
+    };
+    
+    // Usage examples
+    export const DivaScoreCard = ({ user }: { user: User }) => (
+      <View style={styles.card}>
+        <OptimizedImage
+          uri={user.profileImage}
+          width={60}
+          height={60}
+          style={styles.avatar}
+          quality="high"
+          fallback="https://cdn.awo-platform.com/defaults/avatar.png"
+        />
+        <Text style={styles.score}>{user.divaScore}</Text>
+      </View>
+    );
+    ```
+  </Tab>
+</Tabs>
+
+### Lazy Loading Implementation
+
+<Tabs>
+  <Tab title="Intersection Observer">
+    ```typescript
+    // useLazyImage.ts
+    import { useState, useEffect, useRef } from 'react';
+    
+    interface UseLazyImageOptions {
+      rootMargin?: string;
+      threshold?: number;
+      placeholder?: string;
+    }
+    
+    export const useLazyImage = (
+      src: string, 
+      options: UseLazyImageOptions = {}
+    ) => {
+      const {
+        rootMargin = '50px',
+        threshold = 0.1,
+        placeholder = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PC9zdmc+'
+      } = options;
+    
+      const [imageSrc, setImageSrc] = useState<string>(placeholder);
+      const [isLoaded, setIsLoaded] = useState(false);
+      const [isInView, setIsInView] = useState(false);
+      const imgRef = useRef<HTMLImageElement>(null);
+    
+      useEffect(() => {
+        const observer = new IntersectionObserver(
+          ([entry]) => {
+            if (entry.isIntersecting) {
+              setIsInView(true);
+              observer.disconnect();
+            }
+          },
+          {
+            rootMargin,
+            threshold,
+          }
+        );
+    
+        if (imgRef.current) {
+          observer.observe(imgRef.current);
+        }
+    
+        return () => observer.disconnect();
+      }, [rootMargin, threshold]);
+    
+      useEffect(() => {
+        if (isInView && !isLoaded) {
+          const img = new Image();
+          img.onload = () => {
+            setImageSrc(src);
+            setIsLoaded(true);
+          };
+          img.onerror = () => {
+            setImageSrc(placeholder);
+            setIsLoaded(true);
+          };
+          img.src = src;
+        }
+      }, [isInView, isLoaded, src, placeholder]);
+    
+      return { imageSrc, isLoaded, imgRef };
+    };
+    
+    // LazyImage component
+    export const LazyImage: React.FC<{
+      src: string;
+      alt: string;
+      className?: string;
+      width?: number;
+      height?: number;
+    }> = ({ src, alt, className, width, height }) => {
+      const { imageSrc, isLoaded, imgRef } = useLazyImage(src);
+    
+      return (
+        <img
+          ref={imgRef}
+          src={imageSrc}
+          alt={alt}
+          className={`transition-opacity duration-300 ${
+            isLoaded ? 'opacity-100' : 'opacity-70'
+          } ${className}`}
+          width={width}
+          height={height}
+          loading="lazy"
+        />
+      );
+    };
+    ```
+  </Tab>
+  <Tab title="React Native Lazy Loading">
+    ```typescript
+    // LazyImageList.tsx (React Native)
+    import React, { useState, useCallback } from 'react';
+    import { FlatList, View, Dimensions } from 'react-native';
+    import { OptimizedImage } from './OptimizedImage';
+    
+    interface LazyImageListProps {
+      images: Array<{
+        id: string;
+        uri: string;
+        title?: string;
+      }>;
+      numColumns?: number;
+      onImagePress?: (image: any) => void;
+    }
+    
+    export const LazyImageList: React.FC<LazyImageListProps> = ({
+      images,
+      numColumns = 2,
+      onImagePress,
+    }) => {
+      const [viewableItems, setViewableItems] = useState<Set<string>>(new Set());
+      const screenWidth = Dimensions.get('window').width;
+      const imageSize = (screenWidth - 32 - (numColumns - 1) * 8) / numColumns;
+    
+      const onViewableItemsChanged = useCallback(({ viewableItems: items }) => {
+        const viewableIds = new Set(items.map(item => item.item.id));
+        setViewableItems(viewableIds);
+      }, []);
+    
+      const renderImage = useCallback(({ item, index }) => {
+        const isViewable = viewableItems.has(item.id);
+        
+        return (
+          <View
+            style={{
+              width: imageSize,
+              height: imageSize,
+              marginRight: (index + 1) % numColumns === 0 ? 0 : 8,
+              marginBottom: 8,
+            }}
+          >
+            {isViewable ? (
+              <OptimizedImage
+                uri={item.uri}
+                width={imageSize}
+                height={imageSize}
+                quality="normal"
+                onPress={() => onImagePress?.(item)}
+              />
+            ) : (
+              <View
+                style={{
+                  width: imageSize,
+                  height: imageSize,
+                  backgroundColor: '#f3f4f6',
+                }}
+              />
+            )}
+          </View>
+        );
+      }, [viewableItems, imageSize, numColumns, onImagePress]);
+    
+      return (
+        <FlatList
+          data={images}
+          renderItem={renderImage}
+          keyExtractor={(item) => item.id}
+          numColumns={numColumns}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={{
+            itemVisiblePercentThreshold: 50,
+            minimumViewTime: 100,
+          }}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={6}
+          getItemLayout={(data, index) => ({
+            length: imageSize + 8,
+            offset: (imageSize + 8) * Math.floor(index / numColumns),
+            index,
+          })}
+        />
+      );
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Icon System
+
+### Icon Implementation
+
+<Tabs>
+  <Tab title="SVG Icon System">
+    ```typescript
+    // IconSystem.tsx
+    import React from 'react';
+    
+    interface IconProps {
+      name: string;
+      size?: number;
+      color?: string;
+      className?: string;
+    }
+    
+    const iconPaths = {
+      home: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+      user: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+      'chart-line': 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
+      'piggy-bank': 'M15 8a3 3 0 00-3-3 3 3 0 00-3 3m6 0v2a.5.5 0 00.5.5.5.5 0 01.5.5v3.5a3 3 0 003 3h1a3 3 0 003-3V13a.5.5 0 01.5-.5.5.5 0 00.5-.5V10a.5.5 0 00-.5-.5.5.5 0 01-.5-.5 3 3 0 00-3-3 3 3 0 00-3 3z',
+      'account-group': 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a4 4 0 11-8 0 4 4 0 018 0z',
+      // Add more icons as needed
+    };
+    
+    export const Icon: React.FC<IconProps> = ({ 
+      name, 
+      size = 24, 
+      color = 'currentColor',
+      className = '' 
+    }) => {
+      const path = iconPaths[name];
+      
+      if (!path) {
+        console.warn(`Icon "${name}" not found`);
+        return null;
+      }
+    
+      return (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          role="img"
+          aria-label={`${name} icon`}
+        >
+          <path d={path} />
+        </svg>
+      );
+    };
+    
+    // Icon component with loading state
+    export const DynamicIcon: React.FC<IconProps & { loading?: boolean }> = ({
+      loading,
+      ...props
+    }) => {
+      if (loading) {
+        return (
+          <div
+            className="animate-pulse bg-gray-300 rounded"
+            style={{ width: props.size || 24, height: props.size || 24 }}
+          />
+        );
+      }
+    
+      return <Icon {...props} />;
+    };
+    
+    // Usage examples
+    export const NavigationTab = ({ active, icon, label }) => (
+      <div className={`flex flex-col items-center ${active ? 'text-primary' : 'text-gray-500'}`}>
+        <Icon name={icon} size={24} />
+        <span className="text-xs mt-1">{label}</span>
+      </div>
+    );
+    ```
+  </Tab>
+  <Tab title="React Native Icons">
+    ```typescript
+    // IconSystem.tsx (React Native)
+    import React from 'react';
+    import Svg, { Path, SvgProps } from 'react-native-svg';
+    
+    interface IconProps extends SvgProps {
+      name: string;
+      size?: number;
+      color?: string;
+    }
+    
+    const iconPaths = {
+      home: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+      user: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+      'chart-line': 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
+      'piggy-bank': 'M15 8a3 3 0 00-3-3 3 3 0 00-3 3m6 0v2a.5.5 0 00.5.5.5.5 0 01.5.5v3.5a3 3 0 003 3h1a3 3 0 003-3V13a.5.5 0 01.5-.5.5.5 0 00.5-.5V10a.5.5 0 00-.5-.5.5.5 0 01-.5-.5 3 3 0 00-3-3 3 3 0 00-3 3z',
+      'account-group': 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a4 4 0 11-8 0 4 4 0 018 0z',
+    };
+    
+    export const Icon: React.FC<IconProps> = ({ 
+      name, 
+      size = 24, 
+      color = '#000000',
+      ...props 
+    }) => {
+      const path = iconPaths[name];
+      
+      if (!path) {
+        console.warn(`Icon "${name}" not found`);
+        return null;
+      }
+    
+      return (
+        <Svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          {...props}
+        >
+          <Path d={path} />
+        </Svg>
+      );
+    };
+    
+    // Themed icon component
+    export const ThemedIcon: React.FC<IconProps> = ({ 
+      color,
+      ...props 
+    }) => {
+      const { colors } = useTheme();
+      
+      return (
+        <Icon 
+          color={color || colors.onSurface} 
+          {...props} 
+        />
+      );
+    };
+    
+    // Usage in tab navigation
+    export const TabIcon = ({ focused, name, size = 24 }) => {
+      const { colors } = useTheme();
+      
+      return (
+        <Icon
+          name={name}
+          size={size}
+          color={focused ? colors.primary : colors.onSurfaceVariant}
+        />
+      );
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Image Security & Privacy
+
+### Content Security
+
+<Tabs>
+  <Tab title="Image Upload Security">
+    ```typescript
+    // imageUpload.service.ts
+    import { Injectable, BadRequestException } from '@nestjs/common';
+    import { ConfigService } from '@nestjs/config';
+    import * as sharp from 'sharp';
+    import * as crypto from 'crypto';
+    
+    @Injectable()
+    export class ImageUploadService {
+      private readonly allowedMimeTypes = [
+        'image/jpeg',
+        'image/png', 
+        'image/webp',
+        'image/gif'
+      ];
+      
+      private readonly maxFileSize = 10 * 1024 * 1024; // 10MB
+      private readonly maxDimensions = { width: 4000, height: 4000 };
+    
+      constructor(private configService: ConfigService) {}
+    
+      async validateAndProcessImage(
+        buffer: Buffer,
+        mimeType: string,
+        filename: string
+      ): Promise<{ buffer: Buffer; filename: string; metadata: any }> {
+        // Validate MIME type
+        if (!this.allowedMimeTypes.includes(mimeType)) {
+          throw new BadRequestException('Invalid file type');
+        }
+    
+        // Validate file size
+        if (buffer.length > this.maxFileSize) {
+          throw new BadRequestException('File too large');
+        }
+    
+        // Validate and sanitize image
+        try {
+          const image = sharp(buffer);
+          const metadata = await image.metadata();
+    
+          // Check dimensions
+          if (
+            metadata.width > this.maxDimensions.width ||
+            metadata.height > this.maxDimensions.height
+          ) {
+            throw new BadRequestException('Image dimensions too large');
+          }
+    
+          // Remove EXIF data and other metadata for privacy
+          const processedBuffer = await image
+            .rotate() // Auto-rotate based on EXIF
+            .withMetadata(false) // Remove all metadata
+            .toBuffer();
+    
+          // Generate secure filename
+          const hash = crypto.createHash('sha256').update(processedBuffer).digest('hex');
+          const extension = this.getExtensionFromMimeType(mimeType);
+          const secureFilename = `${hash}.${extension}`;
+    
+          return {
+            buffer: processedBuffer,
+            filename: secureFilename,
+            metadata: {
+              width: metadata.width,
+              height: metadata.height,
+              format: metadata.format,
+              size: processedBuffer.length,
+            },
+          };
+        } catch (error) {
+          throw new BadRequestException('Invalid or corrupted image file');
+        }
+      }
+    
+      private getExtensionFromMimeType(mimeType: string): string {
+        const extensions = {
+          'image/jpeg': 'jpg',
+          'image/png': 'png',
+          'image/webp': 'webp',
+          'image/gif': 'gif',
+        };
+        return extensions[mimeType] || 'jpg';
+      }
+    
+      async generateThumbnails(
+        buffer: Buffer,
+        sizes: Array<{ width: number; height: number; suffix: string }>
+      ): Promise<Array<{ buffer: Buffer; filename: string }>> {
+        const thumbnails = await Promise.all(
+          sizes.map(async ({ width, height, suffix }) => {
+            const thumbnailBuffer = await sharp(buffer)
+              .resize(width, height, {
+                fit: 'cover',
+                position: 'center',
+              })
+              .withMetadata(false)
+              .toBuffer();
+    
+            const hash = crypto.createHash('sha256').update(thumbnailBuffer).digest('hex');
+            
+            return {
+              buffer: thumbnailBuffer,
+              filename: `${hash}_${suffix}.jpg`,
+            };
+          })
+        );
+    
+        return thumbnails;
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Privacy Controls">
+    ```typescript
+    // imagePrivacy.service.ts
+    @Injectable()
+    export class ImagePrivacyService {
+      async anonymizeImage(buffer: Buffer): Promise<Buffer> {
+        // Use face detection to blur faces in images
+        // This is a simplified example - in production, use proper face detection libraries
+        return sharp(buffer)
+          .blur(2) // Simple blur - replace with face-specific blurring
+          .toBuffer();
+      }
+    
+      async removeLocationData(buffer: Buffer): Promise<Buffer> {
+        // Remove GPS and location data from EXIF
+        return sharp(buffer)
+          .withMetadata(false)
+          .toBuffer();
+      }
+    
+      generateImageAccessToken(
+        imageId: string, 
+        userId: string, 
+        permissions: string[]
+      ): string {
+        const payload = {
+          imageId,
+          userId,
+          permissions,
+          exp: Math.floor(Date.now() / 1000) + (60 * 60), // 1 hour expiry
+        };
+    
+        return jwt.sign(payload, this.configService.get('IMAGE_TOKEN_SECRET'));
+      }
+    
+      async checkImageAccess(
+        imageId: string, 
+        userId: string, 
+        requiredPermission: string
+      ): Promise<boolean> {
+        // Implement access control logic
+        const image = await this.imageRepository.findOne({
+          where: { id: imageId },
+          relations: ['owner', 'permissions'],
+        });
+    
+        if (!image) return false;
+        if (image.owner.id === userId) return true;
+    
+        return image.permissions.some(
+          p => p.userId === userId && p.permission === requiredPermission
+        );
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Accessibility Guidelines
+
+### Image Accessibility
+
+<Tabs>
+  <Tab title="Alt Text Best Practices">
+    ```typescript
+    // Accessibility-focused image component
+    interface AccessibleImageProps {
+      src: string;
+      alt: string;
+      decorative?: boolean;
+      longDescription?: string;
+      caption?: string;
+    }
+    
+    export const AccessibleImage: React.FC<AccessibleImageProps> = ({
+      src,
+      alt,
+      decorative = false,
+      longDescription,
+      caption,
+      ...props
+    }) => {
+      const imageId = React.useId();
+      const descriptionId = `${imageId}-desc`;
+      const captionId = `${imageId}-caption`;
+    
+      return (
+        <figure>
+          <img
+            src={src}
+            alt={decorative ? '' : alt}
+            aria-describedby={
+              longDescription ? descriptionId : 
+              caption ? captionId : undefined
+            }
+            role={decorative ? 'presentation' : undefined}
+            {...props}
+          />
+          
+          {longDescription && (
+            <div id={descriptionId} className="sr-only">
+              {longDescription}
+            </div>
+          )}
+          
+          {caption && (
+            <figcaption id={captionId} className="text-sm text-gray-600 mt-2">
+              {caption}
+            </figcaption>
+          )}
+        </figure>
+      );
+    };
+    
+    // Examples of good alt text
+    const altTextExamples = {
+      // ✅ Good: Descriptive and informative
+      userProfile: "Amara Okafor smiling, wearing a blue dress",
+      
+      // ✅ Good: Describes chart data
+      divaChart: "Line chart showing DIVA score increasing from 650 to 750 over 6 months",
+      
+      // ✅ Good: Explains the action
+      uploadButton: "Upload profile photo",
+      
+      // ✅ Good: Empty alt for decorative images
+      decorative: "",
+      
+      // ❌ Bad: Too generic
+      generic: "Image",
+      
+      // ❌ Bad: Redundant
+      redundant: "Photo of photo showing user",
+      
+      // ❌ Bad: Too long
+      tooLong: "This is a very detailed description of every single element in the image including background colors, specific clothing details, exact positioning, lighting conditions, and many other unnecessary details that make the alt text extremely long and difficult to understand for screen reader users",
+    };
+    ```
+  </Tab>
+  <Tab title="Screen Reader Support">
+    ```typescript
+    // Screen reader optimized components
+    export const DivaScoreVisualization = ({ score, components }) => (
+      <div role="img" aria-labelledby="diva-score-title" aria-describedby="diva-score-desc">
+        <h3 id="diva-score-title">Your DIVA Score</h3>
+        
+        <div aria-hidden="true">
+          {/* Visual chart representation */}
+          <DonutChart data={components} />
+        </div>
+        
+        <div id="diva-score-desc" className="sr-only">
+          Your overall DIVA score is {score} out of 1000. 
+          This breaks down as follows: 
+          Discipline {components.discipline}, 
+          Income {components.income}, 
+          Velocity {components.velocity}, 
+          Assets {components.assets}.
+        </div>
+        
+        {/* Alternative table for screen readers */}
+        <table className="sr-only">
+          <caption>DIVA Score Components</caption>
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th>Score</th>
+              <th>Out of</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Discipline</td>
+              <td>{components.discipline}</td>
+              <td>1000</td>
+            </tr>
+            <tr>
+              <td>Income</td>
+              <td>{components.income}</td>
+              <td>1000</td>
+            </tr>
+            <tr>
+              <td>Velocity</td>
+              <td>{components.velocity}</td>
+              <td>1000</td>
+            </tr>
+            <tr>
+              <td>Assets</td>
+              <td>{components.assets}</td>
+              <td>1000</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    );
+    ```
+  </Tab>
+</Tabs>
+
+## Performance Monitoring
+
+### Image Performance Metrics
+
+```typescript
+// imagePerformance.service.ts
+export class ImagePerformanceService {
+  private performanceObserver: PerformanceObserver;
+
+  constructor() {
+    if (typeof window !== 'undefined' && 'PerformanceObserver' in window) {
+      this.setupPerformanceObserver();
+    }
+  }
+
+  private setupPerformanceObserver() {
+    this.performanceObserver = new PerformanceObserver((list) => {
+      list.getEntries().forEach((entry) => {
+        if (entry.entryType === 'resource' && entry.initiatorType === 'img') {
+          this.trackImageLoad(entry as PerformanceResourceTiming);
+        }
+      });
+    });
+
+    this.performanceObserver.observe({ entryTypes: ['resource'] });
+  }
+
+  private trackImageLoad(entry: PerformanceResourceTiming) {
+    const metrics = {
+      url: entry.name,
+      loadTime: entry.responseEnd - entry.requestStart,
+      size: entry.transferSize,
+      cached: entry.transferSize === 0,
+      renderTime: entry.responseEnd - entry.startTime,
+    };
+
+    // Send to analytics
+    this.sendMetrics('image_load', metrics);
+
+    // Log slow loading images
+    if (metrics.loadTime > 2000) {
+      console.warn('Slow image load detected:', metrics);
+    }
+  }
+
+  trackImageError(src: string, error: string) {
+    this.sendMetrics('image_error', {
+      src,
+      error,
+      timestamp: Date.now(),
+    });
+  }
+
+  trackImageVisibility(src: string, isVisible: boolean) {
+    this.sendMetrics('image_visibility', {
+      src,
+      isVisible,
+      timestamp: Date.now(),
+    });
+  }
+
+  private sendMetrics(event: string, data: any) {
+    // Implementation depends on your analytics service
+    if (typeof gtag !== 'undefined') {
+      gtag('event', event, data);
+    }
+  }
+
+  generatePerformanceReport(): ImagePerformanceReport {
+    const entries = performance.getEntriesByType('resource')
+      .filter(entry => entry.initiatorType === 'img') as PerformanceResourceTiming[];
+
+    const totalImages = entries.length;
+    const totalLoadTime = entries.reduce((sum, entry) => sum + entry.duration, 0);
+    const averageLoadTime = totalLoadTime / totalImages;
+    const slowImages = entries.filter(entry => entry.duration > 2000);
+
+    return {
+      totalImages,
+      averageLoadTime,
+      slowImages: slowImages.length,
+      cacheHitRate: entries.filter(entry => entry.transferSize === 0).length / totalImages,
+      recommendations: this.generateRecommendations(entries),
+    };
+  }
+
+  private generateRecommendations(entries: PerformanceResourceTiming[]): string[] {
+    const recommendations = [];
+
+    const largeImages = entries.filter(entry => entry.transferSize > 500000);
+    if (largeImages.length > 0) {
+      recommendations.push(`${largeImages.length} images are larger than 500KB. Consider optimization.`);
+    }
+
+    const slowImages = entries.filter(entry => entry.duration > 3000);
+    if (slowImages.length > 0) {
+      recommendations.push(`${slowImages.length} images took longer than 3 seconds to load.`);
+    }
+
+    const uncachedImages = entries.filter(entry => entry.transferSize > 0);
+    if (uncachedImages.length > entries.length * 0.8) {
+      recommendations.push('Consider implementing better caching strategies.');
+    }
+
+    return recommendations;
+  }
+}
+```
+
+<Tip>
+  **Performance First**: Always optimize images for the web. A 1-second delay in page load can result in 7% fewer conversions. Use modern formats, lazy loading, and responsive images.
+</Tip>
+
+---
+
+**Questions about image implementation?** Check our [component library documentation](/essentials/design-system) or reach out to the design team.

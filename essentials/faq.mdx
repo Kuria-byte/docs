@@ -1,0 +1,820 @@
+# Frequently Asked Questions
+
+Find answers to common questions about the AWO platform, development process, and troubleshooting.
+
+## Getting Started
+
+<AccordionGroup>
+  <Accordion title="What is the AWO platform?">
+    AWO (African Wealth Oasis) is a mobile-first wealth management platform designed specifically for African women in the SADC region. It combines behavioral financial analysis through bank transaction data with culturally relevant community features like digital Chama/Stokvel management.
+
+    **Key Features:**
+
+    - **DIVA Scoring**: Real-time financial health assessment
+    - **Digital Chamas**: Modernized traditional savings groups
+    - **Financial Education**: Gamified learning modules
+    - **Investment Marketplace**: Curated investment opportunities
+    - **Multi-Channel Access**: Mobile, web, and USSD support
+  </Accordion>
+  <Accordion title="Who can use the AWO platform?">
+    AWO is primarily designed for:
+
+    - **African women** aged 25-55 in the SADC region
+    - **SME owners** looking for business financial tools
+    - **Savings group organizers** wanting to digitize their Chamas/Stokvels
+    - **Financial institutions** seeking to reach underserved markets
+    - **Developers** building financial applications for African markets
+
+    The platform supports multiple languages and currencies across SADC countries.
+  </Accordion>
+  <Accordion title="How do I get started as a developer?">
+    Follow these steps to get started:
+
+    1. **Read the Documentation**: Start with our [Quick Start Guide](/quickstart)
+    2. **Set Up Development Environment**: Follow the [Development Guide](/development)
+    3. **Get API Access**: Sign up for API credentials
+    4. **Try the Sandbox**: Test with our sandbox environment
+    5. **Join the Community**: Connect with other developers on [Discord](https://discord.gg/awo-platform)
+
+    The entire setup process takes about 15-20 minutes.
+  </Accordion>
+  <Accordion title="What programming languages are supported?">
+    AWO provides SDKs and documentation for:
+
+    - **JavaScript/TypeScript** (Web and Node.js)
+    - **React Native** (Mobile development)
+    - **Python** (Backend integration)
+    - **REST API** (Any language that supports HTTP)
+    - **GraphQL** (For complex queries)
+
+    We're continuously adding support for more languages based on community needs.
+  </Accordion>
+</AccordionGroup>
+
+## Technical Questions
+
+<AccordionGroup>
+  <Accordion title="What is the DIVA Score and how is it calculated?">
+    The DIVA Score is AWO's proprietary financial health scoring system that analyzes real banking transaction data. DIVA stands for:
+
+    - **Discipline (30%)**: Payment punctuality and consistency
+    - **Income (25%)**: Income stability, growth, and diversification
+    - **Velocity (25%)**: Cash flow patterns and money management efficiency
+    - **Assets (20%)**: Asset accumulation, protection, and optimization
+
+    **Score Ranges:**
+
+    - 800-1000: Excellent financial health
+    - 650-799: Good financial health
+    - 500-649: Fair financial health
+    - 350-499: Needs improvement
+    - Below 350: Building financial foundation
+
+    The score updates weekly based on new transaction data and provides personalized recommendations for improvement.
+  </Accordion>
+  <Accordion title="How does bank account integration work?">
+    AWO uses **Open Banking APIs** to securely connect to users' bank accounts:
+
+    **Supported Banks:**
+
+    - **South Africa**: Standard Bank, FNB, ABSA, Nedbank, Capitec
+    - **Kenya**: KCB, Equity Bank, Co-op Bank, NCBA
+    - **Nigeria**: GTBank, Access Bank, Zenith Bank, First Bank
+
+    **Security Measures:**
+
+    - OAuth 2.0 authentication
+    - Read-only access (no transaction execution)
+    - Encrypted data transmission
+    - User-controlled permissions
+    - Regular security audits
+
+    **Integration Process:**
+
+    1. User selects their bank
+    2. Redirected to bank's secure login
+    3. Grants permission for data access
+    4. AWO receives transaction history
+    5. DIVA score calculated from real data
+  </Accordion>
+  <Accordion title="What are Digital Chamas and how do they work?">
+    Digital Chamas modernize traditional African savings groups with technology while preserving cultural practices:
+
+    **Supported Chama Types:**
+
+    - **Rotating Savings**: Members take turns receiving the pool
+    - **Fixed Savings**: Everyone saves toward a common goal
+    - **Investment Chamas**: Group investing in opportunities
+    - **Lending Chamas**: Members can borrow from the pool
+
+    **Key Features:**
+
+    - **Blockchain Transparency**: All transactions recorded immutably
+    - **Automated Management**: Scheduled contributions and payouts
+    - **Member Communication**: In-app chat and notifications
+    - **Rule Enforcement**: Smart contracts ensure compliance
+    - **Progress Tracking**: Real-time visibility into group performance
+
+    **Benefits:**
+
+    - Reduced administrative overhead
+    - Increased transparency and trust
+    - Better record keeping
+    - Easier member management
+    - Integration with other financial services
+  </Accordion>
+  <Accordion title="How secure is the AWO platform?">
+    AWO implements **bank-grade security** across all systems:
+
+    **Data Protection:**
+
+    - AES-256 encryption for data at rest
+    - TLS 1.3 for data in transit
+    - End-to-end encryption for sensitive communications
+    - Regular security audits and penetration testing
+
+    **Access Control:**
+
+    - Multi-factor authentication (MFA)
+    - OAuth 2.0 \+ JWT tokens
+    - Biometric authentication support
+    - Role-based access control (RBAC)
+
+    **Compliance:**
+
+    - GDPR and local data protection laws
+    - KYC/AML regulations compliance
+    - Financial services regulations
+    - Regular compliance audits
+
+    **Infrastructure Security:**
+
+    - AWS cloud infrastructure with security best practices
+    - DDoS protection and WAF
+    - Intrusion detection and monitoring
+    - Automated security scanning
+  </Accordion>
+</AccordionGroup>
+
+## API & Integration
+
+<AccordionGroup>
+  <Accordion title="What are the API rate limits?">
+    AWO implements rate limiting to ensure fair usage and system stability:
+
+    | Endpoint Category     | Rate Limit   | Window   |
+    | --------------------- | ------------ | -------- |
+    | Authentication        | 10 requests  | 1 minute |
+    | User Operations       | 100 requests | 1 minute |
+    | Financial Data        | 50 requests  | 1 minute |
+    | Chama Operations      | 30 requests  | 1 minute |
+    | External Integrations | 20 requests  | 1 minute |
+
+    **Rate Limit Headers:**
+
+    ```
+    X-RateLimit-Limit: 100
+    X-RateLimit-Remaining: 87
+    X-RateLimit-Reset: 1685123456
+    ```
+
+    **Best Practices:**
+
+    - Implement exponential backoff for 429 responses
+    - Cache responses when appropriate
+    - Use batch endpoints for multiple operations
+    - Monitor your usage through the dashboard
+  </Accordion>
+  <Accordion title="How do I handle API errors?">
+    AWO APIs return standardized error responses:
+
+    **Error Response Format:**
+
+    ```json
+    {
+      "success": false,
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Invalid phone number format",
+        "details": {
+          "field": "phoneNumber",
+          "value": "123456789",
+          "expected": "E.164 format (+27XXXXXXXXX)"
+        }
+      },
+      "meta": {
+        "timestamp": "2025-05-29T10:30:00Z",
+        "requestId": "req_123abc456def"
+      }
+    }
+    ```
+
+    **Common Error Codes:**
+
+    - `AUTH_TOKEN_EXPIRED`: Refresh your authentication token
+    - `DIVA_SCORE_NOT_READY`: Score calculation in progress, retry later
+    - `INSUFFICIENT_FUNDS`: User doesn't have enough balance
+    - `KYC_REQUIRED`: User needs to complete verification
+
+    **Error Handling Best Practices:**
+
+    - Always check the `success` field
+    - Use specific error codes for conditional logic
+    - Log `requestId` for debugging
+    - Show user-friendly messages
+    - Implement retry logic for transient errors
+  </Accordion>
+  <Accordion title="Can I test the API without real bank connections?">
+    Yes\! AWO provides a comprehensive **sandbox environment** for testing:
+
+    **Sandbox Features:**
+
+    - **Test Users**: Pre-created users with various financial profiles
+    - **Mock Bank Data**: Realistic transaction histories
+    - **Test Chamas**: Sample groups for testing functionality
+    - **Simulated Payments**: Test payment flows without real money
+    - **Realistic Responses**: Same format as production
+
+    **Sandbox Base URL:**
+
+    ```
+    https://api-sandbox.awo-platform.com/v1
+    ```
+
+    **Test Data:**
+
+    - Test phone numbers: \+27123456789 to \+27123456799
+    - Test bank accounts with different balance scenarios
+    - Pre-calculated DIVA scores ranging from 300-900
+    - Sample Chamas with different structures
+
+    **Getting Started:**
+
+    1. Sign up for sandbox access
+    2. Use test credentials
+    3. Explore with Postman collection
+    4. Build and test your integration
+    5. Switch to production when ready
+  </Accordion>
+  <Accordion title="How do webhooks work?">
+    Webhooks allow AWO to send real-time notifications to your application:
+
+    **Available Events:**
+
+    - `user.created` - New user registration
+    - `diva_score.updated` - DIVA score recalculated
+    - `transaction.created` - New transaction processed
+    - `chama.contribution.made` - Chama contribution received
+    - `savings_goal.achieved` - Savings goal reached
+
+    **Webhook Payload Example:**
+
+    ```json
+    {
+      "event": "diva_score.updated",
+      "data": {
+        "userId": "123e4567-e89b-12d3-a456-426614174000",
+        "previousScore": 720,
+        "newScore": 750,
+        "improvement": 30
+      },
+      "timestamp": "2025-05-29T10:30:00Z",
+      "signature": "sha256=abc123def456..."
+    }
+    ```
+
+    **Security:**
+
+    - HMAC-SHA256 signature verification
+    - SSL/TLS required for webhook URLs
+    - Retry mechanism with exponential backoff
+    - Idempotency keys to prevent duplicates
+  </Accordion>
+</AccordionGroup>
+
+## Mobile Development
+
+<AccordionGroup>
+  <Accordion title="What mobile platforms are supported?">
+    AWO supports multiple mobile platforms and access methods:
+
+    **Native Mobile:**
+
+    - **iOS**: iOS 12\+ (React Native)
+    - **Android**: Android 6.0\+ (API level 23\+)
+    - **React Native SDK**: For custom mobile apps
+
+    **Web Mobile:**
+
+    - **Progressive Web App (PWA)**: Works on all modern mobile browsers
+    - **Responsive Design**: Optimized for mobile screens
+    - **Offline Capabilities**: Core features work without internet
+
+    **Feature Phones:**
+
+    - **USSD**: Basic features accessible via USSD codes
+    - **SMS**: Notifications and basic interactions
+    - **Voice**: Audio-based interactions (planned)
+
+    **Minimum Requirements:**
+
+    - **iOS**: iPhone 6s or newer
+    - **Android**: 2GB RAM, Android 6.0\+
+    - **Storage**: 100MB available space
+    - **Network**: 2G connection minimum (3G\+ recommended)
+  </Accordion>
+  <Accordion title="How do I integrate AWO into my existing mobile app?">
+    AWO provides flexible integration options:
+
+    **React Native SDK:**
+
+    ```bash
+    npm install @awo-platform/react-native-sdk
+    ```
+
+    **Basic Integration:**
+
+    ```typescript
+    import { AWOProvider, DivaScoreCard } from '@awo-platform/react-native-sdk';
+    
+    function App() {
+      return (
+        <AWOProvider apiKey="your-api-key">
+          <DivaScoreCard userId="user-123" />
+        </AWOProvider>
+      );
+    }
+    ```
+
+    **Available Components:**
+
+    - `DivaScoreCard`: Display user's DIVA score
+    - `ChamaList`: Show user's Chama memberships
+    - `TransactionHistory`: Display transaction data
+    - `SavingsGoals`: Goal tracking interface
+    - `BankConnectionFlow`: Bank linking process
+
+    **Customization:**
+
+    - Full theme customization
+    - Custom component styling
+    - Branded experience
+    - Localization support
+  </Accordion>
+  <Accordion title="What about offline functionality?">
+    AWO supports offline functionality for core features:
+
+    **Offline Capabilities:**
+
+    - View cached DIVA score and history
+    - Browse saved financial education content
+    - Access Chama information
+    - View transaction history
+    - Basic financial calculations
+
+    **Sync Strategy:**
+
+    - **Automatic Sync**: When connectivity restored
+    - **Background Sync**: Updates happen in background
+    - **Conflict Resolution**: Smart handling of data conflicts
+    - **Delta Sync**: Only changed data synchronized
+
+    **Implementation:**
+
+    ```typescript
+    import { useOfflineSync } from '@awo-platform/react-native-sdk';
+    
+    function MyComponent() {
+      const { isOnline, syncStatus, forcSync } = useOfflineSync();
+      
+      return (
+        <View>
+          {!isOnline && <OfflineBanner />}
+          {syncStatus === 'syncing' && <SyncIndicator />}
+        </View>
+      );
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Business & Regulatory
+
+<AccordionGroup>
+  <Accordion title="What countries does AWO support?">
+    AWO currently supports SADC (Southern African Development Community) countries:
+
+    **Phase 1 (Current):**
+
+    - 🇿🇦 **South Africa** - Full platform support
+    - 🇰🇪 **Kenya** - Full platform support
+    - 🇿🇼 **Zimbabwe** - Full platform support
+
+    **Phase 2 (Expanding):**
+
+    - 🇿🇲 **Zambia** - Q4 2025
+    - 🇧🇼 **Botswana** - Q4 2025
+    - 🇹🇿 **Tanzania** - Q1 2026
+    - 🇲🇿 **Mozambique** - Q1 2026
+
+    **Phase 3 (Planned):**
+
+    - 🇺🇬 **Uganda** - 2026
+    - 🇬🇭 **Ghana** - 2026
+    - Additional SADC countries based on demand
+
+    **Country-Specific Features:**
+
+    - Local currency support
+    - Regulatory compliance
+    - Language localization
+    - Cultural customization
+    - Local banking partnerships
+  </Accordion>
+  <Accordion title="How does AWO handle different currencies?">
+    AWO supports multiple currencies and handles conversion seamlessly:
+
+    **Supported Currencies:**
+
+    - **ZAR** (South African Rand)
+    - **KES** (Kenyan Shilling)
+    - **USD** (US Dollar) - for cross-border transactions
+    - **ZWL** (Zimbabwean Dollar)
+    - More currencies added with country expansion
+
+    **Currency Features:**
+
+    - **Real-time Exchange Rates**: Updated multiple times daily
+    - **Multi-Currency Wallets**: Hold different currencies
+    - **Automatic Conversion**: For cross-border Chama transactions
+    - **Currency-Specific DIVA Scores**: Adjusted for local economic factors
+    - **Localized Formatting**: Numbers formatted per local conventions
+
+    **Example API Response:**
+
+    ```json
+    {
+      "amount": 1000,
+      "currency": "ZAR",
+      "equivalent": {
+        "USD": 55.32,
+        "KES": 7420.50
+      },
+      "exchangeRate": {
+        "source": "bank",
+        "timestamp": "2025-05-29T10:30:00Z"
+      }
+    }
+    ```
+  </Accordion>
+  <Accordion title="What regulatory compliance does AWO meet?">
+    AWO maintains strict regulatory compliance across all markets:
+
+    **Financial Services Compliance:**
+
+    - **South Africa**: FSCA (Financial Sector Conduct Authority) compliance
+    - **Kenya**: CBK (Central Bank of Kenya) guidelines
+    - **Regional**: SADC financial regulations
+
+    **Data Protection:**
+
+    - **GDPR**: European General Data Protection Regulation compliance
+    - **POPIA**: South Africa's Protection of Personal Information Act
+    - **Local Laws**: Each country's data protection requirements
+
+    **AML/KYC Compliance:**
+
+    - **FATF Standards**: Financial Action Task Force guidelines
+    - **Risk-Based Approach**: Tiered KYC based on transaction volumes
+    - **Ongoing Monitoring**: Continuous transaction monitoring
+    - **Reporting**: Suspicious activity reporting to authorities
+
+    **Regular Audits:**
+
+    - Internal compliance reviews
+    - External regulatory audits
+    - Security penetration testing
+    - Third-party compliance verification
+  </Accordion>
+  <Accordion title="How does pricing work for AWO services?">
+    AWO offers transparent, fair pricing for financial services:
+
+    **Free Tier:**
+
+    - Basic DIVA score calculation
+    - Up to 3 Chama memberships
+    - Financial education content
+    - Basic savings goal tracking
+
+    **Premium Tier (R49/month):**
+
+    - Advanced DIVA score insights
+    - Unlimited Chama memberships
+    - Priority customer support
+    - Investment marketplace access
+    - Detailed financial analytics
+
+    **Transaction Fees:**
+
+    - **Bank Connections**: Free (covered by AWO)
+    - **Chama Contributions**: 1% of transaction amount
+    - **Cross-Border Transfers**: 2.5% \+ exchange rate margin
+    - **Investment Transactions**: 0.75% management fee
+
+    **Revenue Sharing:**
+
+    - Partners receive percentage of generated revenue
+    - Transparent reporting of all fees
+    - No hidden charges or surprise fees
+    - Volume discounts for enterprise customers
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="My DIVA score isn't updating. Why?">
+    DIVA scores update based on new transaction data. Here are common reasons for delays:
+
+    **Possible Causes:**
+
+    - **Insufficient Transaction Data**: Need at least 30 days of transaction history
+    - **Bank Connection Issues**: Check if bank connection is still active
+    - **Processing Delays**: Scores update weekly, not daily
+    - **Account Inactive**: No recent transactions to analyze
+
+    **Troubleshooting Steps:**
+
+    1. **Check Bank Connection**: Go to Settings \> Connected Accounts
+    2. **Verify Recent Transactions**: Ensure new transactions are being imported
+    3. **Manual Refresh**: Try the "Refresh Score" button
+    4. **Contact Support**: If issue persists after 48 hours
+
+    **API Debugging:**
+
+    ```bash
+    curl -X GET https://api.awo-platform.com/v1/diva-score \
+      -H "Authorization: Bearer YOUR_TOKEN"
+    ```
+
+    Look for the `lastCalculated` timestamp to see when score was last updated.
+  </Accordion>
+  <Accordion title="Bank connection keeps failing. How do I fix this?">
+    Bank connection issues can have several causes:
+
+    **Common Issues:**
+
+    - **Incorrect Credentials**: Double-check username and password
+    - **Two-Factor Authentication**: Some banks require additional steps
+    - **Account Restrictions**: Business accounts may have different requirements
+    - **Bank Maintenance**: Temporary service unavailability
+
+    **Troubleshooting Steps:**
+
+    1. **Try Different Browser**: Some banks work better with specific browsers
+    2. **Disable Ad Blockers**: They can interfere with bank redirects
+    3. **Check Bank Website**: Ensure you can log in directly to your bank
+    4. **Clear Cache**: Clear browser cache and cookies
+    5. **Contact Bank**: Some banks require explicit consent for third-party access
+
+    **Supported Banks Status:**
+    Check our [status page](https://status.awo-platform.com) for real-time bank API availability.
+
+    **Alternative Solutions:**
+
+    - Manual transaction upload (CSV)
+    - Alternative bank account connection
+    - Temporary manual DIVA score input
+  </Accordion>
+  <Accordion title="I'm getting API authentication errors. What's wrong?">
+    Authentication errors are usually related to token issues:
+
+    **Common Error Codes:**
+
+    - `AUTH_TOKEN_MISSING`: No token provided in request
+    - `AUTH_TOKEN_INVALID`: Token is malformed or fake
+    - `AUTH_TOKEN_EXPIRED`: Token has expired (24-hour lifetime)
+    - `AUTH_INSUFFICIENT_PERMISSIONS`: Token lacks required scope
+
+    **Debugging Steps:**
+
+    1. **Check Token Format**: Should be `Bearer <token>`
+    2. **Verify Token Validity**: Decode JWT to check expiration
+    3. **Refresh Token**: Use refresh token to get new access token
+    4. **Check Scopes**: Ensure token has required permissions
+
+    **Token Refresh Example:**
+
+    ```typescript
+    async function refreshAuthToken() {
+      const response = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          refreshToken: storedRefreshToken 
+        })
+      });
+      
+      const { accessToken } = await response.json();
+      return accessToken;
+    }
+    ```
+
+    **Best Practices:**
+
+    - Implement automatic token refresh
+    - Handle 401 responses gracefully
+    - Store tokens securely
+    - Monitor token expiration
+    - Use refresh tokens properly
+  </Accordion>
+  <Accordion title="The mobile app is running slowly. How can I optimize it?">
+    Mobile app performance can be affected by several factors:
+
+    **Common Performance Issues:**
+
+    - **Large Image Files**: Unoptimized images slow down loading
+    - **Memory Leaks**: Improper cleanup of resources
+    - **Excessive API Calls**: Too many network requests
+    - **Heavy Computations**: Complex calculations on main thread
+    - **Poor List Performance**: Inefficient list rendering
+
+    **Optimization Strategies:**
+
+    1. **Image Optimization**:
+
+       ```typescript
+       <OptimizedImage
+         uri={imageUrl}
+         width={200}
+         height={200}
+         quality="high"
+         placeholder={placeholderUrl}
+       />
+       ```
+    2. **List Virtualization**:
+
+       ```typescript
+       <FlatList
+         data={transactions}
+         renderItem={renderTransaction}
+         removeClippedSubviews={true}
+         maxToRenderPerBatch={10}
+         windowSize={10}
+         getItemLayout={getItemLayout}
+       />
+       ```
+    3. **Memoization**:
+
+       ```typescript
+       const ExpensiveComponent = React.memo(({ data }) => {
+         const expensiveValue = useMemo(() => 
+           computeExpensiveValue(data), [data]
+         );
+         
+         return <View>{expensiveValue}</View>;
+       });
+       ```
+    4. **Bundle Analysis**: Use bundle analyzers to identify large dependencies
+    5. **Code Splitting**: Load features on-demand
+    6. **Background Processing**: Move heavy tasks off main thread
+  </Accordion>
+</AccordionGroup>
+
+## Getting Help
+
+<AccordionGroup>
+  <Accordion title="How do I contact support?">
+    AWO provides multiple support channels:
+
+    **Developer Support:**
+
+    - **Discord Community**: [Join our Discord](https://discord.gg/awo-platform) for real-time help
+    - **GitHub Issues**: Report bugs and feature requests
+    - **Email**: [developers@awo-platform.com](mailto:developers@awo-platform.com) for complex technical issues
+    - **Documentation**: Search our comprehensive docs first
+
+    **Business Support:**
+
+    - **Email**: [support@awo-platform.com](mailto:support@awo-platform.com)
+    - **Phone**: \+27 (0)11 123 4567 (Business hours: 8AM-6PM SAST)
+    - **Live Chat**: Available on our website during business hours
+
+    **Enterprise Support:**
+
+    - **Dedicated Account Manager**: For enterprise customers
+    - **Priority Support**: Guaranteed response times
+    - **Custom Integration Support**: Help with complex integrations
+    - **Training Sessions**: Team training and onboarding
+
+    **Support Hours:**
+
+    - Community Discord: 24/7
+    - Email Support: 24-48 hour response
+    - Live Chat: Mon-Fri 8AM-6PM SAST
+    - Phone Support: Mon-Fri 8AM-6PM SAST
+  </Accordion>
+  <Accordion title="Where can I find code examples and tutorials?">
+    AWO provides extensive learning resources:
+
+    **Official Resources:**
+
+    - **Documentation**: Comprehensive guides and API reference
+    - **GitHub Examples**: [github.com/awo-platform/examples](https://github.com/awo-platform/examples)
+    - **Video Tutorials**: Step-by-step integration guides
+    - **Webinars**: Regular developer sessions
+
+    **Code Examples:**
+
+    - **React Native Integration**: Complete mobile app example
+    - **Web Integration**: Dashboard and component examples
+    - **Backend Integration**: Python and Node.js examples
+    - **Webhook Handling**: Event processing examples
+
+    **Learning Path:**
+
+    1. **Start**: Quick Start Guide (15 minutes)
+    2. **Build**: Follow integration tutorial (1 hour)
+    3. **Customize**: Adapt examples to your needs
+    4. **Deploy**: Production deployment guide
+    5. **Optimize**: Performance and security best practices
+
+    **Community Contributions:**
+
+    - **Community Examples**: User-contributed code samples
+    - **Third-Party Integrations**: Community-built integrations
+    - **Blog Posts**: Developer experience articles
+    - **Case Studies**: Real-world implementation stories
+  </Accordion>
+  <Accordion title="How do I contribute to AWO's development?">
+    We welcome contributions from the AWO developer community:
+
+    **Ways to Contribute:**
+
+    - **Bug Reports**: Report issues on GitHub
+    - **Feature Requests**: Suggest new functionality
+    - **Code Contributions**: Submit pull requests
+    - **Documentation**: Improve docs and examples
+    - **Community Support**: Help others in Discord
+
+    **Contribution Process:**
+
+    1. **Fork Repository**: Create your own copy
+    2. **Create Branch**: Work on feature branch
+    3. **Make Changes**: Follow coding standards
+    4. **Write Tests**: Ensure code is tested
+    5. **Submit PR**: Create pull request with description
+
+    **Development Setup:**
+
+    ```bash
+    # Clone the repository
+    git clone https://github.com/awo-platform/awo-core.git
+    cd awo-core
+    
+    # Install dependencies
+    npm install
+    
+    # Set up development environment
+    npm run setup:dev
+    
+    # Run tests
+    npm test
+    
+    # Start development server
+    npm run dev
+    ```
+
+    **Contribution Guidelines:**
+
+    - Follow coding standards
+    - Write comprehensive tests
+    - Update documentation
+    - Use clear commit messages
+    - Respect code of conduct
+  </Accordion>
+</AccordionGroup>
+
+## Still Need Help?
+
+Can't find the answer you're looking for? We're here to help\!
+
+<CardGroup cols={2}>
+  <Card title="Join Discord Community" icon="discord" href="https://discord.gg/awo-platform">
+    Get real-time help from developers and AWO team members
+  </Card>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/awo-platform/awo-core/issues">
+    Report bugs, request features, or ask technical questions
+  </Card>
+  <Card title="Email Support" icon="envelope" href="mailto:developers@awo-platform.com">
+    Contact our developer support team directly
+  </Card>
+  <Card title="Schedule a Call" icon="calendar" href="https://calendly.com/awo-platform/developer-support">
+    Book a 1-on-1 session with our technical team
+  </Card>
+</CardGroup>
+
+---
+
+**Last Updated**: May 29, 2025\
+**Found an error or have a suggestion?** [Edit this page](https://github.com/awo-platform/docs/edit/main/faq.mdx) or [open an issue](https://github.com/awo-platform/docs/issues/new).

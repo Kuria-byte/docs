@@ -1,0 +1,1244 @@
+# Settings & Configuration
+
+This guide covers all configuration aspects of the AWO platform, from development environment setup to production deployment configurations.
+
+## Configuration Philosophy
+
+<CardGroup cols={2}>
+  <Card title="Environment Separation" icon="layers">
+    Clear separation between development, staging, and production
+  </Card>
+  <Card title="Security First" icon="shield">
+    Sensitive data encrypted and properly managed
+  </Card>
+  <Card title="Scalability" icon="trending-up">
+    Configurations that support growth and load
+  </Card>
+  <Card title="Maintainability" icon="tool">
+    Easy to update and manage across environments
+  </Card>
+</CardGroup>
+
+## Environment Configuration
+
+### Development Environment
+
+<Tabs>
+  <Tab title="Backend (.env)">
+    ```bash
+    # Application Settings
+    NODE_ENV=development
+    PORT=3000
+    API_VERSION=v1
+    LOG_LEVEL=debug
+    
+    # Database Configuration
+    DATABASE_URL=postgresql://awo:password@localhost:5432/awo_dev
+    DATABASE_SSL=false
+    DATABASE_LOGGING=true
+    
+    # Redis Configuration
+    REDIS_URL=redis://localhost:6379
+    REDIS_PASSWORD=
+    REDIS_DB=0
+    
+    # JWT Configuration
+    JWT_SECRET=dev-super-secret-key-change-in-production
+    JWT_EXPIRES_IN=24h
+    JWT_REFRESH_EXPIRES_IN=7d
+    
+    # AWS Services (LocalStack for development)
+    AWS_REGION=us-east-1
+    AWS_ACCESS_KEY_ID=test
+    AWS_SECRET_ACCESS_KEY=test
+    AWS_ENDPOINT_URL=http://localhost:4566
+    AWS_S3_BUCKET=awo-dev-bucket
+    
+    # Third-party API Keys
+    STITCH_API_KEY=your-stitch-test-key
+    STITCH_ENVIRONMENT=sandbox
+    MONO_API_KEY=your-mono-test-key
+    MONO_ENVIRONMENT=test
+    FLUTTERWAVE_PUBLIC_KEY=your-flutterwave-test-key
+    FLUTTERWAVE_SECRET_KEY=your-flutterwave-test-secret
+    FLUTTERWAVE_ENVIRONMENT=sandbox
+    
+    # Email Configuration (Mailhog for development)
+    SMTP_HOST=localhost
+    SMTP_PORT=1025
+    SMTP_SECURE=false
+    SMTP_USER=
+    SMTP_PASS=
+    EMAIL_FROM=noreply@awo-platform.dev
+    
+    # Webhook Configuration
+    WEBHOOK_SECRET=dev-webhook-secret
+    WEBHOOK_BASE_URL=http://localhost:3000
+    
+    # Feature Flags
+    FEATURE_CHAMA_BLOCKCHAIN=true
+    FEATURE_INVESTMENT_MARKETPLACE=false
+    FEATURE_CROSS_BORDER_TRANSFERS=false
+    
+    # Rate Limiting
+    RATE_LIMIT_WINDOW_MS=60000
+    RATE_LIMIT_MAX_REQUESTS=100
+    
+    # Monitoring
+    SENTRY_DSN=
+    NEW_RELIC_LICENSE_KEY=
+    ```
+  </Tab>
+  <Tab title="Mobile (.env)">
+    ```bash
+    # API Configuration
+    API_BASE_URL=http://localhost:3000/api/v1
+    GRAPHQL_URL=http://localhost:3000/graphql
+    WEBSOCKET_URL=ws://localhost:3000/ws
+    
+    # App Configuration
+    APP_NAME=AWO Development
+    APP_VERSION=1.0.0-dev
+    BUNDLE_ID=com.awo.platform.dev
+    
+    # Third-party Services
+    SENTRY_DSN=
+    ANALYTICS_KEY=
+    CRASHLYTICS_ENABLED=false
+    
+    # Feature Flags
+    ENABLE_DEV_MENU=true
+    ENABLE_FLIPPER=true
+    ENABLE_STORYBOOK=true
+    
+    # Development Tools
+    ENABLE_NETWORK_INSPECTOR=true
+    ENABLE_PERFORMANCE_MONITOR=true
+    LOG_LEVEL=debug
+    
+    # Deep Linking
+    URL_SCHEME=awo-dev
+    DEEP_LINK_DOMAIN=dev.awo-platform.com
+    ```
+  </Tab>
+  <Tab title="Web (.env.local)">
+    ```bash
+    # API Configuration
+    NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api/v1
+    NEXT_PUBLIC_GRAPHQL_URL=http://localhost:3000/graphql
+    NEXT_PUBLIC_WS_URL=ws://localhost:3000/ws
+    
+    # App Configuration
+    NEXT_PUBLIC_APP_NAME=AWO Web Development
+    NEXT_PUBLIC_APP_VERSION=1.0.0-dev
+    NEXT_PUBLIC_ENVIRONMENT=development
+    
+    # Analytics & Monitoring
+    NEXT_PUBLIC_GOOGLE_ANALYTICS=
+    NEXT_PUBLIC_SENTRY_DSN=
+    NEXT_PUBLIC_HOTJAR_ID=
+    
+    # Feature Flags
+    NEXT_PUBLIC_ENABLE_DEV_TOOLS=true
+    NEXT_PUBLIC_ENABLE_REDUX_DEVTOOLS=true
+    NEXT_PUBLIC_SHOW_API_ERRORS=true
+    
+    # Authentication
+    NEXTAUTH_URL=http://localhost:3001
+    NEXTAUTH_SECRET=dev-nextauth-secret
+    
+    # CDN & Assets
+    NEXT_PUBLIC_CDN_URL=http://localhost:3001
+    NEXT_PUBLIC_IMAGES_DOMAIN=localhost
+    ```
+  </Tab>
+</Tabs>
+
+### Production Environment
+
+<Warning>
+  **Security Notice**: Never commit production environment variables to version control. Use secure secret management systems.
+</Warning>
+
+<Tabs>
+  <Tab title="Backend (Production)">
+    ```bash
+    # Application Settings
+    NODE_ENV=production
+    PORT=3000
+    API_VERSION=v1
+    LOG_LEVEL=info
+    
+    # Database Configuration
+    DATABASE_URL=${DB_CONNECTION_STRING}
+    DATABASE_SSL=true
+    DATABASE_LOGGING=false
+    DATABASE_POOL_SIZE=20
+    DATABASE_CONNECTION_TIMEOUT=30000
+    
+    # Redis Configuration
+    REDIS_URL=${REDIS_CONNECTION_STRING}
+    REDIS_PASSWORD=${REDIS_PASSWORD}
+    REDIS_DB=0
+    REDIS_CLUSTER_MODE=true
+    
+    # JWT Configuration
+    JWT_SECRET=${JWT_SECRET_FROM_VAULT}
+    JWT_EXPIRES_IN=24h
+    JWT_REFRESH_EXPIRES_IN=7d
+    JWT_ISSUER=api.awo-platform.com
+    
+    # AWS Services
+    AWS_REGION=af-south-1
+    AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}
+    AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
+    AWS_S3_BUCKET=awo-prod-assets
+    AWS_CLOUDFRONT_DOMAIN=cdn.awo-platform.com
+    
+    # Third-party API Keys
+    STITCH_API_KEY=${STITCH_PROD_KEY}
+    STITCH_ENVIRONMENT=production
+    MONO_API_KEY=${MONO_PROD_KEY}
+    MONO_ENVIRONMENT=production
+    FLUTTERWAVE_PUBLIC_KEY=${FLUTTERWAVE_PROD_PUBLIC}
+    FLUTTERWAVE_SECRET_KEY=${FLUTTERWAVE_PROD_SECRET}
+    FLUTTERWAVE_ENVIRONMENT=live
+    
+    # Email Configuration
+    SMTP_HOST=email-smtp.af-south-1.amazonaws.com
+    SMTP_PORT=587
+    SMTP_SECURE=true
+    SMTP_USER=${SES_USERNAME}
+    SMTP_PASS=${SES_PASSWORD}
+    EMAIL_FROM=noreply@awo-platform.com
+    
+    # Security
+    WEBHOOK_SECRET=${WEBHOOK_SECRET_FROM_VAULT}
+    ENCRYPTION_KEY=${ENCRYPTION_KEY_FROM_VAULT}
+    CORS_ORIGINS=https://app.awo-platform.com,https://www.awo-platform.com
+    
+    # Rate Limiting
+    RATE_LIMIT_WINDOW_MS=60000
+    RATE_LIMIT_MAX_REQUESTS=1000
+    RATE_LIMIT_REDIS_PREFIX=rl:
+    
+    # Monitoring
+    SENTRY_DSN=${SENTRY_DSN}
+    NEW_RELIC_LICENSE_KEY=${NEW_RELIC_KEY}
+    DATADOG_API_KEY=${DATADOG_KEY}
+    
+    # Feature Flags
+    FEATURE_CHAMA_BLOCKCHAIN=true
+    FEATURE_INVESTMENT_MARKETPLACE=true
+    FEATURE_CROSS_BORDER_TRANSFERS=true
+    ```
+  </Tab>
+  <Tab title="Kubernetes ConfigMap">
+    ```yaml
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: awo-backend-config
+      namespace: awo-production
+    data:
+      NODE_ENV: "production"
+      PORT: "3000"
+      API_VERSION: "v1"
+      LOG_LEVEL: "info"
+      DATABASE_SSL: "true"
+      DATABASE_LOGGING: "false"
+      DATABASE_POOL_SIZE: "20"
+      REDIS_DB: "0"
+      REDIS_CLUSTER_MODE: "true"
+      JWT_EXPIRES_IN: "24h"
+      JWT_REFRESH_EXPIRES_IN: "7d"
+      JWT_ISSUER: "api.awo-platform.com"
+      AWS_REGION: "af-south-1"
+      AWS_S3_BUCKET: "awo-prod-assets"
+      STITCH_ENVIRONMENT: "production"
+      MONO_ENVIRONMENT: "production"
+      FLUTTERWAVE_ENVIRONMENT: "live"
+      SMTP_HOST: "email-smtp.af-south-1.amazonaws.com"
+      SMTP_PORT: "587"
+      SMTP_SECURE: "true"
+      EMAIL_FROM: "noreply@awo-platform.com"
+      RATE_LIMIT_WINDOW_MS: "60000"
+      RATE_LIMIT_MAX_REQUESTS: "1000"
+      CORS_ORIGINS: "https://app.awo-platform.com,https://www.awo-platform.com"
+    
+    ---
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: awo-backend-secrets
+      namespace: awo-production
+    type: Opaque
+    data:
+      DATABASE_URL: <base64-encoded-connection-string>
+      REDIS_URL: <base64-encoded-redis-url>
+      JWT_SECRET: <base64-encoded-jwt-secret>
+      AWS_ACCESS_KEY_ID: <base64-encoded-aws-key>
+      AWS_SECRET_ACCESS_KEY: <base64-encoded-aws-secret>
+      STITCH_API_KEY: <base64-encoded-stitch-key>
+      MONO_API_KEY: <base64-encoded-mono-key>
+      FLUTTERWAVE_SECRET_KEY: <base64-encoded-flutterwave-secret>
+    ```
+  </Tab>
+</Tabs>
+
+## Application Configuration
+
+### Database Configuration
+
+<Tabs>
+  <Tab title="TypeORM Configuration">
+    ```typescript
+    // src/config/database.config.ts
+    import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+    import { ConfigService } from '@nestjs/config';
+    
+    export const getDatabaseConfig = (
+      configService: ConfigService
+    ): TypeOrmModuleOptions => ({
+      type: 'postgres',
+      url: configService.get('DATABASE_URL'),
+      ssl: configService.get('DATABASE_SSL') === 'true' ? {
+        rejectUnauthorized: false
+      } : false,
+      logging: configService.get('DATABASE_LOGGING') === 'true',
+      synchronize: false, // Always false in production
+      migrations: ['dist/migrations/**/*.js'],
+      entities: ['dist/**/*.entity.js'],
+      poolSize: parseInt(configService.get('DATABASE_POOL_SIZE', '10')),
+      connectionTimeoutMillis: parseInt(
+        configService.get('DATABASE_CONNECTION_TIMEOUT', '10000')
+      ),
+      idleTimeoutMillis: 30000,
+      maxUses: 7500,
+    });
+    
+    // Migration configuration
+    export const migrationConfig = {
+      type: 'postgres' as const,
+      url: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_SSL === 'true' ? {
+        rejectUnauthorized: false
+      } : false,
+      migrations: ['src/migrations/**/*.ts'],
+      entities: ['src/**/*.entity.ts'],
+      cli: {
+        migrationsDir: 'src/migrations',
+      },
+    };
+    ```
+  </Tab>
+  <Tab title="Redis Configuration">
+    ```typescript
+    // src/config/redis.config.ts
+    import { CacheModuleOptions } from '@nestjs/cache-manager';
+    import { ConfigService } from '@nestjs/config';
+    import * as redisStore from 'cache-manager-redis-store';
+    
+    export const getRedisConfig = (
+      configService: ConfigService
+    ): CacheModuleOptions => {
+      const redisUrl = configService.get('REDIS_URL');
+      const isCluster = configService.get('REDIS_CLUSTER_MODE') === 'true';
+    
+      if (isCluster) {
+        return {
+          store: redisStore,
+          host: extractHost(redisUrl),
+          port: extractPort(redisUrl),
+          password: configService.get('REDIS_PASSWORD'),
+          db: parseInt(configService.get('REDIS_DB', '0')),
+          ttl: 300, // 5 minutes default
+          max: 1000, // Maximum number of items in cache
+          enableReadyCheck: true,
+          maxRetriesPerRequest: 3,
+          lazyConnect: true,
+        };
+      }
+    
+      return {
+        store: redisStore,
+        url: redisUrl,
+        password: configService.get('REDIS_PASSWORD'),
+        db: parseInt(configService.get('REDIS_DB', '0')),
+        ttl: 300,
+        max: 1000,
+      };
+    };
+    
+    function extractHost(url: string): string {
+      return new URL(url).hostname;
+    }
+    
+    function extractPort(url: string): number {
+      return parseInt(new URL(url).port) || 6379;
+    }
+    ```
+  </Tab>
+  <Tab title="AWS Configuration">
+    ```typescript
+    // src/config/aws.config.ts
+    import { ConfigService } from '@nestjs/config';
+    import { S3 } from 'aws-sdk';
+    
+    export const getAWSConfig = (configService: ConfigService) => {
+      const config = {
+        region: configService.get('AWS_REGION', 'us-east-1'),
+        accessKeyId: configService.get('AWS_ACCESS_KEY_ID'),
+        secretAccessKey: configService.get('AWS_SECRET_ACCESS_KEY'),
+      };
+    
+      // LocalStack configuration for development
+      const endpointUrl = configService.get('AWS_ENDPOINT_URL');
+      if (endpointUrl) {
+        config['endpoint'] = endpointUrl;
+        config['s3ForcePathStyle'] = true;
+      }
+    
+      return config;
+    };
+    
+    export const getS3Config = (configService: ConfigService): S3.ClientConfiguration => ({
+      ...getAWSConfig(configService),
+      signatureVersion: 'v4',
+      params: {
+        Bucket: configService.get('AWS_S3_BUCKET'),
+      },
+    });
+    
+    // S3 service factory
+    @Injectable()
+    export class S3Service {
+      private s3: S3;
+    
+      constructor(private configService: ConfigService) {
+        this.s3 = new S3(getS3Config(this.configService));
+      }
+    
+      async uploadFile(key: string, body: Buffer, contentType: string): Promise<string> {
+        const result = await this.s3.upload({
+          Key: key,
+          Body: body,
+          ContentType: contentType,
+          ACL: 'public-read',
+        }).promise();
+    
+        return result.Location;
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Feature Flags
+
+<Tabs>
+  <Tab title="Feature Flag Service">
+    ```typescript
+    // src/services/feature-flag.service.ts
+    import { Injectable } from '@nestjs/common';
+    import { ConfigService } from '@nestjs/config';
+    
+    export interface FeatureFlags {
+      chamaBlockchain: boolean;
+      investmentMarketplace: boolean;
+      crossBorderTransfers: boolean;
+      advancedAnalytics: boolean;
+      aiInsights: boolean;
+    }
+    
+    @Injectable()
+    export class FeatureFlagService {
+      private flags: FeatureFlags;
+    
+      constructor(private configService: ConfigService) {
+        this.flags = {
+          chamaBlockchain: this.getBooleanFlag('FEATURE_CHAMA_BLOCKCHAIN'),
+          investmentMarketplace: this.getBooleanFlag('FEATURE_INVESTMENT_MARKETPLACE'),
+          crossBorderTransfers: this.getBooleanFlag('FEATURE_CROSS_BORDER_TRANSFERS'),
+          advancedAnalytics: this.getBooleanFlag('FEATURE_ADVANCED_ANALYTICS'),
+          aiInsights: this.getBooleanFlag('FEATURE_AI_INSIGHTS'),
+        };
+      }
+    
+      isEnabled(feature: keyof FeatureFlags): boolean {
+        return this.flags[feature] || false;
+      }
+    
+      getAllFlags(): FeatureFlags {
+        return { ...this.flags };
+      }
+    
+      private getBooleanFlag(key: string, defaultValue = false): boolean {
+        const value = this.configService.get(key);
+        return value === 'true' || value === true || defaultValue;
+      }
+    }
+    
+    // Feature flag decorator
+    export function RequireFeature(feature: keyof FeatureFlags) {
+      return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
+        const method = descriptor.value;
+    
+        descriptor.value = function (...args: any[]) {
+          const featureFlagService = this.featureFlagService as FeatureFlagService;
+          
+          if (!featureFlagService.isEnabled(feature)) {
+            throw new ForbiddenException(`Feature ${feature} is not enabled`);
+          }
+    
+          return method.apply(this, args);
+        };
+      };
+    }
+    ```
+  </Tab>
+  <Tab title="Usage Example">
+    ```typescript
+    // src/controllers/chama.controller.ts
+    @Controller('chamas')
+    export class ChamaController {
+      constructor(
+        private chamaService: ChamaService,
+        private featureFlagService: FeatureFlagService
+      ) {}
+    
+      @Post(':id/blockchain-verify')
+      @RequireFeature('chamaBlockchain')
+      async verifyOnBlockchain(@Param('id') chamaId: string) {
+        return this.chamaService.verifyOnBlockchain(chamaId);
+      }
+    
+      @Get()
+      async getChamas(@GetUser() user: User) {
+        const chamas = await this.chamaService.getUserChamas(user.id);
+        
+        // Conditionally include blockchain data
+        if (this.featureFlagService.isEnabled('chamaBlockchain')) {
+          return this.chamaService.enrichWithBlockchainData(chamas);
+        }
+        
+        return chamas;
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Mobile Feature Flags">
+    ```typescript
+    // src/services/featureFlags.ts
+    interface MobileFeatureFlags {
+      enableBiometricAuth: boolean;
+      enableOfflineMode: boolean;
+      enablePushNotifications: boolean;
+      enableDarkMode: boolean;
+      enableAdvancedCharts: boolean;
+    }
+    
+    class FeatureFlagManager {
+      private flags: MobileFeatureFlags;
+    
+      constructor() {
+        this.flags = {
+          enableBiometricAuth: this.getFlag('ENABLE_BIOMETRIC_AUTH', true),
+          enableOfflineMode: this.getFlag('ENABLE_OFFLINE_MODE', false),
+          enablePushNotifications: this.getFlag('ENABLE_PUSH_NOTIFICATIONS', true),
+          enableDarkMode: this.getFlag('ENABLE_DARK_MODE', true),
+          enableAdvancedCharts: this.getFlag('ENABLE_ADVANCED_CHARTS', false),
+        };
+      }
+    
+      isEnabled(feature: keyof MobileFeatureFlags): boolean {
+        return this.flags[feature];
+      }
+    
+      private getFlag(key: string, defaultValue: boolean): boolean {
+        const value = process.env[key];
+        if (value === undefined) return defaultValue;
+        return value.toLowerCase() === 'true';
+      }
+    }
+    
+    export const featureFlags = new FeatureFlagManager();
+    
+    // Usage in components
+    export const LoginScreen = () => {
+      const showBiometricOption = featureFlags.isEnabled('enableBiometricAuth');
+      
+      return (
+        <View>
+          <TextInput placeholder="Phone Number" />
+          <TextInput placeholder="Password" secureTextEntry />
+          {showBiometricOption && (
+            <TouchableOpacity onPress={authenticateWithBiometrics}>
+              <Text>Use Biometric Authentication</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      );
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Security Configuration
+
+### Authentication & Authorization
+
+<Tabs>
+  <Tab title="JWT Configuration">
+    ```typescript
+    // src/config/jwt.config.ts
+    import { JwtModuleOptions } from '@nestjs/jwt';
+    import { ConfigService } from '@nestjs/config';
+    
+    export const getJwtConfig = (configService: ConfigService): JwtModuleOptions => ({
+      secret: configService.get('JWT_SECRET'),
+      signOptions: {
+        expiresIn: configService.get('JWT_EXPIRES_IN', '24h'),
+        issuer: configService.get('JWT_ISSUER', 'awo-platform'),
+        audience: configService.get('JWT_AUDIENCE', 'awo-users'),
+      },
+    });
+    
+    // JWT strategy configuration
+    @Injectable()
+    export class JwtStrategy extends PassportStrategy(Strategy) {
+      constructor(private configService: ConfigService) {
+        super({
+          jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+          ignoreExpiration: false,
+          secretOrKey: configService.get('JWT_SECRET'),
+          issuer: configService.get('JWT_ISSUER'),
+          audience: configService.get('JWT_AUDIENCE'),
+        });
+      }
+    
+      async validate(payload: any) {
+        return {
+          userId: payload.sub,
+          username: payload.username,
+          roles: payload.roles,
+        };
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="CORS Configuration">
+    ```typescript
+    // src/config/cors.config.ts
+    import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
+    import { ConfigService } from '@nestjs/config';
+    
+    export const getCorsConfig = (configService: ConfigService): CorsOptions => {
+      const origins = configService.get('CORS_ORIGINS', '').split(',').filter(Boolean);
+      const isDevelopment = configService.get('NODE_ENV') === 'development';
+    
+      return {
+        origin: isDevelopment ? true : origins,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: [
+          'Content-Type',
+          'Authorization',
+          'X-Requested-With',
+          'Accept',
+          'Origin',
+          'X-API-Key',
+        ],
+        credentials: true,
+        maxAge: 86400, // 24 hours
+      };
+    };
+    ```
+  </Tab>
+  <Tab title="Rate Limiting">
+    ```typescript
+    // src/config/rate-limit.config.ts
+    import { ThrottlerModuleOptions } from '@nestjs/throttler';
+    import { ConfigService } from '@nestjs/config';
+    
+    export const getRateLimitConfig = (
+      configService: ConfigService
+    ): ThrottlerModuleOptions => ({
+      ttl: parseInt(configService.get('RATE_LIMIT_WINDOW_MS', '60000')),
+      limit: parseInt(configService.get('RATE_LIMIT_MAX_REQUESTS', '100')),
+      storage: {
+        host: configService.get('REDIS_HOST', 'localhost'),
+        port: parseInt(configService.get('REDIS_PORT', '6379')),
+        password: configService.get('REDIS_PASSWORD'),
+        db: parseInt(configService.get('REDIS_DB', '1')),
+        keyPrefix: configService.get('RATE_LIMIT_REDIS_PREFIX', 'rl:'),
+      },
+    });
+    
+    // Custom rate limiting for different endpoints
+    @Injectable()
+    export class CustomThrottlerGuard extends ThrottlerGuard {
+      protected getTracker(req: Request): string {
+        // Use user ID for authenticated requests, IP for others
+        const user = req['user'];
+        return user ? `user:${user.userId}` : req.ip;
+      }
+    
+      protected async shouldSkip(context: ExecutionContext): Promise<boolean> {
+        const request = context.switchToHttp().getRequest();
+        
+        // Skip rate limiting for health checks
+        if (request.url === '/health') {
+          return true;
+        }
+    
+        // Skip for admin users
+        const user = request['user'];
+        if (user && user.roles.includes('admin')) {
+          return true;
+        }
+    
+        return false;
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Environment Validation
+
+```typescript
+// src/config/validation.schema.ts
+import * as Joi from 'joi';
+
+export const validationSchema = Joi.object({
+  // Application
+  NODE_ENV: Joi.string()
+    .valid('development', 'staging', 'production')
+    .default('development'),
+  PORT: Joi.number().default(3000),
+  API_VERSION: Joi.string().default('v1'),
+
+  // Database
+  DATABASE_URL: Joi.string().required(),
+  DATABASE_SSL: Joi.boolean().default(false),
+  DATABASE_LOGGING: Joi.boolean().default(false),
+
+  // Redis
+  REDIS_URL: Joi.string().required(),
+  REDIS_PASSWORD: Joi.string().allow(''),
+  REDIS_DB: Joi.number().default(0),
+
+  // JWT
+  JWT_SECRET: Joi.string().min(32).required(),
+  JWT_EXPIRES_IN: Joi.string().default('24h'),
+  JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
+
+  // AWS
+  AWS_REGION: Joi.string().required(),
+  AWS_ACCESS_KEY_ID: Joi.string().required(),
+  AWS_SECRET_ACCESS_KEY: Joi.string().required(),
+  AWS_S3_BUCKET: Joi.string().required(),
+
+  // Third-party APIs
+  STITCH_API_KEY: Joi.string().required(),
+  STITCH_ENVIRONMENT: Joi.string().valid('sandbox', 'production').required(),
+  MONO_API_KEY: Joi.string().required(),
+  MONO_ENVIRONMENT: Joi.string().valid('test', 'production').required(),
+
+  // Email
+  SMTP_HOST: Joi.string().required(),
+  SMTP_PORT: Joi.number().default(587),
+  SMTP_SECURE: Joi.boolean().default(true),
+  EMAIL_FROM: Joi.string().email().required(),
+
+  // Security
+  WEBHOOK_SECRET: Joi.string().min(32).required(),
+  CORS_ORIGINS: Joi.string().default(''),
+
+  // Monitoring
+  SENTRY_DSN: Joi.string().uri().allow(''),
+  LOG_LEVEL: Joi.string()
+    .valid('error', 'warn', 'info', 'debug', 'verbose')
+    .default('info'),
+});
+
+// Configuration factory
+export default () => ({
+  port: parseInt(process.env.PORT, 10) || 3000,
+  database: {
+    url: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_SSL === 'true',
+    logging: process.env.DATABASE_LOGGING === 'true',
+  },
+  jwt: {
+    secret: process.env.JWT_SECRET,
+    expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+  },
+  redis: {
+    url: process.env.REDIS_URL,
+    password: process.env.REDIS_PASSWORD,
+    db: parseInt(process.env.REDIS_DB, 10) || 0,
+  },
+});
+```
+
+## Monitoring & Logging Configuration
+
+<Tabs>
+  <Tab title="Logging Configuration">
+    ```typescript
+    // src/config/logger.config.ts
+    import { WinstonModuleOptions } from 'nest-winston';
+    import { ConfigService } from '@nestjs/config';
+    import * as winston from 'winston';
+    
+    export const getLoggerConfig = (
+      configService: ConfigService
+    ): WinstonModuleOptions => {
+      const logLevel = configService.get('LOG_LEVEL', 'info');
+      const isProduction = configService.get('NODE_ENV') === 'production';
+    
+      const transports: winston.transport[] = [];
+    
+      // Console transport for development
+      if (!isProduction) {
+        transports.push(
+          new winston.transports.Console({
+            format: winston.format.combine(
+              winston.format.colorize(),
+              winston.format.timestamp(),
+              winston.format.printf(({ timestamp, level, message, context, ...meta }) => {
+                return `${timestamp} [${context}] ${level}: ${message} ${
+                  Object.keys(meta).length ? JSON.stringify(meta, null, 2) : ''
+                }`;
+              })
+            ),
+          })
+        );
+      }
+    
+      // File transport for production
+      if (isProduction) {
+        transports.push(
+          new winston.transports.File({
+            filename: 'logs/error.log',
+            level: 'error',
+            format: winston.format.combine(
+              winston.format.timestamp(),
+              winston.format.json()
+            ),
+          }),
+          new winston.transports.File({
+            filename: 'logs/combined.log',
+            format: winston.format.combine(
+              winston.format.timestamp(),
+              winston.format.json()
+            ),
+          })
+        );
+      }
+    
+      return {
+        level: logLevel,
+        format: winston.format.combine(
+          winston.format.timestamp(),
+          winston.format.errors({ stack: true }),
+          winston.format.json()
+        ),
+        transports,
+      };
+    };
+    ```
+  </Tab>
+  <Tab title="Sentry Configuration">
+    ```typescript
+    // src/config/sentry.config.ts
+    import { ConfigService } from '@nestjs/config';
+    import * as Sentry from '@sentry/node';
+    
+    export const initializeSentry = (configService: ConfigService) => {
+      const dsn = configService.get('SENTRY_DSN');
+      
+      if (!dsn) {
+        console.warn('Sentry DSN not provided, error tracking disabled');
+        return;
+      }
+    
+      Sentry.init({
+        dsn,
+        environment: configService.get('NODE_ENV'),
+        integrations: [
+          new Sentry.Integrations.Http({ tracing: true }),
+          new Sentry.Integrations.Express({ app: true }),
+        ],
+        tracesSampleRate: configService.get('NODE_ENV') === 'production' ? 0.1 : 1.0,
+        beforeSend(event) {
+          // Filter sensitive data
+          if (event.request) {
+            delete event.request.cookies;
+            if (event.request.headers) {
+              delete event.request.headers['authorization'];
+              delete event.request.headers['cookie'];
+            }
+          }
+          return event;
+        },
+      });
+    };
+    
+    // Sentry interceptor
+    @Injectable()
+    export class SentryInterceptor implements NestInterceptor {
+      intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+        return next.handle().pipe(
+          tap({
+            error: (error) => {
+              Sentry.captureException(error);
+            },
+          })
+        );
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Health Checks">
+    ```typescript
+    // src/health/health.controller.ts
+    import { Controller, Get } from '@nestjs/common';
+    import { 
+      HealthCheck, 
+      HealthCheckService, 
+      TypeOrmHealthIndicator,
+      MemoryHealthIndicator 
+    } from '@nestjs/terminus';
+    import { ConfigService } from '@nestjs/config';
+    
+    @Controller('health')
+    export class HealthController {
+      constructor(
+        private health: HealthCheckService,
+        private db: TypeOrmHealthIndicator,
+        private memory: MemoryHealthIndicator,
+        private configService: ConfigService,
+      ) {}
+    
+      @Get()
+      @HealthCheck()
+      check() {
+        return this.health.check([
+          () => this.db.pingCheck('database'),
+          () => this.memory.checkHeap('memory_heap', 150 * 1024 * 1024),
+          () => this.memory.checkRSS('memory_rss', 150 * 1024 * 1024),
+          () => this.checkExternalServices(),
+        ]);
+      }
+    
+      private async checkExternalServices() {
+        const services = ['stitch', 'mono', 'flutterwave'];
+        const results = {};
+    
+        for (const service of services) {
+          try {
+            // Implement actual health check for each service
+            results[service] = { status: 'up' };
+          } catch (error) {
+            results[service] = { status: 'down', error: error.message };
+          }
+        }
+    
+        return {
+          'external-services': {
+            status: Object.values(results).every(r => r['status'] === 'up') ? 'up' : 'down',
+            details: results,
+          },
+        };
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Configuration Management Tools
+
+### Docker Configuration
+
+<Tabs>
+  <Tab title="Dockerfile">
+    ```dockerfile
+    # Multi-stage build for production
+    FROM node:18-alpine AS builder
+    
+    WORKDIR /app
+    
+    # Copy package files
+    COPY package*.json ./
+    COPY tsconfig*.json ./
+    
+    # Install dependencies
+    RUN npm ci --only=production && npm cache clean --force
+    
+    # Copy source code
+    COPY src ./src
+    
+    # Build application
+    RUN npm run build
+    
+    # Production stage
+    FROM node:18-alpine AS production
+    
+    WORKDIR /app
+    
+    # Create non-root user
+    RUN addgroup -g 1001 -S nodejs && \
+        adduser -S awo -u 1001
+    
+    # Copy built application
+    COPY --from=builder --chown=awo:nodejs /app/dist ./dist
+    COPY --from=builder --chown=awo:nodejs /app/node_modules ./node_modules
+    COPY --from=builder --chown=awo:nodejs /app/package.json ./package.json
+    
+    # Set user
+    USER awo
+    
+    # Expose port
+    EXPOSE 3000
+    
+    # Health check
+    HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+      CMD node dist/health-check.js
+    
+    # Start application
+    CMD ["node", "dist/main.js"]
+    ```
+  </Tab>
+  <Tab title="Docker Compose">
+    ```yaml
+    version: '3.8'
+    
+    services:
+      # Backend API
+      api:
+        build:
+          context: .
+          dockerfile: Dockerfile
+        ports:
+          - "3000:3000"
+        environment:
+          - NODE_ENV=development
+          - DATABASE_URL=postgresql://awo:password@postgres:5432/awo_dev
+          - REDIS_URL=redis://redis:6379
+        depends_on:
+          - postgres
+          - redis
+        volumes:
+          - ./logs:/app/logs
+        restart: unless-stopped
+    
+      # PostgreSQL Database
+      postgres:
+        image: postgres:15-alpine
+        environment:
+          POSTGRES_USER: awo
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: awo_dev
+        volumes:
+          - postgres_data:/var/lib/postgresql/data
+        ports:
+          - "5432:5432"
+        restart: unless-stopped
+    
+      # Redis Cache
+      redis:
+        image: redis:7-alpine
+        ports:
+          - "6379:6379"
+        volumes:
+          - redis_data:/data
+        restart: unless-stopped
+    
+      # LocalStack (AWS services emulation)
+      localstack:
+        image: localstack/localstack:latest
+        environment:
+          - SERVICES=s3,ses,lambda
+          - DEBUG=1
+          - DATA_DIR=/tmp/localstack/data
+        ports:
+          - "4566:4566"
+        volumes:
+          - localstack_data:/tmp/localstack
+          - /var/run/docker.sock:/var/run/docker.sock
+    
+      # Mailhog (Email testing)
+      mailhog:
+        image: mailhog/mailhog:latest
+        ports:
+          - "1025:1025"  # SMTP
+          - "8025:8025"  # Web UI
+    
+    volumes:
+      postgres_data:
+      redis_data:
+      localstack_data:
+    
+    networks:
+      default:
+        name: awo-network
+    ```
+  </Tab>
+  <Tab title="Kubernetes Deployment">
+    ```yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: awo-backend
+      namespace: awo-production
+    spec:
+      replicas: 3
+      selector:
+        matchLabels:
+          app: awo-backend
+      template:
+        metadata:
+          labels:
+            app: awo-backend
+        spec:
+          containers:
+          - name: awo-backend
+            image: awo-platform/backend:latest
+            ports:
+            - containerPort: 3000
+            env:
+            - name: NODE_ENV
+              value: "production"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: awo-backend-secrets
+                  key: DATABASE_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: awo-backend-secrets
+                  key: REDIS_URL
+            envFrom:
+            - configMapRef:
+                name: awo-backend-config
+            - secretRef:
+                name: awo-backend-secrets
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+            livenessProbe:
+              httpGet:
+                path: /health
+                port: 3000
+              initialDelaySeconds: 30
+              periodSeconds: 10
+            readinessProbe:
+              httpGet:
+                path: /health
+                port: 3000
+              initialDelaySeconds: 5
+              periodSeconds: 5
+    
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: awo-backend-service
+      namespace: awo-production
+    spec:
+      selector:
+        app: awo-backend
+      ports:
+      - port: 80
+        targetPort: 3000
+      type: ClusterIP
+    ```
+  </Tab>
+</Tabs>
+
+## Configuration Best Practices
+
+<AccordionGroup>
+  <Accordion title="Environment Separation">
+    **Use different configurations for each environment**
+
+    ```typescript
+    // Good: Environment-specific configurations
+    const config = {
+      development: {
+        logging: true,
+        debug: true,
+        rateLimit: 1000,
+      },
+      production: {
+        logging: false,
+        debug: false,
+        rateLimit: 100,
+      },
+    };
+    
+    export default config[process.env.NODE_ENV || 'development'];
+    ```
+  </Accordion>
+  <Accordion title="Secret Management">
+    **Never commit secrets to version control**
+
+    ```bash
+    # Use environment variables
+    export JWT_SECRET=$(openssl rand -base64 32)
+    
+    # Use secret management services
+    aws secretsmanager get-secret-value --secret-id prod/awo/jwt-secret
+    
+    # Use encrypted secrets in CI/CD
+    - name: Deploy
+      env:
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+    ```
+  </Accordion>
+  <Accordion title="Configuration Validation">
+    **Validate configuration at startup**
+
+    ```typescript
+    // Validate required environment variables
+    const requiredEnvVars = [
+      'DATABASE_URL',
+      'JWT_SECRET',
+      'REDIS_URL'
+    ];
+    
+    for (const envVar of requiredEnvVars) {
+      if (!process.env[envVar]) {
+        throw new Error(`Missing required environment variable: ${envVar}`);
+      }
+    }
+    ```
+  </Accordion>
+  <Accordion title="Default Values">
+    **Provide sensible defaults**
+
+    ```typescript
+    const config = {
+      port: parseInt(process.env.PORT) || 3000,
+      logLevel: process.env.LOG_LEVEL || 'info',
+      rateLimit: parseInt(process.env.RATE_LIMIT) || 100,
+      jwtExpiration: process.env.JWT_EXPIRES_IN || '24h',
+    };
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  **Configuration as Code**: Treat configuration as part of your infrastructure code. Version control it, review changes, and automate deployments.
+</Tip>
+
+---
+
+**Need help with configuration?** Check our [deployment guide](/essentials/deployment) or reach out to the DevOps team.

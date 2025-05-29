@@ -1,0 +1,2339 @@
+---
+title: "Reusable Snippets"
+description: "Reusable, custom snippets to keep content in sync"
+icon: "recycle"
+---
+
+import SnippetIntro from '/snippets/snippet-intro.mdx';
+
+# Reusable Code Snippets
+
+This collection contains commonly used code patterns, components, and utilities across the AWO platform. These snippets promote consistency and reduce development time.
+
+## Component Snippets
+
+### Basic Components
+
+<Tabs>
+  <Tab title="Loading States">
+    ```typescript
+    // LoadingSpinner.tsx
+    import React from 'react';
+    import { ActivityIndicator, View, Text } from 'react-native';
+    import { useTheme } from '@react-navigation/native';
+    
+    interface LoadingSpinnerProps {
+      size?: 'small' | 'large';
+      text?: string;
+      overlay?: boolean;
+    }
+    
+    export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
+      size = 'large',
+      text = 'Loading...',
+      overlay = false,
+    }) => {
+      const { colors } = useTheme();
+      
+      const content = (
+        <View style={{ alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <ActivityIndicator size={size} color={colors.primary} />
+          {text && (
+            <Text style={{ 
+              marginTop: 12, 
+              color: colors.onSurface,
+              fontSize: 16 
+            }}>
+              {text}
+            </Text>
+          )}
+        </View>
+      );
+      
+      if (overlay) {
+        return (
+          <View style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+          }}>
+            <View style={{
+              backgroundColor: colors.surface,
+              borderRadius: 12,
+              padding: 24,
+              minWidth: 120,
+            }}>
+              {content}
+            </View>
+          </View>
+        );
+      }
+      
+      return content;
+    };
+    
+    // Skeleton Loader
+    export const SkeletonLoader: React.FC<{
+      width?: number | string;
+      height?: number;
+      borderRadius?: number;
+    }> = ({ width = '100%', height = 20, borderRadius = 4 }) => {
+      return (
+        <View
+          style={{
+            width,
+            height,
+            backgroundColor: '#E5E7EB',
+            borderRadius,
+          }}
+        >
+          <View
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: '#F3F4F6',
+              borderRadius,
+            }}
+            // Add shimmer animation here
+          />
+        </View>
+      );
+    };
+    ```
+  </Tab>
+  <Tab title="Error States">
+    ```typescript
+    // ErrorBoundary.tsx
+    import React, { Component, ReactNode } from 'react';
+    import { View, Text, TouchableOpacity } from 'react-native';
+    
+    interface ErrorBoundaryState {
+      hasError: boolean;
+      error?: Error;
+    }
+    
+    interface ErrorBoundaryProps {
+      children: ReactNode;
+      fallback?: ReactNode;
+      onError?: (error: Error, errorInfo: any) => void;
+    }
+    
+    export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+      constructor(props: ErrorBoundaryProps) {
+        super(props);
+        this.state = { hasError: false };
+      }
+    
+      static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+        return { hasError: true, error };
+      }
+    
+      componentDidCatch(error: Error, errorInfo: any) {
+        console.error('Error caught by boundary:', error, errorInfo);
+        this.props.onError?.(error, errorInfo);
+      }
+    
+      render() {
+        if (this.state.hasError) {
+          if (this.props.fallback) {
+            return this.props.fallback;
+          }
+    
+          return (
+            <View style={{ 
+              flex: 1, 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              padding: 20 
+            }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>
+                Oops! Something went wrong
+              </Text>
+              <Text style={{ 
+                textAlign: 'center', 
+                color: '#666',
+                marginBottom: 16 
+              }}>
+                We're sorry for the inconvenience. Please try again.
+              </Text>
+              <TouchableOpacity
+                onPress={() => this.setState({ hasError: false })}
+                style={{
+                  backgroundColor: '#E63946',
+                  paddingHorizontal: 24,
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                }}
+              >
+                <Text style={{ color: 'white', fontWeight: '600' }}>
+                  Try Again
+                </Text>
+              </TouchableOpacity>
+            </View>
+          );
+        }
+    
+        return this.props.children;
+      }
+    }
+    
+    // Error Message Component
+    export const ErrorMessage: React.FC<{
+      message: string;
+      onRetry?: () => void;
+      type?: 'error' | 'warning' | 'info';
+    }> = ({ message, onRetry, type = 'error' }) => {
+      const colors = {
+        error: { bg: '#FEF2F2', text: '#DC2626', border: '#FECACA' },
+        warning: { bg: '#FFFBEB', text: '#D97706', border: '#FED7AA' },
+        info: { bg: '#EFF6FF', text: '#2563EB', border: '#DBEAFE' },
+      };
+      
+      const color = colors[type];
+      
+      return (
+        <View style={{
+          backgroundColor: color.bg,
+          borderColor: color.border,
+          borderWidth: 1,
+          borderRadius: 8,
+          padding: 16,
+          margin: 16,
+        }}>
+          <Text style={{ color: color.text, fontSize: 14, lineHeight: 20 }}>
+            {message}
+          </Text>
+          {onRetry && (
+            <TouchableOpacity
+              onPress={onRetry}
+              style={{
+                marginTop: 12,
+                alignSelf: 'flex-start',
+              }}
+            >
+              <Text style={{ 
+                color: color.text, 
+                fontWeight: '600',
+                textDecorationLine: 'underline' 
+              }}>
+                Try Again
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      );
+    };
+    ```
+  </Tab>
+  <Tab title="Form Components">
+    ```typescript
+    // FormInput.tsx
+    import React, { forwardRef } from 'react';
+    import { 
+      TextInput, 
+      View, 
+      Text, 
+      TextInputProps,
+      TouchableOpacity 
+    } from 'react-native';
+    import { useTheme } from '@react-navigation/native';
+    import { Icon } from './Icon';
+    
+    interface FormInputProps extends TextInputProps {
+      label?: string;
+      error?: string;
+      hint?: string;
+      required?: boolean;
+      leftIcon?: string;
+      rightIcon?: string;
+      onRightIconPress?: () => void;
+    }
+    
+    export const FormInput = forwardRef<TextInput, FormInputProps>(({
+      label,
+      error,
+      hint,
+      required,
+      leftIcon,
+      rightIcon,
+      onRightIconPress,
+      style,
+      ...props
+    }, ref) => {
+      const { colors } = useTheme();
+      
+      return (
+        <View style={{ marginBottom: 16 }}>
+          {label && (
+            <Text style={{
+              fontSize: 14,
+              fontWeight: '600',
+              color: colors.onSurface,
+              marginBottom: 8,
+            }}>
+              {label}
+              {required && <Text style={{ color: colors.error }}> *</Text>}
+            </Text>
+          )}
+          
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: error ? colors.error : colors.border,
+            borderRadius: 8,
+            backgroundColor: colors.surface,
+            paddingHorizontal: 12,
+          }}>
+            {leftIcon && (
+              <Icon 
+                name={leftIcon} 
+                size={20} 
+                color={colors.onSurfaceVariant} 
+                style={{ marginRight: 8 }}
+              />
+            )}
+            
+            <TextInput
+              ref={ref}
+              style={[
+                {
+                  flex: 1,
+                  paddingVertical: 12,
+                  fontSize: 16,
+                  color: colors.onSurface,
+                },
+                style,
+              ]}
+              placeholderTextColor={colors.onSurfaceVariant}
+              {...props}
+            />
+            
+            {rightIcon && (
+              <TouchableOpacity onPress={onRightIconPress}>
+                <Icon 
+                  name={rightIcon} 
+                  size={20} 
+                  color={colors.onSurfaceVariant} 
+                  style={{ marginLeft: 8 }}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          {error && (
+            <Text style={{
+              fontSize: 12,
+              color: colors.error,
+              marginTop: 4,
+            }}>
+              {error}
+            </Text>
+          )}
+          
+          {hint && !error && (
+            <Text style={{
+              fontSize: 12,
+              color: colors.onSurfaceVariant,
+              marginTop: 4,
+            }}>
+              {hint}
+            </Text>
+          )}
+        </View>
+      );
+    });
+    
+    // Form validation hook
+    export const useFormValidation = <T extends Record<string, any>>(
+      initialValues: T,
+      validationRules: Record<keyof T, (value: any) => string | undefined>
+    ) => {
+      const [values, setValues] = useState<T>(initialValues);
+      const [errors, setErrors] = useState<Partial<Record<keyof T, string>>>({});
+      const [touched, setTouched] = useState<Partial<Record<keyof T, boolean>>>({});
+    
+      const setValue = (field: keyof T, value: any) => {
+        setValues(prev => ({ ...prev, [field]: value }));
+        
+        // Clear error when user starts typing
+        if (errors[field]) {
+          setErrors(prev => ({ ...prev, [field]: undefined }));
+        }
+      };
+    
+      const setFieldTouched = (field: keyof T) => {
+        setTouched(prev => ({ ...prev, [field]: true }));
+      };
+    
+      const validateField = (field: keyof T): string | undefined => {
+        const error = validationRules[field]?.(values[field]);
+        setErrors(prev => ({ ...prev, [field]: error }));
+        return error;
+      };
+    
+      const validateAll = (): boolean => {
+        const newErrors: Partial<Record<keyof T, string>> = {};
+        let hasErrors = false;
+    
+        Object.keys(validationRules).forEach(field => {
+          const error = validationRules[field](values[field]);
+          if (error) {
+            newErrors[field] = error;
+            hasErrors = true;
+          }
+        });
+    
+        setErrors(newErrors);
+        setTouched(
+          Object.keys(initialValues).reduce(
+            (acc, key) => ({ ...acc, [key]: true }),
+            {}
+          )
+        );
+    
+        return !hasErrors;
+      };
+    
+      return {
+        values,
+        errors,
+        touched,
+        setValue,
+        setFieldTouched,
+        validateField,
+        validateAll,
+        isValid: Object.keys(errors).length === 0,
+      };
+    };
+    ```
+  </Tab>
+</Tabs>
+
+### Financial Components
+
+<Tabs>
+  <Tab title="DIVA Score Components">
+    ```typescript
+    // DivaScoreDisplay.tsx
+    import React from 'react';
+    import { View, Text } from 'react-native';
+    import { useTheme } from '@react-navigation/native';
+    import Svg, { Circle, Path } from 'react-native-svg';
+    
+    interface DivaScoreDisplayProps {
+      score: number;
+      size?: 'small' | 'medium' | 'large';
+      showLabel?: boolean;
+      animated?: boolean;
+    }
+    
+    export const DivaScoreDisplay: React.FC<DivaScoreDisplayProps> = ({
+      score,
+      size = 'medium',
+      showLabel = true,
+      animated = false,
+    }) => {
+      const { colors } = useTheme();
+      
+      const dimensions = {
+        small: { size: 60, strokeWidth: 4, fontSize: 14 },
+        medium: { size: 100, strokeWidth: 6, fontSize: 24 },
+        large: { size: 140, strokeWidth: 8, fontSize: 32 },
+      };
+      
+      const { size: circleSize, strokeWidth, fontSize } = dimensions[size];
+      const radius = (circleSize - strokeWidth) / 2;
+      const circumference = radius * 2 * Math.PI;
+      const progress = (score / 1000) * circumference;
+      
+      const getScoreColor = (score: number) => {
+        if (score >= 800) return colors.success || '#10B981';
+        if (score >= 600) return colors.warning || '#F59E0B';
+        return colors.error || '#EF4444';
+      };
+      
+      return (
+        <View style={{ alignItems: 'center' }}>
+          <View style={{ position: 'relative' }}>
+            <Svg width={circleSize} height={circleSize}>
+              {/* Background circle */}
+              <Circle
+                cx={circleSize / 2}
+                cy={circleSize / 2}
+                r={radius}
+                stroke={colors.border}
+                strokeWidth={strokeWidth}
+                fill="transparent"
+              />
+              
+              {/* Progress circle */}
+              <Circle
+                cx={circleSize / 2}
+                cy={circleSize / 2}
+                r={radius}
+                stroke={getScoreColor(score)}
+                strokeWidth={strokeWidth}
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference - progress}
+                strokeLinecap="round"
+                fill="transparent"
+                transform={`rotate(-90 ${circleSize / 2} ${circleSize / 2})`}
+              />
+            </Svg>
+            
+            <View style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+              <Text style={{
+                fontSize,
+                fontWeight: 'bold',
+                color: colors.onSurface,
+              }}>
+                {score}
+              </Text>
+            </View>
+          </View>
+          
+          {showLabel && (
+            <Text style={{
+              marginTop: 8,
+              fontSize: 12,
+              color: colors.onSurfaceVariant,
+              textAlign: 'center',
+            }}>
+              DIVA Score
+            </Text>
+          )}
+        </View>
+      );
+    };
+    
+    // DIVA Score Breakdown Component
+    export const DivaScoreBreakdown: React.FC<{
+      components: {
+        discipline: number;
+        income: number;
+        velocity: number;
+        assets: number;
+      };
+    }> = ({ components }) => {
+      const { colors } = useTheme();
+      
+      const componentData = [
+        { name: 'Discipline', score: components.discipline, color: '#E63946' },
+        { name: 'Income', score: components.income, color: '#457B9D' },
+        { name: 'Velocity', score: components.velocity, color: '#F1C40F' },
+        { name: 'Assets', score: components.assets, color: '#2ECC71' },
+      ];
+      
+      return (
+        <View>
+          {componentData.map((component, index) => (
+            <View key={component.name} style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 12,
+              borderBottomWidth: index < componentData.length - 1 ? 1 : 0,
+              borderBottomColor: colors.border,
+            }}>
+              <View style={{
+                width: 12,
+                height: 12,
+                borderRadius: 6,
+                backgroundColor: component.color,
+                marginRight: 12,
+              }} />
+              
+              <Text style={{
+                flex: 1,
+                fontSize: 16,
+                color: colors.onSurface,
+              }}>
+                {component.name}
+              </Text>
+              
+              <Text style={{
+                fontSize: 16,
+                fontWeight: '600',
+                color: colors.onSurface,
+                marginRight: 12,
+              }}>
+                {component.score}
+              </Text>
+              
+              <View style={{
+                width: 60,
+                height: 4,
+                backgroundColor: colors.surface,
+                borderRadius: 2,
+                overflow: 'hidden',
+              }}>
+                <View style={{
+                  width: `${(component.score / 1000) * 100}%`,
+                  height: '100%',
+                  backgroundColor: component.color,
+                }} />
+              </View>
+            </View>
+          ))}
+        </View>
+      );
+    };
+    ```
+  </Tab>
+  <Tab title="Currency Components">
+    ```typescript
+    // CurrencyDisplay.tsx
+    import React from 'react';
+    import { Text, TextProps } from 'react-native';
+    
+    interface CurrencyDisplayProps extends TextProps {
+      amount: number;
+      currency?: string;
+      locale?: string;
+      showSign?: boolean;
+      precision?: number;
+    }
+    
+    export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({
+      amount,
+      currency = 'ZAR',
+      locale = 'en-ZA',
+      showSign = false,
+      precision = 2,
+      style,
+      ...props
+    }) => {
+      const formatCurrency = (amount: number) => {
+        const formatter = new Intl.NumberFormat(locale, {
+          style: 'currency',
+          currency,
+          minimumFractionDigits: precision,
+          maximumFractionDigits: precision,
+        });
+        
+        return formatter.format(amount);
+      };
+      
+      const getAmountColor = (amount: number, baseColor: string) => {
+        if (!showSign) return baseColor;
+        return amount >= 0 ? '#10B981' : '#EF4444'; // Green for positive, red for negative
+      };
+      
+      return (
+        <Text
+          style={[
+            style,
+            { color: getAmountColor(amount, style?.color || '#000000') }
+          ]}
+          {...props}
+        >
+          {showSign && amount > 0 && '+'}
+          {formatCurrency(amount)}
+        </Text>
+      );
+    };
+    
+    // Currency Input Component
+    export const CurrencyInput: React.FC<{
+      value: number;
+      onValueChange: (value: number) => void;
+      currency?: string;
+      placeholder?: string;
+      error?: string;
+    }> = ({ 
+      value, 
+      onValueChange, 
+      currency = 'ZAR',
+      placeholder = '0.00',
+      error 
+    }) => {
+      const [displayValue, setDisplayValue] = useState(
+        value > 0 ? value.toFixed(2) : ''
+      );
+      
+      const handleTextChange = (text: string) => {
+        // Remove non-numeric characters except decimal point
+        const cleaned = text.replace(/[^0-9.]/g, '');
+        
+        // Ensure only one decimal point
+        const parts = cleaned.split('.');
+        const formatted = parts.length > 2 
+          ? parts[0] + '.' + parts.slice(1).join('')
+          : cleaned;
+          
+        // Limit to 2 decimal places
+        const limited = formatted.includes('.') 
+          ? formatted.substring(0, formatted.indexOf('.') + 3)
+          : formatted;
+          
+        setDisplayValue(limited);
+        onValueChange(parseFloat(limited) || 0);
+      };
+      
+      return (
+        <FormInput
+          value={displayValue}
+          onChangeText={handleTextChange}
+          placeholder={placeholder}
+          keyboardType="numeric"
+          leftIcon="dollar-sign"
+          error={error}
+        />
+      );
+    };
+    
+    // Percentage Display
+    export const PercentageDisplay: React.FC<{
+      value: number;
+      precision?: number;
+      showSign?: boolean;
+      style?: TextProps['style'];
+    }> = ({ value, precision = 1, showSign = true, style }) => {
+      const formatPercentage = (value: number) => {
+        const sign = showSign && value > 0 ? '+' : '';
+        return `${sign}${value.toFixed(precision)}%`;
+      };
+      
+      const getColor = (value: number) => {
+        if (value > 0) return '#10B981'; // Green
+        if (value < 0) return '#EF4444'; // Red
+        return '#6B7280'; // Gray
+      };
+      
+      return (
+        <Text style={[style, { color: getColor(value) }]}>
+          {formatPercentage(value)}
+        </Text>
+      );
+    };
+    ```
+  </Tab>
+  <Tab title="Chart Components">
+    ```typescript
+    // SimpleLineChart.tsx
+    import React from 'react';
+    import { View, Dimensions } from 'react-native';
+    import Svg, { Path, Circle, Line, Text as SvgText } from 'react-native-svg';
+    
+    interface DataPoint {
+      x: number;
+      y: number;
+      label?: string;
+    }
+    
+    interface SimpleLineChartProps {
+      data: DataPoint[];
+      width?: number;
+      height?: number;
+      color?: string;
+      strokeWidth?: number;
+      showDots?: boolean;
+      showGrid?: boolean;
+    }
+    
+    export const SimpleLineChart: React.FC<SimpleLineChartProps> = ({
+      data,
+      width = Dimensions.get('window').width - 32,
+      height = 200,
+      color = '#E63946',
+      strokeWidth = 2,
+      showDots = true,
+      showGrid = false,
+    }) => {
+      if (!data.length) return null;
+      
+      const padding = 20;
+      const chartWidth = width - (padding * 2);
+      const chartHeight = height - (padding * 2);
+      
+      // Find min/max values
+      const minX = Math.min(...data.map(d => d.x));
+      const maxX = Math.max(...data.map(d => d.x));
+      const minY = Math.min(...data.map(d => d.y));
+      const maxY = Math.max(...data.map(d => d.y));
+      
+      // Scale functions
+      const scaleX = (x: number) => 
+        ((x - minX) / (maxX - minX)) * chartWidth + padding;
+      const scaleY = (y: number) => 
+        height - (((y - minY) / (maxY - minY)) * chartHeight + padding);
+      
+      // Generate path
+      const pathData = data.reduce((path, point, index) => {
+        const x = scaleX(point.x);
+        const y = scaleY(point.y);
+        return index === 0 ? `M${x},${y}` : `${path} L${x},${y}`;
+      }, '');
+      
+      return (
+        <View>
+          <Svg width={width} height={height}>
+            {/* Grid lines */}
+            {showGrid && (
+              <>
+                {/* Horizontal grid lines */}
+                {[0, 0.25, 0.5, 0.75, 1].map(ratio => {
+                  const y = padding + (ratio * chartHeight);
+                  return (
+                    <Line
+                      key={`h-${ratio}`}
+                      x1={padding}
+                      y1={y}
+                      x2={width - padding}
+                      y2={y}
+                      stroke="#E5E7EB"
+                      strokeWidth={1}
+                    />
+                  );
+                })}
+                
+                {/* Vertical grid lines */}
+                {[0, 0.25, 0.5, 0.75, 1].map(ratio => {
+                  const x = padding + (ratio * chartWidth);
+                  return (
+                    <Line
+                      key={`v-${ratio}`}
+                      x1={x}
+                      y1={padding}
+                      x2={x}
+                      y2={height - padding}
+                      stroke="#E5E7EB"
+                      strokeWidth={1}
+                    />
+                  );
+                })}
+              </>
+            )}
+            
+            {/* Chart line */}
+            <Path
+              d={pathData}
+              stroke={color}
+              strokeWidth={strokeWidth}
+              fill="transparent"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            
+            {/* Data points */}
+            {showDots && data.map((point, index) => (
+              <Circle
+                key={index}
+                cx={scaleX(point.x)}
+                cy={scaleY(point.y)}
+                r={strokeWidth + 1}
+                fill={color}
+                stroke="white"
+                strokeWidth={2}
+              />
+            ))}
+          </Svg>
+        </View>
+      );
+    };
+    
+    // Progress Bar Component
+    export const ProgressBar: React.FC<{
+      progress: number; // 0-1
+      height?: number;
+      backgroundColor?: string;
+      progressColor?: string;
+      showPercentage?: boolean;
+      animated?: boolean;
+    }> = ({
+      progress,
+      height = 8,
+      backgroundColor = '#E5E7EB',
+      progressColor = '#E63946',
+      showPercentage = false,
+      animated = true,
+    }) => {
+      const percentage = Math.min(Math.max(progress, 0), 1) * 100;
+      
+      return (
+        <View>
+          <View style={{
+            width: '100%',
+            height,
+            backgroundColor,
+            borderRadius: height / 2,
+            overflow: 'hidden',
+          }}>
+            <View style={{
+              width: `${percentage}%`,
+              height: '100%',
+              backgroundColor: progressColor,
+              borderRadius: height / 2,
+              // Add animation here if needed
+            }} />
+          </View>
+          
+          {showPercentage && (
+            <Text style={{
+              fontSize: 12,
+              color: '#6B7280',
+              textAlign: 'right',
+              marginTop: 4,
+            }}>
+              {percentage.toFixed(0)}%
+            </Text>
+          )}
+        </View>
+      );
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Utility Snippets
+
+### Data Formatting
+
+<Tabs>
+  <Tab title="Date Utilities">
+    ```typescript
+    // dateUtils.ts
+    import { format, formatDistanceToNow, isToday, isYesterday, parseISO } from 'date-fns';
+    
+    export const DateUtils = {
+      // Format date for display
+      formatDate: (date: Date | string, formatStr: string = 'MMM dd, yyyy'): string => {
+        const dateObj = typeof date === 'string' ? parseISO(date) : date;
+        return format(dateObj, formatStr);
+      },
+      
+      // Format date relative to now
+      formatRelative: (date: Date | string): string => {
+        const dateObj = typeof date === 'string' ? parseISO(date) : date;
+        
+        if (isToday(dateObj)) {
+          return `Today at ${format(dateObj, 'HH:mm')}`;
+        }
+        
+        if (isYesterday(dateObj)) {
+          return `Yesterday at ${format(dateObj, 'HH:mm')}`;
+        }
+        
+        return formatDistanceToNow(dateObj, { addSuffix: true });
+      },
+      
+      // Format transaction date
+      formatTransactionDate: (date: Date | string): string => {
+        const dateObj = typeof date === 'string' ? parseISO(date) : date;
+        
+        if (isToday(dateObj)) {
+          return format(dateObj, 'HH:mm');
+        }
+        
+        if (isYesterday(dateObj)) {
+          return 'Yesterday';
+        }
+        
+        return format(dateObj, 'MMM dd');
+      },
+      
+      // Format month year for charts
+      formatMonthYear: (date: Date | string): string => {
+        const dateObj = typeof date === 'string' ? parseISO(date) : date;
+        return format(dateObj, 'MMM yyyy');
+      },
+      
+      // Get start and end of current month
+      getCurrentMonthRange: (): { start: Date; end: Date } => {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        return { start, end };
+      },
+      
+      // Get last N months
+      getLastNMonths: (n: number): Date[] => {
+        const months: Date[] = [];
+        const now = new Date();
+        
+        for (let i = n - 1; i >= 0; i--) {
+          const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          months.push(date);
+        }
+        
+        return months;
+      },
+    };
+    
+    // React hook for formatted dates
+    export const useFormattedDate = (date: Date | string, formatStr?: string) => {
+      return useMemo(() => {
+        return DateUtils.formatDate(date, formatStr);
+      }, [date, formatStr]);
+    };
+    
+    // React hook for relative dates that update
+    export const useRelativeDate = (date: Date | string) => {
+      const [formattedDate, setFormattedDate] = useState(
+        DateUtils.formatRelative(date)
+      );
+      
+      useEffect(() => {
+        const updateDate = () => {
+          setFormattedDate(DateUtils.formatRelative(date));
+        };
+        
+        // Update every minute for accuracy
+        const interval = setInterval(updateDate, 60000);
+        
+        return () => clearInterval(interval);
+      }, [date]);
+      
+      return formattedDate;
+    };
+    ```
+  </Tab>
+  <Tab title="Number Utilities">
+    ```typescript
+    // numberUtils.ts
+    export const NumberUtils = {
+      // Format large numbers (1000 -> 1K, 1000000 -> 1M)
+      formatLargeNumber: (num: number, precision: number = 1): string => {
+        if (num < 1000) return num.toString();
+        
+        const units = ['', 'K', 'M', 'B', 'T'];
+        const unitIndex = Math.floor(Math.log10(Math.abs(num)) / 3);
+        const scaledNumber = num / Math.pow(1000, unitIndex);
+        
+        return `${scaledNumber.toFixed(precision)}${units[unitIndex]}`;
+      },
+      
+      // Format percentage
+      formatPercentage: (
+        value: number, 
+        total: number, 
+        precision: number = 1
+      ): string => {
+        if (total === 0) return '0%';
+        const percentage = (value / total) * 100;
+        return `${percentage.toFixed(precision)}%`;
+      },
+      
+      // Clamp number between min and max
+      clamp: (num: number, min: number, max: number): number => {
+        return Math.min(Math.max(num, min), max);
+      },
+      
+      // Round to nearest step
+      roundToStep: (num: number, step: number): number => {
+        return Math.round(num / step) * step;
+      },
+      
+      // Generate random number in range
+      randomInRange: (min: number, max: number): number => {
+        return Math.random() * (max - min) + min;
+      },
+      
+      // Calculate compound interest
+      calculateCompoundInterest: (
+        principal: number,
+        rate: number,
+        time: number,
+        compoundFrequency: number = 12
+      ): number => {
+        return principal * Math.pow(
+          1 + (rate / compoundFrequency),
+          compoundFrequency * time
+        );
+      },
+      
+      // Calculate monthly payment for loan
+      calculateMonthlyPayment: (
+        principal: number,
+        annualRate: number,
+        years: number
+      ): number => {
+        const monthlyRate = annualRate / 12;
+        const numberOfPayments = years * 12;
+        
+        if (monthlyRate === 0) return principal / numberOfPayments;
+        
+        return (
+          (principal * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) /
+          (Math.pow(1 + monthlyRate, numberOfPayments) - 1)
+        );
+      },
+      
+      // Format currency with locale
+      formatCurrency: (
+        amount: number,
+        currency: string = 'ZAR',
+        locale: string = 'en-ZA'
+      ): string => {
+        return new Intl.NumberFormat(locale, {
+          style: 'currency',
+          currency,
+        }).format(amount);
+      },
+      
+      // Format number with thousands separator
+      formatNumber: (
+        num: number,
+        locale: string = 'en-ZA',
+        options?: Intl.NumberFormatOptions
+      ): string => {
+        return new Intl.NumberFormat(locale, options).format(num);
+      },
+    };
+    
+    // React hook for animated numbers
+    export const useAnimatedNumber = (
+      target: number,
+      duration: number = 1000
+    ) => {
+      const [current, setCurrent] = useState(0);
+      
+      useEffect(() => {
+        const startTime = Date.now();
+        const startValue = current;
+        const difference = target - startValue;
+        
+        const animate = () => {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          // Easing function
+          const easeOut = 1 - Math.pow(1 - progress, 3);
+          const newValue = startValue + (difference * easeOut);
+          
+          setCurrent(newValue);
+          
+          if (progress < 1) {
+            requestAnimationFrame(animate);
+          }
+        };
+        
+        requestAnimationFrame(animate);
+      }, [target, duration]);
+      
+      return Math.round(current);
+    };
+    ```
+  </Tab>
+  <Tab title="Validation Utilities">
+    ```typescript
+    // validationUtils.ts
+    export const ValidationUtils = {
+      // Email validation
+      isValidEmail: (email: string): boolean => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+      },
+      
+      // Phone number validation (South African format)
+      isValidPhoneNumber: (phone: string): boolean => {
+        // Remove all non-digits
+        const cleaned = phone.replace(/\D/g, '');
+        
+        // Check for valid SA formats
+        const saRegex = /^(?:\+27|0)[1-9]\d{8}$/;
+        return saRegex.test(phone) || saRegex.test(`+27${cleaned.substring(1)}`);
+      },
+      
+      // ID Number validation (South African)
+      isValidSAIdNumber: (idNumber: string): boolean => {
+        if (!/^\d{13}$/.test(idNumber)) return false;
+        
+        // Luhn algorithm for checksum
+        let sum = 0;
+        for (let i = 0; i < 12; i++) {
+          let digit = parseInt(idNumber[i]);
+          if (i % 2 === 1) {
+            digit *= 2;
+            if (digit > 9) digit -= 9;
+          }
+          sum += digit;
+        }
+        
+        const checkDigit = (10 - (sum % 10)) % 10;
+        return checkDigit === parseInt(idNumber[12]);
+      },
+      
+      // Password strength validation
+      getPasswordStrength: (password: string): {
+        score: number;
+        feedback: string[];
+        isValid: boolean;
+      } => {
+        const feedback: string[] = [];
+        let score = 0;
+        
+        if (password.length >= 8) {
+          score += 1;
+        } else {
+          feedback.push('Password should be at least 8 characters long');
+        }
+        
+        if (/[a-z]/.test(password)) {
+          score += 1;
+        } else {
+          feedback.push('Include lowercase letters');
+        }
+        
+        if (/[A-Z]/.test(password)) {
+          score += 1;
+        } else {
+          feedback.push('Include uppercase letters');
+        }
+        
+        if (/\d/.test(password)) {
+          score += 1;
+        } else {
+          feedback.push('Include numbers');
+        }
+        
+        if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+          score += 1;
+        } else {
+          feedback.push('Include special characters');
+        }
+        
+        return {
+          score,
+          feedback,
+          isValid: score >= 4,
+        };
+      },
+      
+      // Credit card validation
+      isValidCreditCard: (cardNumber: string): {
+        isValid: boolean;
+        type: string;
+      } => {
+        const cleaned = cardNumber.replace(/\D/g, '');
+        
+        // Luhn algorithm
+        let sum = 0;
+        let isEven = false;
+        
+        for (let i = cleaned.length - 1; i >= 0; i--) {
+          let digit = parseInt(cleaned[i]);
+          
+          if (isEven) {
+            digit *= 2;
+            if (digit > 9) digit -= 9;
+          }
+          
+          sum += digit;
+          isEven = !isEven;
+        }
+        
+        const isValid = sum % 10 === 0;
+        
+        // Determine card type
+        let type = 'Unknown';
+        if (/^4/.test(cleaned)) type = 'Visa';
+        else if (/^5[1-5]/.test(cleaned)) type = 'Mastercard';
+        else if (/^3[47]/.test(cleaned)) type = 'American Express';
+        
+        return { isValid, type };
+      },
+      
+      // Amount validation
+      isValidAmount: (amount: string | number): boolean => {
+        const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+        return !isNaN(num) && num > 0 && num <= 1000000; // Max 1M
+      },
+      
+      // Required field validation
+      isRequired: (value: any): string | undefined => {
+        if (!value || (typeof value === 'string' && value.trim() === '')) {
+          return 'This field is required';
+        }
+        return undefined;
+      },
+      
+      // Minimum length validation
+      minLength: (min: number) => (value: string): string | undefined => {
+        if (value && value.length < min) {
+          return `Must be at least ${min} characters`;
+        }
+        return undefined;
+      },
+      
+      // Maximum length validation
+      maxLength: (max: number) => (value: string): string | undefined => {
+        if (value && value.length > max) {
+          return `Must be no more than ${max} characters`;
+        }
+        return undefined;
+      },
+    };
+    
+    // Common validation rules
+    export const ValidationRules = {
+      required: ValidationUtils.isRequired,
+      email: (value: string) => 
+        value && !ValidationUtils.isValidEmail(value) ? 'Invalid email address' : undefined,
+      phone: (value: string) =>
+        value && !ValidationUtils.isValidPhoneNumber(value) ? 'Invalid phone number' : undefined,
+      minLength: ValidationUtils.minLength,
+      maxLength: ValidationUtils.maxLength,
+      amount: (value: string) =>
+        value && !ValidationUtils.isValidAmount(value) ? 'Invalid amount' : undefined,
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## API Integration Snippets
+
+### API Service Patterns
+
+<Tabs>
+  <Tab title="Base API Service">
+    ```typescript
+    // apiService.ts
+    import AsyncStorage from '@react-native-async-storage/async-storage';
+    
+    interface APIResponse<T> {
+      success: boolean;
+      data: T;
+      message?: string;
+      errors?: string[];
+    }
+    
+    interface RequestConfig {
+      headers?: Record<string, string>;
+      timeout?: number;
+      retries?: number;
+    }
+    
+    class APIService {
+      private baseURL: string;
+      private defaultTimeout: number = 30000;
+      private defaultRetries: number = 3;
+      
+      constructor(baseURL: string) {
+        this.baseURL = baseURL;
+      }
+      
+      // Get auth token
+      private async getAuthToken(): Promise<string | null> {
+        try {
+          return await AsyncStorage.getItem('auth_token');
+        } catch (error) {
+          console.error('Failed to get auth token:', error);
+          return null;
+        }
+      }
+      
+      // Build headers
+      private async buildHeaders(customHeaders?: Record<string, string>): Promise<Record<string, string>> {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...customHeaders,
+        };
+        
+        const token = await this.getAuthToken();
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        return headers;
+      }
+      
+      // Handle response
+      private async handleResponse<T>(response: Response): Promise<APIResponse<T>> {
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          
+          if (!response.ok) {
+            throw new APIError(
+              data.message || 'Request failed',
+              response.status,
+              data.code || 'UNKNOWN_ERROR'
+            );
+          }
+          
+          return data;
+        } else {
+          if (!response.ok) {
+            throw new APIError(
+              'Request failed',
+              response.status,
+              'UNKNOWN_ERROR'
+            );
+          }
+          
+          return {
+            success: true,
+            data: null as any,
+          };
+        }
+      }
+      
+      // Generic request method with retry logic
+      private async request<T>(
+        endpoint: string,
+        options: RequestInit & RequestConfig = {}
+      ): Promise<APIResponse<T>> {
+        const { headers: customHeaders, timeout, retries, ...fetchOptions } = options;
+        const url = `${this.baseURL}${endpoint}`;
+        
+        const headers = await this.buildHeaders(customHeaders);
+        const requestTimeout = timeout || this.defaultTimeout;
+        const maxRetries = retries !== undefined ? retries : this.defaultRetries;
+        
+        let lastError: Error;
+        
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), requestTimeout);
+            
+            const response = await fetch(url, {
+              ...fetchOptions,
+              headers,
+              signal: controller.signal,
+            });
+            
+            clearTimeout(timeoutId);
+            return await this.handleResponse<T>(response);
+            
+          } catch (error) {
+            lastError = error as Error;
+            
+            // Don't retry on certain errors
+            if (error instanceof APIError && error.statusCode < 500) {
+              throw error;
+            }
+            
+            // Don't retry on the last attempt
+            if (attempt === maxRetries) {
+              break;
+            }
+            
+            // Exponential backoff
+            const delay = Math.pow(2, attempt) * 1000;
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+        
+        throw lastError;
+      }
+      
+      // HTTP Methods
+      async get<T>(endpoint: string, config?: RequestConfig): Promise<APIResponse<T>> {
+        return this.request<T>(endpoint, { method: 'GET', ...config });
+      }
+      
+      async post<T>(
+        endpoint: string, 
+        data?: any, 
+        config?: RequestConfig
+      ): Promise<APIResponse<T>> {
+        return this.request<T>(endpoint, {
+          method: 'POST',
+          body: data ? JSON.stringify(data) : undefined,
+          ...config,
+        });
+      }
+      
+      async put<T>(
+        endpoint: string, 
+        data?: any, 
+        config?: RequestConfig
+      ): Promise<APIResponse<T>> {
+        return this.request<T>(endpoint, {
+          method: 'PUT',
+          body: data ? JSON.stringify(data) : undefined,
+          ...config,
+        });
+      }
+      
+      async delete<T>(endpoint: string, config?: RequestConfig): Promise<APIResponse<T>> {
+        return this.request<T>(endpoint, { method: 'DELETE', ...config });
+      }
+      
+      // File upload
+      async uploadFile<T>(
+        endpoint: string,
+        file: File | FormData,
+        onProgress?: (progress: number) => void
+      ): Promise<APIResponse<T>> {
+        const headers = await this.buildHeaders();
+        delete headers['Content-Type']; // Let browser set boundary for FormData
+        
+        const formData = file instanceof FormData ? file : new FormData();
+        if (!(file instanceof FormData)) {
+          formData.append('file', file);
+        }
+        
+        // For React Native, you might need to handle this differently
+        const response = await fetch(`${this.baseURL}${endpoint}`, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
+        
+        return this.handleResponse<T>(response);
+      }
+    }
+    
+    // API Error class
+    export class APIError extends Error {
+      constructor(
+        message: string,
+        public statusCode: number,
+        public code: string
+      ) {
+        super(message);
+        this.name = 'APIError';
+      }
+    }
+    
+    // Create API instance
+    export const apiService = new APIService(process.env.API_BASE_URL || 'http://localhost:3000/api/v1');
+    ```
+  </Tab>
+  <Tab title="Specific API Services">
+    ```typescript
+    // userService.ts
+    interface User {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      phoneNumber: string;
+      kycStatus: string;
+      divaScore?: number;
+    }
+    
+    export class UserService {
+      // Get current user profile
+      static async getProfile(): Promise<User> {
+        const response = await apiService.get<User>('/users/profile');
+        return response.data;
+      }
+      
+      // Update user profile
+      static async updateProfile(updates: Partial<User>): Promise<User> {
+        const response = await apiService.put<User>('/users/profile', updates);
+        return response.data;
+      }
+      
+      // Upload profile photo
+      static async uploadProfilePhoto(photo: File): Promise<{ url: string }> {
+        const response = await apiService.uploadFile<{ url: string }>(
+          '/users/profile/photo',
+          photo
+        );
+        return response.data;
+      }
+    }
+    
+    // divaScoreService.ts
+    interface DivaScore {
+      overallScore: number;
+      components: {
+        discipline: number;
+        income: number;
+        velocity: number;
+        assets: number;
+      };
+      lastCalculated: string;
+      insights: Array<{
+        type: string;
+        message: string;
+        category: string;
+      }>;
+    }
+    
+    export class DivaScoreService {
+      // Get current DIVA score
+      static async getDivaScore(): Promise<DivaScore> {
+        const response = await apiService.get<DivaScore>('/diva-score');
+        return response.data;
+      }
+      
+      // Get score history
+      static async getScoreHistory(period: string = '6m'): Promise<Array<{
+        date: string;
+        score: number;
+      }>> {
+        const response = await apiService.get<Array<{
+          date: string;
+          score: number;
+        }>>(`/diva-score/history?period=${period}`);
+        return response.data;
+      }
+      
+      // Refresh score calculation
+      static async refreshScore(): Promise<DivaScore> {
+        const response = await apiService.post<DivaScore>('/diva-score/refresh');
+        return response.data;
+      }
+    }
+    
+    // chamaService.ts
+    interface Chama {
+      id: string;
+      name: string;
+      type: string;
+      memberCount: number;
+      contributionAmount: number;
+      nextContributionDate: string;
+      userRole: string;
+    }
+    
+    export class ChamaService {
+      // Get user's Chamas
+      static async getUserChamas(): Promise<Chama[]> {
+        const response = await apiService.get<Chama[]>('/chamas');
+        return response.data;
+      }
+      
+      // Get Chama details
+      static async getChamaDetails(chamaId: string): Promise<Chama> {
+        const response = await apiService.get<Chama>(`/chamas/${chamaId}`);
+        return response.data;
+      }
+      
+      // Create new Chama
+      static async createChama(chamaData: {
+        name: string;
+        type: string;
+        contributionAmount: number;
+        frequency: string;
+      }): Promise<Chama> {
+        const response = await apiService.post<Chama>('/chamas', chamaData);
+        return response.data;
+      }
+      
+      // Make contribution
+      static async makeContribution(
+        chamaId: string,
+        amount: number
+      ): Promise<{ success: boolean; transactionId: string }> {
+        const response = await apiService.post<{
+          success: boolean;
+          transactionId: string;
+        }>(`/chamas/${chamaId}/contributions`, { amount });
+        return response.data;
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="React Query Integration">
+    ```typescript
+    // hooks/useAPI.ts
+    import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+    import { UserService, DivaScoreService, ChamaService } from '../services';
+    
+    // User hooks
+    export const useUserProfile = () => {
+      return useQuery({
+        queryKey: ['user', 'profile'],
+        queryFn: UserService.getProfile,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      });
+    };
+    
+    export const useUpdateProfile = () => {
+      const queryClient = useQueryClient();
+      
+      return useMutation({
+        mutationFn: UserService.updateProfile,
+        onSuccess: (updatedUser) => {
+          queryClient.setQueryData(['user', 'profile'], updatedUser);
+        },
+      });
+    };
+    
+    // DIVA Score hooks
+    export const useDivaScore = () => {
+      return useQuery({
+        queryKey: ['diva-score'],
+        queryFn: DivaScoreService.getDivaScore,
+        staleTime: 10 * 60 * 1000, // 10 minutes
+      });
+    };
+    
+    export const useDivaScoreHistory = (period: string = '6m') => {
+      return useQuery({
+        queryKey: ['diva-score', 'history', period],
+        queryFn: () => DivaScoreService.getScoreHistory(period),
+        staleTime: 30 * 60 * 1000, // 30 minutes
+      });
+    };
+    
+    export const useRefreshDivaScore = () => {
+      const queryClient = useQueryClient();
+      
+      return useMutation({
+        mutationFn: DivaScoreService.refreshScore,
+        onSuccess: (newScore) => {
+          queryClient.setQueryData(['diva-score'], newScore);
+          queryClient.invalidateQueries({ queryKey: ['diva-score', 'history'] });
+        },
+      });
+    };
+    
+    // Chama hooks
+    export const useUserChamas = () => {
+      return useQuery({
+        queryKey: ['chamas'],
+        queryFn: ChamaService.getUserChamas,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      });
+    };
+    
+    export const useChamaDetails = (chamaId: string) => {
+      return useQuery({
+        queryKey: ['chamas', chamaId],
+        queryFn: () => ChamaService.getChamaDetails(chamaId),
+        enabled: !!chamaId,
+        staleTime: 2 * 60 * 1000, // 2 minutes
+      });
+    };
+    
+    export const useCreateChama = () => {
+      const queryClient = useQueryClient();
+      
+      return useMutation({
+        mutationFn: ChamaService.createChama,
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ['chamas'] });
+        },
+      });
+    };
+    
+    export const useContribution = () => {
+      const queryClient = useQueryClient();
+      
+      return useMutation({
+        mutationFn: ({ chamaId, amount }: { chamaId: string; amount: number }) =>
+          ChamaService.makeContribution(chamaId, amount),
+        onSuccess: (_, { chamaId }) => {
+          queryClient.invalidateQueries({ queryKey: ['chamas'] });
+          queryClient.invalidateQueries({ queryKey: ['chamas', chamaId] });
+        },
+      });
+    };
+    
+    // Generic error handling hook
+    export const useAPIError = () => {
+      return {
+        handleError: (error: unknown) => {
+          if (error instanceof APIError) {
+            switch (error.statusCode) {
+              case 401:
+                // Handle unauthorized - redirect to login
+                break;
+              case 403:
+                // Handle forbidden - show permission error
+                break;
+              case 500:
+                // Handle server error - show generic error
+                break;
+              default:
+                // Show specific error message
+                console.error('API Error:', error.message);
+            }
+          } else {
+            console.error('Unknown error:', error);
+          }
+        },
+      };
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Animation Snippets
+
+### React Native Animations
+
+<Tabs>
+  <Tab title="Fade Animations">
+    ```typescript
+    // fadeAnimations.ts
+    import { useRef, useEffect } from 'react';
+    import { Animated, Easing } from 'react-native';
+    
+    // Fade in animation hook
+    export const useFadeIn = (duration: number = 300, delay: number = 0) => {
+      const opacity = useRef(new Animated.Value(0)).current;
+      
+      useEffect(() => {
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration,
+          delay,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }).start();
+      }, []);
+      
+      return { opacity };
+    };
+    
+    // Fade in/out toggle hook
+    export const useFadeToggle = (visible: boolean, duration: number = 300) => {
+      const opacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
+      
+      useEffect(() => {
+        Animated.timing(opacity, {
+          toValue: visible ? 1 : 0,
+          duration,
+          useNativeDriver: true,
+        }).start();
+      }, [visible]);
+      
+      return { opacity };
+    };
+    
+    // Staggered fade in for lists
+    export const useStaggeredFadeIn = (
+      items: any[],
+      staggerDelay: number = 100,
+      duration: number = 300
+    ) => {
+      const animatedValues = useRef(
+        items.map(() => new Animated.Value(0))
+      ).current;
+      
+      useEffect(() => {
+        const animations = animatedValues.map((animatedValue, index) =>
+          Animated.timing(animatedValue, {
+            toValue: 1,
+            duration,
+            delay: index * staggerDelay,
+            easing: Easing.ease,
+            useNativeDriver: true,
+          })
+        );
+        
+        Animated.parallel(animations).start();
+      }, [items.length]);
+      
+      return animatedValues.map(opacity => ({ opacity }));
+    };
+    
+    // FadeInView component
+    export const FadeInView: React.FC<{
+      children: React.ReactNode;
+      duration?: number;
+      delay?: number;
+      style?: any;
+    }> = ({ children, duration = 300, delay = 0, style }) => {
+      const { opacity } = useFadeIn(duration, delay);
+      
+      return (
+        <Animated.View style={[style, { opacity }]}>
+          {children}
+        </Animated.View>
+      );
+    };
+    ```
+  </Tab>
+  <Tab title="Scale Animations">
+    ```typescript
+    // scaleAnimations.ts
+    export const useScaleIn = (duration: number = 300, delay: number = 0) => {
+      const scale = useRef(new Animated.Value(0)).current;
+      
+      useEffect(() => {
+        Animated.spring(scale, {
+          toValue: 1,
+          delay,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }).start();
+      }, []);
+      
+      return { transform: [{ scale }] };
+    };
+    
+    // Press scale animation
+    export const usePressScale = () => {
+      const scale = useRef(new Animated.Value(1)).current;
+      
+      const onPressIn = () => {
+        Animated.spring(scale, {
+          toValue: 0.95,
+          useNativeDriver: true,
+        }).start();
+      };
+      
+      const onPressOut = () => {
+        Animated.spring(scale, {
+          toValue: 1,
+          useNativeDriver: true,
+        }).start();
+      };
+      
+      return {
+        style: { transform: [{ scale }] },
+        onPressIn,
+        onPressOut,
+      };
+    };
+    
+    // Bouncy button component
+    export const BouncyButton: React.FC<{
+      onPress: () => void;
+      children: React.ReactNode;
+      style?: any;
+    }> = ({ onPress, children, style }) => {
+      const { style: scaleStyle, onPressIn, onPressOut } = usePressScale();
+      
+      return (
+        <Animated.View style={[scaleStyle, style]}>
+          <TouchableOpacity
+            onPress={onPress}
+            onPressIn={onPressIn}
+            onPressOut={onPressOut}
+            activeOpacity={1}
+          >
+            {children}
+          </TouchableOpacity>
+        </Animated.View>
+      );
+    };
+    ```
+  </Tab>
+  <Tab title="Slide Animations">
+    ```typescript
+    // slideAnimations.ts
+    export const useSlideIn = (
+      direction: 'left' | 'right' | 'up' | 'down' = 'right',
+      duration: number = 300,
+      delay: number = 0
+    ) => {
+      const translateX = useRef(new Animated.Value(
+        direction === 'left' ? -100 : direction === 'right' ? 100 : 0
+      )).current;
+      const translateY = useRef(new Animated.Value(
+        direction === 'up' ? -100 : direction === 'down' ? 100 : 0
+      )).current;
+      
+      useEffect(() => {
+        Animated.parallel([
+          Animated.timing(translateX, {
+            toValue: 0,
+            duration,
+            delay,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateY, {
+            toValue: 0,
+            duration,
+            delay,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }, []);
+      
+      return {
+        transform: [
+          { translateX },
+          { translateY },
+        ],
+      };
+    };
+    
+    // Slide up modal animation
+    export const useSlideUpModal = (visible: boolean) => {
+      const translateY = useRef(new Animated.Value(300)).current;
+      const opacity = useRef(new Animated.Value(0)).current;
+      
+      useEffect(() => {
+        if (visible) {
+          Animated.parallel([
+            Animated.timing(translateY, {
+              toValue: 0,
+              duration: 300,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+            Animated.timing(opacity, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        } else {
+          Animated.parallel([
+            Animated.timing(translateY, {
+              toValue: 300,
+              duration: 200,
+              easing: Easing.in(Easing.cubic),
+              useNativeDriver: true,
+            }),
+            Animated.timing(opacity, {
+              toValue: 0,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        }
+      }, [visible]);
+      
+      return {
+        style: {
+          opacity,
+          transform: [{ translateY }],
+        },
+      };
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Testing Snippets
+
+### Test Utilities
+
+<Tabs>
+  <Tab title="Mock Data Generators">
+    ```typescript
+    // mockData.ts
+    import { faker } from '@faker-js/faker';
+    
+    export const MockData = {
+      // Generate mock user
+      user: (overrides?: Partial<User>): User => ({
+        id: faker.string.uuid(),
+        firstName: faker.person.firstName(),
+        lastName: faker.person.lastName(),
+        email: faker.internet.email(),
+        phoneNumber: faker.phone.number('+27#########'),
+        kycStatus: faker.helpers.arrayElement(['pending', 'verified', 'rejected']),
+        divaScore: faker.number.int({ min: 300, max: 900 }),
+        createdAt: faker.date.past(),
+        updatedAt: faker.date.recent(),
+        ...overrides,
+      }),
+      
+      // Generate mock DIVA score
+      divaScore: (overrides?: Partial<DivaScore>): DivaScore => ({
+        overallScore: faker.number.int({ min: 300, max: 900 }),
+        components: {
+          discipline: faker.number.int({ min: 300, max: 900 }),
+          income: faker.number.int({ min: 300, max: 900 }),
+          velocity: faker.number.int({ min: 300, max: 900 }),
+          assets: faker.number.int({ min: 300, max: 900 }),
+        },
+        lastCalculated: faker.date.recent().toISOString(),
+        insights: Array.from({ length: 3 }, () => ({
+          type: faker.helpers.arrayElement(['improvement', 'warning', 'tip']),
+          message: faker.lorem.sentence(),
+          category: faker.helpers.arrayElement(['discipline', 'income', 'velocity', 'assets']),
+        })),
+        ...overrides,
+      }),
+      
+      // Generate mock transaction
+      transaction: (overrides?: Partial<Transaction>): Transaction => ({
+        id: faker.string.uuid(),
+        amount: faker.number.float({ min: 10, max: 5000, fractionDigits: 2 }),
+        description: faker.commerce.productName(),
+        category: faker.helpers.arrayElement([
+          'food_dining', 'transport', 'shopping', 'utilities', 'healthcare'
+        ]),
+        date: faker.date.past(),
+        type: faker.helpers.arrayElement(['debit', 'credit']),
+        merchantName: faker.company.name(),
+        ...overrides,
+      }),
+      
+      // Generate mock Chama
+      chama: (overrides?: Partial<Chama>): Chama => ({
+        id: faker.string.uuid(),
+        name: `${faker.word.adjective()} ${faker.word.noun()} Chama`,
+        type: faker.helpers.arrayElement(['rotating', 'fixed', 'investment', 'lending']),
+        memberCount: faker.number.int({ min: 3, max: 20 }),
+        contributionAmount: faker.number.int({ min: 100, max: 2000 }),
+        nextContributionDate: faker.date.future().toISOString(),
+        userRole: faker.helpers.arrayElement(['admin', 'member']),
+        ...overrides,
+      }),
+      
+      // Generate array of items
+      array: <T>(generator: () => T, count: number = 5): T[] => {
+        return Array.from({ length: count }, generator);
+      },
+    };
+    
+    // Mock API responses
+    export const MockAPIResponses = {
+      success: <T>(data: T): APIResponse<T> => ({
+        success: true,
+        data,
+      }),
+      
+      error: (message: string, code: string = 'TEST_ERROR'): never => {
+        throw new APIError(message, 400, code);
+      },
+      
+      delay: (ms: number = 1000): Promise<void> => {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      },
+    };
+    ```
+  </Tab>
+  <Tab title="Test Helpers">
+    ```typescript
+    // testHelpers.tsx
+    import React from 'react';
+    import { render, RenderOptions } from '@testing-library/react-native';
+    import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+    import { NavigationContainer } from '@react-navigation/native';
+    import { Provider } from 'react-redux';
+    import { configureStore } from '@reduxjs/toolkit';
+    
+    // Mock theme provider
+    const MockThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+      const theme = {
+        colors: {
+          primary: '#E63946',
+          surface: '#FFFFFF',
+          background: '#F8F9FA',
+          onSurface: '#000000',
+          onSurfaceVariant: '#6B7280',
+          border: '#E5E7EB',
+          error: '#EF4444',
+          success: '#10B981',
+          warning: '#F59E0B',
+        },
+      };
+      
+      return (
+        <ThemeContext.Provider value={theme}>
+          {children}
+        </ThemeContext.Provider>
+      );
+    };
+    
+    // Create test wrapper
+    const createTestWrapper = (options: {
+      initialState?: any;
+      queryClient?: QueryClient;
+    } = {}) => {
+      const { initialState, queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false },
+          mutations: { retry: false },
+        },
+      }) } = options;
+      
+      const store = configureStore({
+        reducer: {
+          // Add your reducers here
+        },
+        preloadedState: initialState,
+      });
+      
+      const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+        <Provider store={store}>
+          <QueryClientProvider client={queryClient}>
+            <NavigationContainer>
+              <MockThemeProvider>
+                {children}
+              </MockThemeProvider>
+            </NavigationContainer>
+          </QueryClientProvider>
+        </Provider>
+      );
+      
+      return Wrapper;
+    };
+    
+    // Custom render function
+    export const renderWithProviders = (
+      ui: React.ReactElement,
+      options: RenderOptions & {
+        initialState?: any;
+        queryClient?: QueryClient;
+      } = {}
+    ) => {
+      const { initialState, queryClient, ...renderOptions } = options;
+      const Wrapper = createTestWrapper({ initialState, queryClient });
+      
+      return {
+        ...render(ui, { wrapper: Wrapper, ...renderOptions }),
+        // Add custom utilities
+      };
+    };
+    
+    // Mock navigation helpers
+    export const createMockNavigation = (overrides = {}) => ({
+      navigate: jest.fn(),
+      goBack: jest.fn(),
+      canGoBack: jest.fn(() => true),
+      reset: jest.fn(),
+      setParams: jest.fn(),
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      isFocused: jest.fn(() => true),
+      ...overrides,
+    });
+    
+    // Mock route helpers
+    export const createMockRoute = (params = {}) => ({
+      key: 'test-route',
+      name: 'TestScreen',
+      params,
+    });
+    
+    // API mock helpers
+    export const mockAPICall = <T>(
+      service: any,
+      method: string,
+      response: T,
+      delay: number = 0
+    ) => {
+      const mockFn = jest.fn();
+      
+      if (delay > 0) {
+        mockFn.mockImplementation(() =>
+          new Promise(resolve => setTimeout(() => resolve(response), delay))
+        );
+      } else {
+        mockFn.mockResolvedValue(response);
+      }
+      
+      service[method] = mockFn;
+      return mockFn;
+    };
+    
+    // Wait for async operations
+    export const waitForAsync = (ms: number = 0) =>
+      new Promise(resolve => setTimeout(resolve, ms));
+    
+    // Custom matchers
+    expect.extend({
+      toHaveAccessibilityLabel(received, expected) {
+        const pass = received.props.accessibilityLabel === expected;
+        return {
+          message: () =>
+            `expected ${received} ${pass ? 'not ' : ''}to have accessibility label ${expected}`,
+          pass,
+        };
+      },
+    });
+    ```
+  </Tab>
+  <Tab title="Component Test Examples">
+    ```typescript
+    // DivaScoreCard.test.tsx
+    import React from 'react';
+    import { fireEvent, waitFor } from '@testing-library/react-native';
+    import { DivaScoreCard } from '../DivaScoreCard';
+    import { renderWithProviders, MockData } from '../../test-utils';
+    
+    describe('DivaScoreCard', () => {
+      const mockDivaScore = MockData.divaScore();
+      
+      it('renders DIVA score correctly', () => {
+        const { getByText } = renderWithProviders(
+          <DivaScoreCard divaScore={mockDivaScore} />
+        );
+        
+        expect(getByText(mockDivaScore.overallScore.toString())).toBeTruthy();
+        expect(getByText('DIVA Score')).toBeTruthy();
+      });
+      
+      it('shows loading state', () => {
+        const { getByTestId } = renderWithProviders(
+          <DivaScoreCard divaScore={null} loading={true} />
+        );
+        
+        expect(getByTestId('loading-spinner')).toBeTruthy();
+      });
+      
+      it('handles press events', () => {
+        const onPress = jest.fn();
+        const { getByTestId } = renderWithProviders(
+          <DivaScoreCard divaScore={mockDivaScore} onPress={onPress} />
+        );
+        
+        fireEvent.press(getByTestId('diva-score-card'));
+        expect(onPress).toHaveBeenCalledWith(mockDivaScore);
+      });
+      
+      it('has proper accessibility attributes', () => {
+        const { getByTestId } = renderWithProviders(
+          <DivaScoreCard divaScore={mockDivaScore} />
+        );
+        
+        const card = getByTestId('diva-score-card');
+        expect(card).toHaveAccessibilityLabel(`DIVA Score: ${mockDivaScore.overallScore}`);
+        expect(card.props.accessible).toBe(true);
+      });
+    });
+    
+    // API Hook test example
+    describe('useDivaScore', () => {
+      it('fetches DIVA score data', async () => {
+        const mockScore = MockData.divaScore();
+        const mockFn = mockAPICall(DivaScoreService, 'getDivaScore', mockScore);
+        
+        const { result } = renderHook(() => useDivaScore(), {
+          wrapper: createTestWrapper(),
+        });
+        
+        await waitFor(() => {
+          expect(result.current.isSuccess).toBe(true);
+        });
+        
+        expect(result.current.data).toEqual(mockScore);
+        expect(mockFn).toHaveBeenCalledTimes(1);
+      });
+      
+      it('handles error states', async () => {
+        const mockFn = mockAPICall(
+          DivaScoreService, 
+          'getDivaScore', 
+          Promise.reject(new APIError('Failed to fetch', 500, 'SERVER_ERROR'))
+        );
+        
+        const { result } = renderHook(() => useDivaScore(), {
+          wrapper: createTestWrapper(),
+        });
+        
+        await waitFor(() => {
+          expect(result.current.isError).toBe(true);
+        });
+        
+        expect(result.current.error).toBeInstanceOf(APIError);
+      });
+    });
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  **Snippet Usage**: Copy these snippets and adapt them to your specific needs. They're designed to be starting points that you can customize for your particular use cases.
+</Tip>
+
+---
+
+**Need more specific snippets?** Check our [component library documentation](/essentials/design-system) or contribute your own snippets to help the team\!
