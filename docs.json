@@ -6,6 +6,7 @@
     "dark": "/logo/awo.svg",
     "light": "/logo/awo.svg"
   },
+  
   "favicon": "/favicon.svg",
   "colors": {
    "primary": "#bc9b25",

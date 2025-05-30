@@ -1,74 +1,135 @@
 ---
-title: "AWO Development"
-description: "Preview changes locally to update your docs"
+title: "AWO Development Guide"
+description: "Comprehensive development guide for the AWO platform using modular monolith architecture with monorepo structure"
 ---
 
-# Development Guide
+# AWO Development Guide
 
-This comprehensive guide covers everything you need to know about developing on the AWO platform, from initial setup to advanced development workflows.
+This comprehensive guide covers everything you need to know about developing on the AWO platform, from initial setup to advanced development workflows using our **modular monolith architecture** with **monorepo structure**.
 
 ## Development Principles
 
-AWO development follows these core principles:
+AWO development follows these core principles designed for efficiency and scalability:
 
 <CardGroup cols={2}>
-  <Card title="User-Centric Development" icon="heart">
-    Prioritize features based on core user journey and needs
+  <Card title="Modular Monolith First" icon="building">
+    Clear module boundaries within a single application for easier development and debugging
   </Card>
-  <Card title="Component-First Approach" icon="puzzle-piece">
-    Build reusable components before implementing screens
+  <Card title="Shared Type Safety" icon="shield-check">
+    End-to-end TypeScript with shared types across web, mobile, and backend
+  </Card>
+  <Card title="Financial Transaction Safety" icon="lock">
+    ACID transactions and data consistency prioritized for all financial operations
   </Card>
   <Card title="Progressive Enhancement" icon="arrow-up">
-    Start with core functionality, then add refinements
-  </Card>
-  <Card title="Continuous Integration" icon="rotate">
-    Regular integration with thorough testing at every step
+    Start with core functionality, extract services only when complexity demands it
   </Card>
 </CardGroup>
 
-## Project Structure
+## Monorepo Structure
 
 ```
 awo-platform/
-├── backend/                 # NestJS backend services
-│   ├── src/
-│   │   ├── auth/           # Authentication module
-│   │   ├── users/          # User management
-│   │   ├── diva-score/     # DIVA scoring engine
-│   │   ├── chama/          # Chama management
-│   │   ├── transactions/   # Transaction processing
-│   │   ├── payments/       # Payment integration
-│   │   └── common/         # Shared utilities
-│   ├── test/               # E2E tests
-│   └── docs/               # API documentation
-├── mobile/                 # React Native mobile app
-│   ├── src/
-│   │   ├── components/     # Reusable components
-│   │   ├── screens/        # Screen components
-│   │   ├── navigation/     # Navigation configuration
-│   │   ├── services/       # API services
-│   │   ├── store/          # Redux store
-│   │   └── utils/          # Utility functions
-│   ├── android/            # Android-specific code
-│   ├── ios/                # iOS-specific code
-│   └── __tests__/          # Mobile tests
-├── web/                    # React web application
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── pages/          # Page components
-│   │   ├── hooks/          # Custom hooks
-│   │   ├── services/       # API services
-│   │   └── utils/          # Utility functions
-│   └── public/             # Static assets
-├── shared/                 # Shared packages
-│   ├── types/              # TypeScript definitions
-│   ├── utils/              # Common utilities
-│   └── constants/          # Shared constants
-├── infrastructure/         # Infrastructure as Code
-│   ├── terraform/          # Terraform configurations
-│   ├── k8s/                # Kubernetes manifests
-│   └── docker/             # Docker configurations
-└── docs/                   # Documentation
+├── apps/                          # Applications
+│   ├── backend/                   # NestJS API server
+│   │   ├── src/
+│   │   │   ├── auth/             # Authentication module
+│   │   │   ├── users/            # User management module
+│   │   │   ├── diva/             # DIVA scoring module
+│   │   │   ├── chamas/           # Chama management module
+│   │   │   ├── banking/          # Banking integration module
+│   │   │   ├── payments/         # Payment processing module
+│   │   │   ├── savings/          # Savings goals module
+│   │   │   ├── education/        # Financial education module
+│   │   │   ├── notifications/    # Notification module
+│   │   │   ├── analytics/        # Analytics module
+│   │   │   └── shared/           # Shared services and utilities
+│   │   ├── prisma/               # Database schema and migrations
+│   │   ├── test/                 # E2E and integration tests
+│   │   └── docs/                 # API documentation
+│   ├── web/                      # Next.js PWA
+│   │   ├── src/
+│   │   │   ├── app/              # App Router pages
+│   │   │   ├── components/       # React components
+│   │   │   ├── hooks/            # Custom React hooks
+│   │   │   ├── lib/              # Utilities and configurations
+│   │   │   └── styles/           # CSS and styling
+│   │   ├── public/               # Static assets
+│   │   └── __tests__/            # Web-specific tests
+│   └── mobile/                   # React Native with Expo
+│       ├── src/
+│       │   ├── components/       # React Native components
+│       │   ├── screens/          # Screen components
+│       │   ├── navigation/       # React Navigation setup
+│       │   ├── hooks/            # Mobile-specific hooks
+│       │   ├── services/         # Mobile services
+│       │   └── utils/            # Mobile utilities
+│       ├── app.config.js         # Expo configuration
+│       └── __tests__/            # Mobile tests
+├── packages/                     # Shared packages
+│   ├── types/                    # @awo/types - TypeScript definitions
+│   │   ├── src/
+│   │   │   ├── user.ts           # User-related types
+│   │   │   ├── chama.ts          # Chama-related types
+│   │   │   ├── transaction.ts    # Transaction types
+│   │   │   ├── diva.ts           # DIVA score types
+│   │   │   └── api.ts            # API request/response types
+│   │   └── package.json
+│   ├── api-sdk/                  # @awo/api-sdk - API client
+│   │   ├── src/
+│   │   │   ├── client.ts         # Base API client
+│   │   │   ├── auth.ts           # Auth API methods
+│   │   │   ├── users.ts          # User API methods
+│   │   │   ├── chamas.ts         # Chama API methods
+│   │   │   ├── diva.ts           # DIVA API methods
+│   │   │   └── types.ts          # SDK-specific types
+│   │   └── package.json
+│   ├── ui/                       # @awo/ui - Shared UI components
+│   │   ├── src/
+│   │   │   ├── Button/           # Button component
+│   │   │   ├── Input/            # Input component
+│   │   │   ├── Card/             # Card component
+│   │   │   ├── DivaScore/        # DIVA score widget
+│   │   │   └── ChamaCard/        # Chama display component
+│   │   └── package.json
+│   ├── utils/                    # @awo/utils - Common utilities
+│   │   ├── src/
+│   │   │   ├── validation.ts     # Validation schemas
+│   │   │   ├── currency.ts       # Currency formatting
+│   │   │   ├── date.ts           # Date utilities
+│   │   │   ├── diva.ts           # DIVA calculations
+│   │   │   └── encryption.ts     # Encryption utilities
+│   │   └── package.json
+│   └── config/                   # @awo/config - Configuration
+│       ├── src/
+│       │   ├── env.ts            # Environment handling
+│       │   ├── constants.ts      # App constants
+│       │   ├── countries.ts      # SADC country configs
+│       │   └── theme.ts          # Design system theme
+│       └── package.json
+├── tools/                        # Development tools
+│   ├── database/                 # Database utilities
+│   │   ├── migrations/           # Database migrations
+│   │   ├── seeds/                # Test data seeds
+│   │   └── scripts/              # DB management scripts
+│   ├── scripts/                  # Build and utility scripts
+│   │   ├── build.sh              # Build script
+│   │   ├── deploy.sh             # Deployment script
+│   │   └── test-data.ts          # Generate test data
+│   └── docker/                   # Docker configurations
+│       ├── development/          # Development Docker setup
+│       └── production/           # Production Docker setup
+├── docs/                         # Documentation
+│   ├── api/                      # API documentation
+│   ├── architecture/             # Architecture decisions
+│   └── development/              # Development guides
+├── package.json                  # Root package.json with workspaces
+├── turbo.json                    # Turborepo configuration
+├── tsconfig.json                 # Root TypeScript config
+├── .github/                      # GitHub workflows
+│   └── workflows/                # CI/CD pipelines
+├── docker-compose.yml            # Development services
+└── README.md                     # Project documentation
 ```
 
 ## Development Environment Setup
@@ -81,26 +142,31 @@ awo-platform/
     # Install Homebrew
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     
-    # Install Node.js
+    # Install Node.js 18 LTS
     brew install node@18
     
     # Install Docker Desktop
     brew install --cask docker
     
-    # Install React Native CLI
-    npm install -g @react-native-community/cli
+    # Install Expo CLI
+    npm install -g @expo/cli
     
     # For iOS development
     brew install cocoapods
     sudo xcode-select --install
+    
+    # Verify installations
+    node --version    # Should be 18.x.x
+    npm --version     # Should be 9.x.x
+    expo --version    # Should be 0.10.x+
     ```
   </Tab>
   <Tab title="Linux (Ubuntu)">
     ```bash
-    # Update package index
-    sudo apt update
+    # Update system
+    sudo apt update && sudo apt upgrade -y
     
-    # Install Node.js 18
+    # Install Node.js 18 LTS
     curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
     sudo apt-get install -y nodejs
     
@@ -108,14 +174,19 @@ awo-platform/
     sudo apt-get install docker.io docker-compose
     sudo usermod -aG docker $USER
     
-    # Install React Native dependencies
+    # Install development tools
+    sudo apt-get install build-essential
+    
+    # Install Expo CLI
+    npm install -g @expo/cli
+    
+    # For Android development
     sudo apt-get install openjdk-11-jdk
-    npm install -g @react-native-community/cli
     ```
   </Tab>
   <Tab title="Windows">
     ```powershell
-    # Install Chocolatey
+    # Install via Chocolatey (run as Administrator)
     Set-ExecutionPolicy Bypass -Scope Process -Force
     iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
     
@@ -125,8 +196,11 @@ awo-platform/
     # Install Docker Desktop
     choco install docker-desktop
     
-    # Install React Native CLI
-    npm install -g @react-native-community/cli
+    # Install Git
+    choco install git
+    
+    # Install Expo CLI
+    npm install -g @expo/cli
     
     # Install Windows Subsystem for Linux (recommended)
     wsl --install
@@ -136,582 +210,1583 @@ awo-platform/
 
 ### IDE Configuration
 
-We recommend **Visual Studio Code** with the following extensions:
+**Visual Studio Code** with essential extensions:
 
 <AccordionGroup>
   <Accordion title="Essential Extensions">
-    - **ESLint**: JavaScript/TypeScript linting
-    - **Prettier**: Code formatting
-    - **TypeScript Importer**: Auto import management
-    - **Auto Rename Tag**: Paired tag renaming
-    - **Bracket Pair Colorizer**: Better bracket visibility
-    - **GitLens**: Enhanced Git integration
+    ```json
+    {
+      "recommendations": [
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode.vscode-typescript-next",
+        "formulahendry.auto-rename-tag",
+        "christian-kohler.path-intellisense",
+        "eamodio.gitlens",
+        "ms-vscode.vscode-json"
+      ]
+    }
+    ```
+
+    **Settings Configuration:**
+    ```json
+    {
+      "typescript.preferences.include-package-json-autoImports": "on",
+      "typescript.suggest.autoImports": true,
+      "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": true,
+        "source.organizeImports": true
+      },
+      "editor.formatOnSave": true,
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    }
+    ```
   </Accordion>
   <Accordion title="React Native Extensions">
     - **React Native Tools**: Debugging and IntelliSense
-    - **React Native Snippet**: Code snippets
-    - **ES7\+ React/Redux/React-Native snippets**: Additional snippets
-    - **React-Native/React/Redux snippets**: More code shortcuts
+    - **Expo Tools**: Expo project support
+    - **React-Native/React/Redux snippets**: Code shortcuts
+    - **Auto Import - ES6, TS, JSX, TSX**: Automatic imports
   </Accordion>
   <Accordion title="Backend Development Extensions">
-    - **Thunder Client**: API testing (alternative to Postman)
+    - **Thunder Client**: API testing (Postman alternative)
     - **PostgreSQL**: Database management
     - **Docker**: Container management
-    - **Kubernetes**: K8s manifest support
+    - **REST Client**: HTTP request testing
   </Accordion>
 </AccordionGroup>
 
 ## Backend Development
 
-### NestJS Application Structure
+### NestJS Modular Monolith Structure
 
 ```typescript
-// src/app.module.ts
+// apps/backend/src/app.module.ts
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { CacheModule } from '@nestjs/cache-manager';
+import * as redisStore from 'cache-manager-redis-store';
+
+// Import all modules
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { DivaModule } from './diva/diva.module';
+import { ChamasModule } from './chamas/chamas.module';
+import { BankingModule } from './banking/banking.module';
+import { PaymentsModule } from './payments/payments.module';
+import { SavingsModule } from './savings/savings.module';
+import { EducationModule } from './education/education.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+
 @Module({
   imports: [
+    // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: '.env',
       validationSchema: Joi.object({
-        NODE_ENV: Joi.string().valid('development', 'production', 'test'),
+        NODE_ENV: Joi.string().valid('development', 'staging', 'production').default('development'),
+        PORT: Joi.number().default(3000),
         DATABASE_URL: Joi.string().required(),
-        JWT_SECRET: Joi.string().required(),
+        REDIS_URL: Joi.string().required(),
+        JWT_SECRET: Joi.string().min(32).required(),
+        ENCRYPTION_KEY: Joi.string().length(32).required(),
       }),
     }),
+
+    // Database with schema-based organization
     TypeOrmModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
         url: configService.get('DATABASE_URL'),
-        autoLoadEntities: true,
+        entities: [
+          // User entities
+          'dist/users/entities/*.entity.js',
+          // Financial entities
+          'dist/diva/entities/*.entity.js',
+          'dist/banking/entities/*.entity.js',
+          // Chama entities
+          'dist/chamas/entities/*.entity.js',
+          // Other entities
+          'dist/*/entities/*.entity.js',
+        ],
+        migrations: ['dist/migrations/*.js'],
+        migrationsRun: configService.get('NODE_ENV') === 'production',
         synchronize: configService.get('NODE_ENV') === 'development',
+        logging: configService.get('NODE_ENV') === 'development' ? 'all' : ['error'],
+        extra: {
+          connectionLimit: 10,
+          acquireTimeout: 60000,
+          timeout: 60000,
+        },
       }),
       inject: [ConfigService],
     }),
+
+    // Redis caching
+    CacheModule.registerAsync({
+      isGlobal: true,
+      useFactory: (configService: ConfigService) => ({
+        store: redisStore,
+        url: configService.get('REDIS_URL'),
+        ttl: 300, // 5 minutes default
+      }),
+      inject: [ConfigService],
+    }),
+
+    // Core modules
     AuthModule,
     UsersModule,
-    DivaScoreModule,
-    ChamaModule,
-    TransactionsModule,
+    DivaModule,
+    ChamasModule,
+    BankingModule,
     PaymentsModule,
+    SavingsModule,
+    EducationModule,
+    NotificationsModule,
+    AnalyticsModule,
+  ],
+  providers: [
+    // Global error filter
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
+    // Global validation pipe
+    {
+      provide: APP_PIPE,
+      useClass: ValidationPipe,
+    },
+    // Global logging interceptor
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor,
+    },
   ],
 })
 export class AppModule {}
 ```
 
-### API Development Standards
+### Module Development Pattern
 
 <Tabs>
+  <Tab title="Module Structure">
+    ```typescript
+    // apps/backend/src/chamas/chamas.module.ts
+    @Module({
+      imports: [
+        TypeOrmModule.forFeature([
+          ChamaEntity,
+          ChamaMembershipEntity,
+          ContributionEntity,
+          PayoutEntity,
+        ]),
+        // Import related modules
+        UsersModule,
+        PaymentsModule,
+        NotificationsModule,
+      ],
+      controllers: [ChamasController],
+      providers: [
+        ChamasService,
+        ContributionsService,
+        PayoutsService,
+        ChamaValidationService,
+        ChamaBlockchainService,
+      ],
+      exports: [
+        ChamasService, // Export for use by other modules
+      ],
+    })
+    export class ChamasModule {}
+    ```
+  </Tab>
   <Tab title="Controller Example">
     ```typescript
-    @Controller('users')
-    @ApiTags('Users')
+    // apps/backend/src/chamas/chamas.controller.ts
+    @Controller('chamas')
+    @ApiTags('Chamas')
     @UseGuards(JwtAuthGuard)
-    export class UsersController {
-      constructor(private readonly usersService: UsersService) {}
-    
-      @Get('profile')
-      @ApiOperation({ summary: 'Get user profile' })
-      @ApiResponse({ status: 200, type: UserProfileDto })
-      async getProfile(@GetUser() user: User): Promise<UserProfileDto> {
-        return this.usersService.getProfile(user.id);
-      }
-    
-      @Put('profile')
-      @ApiOperation({ summary: 'Update user profile' })
-      @ApiResponse({ status: 200, type: UserProfileDto })
-      async updateProfile(
-        @GetUser() user: User,
-        @Body() updateDto: UpdateUserProfileDto,
-      ): Promise<UserProfileDto> {
-        return this.usersService.updateProfile(user.id, updateDto);
-      }
-    }
-    ```
-  </Tab>
-  <Tab title="Service Example">
-    ```typescript
-    @Injectable()
-    export class UsersService {
+    export class ChamasController {
       constructor(
-        @InjectRepository(User)
-        private usersRepository: Repository<User>,
-        private logger: Logger,
+        private readonly chamasService: ChamasService,
+        private readonly contributionsService: ContributionsService,
       ) {}
-    
-      async getProfile(userId: string): Promise<UserProfileDto> {
-        try {
-          const user = await this.usersRepository.findOne({
-            where: { id: userId },
-            relations: ['financialProfile', 'chamas'],
-          });
-    
-          if (!user) {
-            throw new NotFoundException('User not found');
-          }
-    
-          return this.mapToProfileDto(user);
-        } catch (error) {
-          this.logger.error(`Failed to get user profile: ${error.message}`);
-          throw error;
-        }
+
+      @Post()
+      @ApiOperation({ summary: 'Create a new Chama' })
+      @ApiResponse({ status: 201, type: ChamaResponseDto })
+      @UseGuards(PermissionsGuard)
+      @RequirePermissions(Permission.CREATE_CHAMA)
+      async createChama(
+        @Body() createChamaDto: CreateChamaDto,
+        @GetUser() user: User,
+      ): Promise<ChamaResponseDto> {
+        const chama = await this.chamasService.createChama(createChamaDto, user.id);
+        return this.chamasService.toChamaResponseDto(chama);
       }
-    
-      private mapToProfileDto(user: User): UserProfileDto {
-        return {
-          id: user.id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          phoneNumber: user.phoneNumber,
-          kycStatus: user.kycStatus,
-          divaScore: user.financialProfile?.divaScore,
-          chamasCount: user.chamas?.length || 0,
-        };
+
+      @Get(':id')
+      @ApiOperation({ summary: 'Get Chama details' })
+      @ApiResponse({ status: 200, type: ChamaDetailResponseDto })
+      async getChamaDetails(
+        @Param('id', ParseUUIDPipe) chamaId: string,
+        @GetUser() user: User,
+      ): Promise<ChamaDetailResponseDto> {
+        // Verify user has access to this Chama
+        await this.chamasService.verifyUserAccess(chamaId, user.id);
+        
+        const chama = await this.chamasService.getChamaWithDetails(chamaId);
+        return this.chamasService.toChamaDetailResponseDto(chama);
+      }
+
+      @Post(':id/contributions')
+      @ApiOperation({ summary: 'Make a contribution to Chama' })
+      @ApiResponse({ status: 201, type: ContributionResponseDto })
+      async makeContribution(
+        @Param('id', ParseUUIDPipe) chamaId: string,
+        @Body() contributionDto: CreateContributionDto,
+        @GetUser() user: User,
+      ): Promise<ContributionResponseDto> {
+        const contribution = await this.contributionsService.createContribution(
+          chamaId,
+          user.id,
+          contributionDto,
+        );
+        return this.contributionsService.toContributionResponseDto(contribution);
       }
     }
     ```
   </Tab>
-  <Tab title="DTO Example">
+  <Tab title="Service Implementation">
     ```typescript
-    export class UpdateUserProfileDto {
-      @ApiProperty({ description: 'User first name' })
-      @IsString()
-      @Length(2, 50)
-      @IsOptional()
-      firstName?: string;
-    
-      @ApiProperty({ description: 'User last name' })
-      @IsString()
-      @Length(2, 50)
-      @IsOptional()
-      lastName?: string;
-    
-      @ApiProperty({ description: 'User email address' })
-      @IsEmail()
-      @IsOptional()
-      email?: string;
-    
-      @ApiProperty({ description: 'User date of birth' })
-      @IsDateString()
-      @IsOptional()
-      dateOfBirth?: string;
-    
-      @ApiProperty({ description: 'User city' })
-      @IsString()
-      @IsOptional()
-      city?: string;
+    // apps/backend/src/chamas/chamas.service.ts
+    @Injectable()
+    export class ChamasService {
+      private readonly logger = new Logger(ChamasService.name);
+
+      constructor(
+        @InjectRepository(ChamaEntity)
+        private chamasRepository: Repository<ChamaEntity>,
+        @InjectRepository(ChamaMembershipEntity)
+        private membershipsRepository: Repository<ChamaMembershipEntity>,
+        private paymentsService: PaymentsService,
+        private notificationsService: NotificationsService,
+        private blockchainService: ChamaBlockchainService,
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
+      ) {}
+
+      async createChama(createDto: CreateChamaDto, creatorId: string): Promise<ChamaEntity> {
+        // Use database transaction for consistency
+        return this.chamasRepository.manager.transaction(async (entityManager) => {
+          // Create the Chama
+          const chama = entityManager.create(ChamaEntity, {
+            ...createDto,
+            creatorId,
+            status: ChamaStatus.FORMING,
+          });
+          const savedChama = await entityManager.save(chama);
+
+          // Add creator as admin member
+          const membership = entityManager.create(ChamaMembershipEntity, {
+            chamaId: savedChama.id,
+            userId: creatorId,
+            role: MemberRole.ADMIN,
+            status: MemberStatus.ACTIVE,
+            joinedAt: new Date(),
+          });
+          await entityManager.save(membership);
+
+          // Initialize blockchain ledger
+          await this.blockchainService.initializeChamaLedger(savedChama.id);
+
+          // Clear relevant caches
+          await this.clearUserChamasCache(creatorId);
+
+          this.logger.log(`Chama created: ${savedChama.id} by user: ${creatorId}`);
+          
+          return savedChama;
+        });
+      }
+
+      async getChamaWithDetails(chamaId: string): Promise<ChamaEntity> {
+        const cacheKey = `chama:details:${chamaId}`;
+        
+        // Try cache first
+        const cached = await this.cacheManager.get<ChamaEntity>(cacheKey);
+        if (cached) {
+          return cached;
+        }
+
+        // Fetch from database with relations
+        const chama = await this.chamasRepository.findOne({
+          where: { id: chamaId },
+          relations: [
+            'memberships',
+            'memberships.user',
+            'contributions',
+            'payouts',
+          ],
+          order: {
+            contributions: { createdAt: 'DESC' },
+            payouts: { createdAt: 'DESC' },
+          },
+        });
+
+        if (!chama) {
+          throw new NotFoundException('Chama not found');
+        }
+
+        // Cache for 10 minutes
+        await this.cacheManager.set(cacheKey, chama, 600);
+
+        return chama;
+      }
+
+      private async clearUserChamasCache(userId: string): Promise<void> {
+        await this.cacheManager.del(`user:${userId}:chamas`);
+      }
     }
     ```
   </Tab>
 </Tabs>
 
-### Database Migrations
+### Database Schema Management
 
-```bash
-# Generate a new migration
-npm run migration:generate -- --name=AddUserPreferences
+<Tabs>
+  <Tab title="Entity Definition">
+    ```typescript
+    // apps/backend/src/chamas/entities/chama.entity.ts
+    @Entity('chamas', { schema: 'chamas' })
+    @Index(['creatorId'])
+    @Index(['status'])
+    @Index(['createdAt'])
+    export class ChamaEntity {
+      @PrimaryGeneratedColumn('uuid')
+      id: string;
 
-# Run migrations
-npm run migration:run
+      @Column({ length: 100 })
+      name: string;
 
-# Revert last migration
-npm run migration:revert
+      @Column('text')
+      description: string;
 
-# Show migration status
-npm run migration:show
-```
+      @Column({
+        type: 'enum',
+        enum: ChamaType,
+        default: ChamaType.ROTATING,
+      })
+      type: ChamaType;
 
-Example migration:
+      @Column('uuid')
+      creatorId: string;
 
-```typescript
-export class AddUserPreferences1685123456789 implements MigrationInterface {
-  name = 'AddUserPreferences1685123456789';
+      @Column('decimal', { precision: 15, scale: 2 })
+      contributionAmount: number;
 
-  public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
-      CREATE TABLE "user_preferences" (
-        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
-        "userId" uuid NOT NULL,
-        "language" character varying NOT NULL DEFAULT 'en',
-        "currency" character varying NOT NULL DEFAULT 'USD',
-        "notifications" jsonb NOT NULL DEFAULT '{}',
-        "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
-        "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
-        CONSTRAINT "PK_user_preferences" PRIMARY KEY ("id"),
-        CONSTRAINT "FK_user_preferences_user" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE
-      )
-    `);
-  }
+      @Column({
+        type: 'enum',
+        enum: ContributionFrequency,
+        default: ContributionFrequency.MONTHLY,
+      })
+      frequency: ContributionFrequency;
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP TABLE "user_preferences"`);
-  }
-}
-```
+      @Column('int', { default: 10 })
+      memberLimit: number;
+
+      @Column({
+        type: 'enum',
+        enum: ChamaStatus,
+        default: ChamaStatus.FORMING,
+      })
+      status: ChamaStatus;
+
+      @Column('jsonb', { nullable: true })
+      rules: ChamaRules;
+
+      @Column('varchar', { nullable: true })
+      blockchainAddress: string;
+
+      @CreateDateColumn()
+      createdAt: Date;
+
+      @UpdateDateColumn()
+      updatedAt: Date;
+
+      // Relationships
+      @ManyToOne(() => UserEntity, { eager: false })
+      @JoinColumn({ name: 'creatorId' })
+      creator: UserEntity;
+
+      @OneToMany(() => ChamaMembershipEntity, (membership) => membership.chama)
+      memberships: ChamaMembershipEntity[];
+
+      @OneToMany(() => ContributionEntity, (contribution) => contribution.chama)
+      contributions: ContributionEntity[];
+
+      @OneToMany(() => PayoutEntity, (payout) => payout.chama)
+      payouts: PayoutEntity[];
+    }
+    ```
+  </Tab>
+  <Tab title="Migration Example">
+    ```typescript
+    // apps/backend/src/migrations/1685123456789-CreateChamaSchema.ts
+    export class CreateChamaSchema1685123456789 implements MigrationInterface {
+      name = 'CreateChamaSchema1685123456789';
+
+      public async up(queryRunner: QueryRunner): Promise<void> {
+        // Create chamas schema
+        await queryRunner.createSchema('chamas', true);
+
+        // Create chamas table
+        await queryRunner.query(`
+          CREATE TABLE "chamas"."chamas" (
+            "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+            "name" character varying(100) NOT NULL,
+            "description" text NOT NULL,
+            "type" "chamas"."chamas_type_enum" NOT NULL DEFAULT 'ROTATING',
+            "creatorId" uuid NOT NULL,
+            "contributionAmount" numeric(15,2) NOT NULL,
+            "frequency" "chamas"."chamas_frequency_enum" NOT NULL DEFAULT 'MONTHLY',
+            "memberLimit" integer NOT NULL DEFAULT 10,
+            "status" "chamas"."chamas_status_enum" NOT NULL DEFAULT 'FORMING',
+            "rules" jsonb,
+            "blockchainAddress" character varying,
+            "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+            "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+            CONSTRAINT "PK_chamas" PRIMARY KEY ("id")
+          )
+        `);
+
+        // Create indexes
+        await queryRunner.query(`
+          CREATE INDEX "IDX_chamas_creatorId" ON "chamas"."chamas" ("creatorId")
+        `);
+        await queryRunner.query(`
+          CREATE INDEX "IDX_chamas_status" ON "chamas"."chamas" ("status")
+        `);
+        await queryRunner.query(`
+          CREATE INDEX "IDX_chamas_createdAt" ON "chamas"."chamas" ("createdAt")
+        `);
+
+        // Add foreign key constraint
+        await queryRunner.query(`
+          ALTER TABLE "chamas"."chamas" 
+          ADD CONSTRAINT "FK_chamas_creator" 
+          FOREIGN KEY ("creatorId") REFERENCES "users"."users"("id") ON DELETE RESTRICT
+        `);
+      }
+
+      public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`DROP TABLE "chamas"."chamas"`);
+        await queryRunner.dropSchema('chamas');
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Database Commands">
+    ```bash
+    # Navigate to backend directory
+    cd apps/backend
+
+    # Generate migration from entity changes
+    npm run db:migration:generate -- --name=AddChamaVotingFeature
+
+    # Create empty migration
+    npm run db:migration:create -- --name=AddChamaIndexes
+
+    # Run pending migrations
+    npm run db:migration:run
+
+    # Revert last migration
+    npm run db:migration:revert
+
+    # Show migration status
+    npm run db:migration:show
+
+    # Drop entire schema (development only)
+    npm run db:schema:drop
+
+    # Sync entities with database (development only)
+    npm run db:schema:sync
+    ```
+  </Tab>
+</Tabs>
 
 ## Frontend Development
 
-### Mobile Development (React Native)
+### Shared Package Development
 
 <Tabs>
-  <Tab title="Component Structure">
+  <Tab title="Types Package">
     ```typescript
-    // src/components/DivaScoreCard/DivaScoreCard.tsx
-    interface DivaScoreCardProps {
-      score: number;
-      trend: 'up' | 'down' | 'stable';
-      lastUpdated: Date;
-      onPress?: () => void;
+    // packages/types/src/chama.ts
+    export interface Chama {
+      id: string;
+      name: string;
+      description: string;
+      type: ChamaType;
+      creatorId: string;
+      contributionAmount: number;
+      frequency: ContributionFrequency;
+      memberLimit: number;
+      status: ChamaStatus;
+      rules?: ChamaRules;
+      blockchainAddress?: string;
+      createdAt: Date;
+      updatedAt: Date;
+      membersCount?: number;
+      totalContributions?: number;
     }
-    
-    export const DivaScoreCard: React.FC<DivaScoreCardProps> = ({
-      score,
-      trend,
-      lastUpdated,
+
+    export enum ChamaType {
+      ROTATING = 'ROTATING',
+      FIXED = 'FIXED',
+      INVESTMENT = 'INVESTMENT',
+      LENDING = 'LENDING',
+    }
+
+    export enum ChamaStatus {
+      FORMING = 'FORMING',
+      ACTIVE = 'ACTIVE',
+      COMPLETED = 'COMPLETED',
+      PAUSED = 'PAUSED',
+      CANCELLED = 'CANCELLED',
+    }
+
+    export interface CreateChamaRequest {
+      name: string;
+      description: string;
+      type: ChamaType;
+      contributionAmount: number;
+      frequency: ContributionFrequency;
+      memberLimit: number;
+      rules?: ChamaRules;
+    }
+
+    export interface ChamaRules {
+      autoKickAfterMissed?: number;
+      allowEarlyPayout?: boolean;
+      requireVoteForChanges?: boolean;
+      minimumVotePercentage?: number;
+      lateFeeAmount?: number;
+      lateFeeGracePeriod?: number;
+    }
+    ```
+  </Tab>
+  <Tab title="API SDK Package">
+    ```typescript
+    // packages/api-sdk/src/chamas.ts
+    import { AWOAPIClient } from './client';
+    import {
+      Chama,
+      CreateChamaRequest,
+      ChamaContribution,
+      CreateContributionRequest,
+      PaginatedResponse,
+      APIResponse,
+    } from '@awo/types';
+
+    export class ChamasAPI {
+      constructor(private client: AWOAPIClient) {}
+
+      async getUserChamas(): Promise<APIResponse<Chama[]>> {
+        return this.client.get<Chama[]>('/chamas/user');
+      }
+
+      async createChama(data: CreateChamaRequest): Promise<APIResponse<Chama>> {
+        return this.client.post<Chama>('/chamas', data);
+      }
+
+      async getChamaDetails(chamaId: string): Promise<APIResponse<Chama>> {
+        return this.client.get<Chama>(`/chamas/${chamaId}`);
+      }
+
+      async joinChama(chamaId: string): Promise<APIResponse<void>> {
+        return this.client.post<void>(`/chamas/${chamaId}/join`);
+      }
+
+      async makeContribution(
+        chamaId: string,
+        data: CreateContributionRequest
+      ): Promise<APIResponse<ChamaContribution>> {
+        return this.client.post<ChamaContribution>(`/chamas/${chamaId}/contributions`, data);
+      }
+
+      async getChamaContributions(
+        chamaId: string,
+        page = 1,
+        limit = 20
+      ): Promise<APIResponse<PaginatedResponse<ChamaContribution>>> {
+        return this.client.get<PaginatedResponse<ChamaContribution>>(
+          `/chamas/${chamaId}/contributions?page=${page}&limit=${limit}`
+        );
+      }
+
+      async leaveChamaChama(chamaId: string): Promise<APIResponse<void>> {
+        return this.client.delete<void>(`/chamas/${chamaId}/leave`);
+      }
+
+      async voteChamaProposal(
+        chamaId: string,
+        proposalId: string,
+        vote: 'yes' | 'no'
+      ): Promise<APIResponse<void>> {
+        return this.client.post<void>(`/chamas/${chamaId}/proposals/${proposalId}/vote`, { vote });
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="UI Components Package">
+    ```typescript
+    // packages/ui/src/ChamaCard/ChamaCard.tsx
+    import React from 'react';
+    import { Chama, ChamaStatus } from '@awo/types';
+    import { formatCurrency, formatDate } from '@awo/utils';
+
+    interface ChamaCardProps {
+      chama: Chama;
+      onPress?: (chama: Chama) => void;
+      showStatus?: boolean;
+      variant?: 'default' | 'compact';
+    }
+
+    export const ChamaCard: React.FC<ChamaCardProps> = ({
+      chama,
       onPress,
+      showStatus = true,
+      variant = 'default',
     }) => {
-      const { colors, spacing } = useTheme();
-      const { t } = useTranslation();
-    
+      const getStatusColor = (status: ChamaStatus): string => {
+        switch (status) {
+          case ChamaStatus.ACTIVE:
+            return '#10B981'; // green
+          case ChamaStatus.FORMING:
+            return '#F59E0B'; // yellow
+          case ChamaStatus.COMPLETED:
+            return '#6B7280'; // gray
+          case ChamaStatus.PAUSED:
+            return '#EF4444'; // red
+          default:
+            return '#6B7280';
+        }
+      };
+
+      const handlePress = () => {
+        onPress?.(chama);
+      };
+
       return (
-        <TouchableOpacity
-          style={[styles.container, { backgroundColor: colors.surface }]}
-          onPress={onPress}
-          accessible={true}
-          accessibilityLabel={t('divaScore.cardAccessibilityLabel', { score })}
+        <div
+          className={`
+            bg-white rounded-lg border border-gray-200 shadow-sm
+            hover:shadow-md transition-shadow duration-200
+            ${onPress ? 'cursor-pointer' : ''}
+            ${variant === 'compact' ? 'p-4' : 'p-6'}
+          `}
+          onClick={handlePress}
+          role={onPress ? 'button' : undefined}
+          tabIndex={onPress ? 0 : undefined}
         >
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.onSurface }]}>
-              {t('divaScore.title')}
-            </Text>
-            <TrendIndicator trend={trend} />
-          </View>
-          
-          <View style={styles.scoreContainer}>
-            <Text style={[styles.score, { color: colors.primary }]}>
-              {score}
-            </Text>
-            <Text style={[styles.maxScore, { color: colors.onSurfaceVariant }]}>
-              / 1000
-            </Text>
-          </View>
-          
-          <Text style={[styles.lastUpdated, { color: colors.onSurfaceVariant }]}>
-            {t('divaScore.lastUpdated', { 
-              date: formatDistanceToNow(lastUpdated, { addSuffix: true }) 
-            })}
-          </Text>
-        </TouchableOpacity>
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                {chama.name}
+              </h3>
+              <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                {chama.description}
+              </p>
+              
+              <div className="flex items-center gap-4 text-sm text-gray-500">
+                <span>
+                  {formatCurrency(chama.contributionAmount)} / {chama.frequency.toLowerCase()}
+                </span>
+                <span>
+                  {chama.membersCount || 0} / {chama.memberLimit} members
+                </span>
+              </div>
+            </div>
+
+            {showStatus && (
+              <div
+                className="px-2 py-1 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: `${getStatusColor(chama.status)}20`,
+                  color: getStatusColor(chama.status),
+                }}
+              >
+                {chama.status.toLowerCase()}
+              </div>
+            )}
+          </div>
+
+          {variant === 'default' && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">
+                  Created {formatDate(chama.createdAt, 'relative')}
+                </span>
+                {chama.totalContributions && (
+                  <span className="font-medium text-gray-900">
+                    Total: {formatCurrency(chama.totalContributions)}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       );
     };
     ```
   </Tab>
-  <Tab title="Redux Setup">
+</Tabs>
+
+### Web Application Development (Next.js)
+
+<Tabs>
+  <Tab title="App Router Structure">
     ```typescript
-    // src/store/slices/divaScore.slice.ts
-    interface DivaScoreState {
-      score: number | null;
-      components: DivaScoreComponents | null;
-      history: DivaScoreHistoryItem[];
-      insights: DivaScoreInsight[];
-      loading: boolean;
-      error: string | null;
-      lastUpdated: string | null;
+    // apps/web/src/app/dashboard/chamas/page.tsx
+    import { Suspense } from 'react';
+    import { ChamasGrid } from '@/components/chamas/ChamasGrid';
+    import { ChamasGridSkeleton } from '@/components/chamas/ChamasGridSkeleton';
+    import { CreateChamaButton } from '@/components/chamas/CreateChamaButton';
+
+    export default function ChamasPage() {
+      return (
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">My Chamas</h1>
+              <p className="text-gray-600 mt-2">
+                Manage your community savings groups
+              </p>
+            </div>
+            <CreateChamaButton />
+          </div>
+
+          <Suspense fallback={<ChamasGridSkeleton />}>
+            <ChamasGrid />
+          </Suspense>
+        </div>
+      );
     }
-    
-    const initialState: DivaScoreState = {
-      score: null,
-      components: null,
-      history: [],
-      insights: [],
-      loading: false,
-      error: null,
-      lastUpdated: null,
-    };
-    
-    export const divaScoreSlice = createSlice({
-      name: 'divaScore',
-      initialState,
-      reducers: {
-        setLoading: (state, action) => {
-          state.loading = action.payload;
-        },
-        setError: (state, action) => {
-          state.error = action.payload;
-          state.loading = false;
-        },
-        setScore: (state, action) => {
-          state.score = action.payload.score;
-          state.components = action.payload.components;
-          state.lastUpdated = new Date().toISOString();
-          state.loading = false;
-          state.error = null;
-        },
-        addHistoryItem: (state, action) => {
-          state.history.unshift(action.payload);
-        },
-      },
-    });
+
+    // apps/web/src/components/chamas/ChamasGrid.tsx
+    'use client';
+    import { useQuery } from '@tanstack/react-query';
+    import { useAWOAPI } from '@/hooks/useAWOAPI';
+    import { ChamaCard } from '@awo/ui';
+    import { useRouter } from 'next/navigation';
+
+    export function ChamasGrid() {
+      const api = useAWOAPI();
+      const router = useRouter();
+
+      const {
+        data: chamas,
+        isLoading,
+        error,
+      } = useQuery({
+        queryKey: ['chamas', 'user'],
+        queryFn: () => api.chamas.getUserChamas(),
+      });
+
+      if (isLoading) {
+        return <div>Loading chamas...</div>;
+      }
+
+      if (error) {
+        return <div>Error loading chamas: {error.message}</div>;
+      }
+
+      if (!chamas?.data?.length) {
+        return (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No Chamas yet
+            </h3>
+            <p className="text-gray-600">
+              Create your first Chama to start saving with your community
+            </p>
+          </div>
+        );
+      }
+
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {chamas.data.map((chama) => (
+            <ChamaCard
+              key={chama.id}
+              chama={chama}
+              onPress={(chama) => router.push(`/dashboard/chamas/${chama.id}`)}
+            />
+          ))}
+        </div>
+      );
+    }
     ```
   </Tab>
-  <Tab title="API Integration">
+  <Tab title="API Integration Hook">
     ```typescript
-    // src/services/api/divaScore.api.ts
-    export const divaScoreApi = createApi({
-      reducerPath: 'divaScoreApi',
-      baseQuery: fetchBaseQuery({
-        baseUrl: '/api/diva-score',
-        prepareHeaders: (headers, { getState }) => {
-          const token = (getState() as RootState).auth.token;
-          if (token) {
-            headers.set('authorization', `Bearer ${token}`);
-          }
-          return headers;
+    // apps/web/src/hooks/useAWOAPI.ts
+    import { useMemo } from 'react';
+    import { AWOAPIClient } from '@awo/api-sdk';
+    import { useAuth } from './useAuth';
+
+    export function useAWOAPI() {
+      const { token } = useAuth();
+
+      return useMemo(() => {
+        const client = new AWOAPIClient({
+          baseURL: process.env.NEXT_PUBLIC_API_URL,
+          token,
+        });
+        return client;
+      }, [token]);
+    }
+
+    // apps/web/src/hooks/useAuth.ts
+    import { useSession } from 'next-auth/react';
+    import { useRouter } from 'next/navigation';
+
+    export function useAuth() {
+      const { data: session, status } = useSession();
+      const router = useRouter();
+
+      const user = session?.user;
+      const token = session?.accessToken;
+      const isAuthenticated = status === 'authenticated';
+      const isLoading = status === 'loading';
+
+      const login = (redirectTo?: string) => {
+        router.push(`/auth/login${redirectTo ? `?redirectTo=${redirectTo}` : ''}`);
+      };
+
+      const logout = async () => {
+        await signOut({ callbackUrl: '/' });
+      };
+
+      return {
+        user,
+        token,
+        isAuthenticated,
+        isLoading,
+        login,
+        logout,
+      };
+    }
+    ```
+  </Tab>
+  <Tab title="Form Handling">
+    ```typescript
+    // apps/web/src/components/chamas/CreateChamaForm.tsx
+    'use client';
+    import { useState } from 'react';
+    import { useForm } from 'react-hook-form';
+    import { zodResolver } from '@hookform/resolvers/zod';
+    import { useMutation, useQueryClient } from '@tanstack/react-query';
+    import { createChamaSchema } from '@awo/utils';
+    import { CreateChamaRequest, ChamaType, ContributionFrequency } from '@awo/types';
+    import { useAWOAPI } from '@/hooks/useAWOAPI';
+    import { Button, Input, Select, Textarea } from '@/components/ui';
+
+    interface CreateChamaFormProps {
+      onSuccess?: () => void;
+      onCancel?: () => void;
+    }
+
+    export function CreateChamaForm({ onSuccess, onCancel }: CreateChamaFormProps) {
+      const api = useAWOAPI();
+      const queryClient = useQueryClient();
+
+      const {
+        register,
+        handleSubmit,
+        formState: { errors, isSubmitting },
+        reset,
+      } = useForm<CreateChamaRequest>({
+        resolver: zodResolver(createChamaSchema),
+        defaultValues: {
+          type: ChamaType.ROTATING,
+          frequency: ContributionFrequency.MONTHLY,
+          memberLimit: 10,
         },
-      }),
-      tagTypes: ['DivaScore', 'DivaScoreHistory', 'DivaScoreInsights'],
-      endpoints: (builder) => ({
-        getDivaScore: builder.query<DivaScoreResponse, void>({
-          query: () => '',
-          providesTags: ['DivaScore'],
-        }),
-        getDivaScoreHistory: builder.query<DivaScoreHistoryResponse, { period: string }>({
-          query: ({ period }) => `history?period=${period}`,
-          providesTags: ['DivaScoreHistory'],
-        }),
-        getDivaScoreInsights: builder.query<DivaScoreInsightsResponse, void>({
-          query: () => 'insights',
-          providesTags: ['DivaScoreInsights'],
-        }),
-        refreshDivaScore: builder.mutation<DivaScoreResponse, void>({
-          query: () => ({
-            url: 'refresh',
-            method: 'POST',
-          }),
-          invalidatesTags: ['DivaScore', 'DivaScoreHistory', 'DivaScoreInsights'],
-        }),
-      }),
-    });
+      });
+
+      const createChamaMutation = useMutation({
+        mutationFn: (data: CreateChamaRequest) => api.chamas.createChama(data),
+        onSuccess: (response) => {
+          // Invalidate and refetch user chamas
+          queryClient.invalidateQueries({ queryKey: ['chamas', 'user'] });
+          
+          // Reset form
+          reset();
+          
+          // Call success callback
+          onSuccess?.();
+
+          // Show success message
+          toast.success('Chama created successfully!');
+        },
+        onError: (error) => {
+          toast.error(error.message || 'Failed to create Chama');
+        },
+      });
+
+      const onSubmit = (data: CreateChamaRequest) => {
+        createChamaMutation.mutate(data);
+      };
+
+      return (
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div>
+            <Input
+              label="Chama Name"
+              {...register('name')}
+              error={errors.name?.message}
+              placeholder="Enter a name for your Chama"
+            />
+          </div>
+
+          <div>
+            <Textarea
+              label="Description"
+              {...register('description')}
+              error={errors.description?.message}
+              placeholder="Describe the purpose and goals of your Chama"
+              rows={3}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Select
+                label="Chama Type"
+                {...register('type')}
+                error={errors.type?.message}
+              >
+                <option value={ChamaType.ROTATING}>Rotating Savings</option>
+                <option value={ChamaType.FIXED}>Fixed Savings</option>
+                <option value={ChamaType.INVESTMENT}>Investment Group</option>
+                <option value={ChamaType.LENDING}>Lending Circle</option>
+              </Select>
+            </div>
+
+            <div>
+              <Select
+                label="Contribution Frequency"
+                {...register('frequency')}
+                error={errors.frequency?.message}
+              >
+                <option value={ContributionFrequency.WEEKLY}>Weekly</option>
+                <option value={ContributionFrequency.MONTHLY}>Monthly</option>
+                <option value={ContributionFrequency.QUARTERLY}>Quarterly</option>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Input
+                label="Contribution Amount"
+                type="number"
+                step="0.01"
+                min="1"
+                {...register('contributionAmount', { valueAsNumber: true })}
+                error={errors.contributionAmount?.message}
+                placeholder="0.00"
+              />
+            </div>
+
+            <div>
+              <Input
+                label="Member Limit"
+                type="number"
+                min="2"
+                max="50"
+                {...register('memberLimit', { valueAsNumber: true })}
+                error={errors.memberLimit?.message}
+                placeholder="10"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-6 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              loading={isSubmitting}
+              disabled={isSubmitting}
+            >
+              Create Chama
+            </Button>
+          </div>
+        </form>
+      );
+    }
     ```
   </Tab>
 </Tabs>
 
-### Testing Strategy
+### Mobile Application Development (React Native)
 
 <Tabs>
-  <Tab title="Unit Tests">
+  <Tab title="Screen Component">
     ```typescript
-    // __tests__/components/DivaScoreCard.test.tsx
-    describe('DivaScoreCard', () => {
-      const defaultProps = {
-        score: 750,
-        trend: 'up' as const,
-        lastUpdated: new Date('2025-05-29T10:00:00Z'),
-      };
-    
-      it('renders score correctly', () => {
-        render(<DivaScoreCard {...defaultProps} />);
-        
-        expect(screen.getByText('750')).toBeOnTheScreen();
-        expect(screen.getByText('/ 1000')).toBeOnTheScreen();
+    // apps/mobile/src/screens/ChamasScreen.tsx
+    import React, { useCallback } from 'react';
+    import { View, FlatList, RefreshControl, Alert } from 'react-native';
+    import { useQuery } from '@tanstack/react-query';
+    import { useNavigation } from '@react-navigation/native';
+    import { ChamaCard } from '@awo/ui';
+    import { useAWOAPI } from '@/hooks/useAWOAPI';
+    import { useTheme } from '@/hooks/useTheme';
+    import { Chama } from '@awo/types';
+    import { Button, Text, EmptyState, LoadingState } from '@/components/ui';
+    import { Plus } from '@/components/icons';
+
+    export function ChamasScreen() {
+      const api = useAWOAPI();
+      const navigation = useNavigation();
+      const { colors, spacing } = useTheme();
+
+      const {
+        data: chamas,
+        isLoading,
+        error,
+        refetch,
+        isRefreshing,
+      } = useQuery({
+        queryKey: ['chamas', 'user'],
+        queryFn: () => api.chamas.getUserChamas(),
       });
-    
-      it('shows correct trend indicator', () => {
-        render(<DivaScoreCard {...defaultProps} trend="up" />);
-        
-        const trendIcon = screen.getByTestId('trend-indicator');
-        expect(trendIcon).toHaveProp('name', 'trend-up');
-      });
-    
-      it('calls onPress when tapped', () => {
-        const mockOnPress = jest.fn();
-        render(<DivaScoreCard {...defaultProps} onPress={mockOnPress} />);
-        
-        fireEvent.press(screen.getByRole('button'));
-        expect(mockOnPress).toHaveBeenCalledTimes(1);
-      });
-    
-      it('has proper accessibility label', () => {
-        render(<DivaScoreCard {...defaultProps} />);
-        
-        const card = screen.getByRole('button');
-        expect(card).toHaveAccessibilityLabel('DIVA Score: 750 out of 1000');
-      });
-    });
+
+      const handleChamaPress = useCallback((chama: Chama) => {
+        navigation.navigate('ChamaDetails', { chamaId: chama.id });
+      }, [navigation]);
+
+      const handleCreateChama = useCallback(() => {
+        navigation.navigate('CreateChama');
+      }, [navigation]);
+
+      const renderChamaCard = useCallback(({ item }: { item: Chama }) => (
+        <View style={{ marginBottom: spacing.md }}>
+          <ChamaCard
+            chama={item}
+            onPress={handleChamaPress}
+            variant="default"
+          />
+        </View>
+      ), [handleChamaPress, spacing.md]);
+
+      const renderHeader = useCallback(() => (
+        <View style={{ marginBottom: spacing.lg }}>
+          <Text variant="h1" style={{ marginBottom: spacing.xs }}>
+            My Chamas
+          </Text>
+          <Text variant="body" color="secondary">
+            Manage your community savings groups
+          </Text>
+        </View>
+      ), [spacing]);
+
+      const renderEmpty = useCallback(() => (
+        <EmptyState
+          icon="users"
+          title="No Chamas yet"
+          description="Create your first Chama to start saving with your community"
+          action={{
+            label: 'Create Chama',
+            onPress: handleCreateChama,
+          }}
+        />
+      ), [handleCreateChama]);
+
+      if (isLoading) {
+        return <LoadingState message="Loading your Chamas..." />;
+      }
+
+      if (error) {
+        return (
+          <View style={{ flex: 1, justifyContent: 'center', padding: spacing.lg }}>
+            <Text variant="h3" style={{ textAlign: 'center', marginBottom: spacing.md }}>
+              Error loading Chamas
+            </Text>
+            <Text variant="body" color="secondary" style={{ textAlign: 'center', marginBottom: spacing.lg }}>
+              {error.message}
+            </Text>
+            <Button onPress={() => refetch()}>
+              Try Again
+            </Button>
+          </View>
+        );
+      }
+
+      return (
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <FlatList
+            data={chamas?.data || []}
+            renderItem={renderChamaCard}
+            keyExtractor={(item) => item.id}
+            ListHeaderComponent={renderHeader}
+            ListEmptyComponent={renderEmpty}
+            contentContainerStyle={{
+              padding: spacing.lg,
+              paddingBottom: spacing.xl,
+            }}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={refetch}
+                tintColor={colors.primary}
+              />
+            }
+            showsVerticalScrollIndicator={false}
+          />
+
+          <View
+            style={{
+              position: 'absolute',
+              bottom: spacing.lg,
+              right: spacing.lg,
+            }}
+          >
+            <Button
+              variant="fab"
+              onPress={handleCreateChama}
+              accessibilityLabel="Create new Chama"
+            >
+              <Plus size={24} color={colors.onPrimary} />
+            </Button>
+          </View>
+        </View>
+      );
+    }
     ```
   </Tab>
-  <Tab title="Integration Tests">
+  <Tab title="Navigation Setup">
     ```typescript
-    // __tests__/integration/divaScore.integration.test.tsx
-    describe('DIVA Score Integration', () => {
-      beforeEach(() => {
-        server.use(
-          rest.get('/api/diva-score', (req, res, ctx) => {
-            return res(
-              ctx.json({
-                score: 750,
-                components: {
-                  discipline: 800,
-                  income: 700,
-                  velocity: 750,
-                  assets: 750,
-                },
-                insights: [
-                  {
-                    type: 'improvement',
-                    message: 'Your savings consistency has improved',
-                    category: 'discipline',
-                  },
-                ],
-              })
-            );
+    // apps/mobile/src/navigation/ChamasStackNavigator.tsx
+    import { createNativeStackNavigator } from '@react-navigation/native-stack';
+    import { ChamasScreen } from '@/screens/ChamasScreen';
+    import { ChamaDetailsScreen } from '@/screens/ChamaDetailsScreen';
+    import { CreateChamaScreen } from '@/screens/CreateChamaScreen';
+    import { ChamaSettingsScreen } from '@/screens/ChamaSettingsScreen';
+
+    export type ChamasStackParamList = {
+      ChamasList: undefined;
+      ChamaDetails: { chamaId: string };
+      CreateChama: undefined;
+      ChamaSettings: { chamaId: string };
+    };
+
+    const Stack = createNativeStackNavigator<ChamasStackParamList>();
+
+    export function ChamasStackNavigator() {
+      return (
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: true,
+            headerBackTitleVisible: false,
+            headerTitleStyle: {
+              fontSize: 18,
+              fontWeight: '600',
+            },
+          }}
+        >
+          <Stack.Screen
+            name="ChamasList"
+            component={ChamasScreen}
+            options={{
+              title: 'Chamas',
+              headerLargeTitle: true,
+            }}
+          />
+          <Stack.Screen
+            name="ChamaDetails"
+            component={ChamaDetailsScreen}
+            options={{
+              title: 'Chama Details',
+            }}
+          />
+          <Stack.Screen
+            name="CreateChama"
+            component={CreateChamaScreen}
+            options={{
+              title: 'Create Chama',
+              presentation: 'modal',
+            }}
+          />
+          <Stack.Screen
+            name="ChamaSettings"
+            component={ChamaSettingsScreen}
+            options={{
+              title: 'Chama Settings',
+            }}
+          />
+        </Stack.Navigator>
+      );
+    }
+    ```
+  </Tab>
+  <Tab title="State Management">
+    ```typescript
+    // apps/mobile/src/store/slices/chamasSlice.ts
+    import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+    import { Chama, CreateChamaRequest } from '@awo/types';
+    import { awoAPI } from '@/services/api';
+
+    interface ChamasState {
+      chamas: Chama[];
+      selectedChama: Chama | null;
+      loading: boolean;
+      error: string | null;
+      lastUpdated: number | null;
+    }
+
+    const initialState: ChamasState = {
+      chamas: [],
+      selectedChama: null,
+      loading: false,
+      error: null,
+      lastUpdated: null,
+    };
+
+    // Async thunks
+    export const fetchUserChamas = createAsyncThunk(
+      'chamas/fetchUserChamas',
+      async (_, { rejectWithValue }) => {
+        try {
+          const response = await awoAPI.chamas.getUserChamas();
+          return response.data;
+        } catch (error) {
+          return rejectWithValue(error.message);
+        }
+      }
+    );
+
+    export const createChama = createAsyncThunk(
+      'chamas/createChama',
+      async (data: CreateChamaRequest, { rejectWithValue }) => {
+        try {
+          const response = await awoAPI.chamas.createChama(data);
+          return response.data;
+        } catch (error) {
+          return rejectWithValue(error.message);
+        }
+      }
+    );
+
+    export const fetchChamaDetails = createAsyncThunk(
+      'chamas/fetchChamaDetails',
+      async (chamaId: string, { rejectWithValue }) => {
+        try {
+          const response = await awoAPI.chamas.getChamaDetails(chamaId);
+          return response.data;
+        } catch (error) {
+          return rejectWithValue(error.message);
+        }
+      }
+    );
+
+    const chamasSlice = createSlice({
+      name: 'chamas',
+      initialState,
+      reducers: {
+        clearError: (state) => {
+          state.error = null;
+        },
+        setSelectedChama: (state, action) => {
+          state.selectedChama = action.payload;
+        },
+        clearSelectedChama: (state) => {
+          state.selectedChama = null;
+        },
+      },
+      extraReducers: (builder) => {
+        builder
+          // Fetch user chamas
+          .addCase(fetchUserChamas.pending, (state) => {
+            state.loading = true;
+            state.error = null;
           })
-        );
-      });
-    
-      it('loads and displays DIVA score data', async () => {
-        render(
-          <Provider store={store}>
-            <DivaScoreScreen />
-          </Provider>
-        );
-    
-        expect(screen.getByText('Loading...')).toBeOnTheScreen();
-    
-        await waitFor(() => {
-          expect(screen.getByText('750')).toBeOnTheScreen();
-        });
-    
-        expect(screen.getByText('Discipline: 800')).toBeOnTheScreen();
-        expect(screen.getByText('Income: 700')).toBeOnTheScreen();
-      });
+          .addCase(fetchUserChamas.fulfilled, (state, action) => {
+            state.loading = false;
+            state.chamas = action.payload;
+            state.lastUpdated = Date.now();
+          })
+          .addCase(fetchUserChamas.rejected, (state, action) => {
+            state.loading = false;
+            state.error = action.payload as string;
+          })
+          
+          // Create chama
+          .addCase(createChama.pending, (state) => {
+            state.loading = true;
+            state.error = null;
+          })
+          .addCase(createChama.fulfilled, (state, action) => {
+            state.loading = false;
+            state.chamas.unshift(action.payload);
+          })
+          .addCase(createChama.rejected, (state, action) => {
+            state.loading = false;
+            state.error = action.payload as string;
+          })
+          
+          // Fetch chama details
+          .addCase(fetchChamaDetails.fulfilled, (state, action) => {
+            state.selectedChama = action.payload;
+            // Update in chamas list if it exists
+            const index = state.chamas.findIndex(c => c.id === action.payload.id);
+            if (index !== -1) {
+              state.chamas[index] = action.payload;
+            }
+          });
+      },
     });
-    ```
-  </Tab>
-  <Tab title="E2E Tests">
-    ```typescript
-    // e2e/divaScore.e2e.ts
-    describe('DIVA Score Flow', () => {
-      beforeAll(async () => {
-        await device.launchApp();
-      });
-    
-      beforeEach(async () => {
-        await device.reloadReactNative();
-      });
-    
-      it('should display DIVA score on dashboard', async () => {
-        // Login
-        await element(by.id('phone-input')).typeText('+27123456789');
-        await element(by.id('login-button')).tap();
-    
-        // Navigate to dashboard
-        await expect(element(by.id('dashboard-screen'))).toBeVisible();
-    
-        // Check DIVA score card
-        await expect(element(by.id('diva-score-card'))).toBeVisible();
-        await expect(element(by.text('750'))).toBeVisible();
-      });
-    
-      it('should navigate to detailed DIVA score view', async () => {
-        await element(by.id('diva-score-card')).tap();
-    
-        await expect(element(by.id('diva-score-detail-screen'))).toBeVisible();
-        await expect(element(by.text('Score Breakdown'))).toBeVisible();
-        await expect(element(by.text('Discipline'))).toBeVisible();
-        await expect(element(by.text('Income'))).toBeVisible();
-      });
-    });
+
+    export const { clearError, setSelectedChama, clearSelectedChama } = chamasSlice.actions;
+    export default chamasSlice.reducer;
     ```
   </Tab>
 </Tabs>
 
 ## Development Workflow
 
-### Git Workflow
+### Monorepo Development Commands
 
-We follow the **GitFlow** branching model:
+<Tabs>
+  <Tab title="Daily Development">
+    ```bash
+    # Start all applications in development mode
+    npm run dev
 
+    # Start specific application
+    npm run dev:backend
+    npm run dev:web
+    npm run dev:mobile
+
+    # Build all packages and applications
+    npm run build
+
+    # Build specific package
+    npm run build -- --filter=@awo/types
+
+    # Type checking across all packages
+    npm run type-check
+
+    # Linting across all packages
+    npm run lint
+
+    # Fix linting issues
+    npm run lint:fix
+
+    # Format code across all packages
+    npm run format
+
+    # Run tests across all packages
+    npm run test
+
+    # Run tests in watch mode
+    npm run test:watch
+
+    # Run tests with coverage
+    npm run test:coverage
+    ```
+  </Tab>
+  <Tab title="Package Management">
+    ```bash
+    # Add dependency to specific package
+    npm run add-dep -- @awo/types lodash
+
+    # Add dependency to root workspace
+    npm install --workspace-root typescript
+
+    # Add dependency to backend
+    npm install --workspace apps/backend @nestjs/swagger
+
+    # Add dependency to web app
+    npm install --workspace apps/web next-auth
+
+    # Add dependency to mobile app
+    npm install --workspace apps/mobile react-native-vector-icons
+
+    # Remove dependency from specific package
+    npm run remove-dep -- @awo/api-sdk axios
+
+    # Upgrade dependencies across all packages
+    npm run upgrade-deps
+
+    # Check for security vulnerabilities
+    npm audit
+
+    # Fix security vulnerabilities
+    npm audit fix
+    ```
+  </Tab>
+  <Tab title="Database Management">
+    ```bash
+    # Navigate to backend directory
+    cd apps/backend
+
+    # Create new migration
+    npm run db:migration:create -- --name=AddChamaVotingFeature
+
+    # Generate migration from entity changes
+    npm run db:migration:generate -- --name=UpdateUserSchema
+
+    # Run pending migrations
+    npm run db:migration:run
+
+    # Revert last migration
+    npm run db:migration:revert
+
+    # Show migration status
+    npm run db:migration:show
+
+    # Seed development data
+    npm run db:seed
+
+    # Reset database (development only)
+    npm run db:reset
+
+    # Create database backup
+    npm run db:backup
+
+    # Restore from backup
+    npm run db:restore -- --file=backup.sql
+    ```
+  </Tab>
+</Tabs>
+
+### Git Workflow & Branching Strategy
+
+```mermaid
+gitGraph
+    commit id: "Initial commit"
+    branch develop
+    checkout develop
+    commit id: "Setup monorepo"
+    
+    branch feature/chama-management
+    checkout feature/chama-management
+    commit id: "Add Chama entities"
+    commit id: "Implement Chama service"
+    commit id: "Add Chama API endpoints"
+    
+    checkout develop
+    merge feature/chama-management
+    
+    branch feature/mobile-chama-ui
+    checkout feature/mobile-chama-ui
+    commit id: "Add Chama components"
+    commit id: "Implement Chama screens"
+    
+    checkout develop
+    merge feature/mobile-chama-ui
+    
+    branch release/v1.1.0
+    checkout release/v1.1.0
+    commit id: "Version bump"
+    commit id: "Update changelog"
+    
+    checkout main
+    merge release/v1.1.0
+    commit id: "Release v1.1.0"
+    
+    checkout develop
+    merge main
 ```
-main
-├── develop
-│   ├── feature/user-profile-enhancement
-│   ├── feature/diva-score-improvements
-│   └── feature/chama-blockchain-integration
-├── release/v1.1.0
-└── hotfix/critical-security-patch
-```
 
-### Branch Naming Convention
+### Commit Message Convention
 
-- `feature/feature-name` - New features
-- `bugfix/bug-description` - Bug fixes
-- `hotfix/critical-issue` - Critical production fixes
-- `release/version-number` - Release preparation
-- `chore/task-description` - Maintenance tasks
+```bash
+# Format: type(scope): description
 
-### Commit Message Format
+# Types:
+feat     # New feature
+fix      # Bug fix
+docs     # Documentation changes
+style    # Code style changes (formatting, etc.)
+refactor # Code refactoring
+test     # Adding or updating tests
+chore    # Maintenance tasks
+perf     # Performance improvements
 
-```
-type(scope): brief description
+# Scopes (optional):
+backend  # Backend changes
+web      # Web app changes
+mobile   # Mobile app changes
+shared   # Shared package changes
+types    # Type definitions
+api-sdk  # API SDK changes
+ui       # UI component changes
+docs     # Documentation
 
-Longer description if needed
-
-- List of changes
-- More details about the change
-
-Closes #123
-```
-
-**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
-
-**Examples**:
-
-```
-feat(diva-score): add historical trend analysis
-
-- Implement 6-month trend calculation
-- Add trend visualization component
-- Update API to include historical data
-
-Closes #456
-
-fix(auth): resolve token refresh infinite loop
-
-The token refresh was causing an infinite loop when
-the refresh token was expired.
-
-- Add expiry check before refresh attempt
-- Implement proper error handling
-- Add unit tests for edge cases
-
-Closes #789
+# Examples:
+feat(backend): implement Chama blockchain integration
+fix(mobile): resolve navigation issue in Chama screens
+docs(api-sdk): add examples for Chama API methods
+refactor(shared): improve type safety in validation utilities
+test(backend): add unit tests for DIVA score calculation
+chore(deps): upgrade TypeScript to v5.1.0
 ```
 
 ### Code Review Process
 
 <Steps>
   <Step title="Create Pull Request">
-    - Use the PR template
-    - Link related issues
-    - Add comprehensive description
-    - Include screenshots/videos for UI changes
+    ```bash
+    # Create feature branch
+    git checkout -b feature/chama-voting-system
+    
+    # Make changes and commit
+    git add .
+    git commit -m "feat(backend): implement Chama voting system"
+    
+    # Push to remote
+    git push origin feature/chama-voting-system
+    
+    # Create PR using GitHub CLI or web interface
+    gh pr create --title "Implement Chama voting system" --body "Description of changes"
+    ```
   </Step>
   <Step title="Automated Checks">
-    - Linting and formatting checks
-    - Unit and integration tests
-    - Security vulnerability scanning
-    - Build verification
+    - **Linting**: ESLint checks across all packages
+    - **Type Checking**: TypeScript compilation
+    - **Unit Tests**: Jest test suites
+    - **Integration Tests**: API and component tests
+    - **Security Scanning**: Dependency vulnerability checks
+    - **Build Verification**: Successful build of all packages
   </Step>
   <Step title="Manual Review">
-    - At least 2 reviewers required
-    - Focus on code quality, architecture, and business logic
-    - Security review for sensitive changes
-    - Performance impact assessment
+    - **Code Quality**: Architecture, patterns, best practices
+    - **Business Logic**: Correctness of financial calculations
+    - **Security**: Authentication, authorization, data protection
+    - **Performance**: Database queries, API efficiency
+    - **Testing**: Adequate test coverage and quality
   </Step>
   <Step title="Merge & Deploy">
-    - Squash and merge to develop
-    - Automated deployment to staging
-    - Manual promotion to production
+    ```bash
+    # Squash and merge to develop
+    gh pr merge --squash
+    
+    # Automatic deployment to staging environment
+    # Manual approval required for production deployment
+    ```
   </Step>
 </Steps>
 
@@ -722,105 +1797,2237 @@ Closes #789
 <Tabs>
   <Tab title="Database Optimization">
     ```typescript
-    // Efficient queries with proper indexing
-    @Entity()
-    @Index(['userId', 'transactionDate'])
-    export class Transaction {
-      @PrimaryGeneratedColumn('uuid')
-      id: string;
-    
-      @Column()
-      @Index()
-      userId: string;
-    
-      @Column('decimal', { precision: 10, scale: 2 })
-      amount: number;
-    
-      @Column()
-      @Index()
-      transactionDate: Date;
-    
-      @Column()
-      category: string;
-    }
-    
-    // Optimized repository queries
-    async findUserTransactions(
-      userId: string,
-      options: FindTransactionsOptions
-    ): Promise<Transaction[]> {
-      return this.transactionRepository
-        .createQueryBuilder('transaction')
-        .where('transaction.userId = :userId', { userId })
-        .andWhere('transaction.transactionDate >= :startDate', {
-          startDate: options.startDate,
-        })
-        .orderBy('transaction.transactionDate', 'DESC')
-        .limit(options.limit)
-        .offset(options.offset)
-        .getMany();
+    // Efficient queries with proper indexing and relations
+    @Injectable()
+    export class ChamasService {
+      // Optimized query with strategic joins
+      async getChamasWithStats(userId: string): Promise<ChamaWithStats[]> {
+        return this.chamasRepository
+          .createQueryBuilder('chama')
+          .leftJoin('chama.memberships', 'membership')
+          .leftJoin('chama.contributions', 'contribution')
+          .select([
+            'chama.id',
+            'chama.name',
+            'chama.description',
+            'chama.status',
+            'chama.contributionAmount',
+            'chama.createdAt',
+          ])
+          .addSelect('COUNT(DISTINCT membership.id)', 'memberCount')
+          .addSelect('COALESCE(SUM(contribution.amount), 0)', 'totalContributions')
+          .addSelect('COUNT(DISTINCT contribution.id)', 'contributionCount')
+          .where('membership.userId = :userId', { userId })
+          .andWhere('membership.status = :status', { status: 'ACTIVE' })
+          .groupBy('chama.id')
+          .orderBy('chama.createdAt', 'DESC')
+          .getRawAndEntities();
+      }
+
+      // Pagination with cursor-based approach for large datasets
+      async getChamaContributions(
+        chamaId: string,
+        cursor?: string,
+        limit = 20
+      ): Promise<PaginatedContributions> {
+        const query = this.contributionsRepository
+          .createQueryBuilder('contribution')
+          .leftJoinAndSelect('contribution.user', 'user')
+          .where('contribution.chamaId = :chamaId', { chamaId })
+          .orderBy('contribution.createdAt', 'DESC')
+          .limit(limit + 1); // +1 to check if there are more items
+
+        if (cursor) {
+          query.andWhere('contribution.createdAt < :cursor', { 
+            cursor: new Date(cursor) 
+          });
+        }
+
+        const contributions = await query.getMany();
+        const hasNextPage = contributions.length > limit;
+        const items = hasNextPage ? contributions.slice(0, -1) : contributions;
+        
+        return {
+          items,
+          hasNextPage,
+          nextCursor: hasNextPage ? items[items.length - 1].createdAt.toISOString() : null,
+        };
+      }
     }
     ```
   </Tab>
   <Tab title="Caching Strategy">
     ```typescript
-    // Redis caching implementation
+    // Multi-layer caching with Redis
     @Injectable()
-    export class DivaScoreService {
+    export class CacheService {
+      private memoryCache = new Map<string, { data: any; expires: number }>();
+
       constructor(
-        @Inject(CACHE_MANAGER) private cacheManager: Cache,
-        private transactionsService: TransactionsService,
-      ) {}
-    
-      async calculateDivaScore(userId: string): Promise<DivaScore> {
-        const cacheKey = `diva-score:${userId}`;
-        
-        // Check cache first
-        const cachedScore = await this.cacheManager.get<DivaScore>(cacheKey);
-        if (cachedScore) {
-          return cachedScore;
+        @Inject(CACHE_MANAGER) private redisCache: Cache,
+      ) {
+        // Clean up expired memory cache entries every 5 minutes
+        setInterval(() => this.cleanupMemoryCache(), 5 * 60 * 1000);
+      }
+
+      // Intelligent caching strategy
+      async get<T>(key: string, fallback?: () => Promise<T>): Promise<T | null> {
+        // L1: Memory cache (fastest)
+        const memoryResult = this.getFromMemory<T>(key);
+        if (memoryResult !== null) {
+          return memoryResult;
         }
-    
-        // Calculate score if not cached
-        const transactions = await this.transactionsService.findRecentTransactions(userId);
-        const score = this.performScoreCalculation(transactions);
-    
-        // Cache for 1 hour
-        await this.cacheManager.set(cacheKey, score, 3600);
+
+        // L2: Redis cache (fast)
+        const redisResult = await this.redisCache.get<T>(key);
+        if (redisResult) {
+          // Store in memory for next access
+          this.setInMemory(key, redisResult, 300); // 5 minutes
+          return redisResult;
+        }
+
+        // L3: Fallback function (slowest)
+        if (fallback) {
+          const data = await fallback();
+          await this.set(key, data, 600); // Cache for 10 minutes
+          return data;
+        }
+
+        return null;
+      }
+
+      async set<T>(key: string, data: T, ttl = 300): Promise<void> {
+        // Store in both layers
+        await this.redisCache.set(key, data, ttl);
+        this.setInMemory(key, data, Math.min(ttl, 300));
+      }
+
+      // Cache invalidation patterns
+      async invalidatePattern(pattern: string): Promise<void> {
+        // Clear memory cache
+        for (const key of this.memoryCache.keys()) {
+          if (key.includes(pattern)) {
+            this.memoryCache.delete(key);
+          }
+        }
+
+        // Clear Redis cache
+        const keys = await this.redisCache.store.keys(`*${pattern}*`);
+        if (keys.length > 0) {
+          await Promise.all(keys.map(key => this.redisCache.del(key)));
+        }
+      }
+
+      private getFromMemory<T>(key: string): T | null {
+        const entry = this.memoryCache.get(key);
+        if (!entry) return null;
         
-        return score;
+        if (Date.now() > entry.expires) {
+          this.memoryCache.delete(key);
+          return null;
+        }
+        
+        return entry.data;
+      }
+
+      private setInMemory<T>(key: string, data: T, ttl: number): void {
+        this.memoryCache.set(key, {
+          data,
+          expires: Date.now() + (ttl * 1000),
+        });
+      }
+
+      private cleanupMemoryCache(): void {
+        const now = Date.now();
+        for (const [key, entry] of this.memoryCache.entries()) {
+          if (now > entry.expires) {
+            this.memoryCache.delete(key);
+          }
+        }
+      }
+    }
+
+    // Usage in service with caching decorator
+    @Injectable()
+    export class DivaService {
+      constructor(private cacheService: CacheService) {}
+
+      async getDivaScore(userId: string): Promise<DivaScore> {
+        return this.cacheService.get(
+          `diva:score:${userId}`,
+          () => this.calculateDivaScore(userId)
+        );
+      }
+
+      async calculateDivaScore(userId: string): Promise<DivaScore> {
+        // Expensive calculation here
+        const transactions = await this.getTransactions(userId);
+        return this.performCalculation(transactions);
       }
     }
     ```
   </Tab>
-  <Tab title="Background Jobs">
+  <Tab title="Background Processing">
     ```typescript
-    // Queue-based background processing
+    // Queue-based background jobs with Bull
     @Processor('diva-score-calculation')
     export class DivaScoreProcessor {
       private readonly logger = new Logger(DivaScoreProcessor.name);
-    
-      @Process('calculate-score')
-      async handleScoreCalculation(job: Job<{ userId: string }>) {
-        const { userId } = job.data;
+
+      constructor(
+        private divaService: DivaService,
+        private notificationService: NotificationService,
+      ) {}
+
+      @Process('calculate-user-score')
+      async handleUserScoreCalculation(job: Job<{ userId: string; triggerEvent: string }>) {
+        const { userId, triggerEvent } = job.data;
         
         try {
-          this.logger.log(`Starting DIVA score calculation for user ${userId}`);
+          this.logger.log(`Starting DIVA score calculation for user ${userId}, triggered by: ${triggerEvent}`);
           
-          const score = await this.divaScoreService.calculateDivaScore(userId);
+          // Update job progress
+          await job.progress(10);
+
+          // Get current score for comparison
+          const currentScore = await this.divaService.getCurrentScore(userId);
+          
+          // Calculate new score
+          await job.progress(50);
+          const newScore = await this.divaService.calculateDivaScore(userId);
           
           // Update user's score in database
-          await this.usersService.updateDivaScore(userId, score);
+          await job.progress(80);
+          await this.divaService.updateUserScore(userId, newScore);
           
-          // Send notification if score improved significantly
-          if (score.overallScore > job.data.previousScore + 50) {
-            await this.notificationService.sendScoreImprovementNotification(userId, score);
+          // Send notifications if score improved significantly
+          if (newScore.overallScore > (currentScore?.overallScore || 0) + 50) {
+            await this.notificationService.sendScoreImprovementNotification(userId, newScore);
           }
           
-          this.logger.log(`Completed DIVA score calculation for user ${userId}`);
+          await job.progress(100);
+          this.logger.log(`Completed DIVA score calculation for user ${userId}: ${newScore.overallScore}`);
+          
+          return newScore;
         } catch (error) {
           this.logger.error(`Failed to calculate DIVA score for user ${userId}:`, error);
           throw error;
+        }
+      }
+
+      @Process('bulk-score-calculation')
+      async handleBulkScoreCalculation(job: Job<{ userIds: string[] }>) {
+        const { userIds } = job.data;
+        const batchSize = 10;
+        
+        for (let i = 0; i < userIds.length; i += batchSize) {
+          const batch = userIds.slice(i, i + batchSize);
+          
+          // Process batch in parallel
+          await Promise.all(
+            batch.map(userId => 
+              this.divaService.calculateDivaScore(userId).catch(error => {
+                this.logger.error(`Failed to calculate score for user ${userId}:`, error);
+              })
+            )
+          );
+          
+          // Update progress
+          await job.progress((i + batch.length) / userIds.length * 100);
+          
+          // Small delay to prevent overwhelming the database
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+    }
+
+    // Job scheduling service
+    @Injectable()
+    export class SchedulerService {
+      constructor(
+        @InjectQueue('diva-score-calculation') private divaQueue: Queue,
+      ) {}
+
+      async scheduleScoreCalculation(userId: string, triggerEvent: string, delay = 0): Promise<void> {
+        await this.divaQueue.add(
+          'calculate-user-score',
+          { userId, triggerEvent },
+          {
+            delay,
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              settings: {
+                delay: 2000,
+              },
+            },
+          }
+        );
+      }
+
+      async scheduleBulkScoreCalculation(userIds: string[]): Promise<void> {
+        await this.divaQueue.add(
+          'bulk-score-calculation',
+          { userIds },
+          {
+            attempts: 5,
+            backoff: {
+              type: 'exponential',
+              settings: {
+                delay: 5000,
+              },
+            },
+          }
+        );
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Frontend Performance
+
+<Tabs>
+  <Tab title="React Query Optimization">
+    ```typescript
+    // Optimized React Query configuration
+    // apps/web/src/lib/react-query.ts
+    import { QueryClient } from '@tanstack/react-query';
+
+    export const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          staleTime: 5 * 60 * 1000, // 5 minutes
+          cacheTime: 10 * 60 * 1000, // 10 minutes
+          refetchOnWindowFocus: false,
+          refetchOnReconnect: 'always',
+          retry: (failureCount, error) => {
+            // Don't retry on 4xx errors
+            if (error?.status >= 400 && error?.status < 500) {
+              return false;
+            }
+            return failureCount < 3;
+          },
+        },
+        mutations: {
+          retry: false,
+        },
+      },
+    });
+
+    // Optimized hooks with proper caching
+    export function useUserChamas() {
+      return useQuery({
+        queryKey: ['chamas', 'user'],
+        queryFn: () => api.chamas.getUserChamas(),
+        staleTime: 2 * 60 * 1000, // 2 minutes for frequently changing data
+      });
+    }
+
+    export function useChamaDetails(chamaId: string) {
+      return useQuery({
+        queryKey: ['chamas', chamaId],
+        queryFn: () => api.chamas.getChamaDetails(chamaId),
+        enabled: !!chamaId,
+        staleTime: 5 * 60 * 1000, // 5 minutes for relatively stable data
+      });
+    }
+
+    export function useChamaContributions(chamaId: string, enabled = true) {
+      return useInfiniteQuery({
+        queryKey: ['chamas', chamaId, 'contributions'],
+        queryFn: ({ pageParam }) => api.chamas.getChamaContributions(chamaId, pageParam),
+        getNextPageParam: (lastPage) => lastPage.nextCursor,
+        enabled: enabled && !!chamaId,
+        staleTime: 1 * 60 * 1000, // 1 minute for financial data
+      });
+    }
+
+    // Mutation with optimistic updates
+    export function useCreateChama() {
+      const queryClient = useQueryClient();
+
+      return useMutation({
+        mutationFn: (data: CreateChamaRequest) => api.chamas.createChama(data),
+        onMutate: async (newChama) => {
+          // Cancel any outgoing refetches
+          await queryClient.cancelQueries({ queryKey: ['chamas', 'user'] });
+
+          // Snapshot the previous value
+          const previousChamas = queryClient.getQueryData(['chamas', 'user']);
+
+          // Optimistically update to the new value
+          queryClient.setQueryData(['chamas', 'user'], (old: any) => ({
+            ...old,
+            data: [
+              {
+                id: 'temp-' + Date.now(),
+                ...newChama,
+                status: 'FORMING',
+                createdAt: new Date().toISOString(),
+                membersCount: 1,
+              },
+              ...(old?.data || []),
+            ],
+          }));
+
+          return { previousChamas };
+        },
+        onError: (err, newChama, context) => {
+          // Revert the optimistic update
+          queryClient.setQueryData(['chamas', 'user'], context?.previousChamas);
+        },
+        onSettled: () => {
+          // Always refetch after error or success
+          queryClient.invalidateQueries({ queryKey: ['chamas', 'user'] });
+        },
+      });
+    }
+    ```
+  </Tab>
+  <Tab title="Component Optimization">
+    ```typescript
+    // Optimized component with proper memoization
+    import React, { memo, useMemo, useCallback } from 'react';
+    import { VirtualizedList } from '@/components/ui';
+
+    interface ChamaListProps {
+      chamas: Chama[];
+      onChamaPress: (chama: Chama) => void;
+      searchQuery?: string;
+    }
+
+    export const ChamaList = memo<ChamaListProps>(({ 
+      chamas, 
+      onChamaPress, 
+      searchQuery 
+    }) => {
+      // Memoize filtered and sorted data
+      const filteredChamas = useMemo(() => {
+        let filtered = chamas;
+
+        // Apply search filter
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase();
+          filtered = filtered.filter(chama =>
+            chama.name.toLowerCase().includes(query) ||
+            chama.description.toLowerCase().includes(query)
+          );
+        }
+
+        // Sort by status and creation date
+        return filtered.sort((a, b) => {
+          // Active chamas first
+          if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1;
+          if (b.status === 'ACTIVE' && a.status !== 'ACTIVE') return 1;
+          
+          // Then by creation date (newest first)
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+      }, [chamas, searchQuery]);
+
+      // Memoize render function to prevent unnecessary re-renders
+      const renderChamaItem = useCallback(({ item, index }: { item: Chama; index: number }) => (
+        <MemoizedChamaCard
+          key={item.id}
+          chama={item}
+          onPress={onChamaPress}
+          index={index}
+        />
+      ), [onChamaPress]);
+
+      // Memoize key extractor
+      const keyExtractor = useCallback((item: Chama) => item.id, []);
+
+      // Memoize item layout for better performance
+      const getItemLayout = useCallback(
+        (data: Chama[] | null | undefined, index: number) => ({
+          length: ITEM_HEIGHT,
+          offset: ITEM_HEIGHT * index,
+          index,
+        }),
+        []
+      );
+
+      if (filteredChamas.length === 0) {
+        return <EmptyState message="No chamas found" />;
+      }
+
+      return (
+        <VirtualizedList
+          data={filteredChamas}
+          renderItem={renderChamaItem}
+          keyExtractor={keyExtractor}
+          getItemLayout={getItemLayout}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={5}
+          updateCellsBatchingPeriod={50}
+        />
+      );
+    });
+
+    // Memoized card component
+    const MemoizedChamaCard = memo<{
+      chama: Chama;
+      onPress: (chama: Chama) => void;
+      index: number;
+    }>(({ chama, onPress, index }) => {
+      const handlePress = useCallback(() => {
+        onPress(chama);
+      }, [chama, onPress]);
+
+      return (
+        <ChamaCard
+          chama={chama}
+          onPress={handlePress}
+          testID={`chama-card-${index}`}
+        />
+      );
+    });
+    ```
+  </Tab>
+  <Tab title="Bundle Optimization">
+    ```javascript
+    // apps/web/next.config.js
+    const withBundleAnalyzer = require('@next/bundle-analyzer')({
+      enabled: process.env.ANALYZE === 'true',
+    });
+
+    /** @type {import('next').NextConfig} */
+    const nextConfig = {
+      // Optimize bundle size
+      experimental: {
+        optimizeCss: true,
+        optimizePackageImports: ['@awo/ui', '@awo/utils'],
+      },
+
+      // Image optimization
+      images: {
+        domains: ['awo-platform.s3.amazonaws.com'],
+        formats: ['image/webp', 'image/avif'],
+        minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
+      },
+
+      // Webpack optimizations
+      webpack: (config, { dev, isServer }) => {
+        // Production optimizations
+        if (!dev) {
+          config.optimization.splitChunks = {
+            chunks: 'all',
+            cacheGroups: {
+              // Vendor libraries
+              vendor: {
+                test: /[\\/]node_modules[\\/]/,
+                name: 'vendors',
+                chunks: 'all',
+                priority: 10,
+              },
+              // AWO shared packages
+              awoShared: {
+                test: /[\\/]packages[\\/]/,
+                name: 'awo-shared',
+                chunks: 'all',
+                priority: 20,
+              },
+              // React and related libraries
+              react: {
+                test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/,
+                name: 'react',
+                chunks: 'all',
+                priority: 30,
+              },
+            },
+          };
+        }
+
+        // Tree shaking optimization
+        config.optimization.usedExports = true;
+        config.optimization.sideEffects = false;
+
+        return config;
+      },
+
+      // Headers for caching
+      async headers() {
+        return [
+          {
+            source: '/_next/static/:path*',
+            headers: [
+              {
+                key: 'Cache-Control',
+                value: 'public, max-age=31536000, immutable',
+              },
+            ],
+          },
+        ];
+      },
+    };
+
+    module.exports = withBundleAnalyzer(nextConfig);
+
+    // apps/mobile/metro.config.js
+    const { getDefaultConfig } = require('expo/metro-config');
+
+    const config = getDefaultConfig(__dirname);
+
+    // Enable tree shaking
+    config.transformer.minifierConfig = {
+      mangle: {
+        keep_fnames: true,
+      },
+      output: {
+        ascii_only: true,
+        quote_keys: true,
+        wrap_iife: true,
+      },
+      sourceMap: {
+        includeSources: false,
+      },
+      toplevel: false,
+      warnings: false,
+    };
+
+    // Optimize bundle size
+    config.resolver.alias = {
+      '@': './src',
+      '@components': './src/components',
+      '@screens': './src/screens',
+      '@hooks': './src/hooks',
+      '@services': './src/services',
+      '@utils': './src/utils',
+    };
+
+    // Enable hermes for better performance
+    config.transformer.hermesCommand = 'node_modules/react-native/sdks/hermesc/osx-bin/hermesc';
+
+    module.exports = config;
+    ```
+  </Tab>
+</Tabs>
+
+## Testing Strategy
+
+### Comprehensive Testing Approach
+
+<Tabs>
+  <Tab title="Backend Testing">
+    ```typescript
+    // apps/backend/src/chamas/chamas.service.spec.ts
+    describe('ChamasService', () => {
+      let service: ChamasService;
+      let repository: Repository<ChamaEntity>;
+      let membershipsRepository: Repository<ChamaMembershipEntity>;
+
+      beforeEach(async () => {
+        const module: TestingModule = await Test.createTestingModule({
+          providers: [
+            ChamasService,
+            {
+              provide: getRepositoryToken(ChamaEntity),
+              useClass: Repository,
+            },
+            {
+              provide: getRepositoryToken(ChamaMembershipEntity),
+              useClass: Repository,
+            },
+            {
+              provide: PaymentsService,
+              useValue: mockPaymentsService,
+            },
+            {
+              provide: CACHE_MANAGER,
+              useValue: mockCacheManager,
+            },
+          ],
+        }).compile();
+
+        service = module.get<ChamasService>(ChamasService);
+        repository = module.get<Repository<ChamaEntity>>(getRepositoryToken(ChamaEntity));
+        membershipsRepository = module.get<Repository<ChamaMembershipEntity>>(
+          getRepositoryToken(ChamaMembershipEntity)
+        );
+      });
+
+      describe('createChama', () => {
+        it('should create a new chama successfully', async () => {
+          const createDto: CreateChamaDto = {
+            name: 'Test Chama',
+            description: 'Test description',
+            type: ChamaType.ROTATING,
+            contributionAmount: 1000,
+            frequency: ContributionFrequency.MONTHLY,
+            memberLimit: 10,
+          };
+          const creatorId = 'user-id';
+
+          const mockChama = { id: 'chama-id', ...createDto, creatorId };
+          const mockMembership = { chamaId: 'chama-id', userId: creatorId, role: 'ADMIN' };
+
+          jest.spyOn(repository.manager, 'transaction').mockImplementation(async (cb) => {
+            const manager = {
+              create: jest.fn()
+                .mockReturnValueOnce(mockChama)
+                .mockReturnValueOnce(mockMembership),
+              save: jest.fn()
+                .mockResolvedValueOnce(mockChama)
+                .mockResolvedValueOnce(mockMembership),
+            };
+            return cb(manager as any);
+          });
+
+          const result = await service.createChama(createDto, creatorId);
+
+          expect(result).toEqual(mockChama);
+          expect(repository.manager.transaction).toHaveBeenCalled();
+        });
+
+        it('should throw error if contribution amount is invalid', async () => {
+          const createDto: CreateChamaDto = {
+            name: 'Test Chama',
+            description: 'Test description',
+            type: ChamaType.ROTATING,
+            contributionAmount: -100, // Invalid amount
+            frequency: ContributionFrequency.MONTHLY,
+            memberLimit: 10,
+          };
+
+          await expect(service.createChama(createDto, 'user-id')).rejects.toThrow(
+            'Contribution amount must be positive'
+          );
+        });
+      });
+
+      describe('getChamaWithDetails', () => {
+        it('should return cached chama if available', async () => {
+          const chamaId = 'chama-id';
+          const mockChama = { id: chamaId, name: 'Test Chama' };
+
+          mockCacheManager.get.mockResolvedValue(mockChama);
+
+          const result = await service.getChamaWithDetails(chamaId);
+
+          expect(result).toEqual(mockChama);
+          expect(mockCacheManager.get).toHaveBeenCalledWith(`chama:details:${chamaId}`);
+          expect(repository.findOne).not.toHaveBeenCalled();
+        });
+
+        it('should fetch from database and cache if not in cache', async () => {
+          const chamaId = 'chama-id';
+          const mockChama = { id: chamaId, name: 'Test Chama' };
+
+          mockCacheManager.get.mockResolvedValue(null);
+          jest.spyOn(repository, 'findOne').mockResolvedValue(mockChama as any);
+
+          const result = await service.getChamaWithDetails(chamaId);
+
+          expect(result).toEqual(mockChama);
+          expect(repository.findOne).toHaveBeenCalledWith({
+            where: { id: chamaId },
+            relations: ['memberships', 'memberships.user', 'contributions', 'payouts'],
+            order: {
+              contributions: { createdAt: 'DESC' },
+              payouts: { createdAt: 'DESC' },
+            },
+          });
+          expect(mockCacheManager.set).toHaveBeenCalledWith(
+            `chama:details:${chamaId}`,
+            mockChama,
+            600
+          );
+        });
+      });
+    });
+
+    // Integration test
+    // apps/backend/test/chamas.e2e-spec.ts
+    describe('Chamas (e2e)', () => {
+      let app: INestApplication;
+      let authToken: string;
+      let userId: string;
+
+      beforeAll(async () => {
+        const moduleFixture: TestingModule = await Test.createTestingModule({
+          imports: [AppModule],
+        }).compile();
+
+        app = moduleFixture.createNestApplication();
+        await app.init();
+
+        // Setup test user and get auth token
+        const authResponse = await request(app.getHttpServer())
+          .post('/auth/register')
+          .send({
+            phoneNumber: '+27123456789',
+            firstName: 'Test',
+            lastName: 'User',
+            country: 'ZA',
+          });
+
+        authToken = authResponse.body.accessToken;
+        userId = authResponse.body.user.id;
+      });
+
+      afterAll(async () => {
+        await app.close();
+      });
+
+      describe('/chamas (POST)', () => {
+        it('should create a new chama', () => {
+          return request(app.getHttpServer())
+            .post('/chamas')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send({
+              name: 'Test Chama',
+              description: 'Test description',
+              type: 'ROTATING',
+              contributionAmount: 1000,
+              frequency: 'MONTHLY',
+              memberLimit: 10,
+            })
+            .expect(201)
+            .expect((res) => {
+              expect(res.body).toHaveProperty('id');
+              expect(res.body.name).toBe('Test Chama');
+              expect(res.body.creatorId).toBe(userId);
+              expect(res.body.status).toBe('FORMING');
+            });
+        });
+
+        it('should return 400 for invalid data', () => {
+          return request(app.getHttpServer())
+            .post('/chamas')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send({
+              name: '', // Invalid: empty name
+              contributionAmount: -100, // Invalid: negative amount
+            })
+            .expect(400)
+            .expect((res) => {
+              expect(res.body.message).toContain('validation failed');
+            });
+        });
+
+        it('should return 401 without authentication', () => {
+          return request(app.getHttpServer())
+            .post('/chamas')
+            .send({
+              name: 'Test Chama',
+              description: 'Test description',
+            })
+            .expect(401);
+        });
+      });
+    });
+    ```
+  </Tab>
+  <Tab title="Frontend Testing">
+    ```typescript
+    // apps/web/src/components/chamas/__tests__/ChamaCard.test.tsx
+    import { render, screen, fireEvent } from '@testing-library/react';
+    import { ChamaCard } from '../ChamaCard';
+    import { ChamaType, ChamaStatus, ContributionFrequency } from '@awo/types';
+
+    const mockChama = {
+      id: 'chama-1',
+      name: 'Test Chama',
+      description: 'Test description',
+      type: ChamaType.ROTATING,
+      status: ChamaStatus.ACTIVE,
+      contributionAmount: 1000,
+      frequency: ContributionFrequency.MONTHLY,
+      memberLimit: 10,
+      createdAt: new Date('2025-01-01'),
+      membersCount: 5,
+      totalContributions: 15000,
+    };
+
+    describe('ChamaCard', () => {
+      it('renders chama information correctly', () => {
+        render(<ChamaCard chama={mockChama} />);
+
+        expect(screen.getByText('Test Chama')).toBeInTheDocument();
+        expect(screen.getByText('Test description')).toBeInTheDocument();
+        expect(screen.getByText('R1,000 / monthly')).toBeInTheDocument();
+        expect(screen.getByText('5 / 10 members')).toBeInTheDocument();
+        expect(screen.getByText('active')).toBeInTheDocument();
+      });
+
+      it('calls onPress when clicked', () => {
+        const mockOnPress = jest.fn();
+        render(<ChamaCard chama={mockChama} onPress={mockOnPress} />);
+
+        fireEvent.click(screen.getByRole('button'));
+        expect(mockOnPress).toHaveBeenCalledWith(mockChama);
+      });
+
+      it('shows correct status color', () => {
+        render(<ChamaCard chama={mockChama} />);
+
+        const statusBadge = screen.getByText('active');
+        expect(statusBadge).toHaveStyle({
+          color: '#10B981',
+          backgroundColor: '#10B98120',
+        });
+      });
+
+      it('handles compact variant', () => {
+        render(<ChamaCard chama={mockChama} variant="compact" />);
+
+        // Should not show total contributions in compact mode
+        expect(screen.queryByText('Total: R15,000')).not.toBeInTheDocument();
+      });
+
+      it('handles missing optional data gracefully', () => {
+        const chamaWithoutOptionalData = {
+          ...mockChama,
+          membersCount: undefined,
+          totalContributions: undefined,
+        };
+
+        render(<ChamaCard chama={chamaWithoutOptionalData} />);
+
+        expect(screen.getByText('0 / 10 members')).toBeInTheDocument();
+        expect(screen.queryByText('Total:')).not.toBeInTheDocument();
+      });
+    });
+
+    // React Query hook testing
+    // apps/web/src/hooks/__tests__/useUserChamas.test.tsx
+    import { renderHook, waitFor } from '@testing-library/react';
+    import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+    import { useUserChamas } from '../useUserChamas';
+    import { awoAPI } from '@/lib/api';
+
+    // Mock the API
+    jest.mock('@/lib/api');
+    const mockAPI = awoAPI as jest.Mocked<typeof awoAPI>;
+
+    const createWrapper = () => {
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: false,
+          },
+        },
+      });
+      return ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      );
+    };
+
+    describe('useUserChamas', () => {
+      beforeEach(() => {
+        jest.clearAllMocks();
+      });
+
+      it('should return chamas data on success', async () => {
+        const mockChamas = [mockChama];
+        mockAPI.chamas.getUserChamas.mockResolvedValue({
+          data: mockChamas,
+          success: true,
+        });
+
+        const { result } = renderHook(() => useUserChamas(), {
+          wrapper: createWrapper(),
+        });
+
+        await waitFor(() => {
+          expect(result.current.isSuccess).toBe(true);
+        });
+
+        expect(result.current.data?.data).toEqual(mockChamas);
+        expect(mockAPI.chamas.getUserChamas).toHaveBeenCalledTimes(1);
+      });
+
+      it('should handle API error', async () => {
+        const errorMessage = 'Failed to fetch chamas';
+        mockAPI.chamas.getUserChamas.mockRejectedValue(new Error(errorMessage));
+
+        const { result } = renderHook(() => useUserChamas(), {
+          wrapper: createWrapper(),
+        });
+
+        await waitFor(() => {
+          expect(result.current.isError).toBe(true);
+        });
+
+        expect(result.current.error?.message).toBe(errorMessage);
+      });
+    });
+
+    // Component integration testing
+    // apps/web/src/components/chamas/__tests__/ChamasGrid.test.tsx
+    import { render, screen, waitFor } from '@testing-library/react';
+    import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+    import { BrowserRouter } from 'react-router-dom';
+    import { ChamasGrid } from '../ChamasGrid';
+    import { awoAPI } from '@/lib/api';
+
+    jest.mock('@/lib/api');
+    const mockAPI = awoAPI as jest.Mocked<typeof awoAPI>;
+
+    const AllTheProviders = ({ children }: { children: React.ReactNode }) => {
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false },
+        },
+      });
+
+      return (
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            {children}
+          </BrowserRouter>
+        </QueryClientProvider>
+      );
+    };
+
+    describe('ChamasGrid', () => {
+      it('should display chamas when loaded', async () => {
+        mockAPI.chamas.getUserChamas.mockResolvedValue({
+          data: [mockChama],
+          success: true,
+        });
+
+        render(<ChamasGrid />, { wrapper: AllTheProviders });
+
+        await waitFor(() => {
+          expect(screen.getByText('Test Chama')).toBeInTheDocument();
+        });
+
+        expect(screen.getByText('Test description')).toBeInTheDocument();
+      });
+
+      it('should display empty state when no chamas', async () => {
+        mockAPI.chamas.getUserChamas.mockResolvedValue({
+          data: [],
+          success: true,
+        });
+
+        render(<ChamasGrid />, { wrapper: AllTheProviders });
+
+        await waitFor(() => {
+          expect(screen.getByText('No Chamas yet')).toBeInTheDocument();
+        });
+
+        expect(screen.getByText('Create your first Chama to start saving with your community')).toBeInTheDocument();
+      });
+    });
+    ```
+  </Tab>
+  <Tab title="Mobile Testing">
+    ```typescript
+    // apps/mobile/src/components/__tests__/ChamaCard.test.tsx
+    import React from 'react';
+    import { render, fireEvent } from '@testing-library/react-native';
+    import { ChamaCard } from '../ChamaCard';
+    import { ThemeProvider } from '@/contexts/ThemeContext';
+
+    const mockChama = {
+      id: 'chama-1',
+      name: 'Test Chama',
+      description: 'Test description',
+      type: 'ROTATING',
+      status: 'ACTIVE',
+      contributionAmount: 1000,
+      frequency: 'MONTHLY',
+      memberLimit: 10,
+      createdAt: new Date('2025-01-01'),
+      membersCount: 5,
+    };
+
+    const renderWithTheme = (component: React.ReactElement) => {
+      return render(
+        <ThemeProvider>
+          {component}
+        </ThemeProvider>
+      );
+    };
+
+    describe('ChamaCard', () => {
+      it('renders chama information correctly', () => {
+        const { getByText } = renderWithTheme(<ChamaCard chama={mockChama} />);
+
+        expect(getByText('Test Chama')).toBeTruthy();
+        expect(getByText('Test description')).toBeTruthy();
+        expect(getByText('R1,000 / monthly')).toBeTruthy();
+        expect(getByText('5 / 10 members')).toBeTruthy();
+      });
+
+      it('calls onPress when tapped', () => {
+        const mockOnPress = jest.fn();
+        const { getByTestId } = renderWithTheme(
+          <ChamaCard chama={mockChama} onPress={mockOnPress} />
+        );
+
+        fireEvent.press(getByTestId('chama-card'));
+        expect(mockOnPress).toHaveBeenCalledWith(mockChama);
+      });
+
+      it('has proper accessibility labels', () => {
+        const { getByLabelText } = renderWithTheme(<ChamaCard chama={mockChama} />);
+
+        expect(getByLabelText('Chama: Test Chama')).toBeTruthy();
+      });
+    });
+
+    // Screen testing with navigation
+    // apps/mobile/src/screens/__tests__/ChamasScreen.test.tsx
+    import React from 'react';
+    import { render, fireEvent, waitFor } from '@testing-library/react-native';
+    import { NavigationContainer } from '@react-navigation/native';
+    import { createNativeStackNavigator } from '@react-navigation/native-stack';
+    import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+    import { ChamasScreen } from '../ChamasScreen';
+    import { awoAPI } from '@/services/api';
+
+    jest.mock('@/services/api');
+    const mockAPI = awoAPI as jest.Mocked<typeof awoAPI>;
+
+    const Stack = createNativeStackNavigator();
+
+    const TestNavigator = () => (
+      <NavigationContainer>
+        <Stack.Navigator>
+          <Stack.Screen name="Chamas" component={ChamasScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    );
+
+    const renderWithProviders = (component: React.ReactElement) => {
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false },
+        },
+      });
+
+      return render(
+        <QueryClientProvider client={queryClient}>
+          <TestNavigator />
+        </QueryClientProvider>
+      );
+    };
+
+    describe('ChamasScreen', () => {
+      beforeEach(() => {
+        jest.clearAllMocks();
+      });
+
+      it('should display loading state initially', () => {
+        mockAPI.chamas.getUserChamas.mockImplementation(
+          () => new Promise(() => {}) // Never resolves
+        );
+
+        const { getByText } = renderWithProviders(<ChamasScreen />);
+        expect(getByText('Loading your Chamas...')).toBeTruthy();
+      });
+
+      it('should display chamas when loaded', async () => {
+        mockAPI.chamas.getUserChamas.mockResolvedValue({
+          data: [mockChama],
+          success: true,
+        });
+
+        const { getByText } = renderWithProviders(<ChamasScreen />);
+
+        await waitFor(() => {
+          expect(getByText('Test Chama')).toBeTruthy();
+        });
+      });
+
+      it('should handle pull to refresh', async () => {
+        mockAPI.chamas.getUserChamas.mockResolvedValue({
+          data: [mockChama],
+          success: true,
+        });
+
+        const { getByTestId } = renderWithProviders(<ChamasScreen />);
+
+        await waitFor(() => {
+          expect(getByTestId('chamas-list')).toBeTruthy();
+        });
+
+        fireEvent(getByTestId('chamas-list'), 'refresh');
+        expect(mockAPI.chamas.getUserChamas).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    // E2E testing with Detox
+    // apps/mobile/e2e/chamas.e2e.js
+    describe('Chamas Flow', () => {
+      beforeAll(async () => {
+        await device.launchApp();
+      });
+
+      beforeEach(async () => {
+        await device.reloadReactNative();
+      });
+
+      it('should display chamas list on dashboard', async () => {
+        // Navigate to chamas tab
+        await element(by.id('tab-chamas')).tap();
+        
+        // Wait for chamas to load
+        await waitFor(element(by.id('chamas-list')))
+          .toBeVisible()
+          .withTimeout(5000);
+
+        // Check if create button is visible
+        await expect(element(by.id('create-chama-fab'))).toBeVisible();
+      });
+
+      it('should navigate to create chama screen', async () => {
+        await element(by.id('tab-chamas')).tap();
+        await element(by.id('create-chama-fab')).tap();
+        
+        await expect(element(by.id('create-chama-screen'))).toBeVisible();
+        await expect(element(by.id('chama-name-input'))).toBeVisible();
+      });
+
+      it('should create a new chama', async () => {
+        await element(by.id('tab-chamas')).tap();
+        await element(by.id('create-chama-fab')).tap();
+        
+        // Fill form
+        await element(by.id('chama-name-input')).typeText('E2E Test Chama');
+        await element(by.id('chama-description-input')).typeText('Test description');
+        await element(by.id('contribution-amount-input')).typeText('1000');
+        
+        // Submit form
+        await element(by.id('create-chama-button')).tap();
+        
+        // Wait for navigation back to list
+        await waitFor(element(by.text('E2E Test Chama')))
+          .toBeVisible()
+          .withTimeout(5000);
+      });
+    });
+    ```
+  </Tab>
+  <Tab title="Shared Package Testing">
+    ```typescript
+    // packages/api-sdk/src/__tests__/chamas.test.ts
+    import { ChamasAPI } from '../chamas';
+    import { AWOAPIClient } from '../client';
+
+    describe('ChamasAPI', () => {
+      let chamasAPI: ChamasAPI;
+      let mockClient: jest.Mocked<AWOAPIClient>;
+
+      beforeEach(() => {
+        mockClient = {
+          get: jest.fn(),
+          post: jest.fn(),
+          put: jest.fn(),
+          delete: jest.fn(),
+        } as any;
+        
+        chamasAPI = new ChamasAPI(mockClient);
+      });
+
+      describe('getUserChamas', () => {
+        it('should call GET /chamas/user', async () => {
+          const mockResponse = { data: [mockChama], success: true };
+          mockClient.get.mockResolvedValue(mockResponse);
+
+          const result = await chamasAPI.getUserChamas();
+
+          expect(mockClient.get).toHaveBeenCalledWith('/chamas/user');
+          expect(result).toEqual(mockResponse);
+        });
+      });
+
+      describe('createChama', () => {
+        it('should call POST /chamas with correct data', async () => {
+          const createData = {
+            name: 'Test Chama',
+            description: 'Test description',
+            type: 'ROTATING',
+            contributionAmount: 1000,
+            frequency: 'MONTHLY',
+            memberLimit: 10,
+          };
+          const mockResponse = { data: mockChama, success: true };
+          mockClient.post.mockResolvedValue(mockResponse);
+
+          const result = await chamasAPI.createChama(createData);
+
+          expect(mockClient.post).toHaveBeenCalledWith('/chamas', createData);
+          expect(result).toEqual(mockResponse);
+        });
+      });
+    });
+
+    // packages/utils/src/__tests__/validation.test.ts
+    import { validatePhoneNumber, validateEmail, createChamaSchema } from '../validation';
+
+    describe('Validation Utils', () => {
+      describe('validatePhoneNumber', () => {
+        it('should validate correct phone numbers', () => {
+          expect(validatePhoneNumber('+27123456789')).toEqual({
+            isValid: true,
+            sanitized: '+27123456789',
+          });
+        });
+
+        it('should reject invalid phone numbers', () => {
+          expect(validatePhoneNumber('123456789')).toEqual({
+            isValid: false,
+            errors: ['Invalid phone number format. Must be in international format (+1234567890)'],
+          });
+        });
+
+        it('should sanitize phone numbers by removing spaces', () => {
+          expect(validatePhoneNumber('+27 12 345 6789')).toEqual({
+            isValid: true,
+            sanitized: '+27123456789',
+          });
+        });
+      });
+
+      describe('createChamaSchema', () => {
+        it('should validate correct chama data', () => {
+          const validData = {
+            name: 'Test Chama',
+            description: 'Test description',
+            type: 'ROTATING',
+            contributionAmount: 1000,
+            frequency: 'MONTHLY',
+            memberLimit: 10,
+          };
+
+          expect(() => createChamaSchema.parse(validData)).not.toThrow();
+        });
+
+        it('should reject invalid chama data', () => {
+          const invalidData = {
+            name: '', // Too short
+            contributionAmount: -100, // Negative
+            memberLimit: 1, // Too few members
+          };
+
+          expect(() => createChamaSchema.parse(invalidData)).toThrow();
+        });
+      });
+    });
+
+    // packages/types/src/__tests__/types.test.ts
+    import { ChamaType, ChamaStatus, ContributionFrequency } from '../chama';
+
+    describe('Chama Types', () => {
+      it('should have correct enum values', () => {
+        expect(ChamaType.ROTATING).toBe('ROTATING');
+        expect(ChamaType.FIXED).toBe('FIXED');
+        expect(ChamaType.INVESTMENT).toBe('INVESTMENT');
+        expect(ChamaType.LENDING).toBe('LENDING');
+      });
+
+      it('should have correct status values', () => {
+        expect(ChamaStatus.FORMING).toBe('FORMING');
+        expect(ChamaStatus.ACTIVE).toBe('ACTIVE');
+        expect(ChamaStatus.COMPLETED).toBe('COMPLETED');
+        expect(ChamaStatus.PAUSED).toBe('PAUSED');
+        expect(ChamaStatus.CANCELLED).toBe('CANCELLED');
+      });
+
+      it('should have correct frequency values', () => {
+        expect(ContributionFrequency.WEEKLY).toBe('WEEKLY');
+        expect(ContributionFrequency.MONTHLY).toBe('MONTHLY');
+        expect(ContributionFrequency.QUARTERLY).toBe('QUARTERLY');
+      });
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Debugging & Troubleshooting
+
+### Development Debugging Tools
+
+<Tabs>
+  <Tab title="Backend Debugging">
+    ```typescript
+    // apps/backend/src/common/interceptors/logging.interceptor.ts
+    @Injectable()
+    export class LoggingInterceptor implements NestInterceptor {
+      private readonly logger = new Logger(LoggingInterceptor.name);
+
+      intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+        const request = context.switchToHttp().getRequest();
+        const response = context.switchToHttp().getResponse();
+        const { method, url, body, user } = request;
+        const userAgent = request.get('User-Agent') || '';
+        const ip = request.ip;
+
+        const startTime = Date.now();
+        
+        this.logger.log({
+          message: 'Incoming request',
+          method,
+          url,
+          userAgent,
+          ip,
+          userId: user?.id,
+          timestamp: new Date().toISOString(),
+        });
+
+        return next.handle().pipe(
+          tap(() => {
+            const endTime = Date.now();
+            const duration = endTime - startTime;
+            
+            this.logger.log({
+              message: 'Outgoing response',
+              method,
+              url,
+              statusCode: response.statusCode,
+              duration: `${duration}ms`,
+              userId: user?.id,
+              timestamp: new Date().toISOString(),
+            });
+          }),
+          catchError((error) => {
+            const endTime = Date.now();
+            const duration = endTime - startTime;
+            
+            this.logger.error({
+              message: 'Request failed',
+              method,
+              url,
+              error: error.message,
+              stack: error.stack,
+              duration: `${duration}ms`,
+              userId: user?.id,
+              timestamp: new Date().toISOString(),
+            });
+            
+            throw error;
+          })
+        );
+      }
+    }
+
+    // Debug configuration for development
+    // apps/backend/src/config/logger.config.ts
+    import { WinstonModule } from 'nest-winston';
+    import * as winston from 'winston';
+
+    export const loggerConfig = WinstonModule.createLogger({
+      level: process.env.LOG_LEVEL || 'info',
+      format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.errors({ stack: true }),
+        winston.format.json(),
+        winston.format.prettyPrint()
+      ),
+      transports: [
+        new winston.transports.Console({
+          format: winston.format.combine(
+            winston.format.colorize(),
+            winston.format.simple()
+          ),
+        }),
+        ...(process.env.NODE_ENV === 'production'
+          ? [
+              new winston.transports.File({
+                filename: 'logs/error.log',
+                level: 'error',
+              }),
+              new winston.transports.File({
+                filename: 'logs/combined.log',
+              }),
+            ]
+          : []),
+      ],
+    });
+
+    // Database query debugging
+    // apps/backend/src/config/database.config.ts
+    export const databaseConfig = {
+      type: 'postgres' as const,
+      url: process.env.DATABASE_URL,
+      logging: process.env.NODE_ENV === 'development' ? 'all' : ['error'],
+      logger: 'advanced-console',
+      extra: {
+        // Connection pool configuration
+        max: 20,
+        connectionTimeoutMillis: 30000,
+        idleTimeoutMillis: 30000,
+      },
+    };
+    ```
+
+    **VS Code Debug Configuration:**
+    ```json
+    // .vscode/launch.json
+    {
+      "version": "0.2.0",
+      "configurations": [
+        {
+          "name": "Debug Backend",
+          "type": "node",
+          "request": "launch",
+          "program": "${workspaceFolder}/apps/backend/src/main.ts",
+          "preLaunchTask": "${workspaceFolder}/apps/backend:build",
+          "outFiles": ["${workspaceFolder}/apps/backend/dist/**/*.js"],
+          "env": {
+            "NODE_ENV": "development"
+          },
+          "console": "integratedTerminal",
+          "restart": true,
+          "runtimeArgs": ["--nolazy", "-r", "ts-node/register"]
+        }
+      ]
+    }
+    ```
+  </Tab>
+  <Tab title="Frontend Debugging">
+    ```typescript
+    // Web debugging with React Developer Tools
+    // apps/web/src/lib/debug.ts
+    export const debugConfig = {
+      enableReduxDevTools: process.env.NODE_ENV === 'development',
+      enableReactQueryDevtools: process.env.NODE_ENV === 'development',
+      enableAxiosLogging: process.env.NODE_ENV === 'development',
+    };
+
+    // API request/response logging
+    // apps/web/src/lib/api-client.ts
+    import axios from 'axios';
+
+    const apiClient = axios.create({
+      baseURL: process.env.NEXT_PUBLIC_API_URL,
+      timeout: 30000,
+    });
+
+    // Request interceptor for logging
+    apiClient.interceptors.request.use(
+      (config) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.group(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+          console.log('Headers:', config.headers);
+          console.log('Data:', config.data);
+          console.groupEnd();
+        }
+        return config;
+      },
+      (error) => {
+        console.error('Request Error:', error);
+        return Promise.reject(error);
+      }
+    );
+
+    // Response interceptor for logging
+    apiClient.interceptors.response.use(
+      (response) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.group(`✅ API Response: ${response.config.method?.toUpperCase()} ${response.config.url}`);
+          console.log('Status:', response.status);
+          console.log('Data:', response.data);
+          console.groupEnd();
+        }
+        return response;
+      },
+      (error) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.group(`❌ API Error: ${error.config?.method?.toUpperCase()} ${error.config?.url}`);
+          console.log('Status:', error.response?.status);
+          console.log('Error:', error.response?.data);
+          console.groupEnd();
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    // React Query debugging
+    // apps/web/src/app/providers.tsx
+    import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+
+    export function Providers({ children }: { children: React.ReactNode }) {
+      return (
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider theme={theme}>
+            {children}
+            {process.env.NODE_ENV === 'development' && <ReactQueryDevtools />}
+          </ThemeProvider>
+        </QueryClientProvider>
+      );
+    }
+
+    // Mobile debugging with Flipper
+    // apps/mobile/src/services/debug.ts
+    import { logger } from 'react-native-logs';
+
+    const defaultConfig = {
+      severity: __DEV__ ? 'debug' : 'error',
+      transport: __DEV__ ? logger.consoleTransport : logger.fileAsyncTransport,
+      transportOptions: {
+        colors: {
+          info: 'blueBright',
+          warn: 'yellowBright',
+          error: 'redBright',
+        },
+      },
+    };
+
+    export const log = logger.createLogger(defaultConfig);
+
+    // Redux debugging
+    // apps/mobile/src/store/index.ts
+    import { configureStore } from '@reduxjs/toolkit';
+    import { setupListeners } from '@reduxjs/toolkit/query';
+    import { FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
+
+    export const store = configureStore({
+      reducer: {
+        auth: authSlice,
+        chamas: chamasSlice,
+        // ... other slices
+      },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware({
+          serializableCheck: {
+            ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
+          },
+        }).concat(
+          // Add Redux DevTools in development
+          ...__DEV__ ? [require('redux-flipper').default()] : []
+        ),
+      devTools: __DEV__,
+    });
+    ```
+  </Tab>
+  <Tab title="Common Issues & Solutions">
+    ```bash
+    # Database connection issues
+    # Check PostgreSQL status
+    docker-compose ps postgres
+    
+    # Reset database container
+    docker-compose down postgres
+    docker-compose up -d postgres
+    
+    # Check database logs
+    docker-compose logs postgres
+    
+    # Test database connection manually
+    psql postgresql://awo_user:awo_password@localhost:5432/awo_development
+    
+    # Redis connection issues
+    # Check Redis status
+    docker-compose ps redis
+    
+    # Connect to Redis CLI
+    docker-compose exec redis redis-cli
+    
+    # Test Redis connection
+    docker-compose exec redis redis-cli ping
+    
+    # Node.js memory issues
+    # Increase Node.js memory limit
+    NODE_OPTIONS="--max-old-space-size=4096" npm run dev
+    
+    # Check memory usage
+    node --expose-gc -e "console.log(process.memoryUsage()); global.gc(); console.log(process.memoryUsage());"
+    
+    # TypeScript compilation issues
+    # Clear TypeScript cache
+    rm -rf apps/*/tsconfig.tsbuildinfo
+    rm -rf packages/*/tsconfig.tsbuildinfo
+    
+    # Rebuild all TypeScript projects
+    npm run build:ts
+    
+    # Check for circular dependencies
+    npx madge --circular --extensions ts,tsx apps/backend/src
+    
+    # Package dependency issues
+    # Clear all node_modules and reinstall
+    npm run clean
+    npm install
+    
+    # Check for duplicate packages
+    npm ls --depth=0
+    
+    # Fix package vulnerabilities
+    npm audit fix
+    
+    # Mobile development issues
+    # Clear Metro cache
+    npx expo start --clear
+    
+    # Reset iOS simulator
+    npx expo run:ios --clear-cache
+    
+    # Reset Android emulator
+    npx expo run:android --clear-cache
+    
+    # Clear React Native cache
+    npx react-native start --reset-cache
+    
+    # API integration debugging
+    # Test API endpoints manually
+    curl -X GET http://localhost:3000/health \
+      -H "Authorization: Bearer your-token"
+    
+    # Check API response times
+    curl -w "@curl-format.txt" -o /dev/null -s "http://localhost:3000/chamas"
+    
+    # Monitor API calls
+    npx http-server -p 8080 --cors
+    ```
+
+    **Debugging Scripts:**
+    ```json
+    // package.json scripts for debugging
+    {
+      "scripts": {
+        "debug:backend": "cd apps/backend && npm run start:debug",
+        "debug:web": "cd apps/web && npm run dev -- --inspect",
+        "debug:mobile": "cd apps/mobile && npx expo start --dev-client",
+        "logs:backend": "cd apps/backend && npm run logs",
+        "logs:docker": "docker-compose logs -f",
+        "health:check": "curl http://localhost:3000/health",
+        "db:debug": "cd apps/backend && npm run db:query -- \"SELECT version();\"",
+        "cache:clear": "npm run clean && npm install",
+        "deps:check": "npm run check:deps",
+        "memory:profile": "node --inspect apps/backend/dist/main.js"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Deployment
+
+### Multi-Environment Deployment Strategy
+
+<Tabs>
+  <Tab title="Development Environment">
+    ```bash
+    # Local development setup
+    npm run dev
+
+    # This starts:
+    # - Backend API on localhost:3000
+    # - Web app on localhost:3001
+    # - Mobile app via Expo (localhost:8081)
+    # - PostgreSQL on localhost:5432
+    # - Redis on localhost:6379
+
+    # Environment variables for development
+    NODE_ENV=development
+    DATABASE_URL=postgresql://awo_user:awo_password@localhost:5432/awo_development
+    REDIS_URL=redis://localhost:6379
+    JWT_SECRET=development-secret-key
+    ```
+  </Tab>
+  <Tab title="Staging Environment">
+    ```bash
+    # Staging deployment
+    npm run deploy:staging
+
+    # Environment configuration
+    NODE_ENV=staging
+    DATABASE_URL=postgresql://staging_user:password@staging-db:5432/awo_staging
+    REDIS_URL=redis://staging-redis:6379
+    JWT_SECRET=staging-secret-key
+    
+    # Staging infrastructure
+    # - Railway for backend hosting
+    # - Vercel for web app
+    # - Expo EAS for mobile builds
+    # - Supabase for PostgreSQL
+    # - Redis Cloud for caching
+    ```
+
+    **GitHub Actions for Staging:**
+    ```yaml
+    # .github/workflows/deploy-staging.yml
+    name: Deploy to Staging
+
+    on:
+      push:
+        branches: [develop]
+
+    jobs:
+      test:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+          - uses: actions/setup-node@v3
+            with:
+              node-version: '18'
+              cache: 'npm'
+          
+          - name: Install dependencies
+            run: npm ci
+          
+          - name: Run tests
+            run: npm run test:ci
+          
+          - name: Build packages
+            run: npm run build
+
+      deploy-backend:
+        needs: test
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+          
+          - name: Deploy to Railway
+            uses: railway-app/railway@v1
+            with:
+              service: awo-backend-staging
+              environment: staging
+            env:
+              RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      deploy-web:
+        needs: test
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+          
+          - name: Deploy to Vercel
+            uses: amondnet/vercel-action@v25
+            with:
+              vercel-token: ${{ secrets.VERCEL_TOKEN }}
+              vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+              vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+              working-directory: apps/web
+
+      deploy-mobile:
+        needs: test
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+          
+          - name: Setup Expo
+            uses: expo/expo-github-action@v8
+            with:
+              expo-version: latest
+              token: ${{ secrets.EXPO_TOKEN }}
+          
+          - name: Build and submit
+            run: |
+              cd apps/mobile
+              eas build --platform all --auto-submit
+    ```
+  </Tab>
+  <Tab title="Production Environment">
+    ```bash
+    # Production deployment
+    npm run deploy:production
+
+    # Environment configuration
+    NODE_ENV=production
+    DATABASE_URL=postgresql://prod_user:secure_password@prod-db:5432/awo_production
+    REDIS_URL=redis://prod-redis:6379
+    JWT_SECRET=production-secret-key-32-chars
+    
+    # Production infrastructure
+    # - AWS ECS/Railway for backend
+    # - Vercel Pro for web app
+    # - App Store/Google Play for mobile
+    # - AWS RDS for PostgreSQL
+    # - AWS ElastiCache for Redis
+    # - AWS S3 for file storage
+    # - CloudFront CDN for global delivery
+    ```
+
+    **Production Deployment Pipeline:**
+    ```yaml
+    # .github/workflows/deploy-production.yml
+    name: Deploy to Production
+
+    on:
+      push:
+        branches: [main]
+        tags: ['v*']
+
+    jobs:
+      security-scan:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+          
+          - name: Run security audit
+            run: npm audit --audit-level=moderate
+          
+          - name: Run Snyk security scan
+            uses: snyk/actions/node@master
+            env:
+              SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      test-full:
+        runs-on: ubuntu-latest
+        strategy:
+          matrix:
+            node-version: [18, 20]
+        steps:
+          - uses: actions/checkout@v3
+          
+          - name: Use Node.js ${{ matrix.node-version }}
+            uses: actions/setup-node@v3
+            with:
+              node-version: ${{ matrix.node-version }}
+              cache: 'npm'
+          
+          - name: Install dependencies
+            run: npm ci
+          
+          - name: Run linting
+            run: npm run lint
+          
+          - name: Run type checking
+            run: npm run type-check
+          
+          - name: Run unit tests
+            run: npm run test:coverage
+          
+          - name: Run integration tests
+            run: npm run test:integration
+          
+          - name: Run E2E tests
+            run: npm run test:e2e
+
+      deploy-production:
+        needs: [security-scan, test-full]
+        runs-on: ubuntu-latest
+        environment: production
+        steps:
+          - uses: actions/checkout@v3
+          
+          - name: Deploy backend to production
+            run: |
+              # Build production image
+              docker build -t awo-backend:prod apps/backend
+              
+              # Deploy to production (Railway/AWS)
+              railway deploy --service awo-backend-prod
+          
+          - name: Deploy web to production
+            run: |
+              cd apps/web
+              vercel --prod --token=${{ secrets.VERCEL_TOKEN }}
+          
+          - name: Submit mobile to stores
+            run: |
+              cd apps/mobile
+              eas submit --platform all
+          
+          - name: Run smoke tests
+            run: npm run test:smoke:production
+          
+          - name: Notify team
+            uses: 8398a7/action-slack@v3
+            with:
+              status: ${{ job.status }}
+              channel: '#deployments'
+            env:
+              SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+    ```
+  </Tab>
+</Tabs>
+
+### Database Migration Strategy
+
+```bash
+# Production-safe migration process
+cd apps/backend
+
+# 1. Create backup before migration
+npm run db:backup -- --file="backup-$(date +%Y%m%d_%H%M%S).sql"
+
+# 2. Run migrations in transaction mode
+npm run db:migrate -- --transaction
+
+# 3. Verify migration success
+npm run db:verify
+
+# 4. Run data validation tests
+npm run test:data-integrity
+
+# 5. Monitor application health
+npm run health:check
+
+# Rollback procedure if needed
+npm run db:rollback -- --steps=1
+```
+
+### Monitoring & Health Checks
+
+```typescript
+// apps/backend/src/health/health.controller.ts
+@Controller('health')
+export class HealthController {
+  constructor(
+    private readonly healthCheckService: HealthCheckService,
+    private readonly typeOrmHealthIndicator: TypeOrmHealthIndicator,
+    private readonly memoryHealthIndicator: MemoryHealthIndicator,
+  ) {}
+
+  @Get()
+  @HealthCheck()
+  check() {
+    return this.healthCheckService.check([
+      // Database health
+      () => this.typeOrmHealthIndicator.pingCheck('database'),
+      
+      // Memory usage
+      () => this.memoryHealthIndicator.checkHeap('memory_heap', 150 * 1024 * 1024),
+      () => this.memoryHealthIndicator.checkRSS('memory_rss', 300 * 1024 * 1024),
+      
+      // Redis health
+      () => this.pingRedis(),
+      
+      // External APIs health
+      () => this.checkExternalAPIs(),
+    ]);
+  }
+
+  private async pingRedis(): Promise<HealthIndicatorResult> {
+    try {
+      await this.redisService.ping();
+      return { redis: { status: 'up' } };
+    } catch (error) {
+      return { redis: { status: 'down', error: error.message } };
+    }
+  }
+
+  private async checkExternalAPIs(): Promise<HealthIndicatorResult> {
+    const results = await Promise.allSettled([
+      this.checkAPI('stitch', process.env.STITCH_API_URL),
+      this.checkAPI('flutterwave', process.env.FLUTTERWAVE_API_URL),
+    ]);
+
+    return {
+      external_apis: results.reduce((acc, result, index) => {
+        const api = ['stitch', 'flutterwave'][index];
+        acc[api] = result.status === 'fulfilled' ? { status: 'up' } : { status: 'down' };
+        return acc;
+      }, {}),
+    };
+  }
+}
+```
+
+## Performance Monitoring
+
+### Application Performance Monitoring
+
+<Tabs>
+  <Tab title="Backend Monitoring">
+    ```typescript
+    // apps/backend/src/monitoring/performance.interceptor.ts
+    @Injectable()
+    export class PerformanceInterceptor implements NestInterceptor {
+      private readonly logger = new Logger(PerformanceInterceptor.name);
+
+      intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+        const startTime = process.hrtime.bigint();
+        const request = context.switchToHttp().getRequest();
+        const { method, url } = request;
+
+        return next.handle().pipe(
+          tap(() => {
+            const endTime = process.hrtime.bigint();
+            const duration = Number(endTime - startTime) / 1000000; // Convert to milliseconds
+
+            // Log slow requests
+            if (duration > 1000) {
+              this.logger.warn(`Slow request: ${method} ${url} took ${duration.toFixed(2)}ms`);
+            }
+
+            // Send metrics to monitoring service
+            this.sendMetrics({
+              method,
+              url,
+              duration,
+              timestamp: new Date(),
+            });
+          })
+        );
+      }
+
+      private sendMetrics(data: any) {
+        // Send to monitoring service (e.g., New Relic, DataDog)
+        if (process.env.NODE_ENV === 'production') {
+          // Implement metrics sending logic
+        }
+      }
+    }
+
+    // Database query monitoring
+    // apps/backend/src/monitoring/query.subscriber.ts
+    @EventSubscriber()
+    export class QuerySubscriber implements Subscriber {
+      private readonly logger = new Logger(QuerySubscriber.name);
+
+      listenTo() {
+        return 'query';
+      }
+
+      beforeQuery(event: any) {
+        event.startTime = Date.now();
+      }
+
+      afterQuery(event: any) {
+        const duration = Date.now() - event.startTime;
+        
+        if (duration > 100) { // Log queries taking more than 100ms
+          this.logger.warn({
+            message: 'Slow query detected',
+            query: event.query,
+            parameters: event.parameters,
+            duration: `${duration}ms`,
+          });
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Frontend Monitoring">
+    ```typescript
+    // apps/web/src/lib/monitoring.ts
+    import { getCLS, getFID, getFCP, getLCP, getTTFB } from 'web-vitals';
+
+    export function initMonitoring() {
+      // Web Vitals monitoring
+      getCLS(sendToAnalytics);
+      getFID(sendToAnalytics);
+      getFCP(sendToAnalytics);
+      getLCP(sendToAnalytics);
+      getTTFB(sendToAnalytics);
+
+      // Error monitoring
+      window.addEventListener('error', (event) => {
+        sendErrorToMonitoring({
+          message: event.error?.message || 'Unknown error',
+          stack: event.error?.stack,
+          filename: event.filename,
+          lineno: event.lineno,
+          colno: event.colno,
+        });
+      });
+
+      // Unhandled promise rejection monitoring
+      window.addEventListener('unhandledrejection', (event) => {
+        sendErrorToMonitoring({
+          message: event.reason?.message || 'Unhandled promise rejection',
+          stack: event.reason?.stack,
+          type: 'unhandledrejection',
+        });
+      });
+    }
+
+    function sendToAnalytics(metric: any) {
+      if (process.env.NODE_ENV === 'production') {
+        // Send to analytics service
+        console.log('Web Vital:', metric);
+      }
+    }
+
+    function sendErrorToMonitoring(error: any) {
+      if (process.env.NODE_ENV === 'production') {
+        // Send to error monitoring service (Sentry, etc.)
+        console.error('Error:', error);
+      }
+    }
+
+    // React error boundary
+    // apps/web/src/components/ErrorBoundary.tsx
+    import React from 'react';
+
+    interface State {
+      hasError: boolean;
+      error?: Error;
+    }
+
+    export class ErrorBoundary extends React.Component<
+      React.PropsWithChildren<{}>,
+      State
+    > {
+      constructor(props: React.PropsWithChildren<{}>) {
+        super(props);
+        this.state = { hasError: false };
+      }
+
+      static getDerivedStateFromError(error: Error): State {
+        return { hasError: true, error };
+      }
+
+      componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+        // Log error to monitoring service
+        sendErrorToMonitoring({
+          message: error.message,
+          stack: error.stack,
+          componentStack: errorInfo.componentStack,
+          type: 'react_error',
+        });
+      }
+
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="error-boundary">
+              <h2>Something went wrong.</h2>
+              <p>We've been notified of this error and will fix it soon.</p>
+              <button onClick={() => this.setState({ hasError: false })}>
+                Try again
+              </button>
+            </div>
+          );
+        }
+
+        return this.props.children;
+      }
+    }
+
+    // Mobile error monitoring
+    // apps/mobile/src/services/monitoring.ts
+    import crashlytics from '@react-native-firebase/crashlytics';
+
+    export class MobileMonitoring {
+      static init() {
+        if (__DEV__) {
+          crashlytics().setCrashlyticsCollectionEnabled(false);
+          return;
+        }
+
+        // Enable crashlytics in production
+        crashlytics().setCrashlyticsCollectionEnabled(true);
+
+        // Set custom keys for debugging
+        crashlytics().setCustomKey('platform', Platform.OS);
+        crashlytics().setCustomKey('version', DeviceInfo.getVersion());
+      }
+
+      static logError(error: Error, context?: string) {
+        if (__DEV__) {
+          console.error('Error:', error, 'Context:', context);
+          return;
+        }
+
+        if (context) {
+          crashlytics().setCustomKey('context', context);
+        }
+        
+        crashlytics().recordError(error);
+      }
+
+      static setUserId(userId: string) {
+        if (!__DEV__) {
+          crashlytics().setUserId(userId);
+        }
+      }
+
+      static log(message: string) {
+        if (!__DEV__) {
+          crashlytics().log(message);
         }
       }
     }
@@ -828,300 +4035,456 @@ Closes #789
   </Tab>
 </Tabs>
 
-### Mobile Performance
+## Security Best Practices
 
-<AccordionGroup>
-  <Accordion title="Bundle Optimization">
-    ```javascript
-    // Metro configuration for React Native
-    module.exports = {
-      transformer: {
-        minifierConfig: {
-          mangle: {
-            keep_fnames: true,
-          },
-          output: {
-            ascii_only: true,
-            quote_keys: true,
-            wrap_iife: true,
-          },
-          sourceMap: {
-            includeSources: false,
-          },
-          toplevel: false,
-          warnings: false,
-        },
-      },
-      resolver: {
-        alias: {
-          '@': './src',
-          '@components': './src/components',
-          '@screens': './src/screens',
-          '@services': './src/services',
-        },
-      },
-    };
-    ```
-  </Accordion>
-  <Accordion title="Image Optimization">
+### Security Implementation
+
+<Tabs>
+  <Tab title="Authentication Security">
     ```typescript
-    // Optimized image loading component
-    interface OptimizedImageProps {
-      uri: string;
-      width: number;
-      height: number;
-      placeholder?: string;
-    }
-    
-    export const OptimizedImage: React.FC<OptimizedImageProps> = ({
-      uri,
-      width,
-      height,
-      placeholder,
-    }) => {
-      const [loading, setLoading] = useState(true);
-      const [error, setError] = useState(false);
-    
-      const optimizedUri = useMemo(() => {
-        // Generate optimized image URL based on device density
-        const scale = PixelRatio.get();
-        const optimizedWidth = width * scale;
-        const optimizedHeight = height * scale;
-        
-        return `${uri}?w=${optimizedWidth}&h=${optimizedHeight}&format=webp&quality=80`;
-      }, [uri, width, height]);
-    
-      return (
-        <View style={{ width, height }}>
-          {loading && placeholder && (
-            <Image source={{ uri: placeholder }} style={{ width, height }} />
-          )}
-          <Image
-            source={{ uri: optimizedUri }}
-            style={{ width, height }}
-            onLoad={() => setLoading(false)}
-            onError={() => setError(true)}
-            resizeMode="cover"
-          />
-        </View>
-      );
-    };
-    ```
-  </Accordion>
-  <Accordion title="List Performance">
-    ```typescript
-    // Virtualized list for large datasets
-    interface TransactionListProps {
-      transactions: Transaction[];
-      onLoadMore: () => void;
-    }
-    
-    export const TransactionList: React.FC<TransactionListProps> = ({
-      transactions,
-      onLoadMore,
-    }) => {
-      const renderTransaction = useCallback(({ item }: { item: Transaction }) => (
-        <TransactionItem
-          key={item.id}
-          transaction={item}
-          onPress={() => navigateToTransaction(item.id)}
-        />
-      ), []);
-    
-      const keyExtractor = useCallback((item: Transaction) => item.id, []);
-    
-      const getItemLayout = useCallback(
-        (data: any, index: number) => ({
-          length: TRANSACTION_ITEM_HEIGHT,
-          offset: TRANSACTION_ITEM_HEIGHT * index,
-          index,
-        }),
-        []
-      );
-    
-      return (
-        <FlatList
-          data={transactions}
-          renderItem={renderTransaction}
-          keyExtractor={keyExtractor}
-          getItemLayout={getItemLayout}
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={10}
-          windowSize={10}
-          initialNumToRender={10}
-          onEndReached={onLoadMore}
-          onEndReachedThreshold={0.5}
-        />
-      );
-    };
-    ```
-  </Accordion>
-</AccordionGroup>
+    // apps/backend/src/auth/guards/jwt-auth.guard.ts
+    @Injectable()
+    export class JwtAuthGuard extends AuthGuard('jwt') {
+      constructor(private reflector: Reflector) {
+        super();
+      }
 
-## Debugging & Troubleshooting
+      canActivate(context: ExecutionContext) {
+        const isPublic = this.reflector.getAllAndOverride<boolean>('isPublic', [
+          context.getHandler(),
+          context.getClass(),
+        ]);
 
-### Common Issues & Solutions
-
-<AccordionGroup>
-  <Accordion title="Database Connection Issues">
-    **Problem**: Cannot connect to PostgreSQL database
-
-    **Solutions**:
-
-    ```bash
-    # Check if PostgreSQL is running
-    docker-compose ps postgres
-    
-    # Restart PostgreSQL container
-    docker-compose restart postgres
-    
-    # Check PostgreSQL logs
-    docker-compose logs postgres
-    
-    # Verify connection string
-    echo $DATABASE_URL
-    
-    # Test connection manually
-    psql $DATABASE_URL -c "SELECT version();"
-    ```
-  </Accordion>
-  <Accordion title="React Native Build Failures">
-    **Problem**: Mobile app fails to build
-
-    **Solutions**:
-
-    ```bash
-    # Clean React Native cache
-    npx react-native start --reset-cache
-    
-    # Clean and rebuild Android
-    cd android
-    ./gradlew clean
-    cd ..
-    npx react-native run-android
-    
-    # Clean and rebuild iOS
-    cd ios
-    rm -rf build/
-    pod install
-    cd ..
-    npx react-native run-ios
-    
-    # Reset Metro cache
-    rm -rf $TMPDIR/react-*
-    ```
-  </Accordion>
-  <Accordion title="API Integration Issues">
-    **Problem**: Third-party API calls failing
-
-    **Solutions**:
-
-    ```typescript
-    // Add comprehensive error handling
-    async function callExternalAPI(endpoint: string, data: any) {
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(data),
-          timeout: 30000, // 30 second timeout
-        });
-    
-        if (!response.ok) {
-          throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+        if (isPublic) {
+          return true;
         }
-    
-        return await response.json();
-      } catch (error) {
-        // Log error for debugging
-        console.error('API call failed:', {
-          endpoint,
-          error: error.message,
-          timestamp: new Date().toISOString(),
-        });
-    
-        // Implement retry logic
-        if (error.code === 'NETWORK_ERROR' && retryCount < 3) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-          return callExternalAPI(endpoint, data, retryCount + 1);
+
+        return super.canActivate(context);
+      }
+
+      handleRequest(err: any, user: any, info: any) {
+        if (err || !user) {
+          throw err || new UnauthorizedException('Invalid token');
         }
-    
-        throw error;
+
+        // Additional security checks
+        if (user.status !== 'ACTIVE') {
+          throw new UnauthorizedException('Account is inactive');
+        }
+
+        if (user.tokenVersion !== user.currentTokenVersion) {
+          throw new UnauthorizedException('Token has been revoked');
+        }
+
+        return user;
+      }
+    }
+
+    // Rate limiting implementation
+    // apps/backend/src/common/guards/rate-limit.guard.ts
+    @Injectable()
+    export class RateLimitGuard implements CanActivate {
+      constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
+
+      async canActivate(context: ExecutionContext): Promise<boolean> {
+        const request = context.switchToHttp().getRequest();
+        const ip = request.ip;
+        const endpoint = `${request.method}:${request.route.path}`;
+        const key = `rate-limit:${ip}:${endpoint}`;
+
+        const current = await this.cacheManager.get<number>(key) || 0;
+        const limit = this.getLimit(endpoint);
+
+        if (current >= limit) {
+          throw new TooManyRequestsException('Rate limit exceeded');
+        }
+
+        await this.cacheManager.set(key, current + 1, 60); // 1 minute window
+        return true;
+      }
+
+      private getLimit(endpoint: string): number {
+        // Different limits for different endpoints
+        const limits = {
+          'POST:/auth/login': 5,        // 5 login attempts per minute
+          'POST:/auth/register': 3,     // 3 registration attempts per minute
+          'POST:/chamas': 10,           // 10 chama creations per minute
+          'default': 100,               // 100 requests per minute default
+        };
+
+        return limits[endpoint] || limits.default;
+      }
+    }
+
+    // Input sanitization
+    // apps/backend/src/common/pipes/sanitization.pipe.ts
+    @Injectable()
+    export class SanitizationPipe implements PipeTransform {
+      transform(value: any) {
+        if (typeof value === 'string') {
+          return this.sanitizeString(value);
+        }
+
+        if (typeof value === 'object' && value !== null) {
+          return this.sanitizeObject(value);
+        }
+
+        return value;
+      }
+
+      private sanitizeString(str: string): string {
+        return str
+          .trim()
+          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+          .replace(/javascript:/gi, '')
+          .replace(/on\w+\s*=/gi, '');
+      }
+
+      private sanitizeObject(obj: any): any {
+        const sanitized = {};
+        for (const key in obj) {
+          if (obj.hasOwnProperty(key)) {
+            sanitized[key] = this.transform(obj[key]);
+          }
+        }
+        return sanitized;
       }
     }
     ```
-  </Accordion>
-</AccordionGroup>
+  </Tab>
+  <Tab title="Data Protection">
+    ```typescript
+    // Field-level encryption service
+    // apps/backend/src/encryption/encryption.service.ts
+    @Injectable()
+    export class EncryptionService {
+      private readonly algorithm = 'aes-256-gcm';
+      private readonly keyDerivation = 'pbkdf2';
 
-### Debugging Tools
+      constructor(
+        @Inject('ENCRYPTION_KEY') private masterKey: string,
+        @Inject('ENCRYPTION_SALT') private salt: string,
+      ) {}
+
+      async encryptPII(data: string, context: string): Promise<string> {
+        const key = this.deriveKey(context);
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipher(this.algorithm, key);
+        
+        cipher.setAAD(Buffer.from(context));
+        
+        let encrypted = cipher.update(data, 'utf8', 'hex');
+        encrypted += cipher.final('hex');
+        
+        const authTag = cipher.getAuthTag();
+        
+        return JSON.stringify({
+          iv: iv.toString('hex'),
+          encrypted,
+          authTag: authTag.toString('hex'),
+          context,
+        });
+      }
+
+      async decryptPII(encryptedData: string): Promise<string> {
+        const { iv, encrypted, authTag, context } = JSON.parse(encryptedData);
+        const key = this.deriveKey(context);
+        
+        const decipher = crypto.createDecipher(this.algorithm, key);
+        decipher.setAuthTag(Buffer.from(authTag, 'hex'));
+        decipher.setAAD(Buffer.from(context));
+        
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        
+        return decrypted;
+      }
+
+      private deriveKey(context: string): Buffer {
+        return crypto.pbkdf2Sync(
+          this.masterKey,
+          this.salt + context,
+          100000,
+          32,
+          'sha256'
+        );
+      }
+    }
+
+    // PII anonymization for analytics
+    // apps/backend/src/analytics/anonymization.service.ts
+    @Injectable()
+    export class AnonymizationService {
+      private hashSalt = process.env.ANONYMIZATION_SALT;
+
+      anonymizeUserData(user: User): AnonymizedUser {
+        return {
+          hashedId: this.hashString(user.id),
+          ageGroup: this.getAgeGroup(user.dateOfBirth),
+          country: user.country,
+          city: this.generalizeLocation(user.city),
+          registrationMonth: format(user.createdAt, 'yyyy-MM'),
+          kycLevel: user.kycLevel,
+          // Remove all PII
+          phoneNumber: undefined,
+          email: undefined,
+          firstName: undefined,
+          lastName: undefined,
+          dateOfBirth: undefined,
+        };
+      }
+
+      private hashString(input: string): string {
+        return crypto
+          .createHash('sha256')
+          .update(input + this.hashSalt)
+          .digest('hex')
+          .substring(0, 16);
+      }
+
+      private getAgeGroup(birthDate?: Date): string {
+        if (!birthDate) return 'unknown';
+        
+        const age = differenceInYears(new Date(), birthDate);
+        if (age < 25) return '18-24';
+        if (age < 35) return '25-34';
+        if (age < 45) return '35-44';
+        if (age < 55) return '45-54';
+        return '55+';
+      }
+
+      private generalizeLocation(city?: string): string {
+        if (!city) return 'unknown';
+        
+        // Only return city for major cities, otherwise return region
+        const majorCities = ['Cape Town', 'Johannesburg', 'Durban', 'Nairobi', 'Lagos', 'Accra'];
+        return majorCities.includes(city) ? city : 'other';
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Frontend Security">
+    ```typescript
+    // CSP implementation
+    // apps/web/next.config.js
+    const securityHeaders = [
+      {
+        key: 'Content-Security-Policy',
+        value: [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' data: https:",
+          "font-src 'self'",
+          "connect-src 'self' https://api.awo-platform.com",
+          "frame-ancestors 'none'",
+        ].join('; '),
+      },
+      {
+        key: 'X-Frame-Options',
+        value: 'DENY',
+      },
+      {
+        key: 'X-Content-Type-Options',
+        value: 'nosniff',
+      },
+      {
+        key: 'Referrer-Policy',
+        value: 'strict-origin-when-cross-origin',
+      },
+      {
+        key: 'Permissions-Policy',
+        value: 'camera=(), microphone=(), geolocation=()',
+      },
+    ];
+
+    module.exports = {
+      async headers() {
+        return [
+          {
+            source: '/(.*)',
+            headers: securityHeaders,
+          },
+        ];
+      },
+    };
+
+    // Input sanitization on frontend
+    // packages/utils/src/sanitization.ts
+    export function sanitizeUserInput(input: string): string {
+      return input
+        .trim()
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/javascript:/gi, '')
+        .replace(/on\w+\s*=/gi, '')
+        .replace(/[<>]/g, '');
+    }
+
+    export function validateAndSanitizeForm<T>(
+      data: T,
+      sanitizers: Record<keyof T, (value: any) => any>
+    ): T {
+      const sanitized = {} as T;
+      
+      for (const key in data) {
+        if (data.hasOwnProperty(key)) {
+          const sanitizer = sanitizers[key];
+          sanitized[key] = sanitizer ? sanitizer(data[key]) : data[key];
+        }
+      }
+      
+      return sanitized;
+    }
+
+    // Secure local storage
+    // apps/web/src/lib/secure-storage.ts
+    import CryptoJS from 'crypto-js';
+
+    class SecureStorage {
+      private secretKey: string;
+
+      constructor() {
+        this.secretKey = process.env.NEXT_PUBLIC_STORAGE_KEY || 'default-key';
+      }
+
+      setItem(key: string, value: any): void {
+        try {
+          const encrypted = CryptoJS.AES.encrypt(
+            JSON.stringify(value),
+            this.secretKey
+          ).toString();
+          localStorage.setItem(key, encrypted);
+        } catch (error) {
+          console.error('Failed to encrypt and store data:', error);
+        }
+      }
+
+      getItem<T>(key: string): T | null {
+        try {
+          const encrypted = localStorage.getItem(key);
+          if (!encrypted) return null;
+
+          const decrypted = CryptoJS.AES.decrypt(encrypted, this.secretKey);
+          const decryptedString = decrypted.toString(CryptoJS.enc.Utf8);
+          return JSON.parse(decryptedString);
+        } catch (error) {
+          console.error('Failed to decrypt and retrieve data:', error);
+          return null;
+        }
+      }
+
+      removeItem(key: string): void {
+        localStorage.removeItem(key);
+      }
+
+      clear(): void {
+        localStorage.clear();
+      }
+    }
+
+    export const secureStorage = new SecureStorage();
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps & Resources
+
+### Advanced Development Topics
 
 <CardGroup cols={2}>
-  <Card title="Backend Debugging" icon="server">
-    - **VS Code Debugger**: Attach to Node.js process
-    - **Winston Logging**: Structured logging with levels
-    - **APM Tools**: New Relic or Datadog for production
-    - **Database Query Logging**: TypeORM query logging
+  <Card title="Microservices Migration" icon="network">
+    Learn how to extract services from the monolith when scaling demands it
   </Card>
-  <Card title="Mobile Debugging" icon="mobile-phone">
-    - **React Native Debugger**: Standalone debugging app
-    - **Flipper**: Mobile app debugger by Facebook
-    - **Reactotron**: Debug React and React Native apps
-    - **Chrome DevTools**: Debug JavaScript remotely
+  <Card title="Advanced Testing" icon="test-tube">
+    Contract testing, chaos engineering, and load testing strategies
+  </Card>
+  <Card title="Performance Optimization" icon="zap">
+    Advanced caching, database optimization, and CDN strategies
+  </Card>
+  <Card title="Security Hardening" icon="shield-alt">
+    Advanced security patterns, compliance, and audit procedures
   </Card>
 </CardGroup>
 
-## Deployment
+### Community & Support
 
-### Staging Deployment
+<CardGroup cols={3}>
+  <Card title="Documentation Hub" icon="book" href="/api-reference">
+    Complete API documentation and implementation guides
+  </Card>
+  <Card title="Developer Community" icon="users">
+    **Discord**: [AWO Developers](https://discord.gg/awo-platform)
+    **GitHub**: [Repository](https://github.com/awo-platform/awo-platform)
+  </Card>
+  <Card title="Technical Support" icon="life-ring">
+    **Email**: developers@awo-platform.com
+    **Office Hours**: Tuesdays 2-4 PM UTC
+    **Emergency**: Via Discord @dev-team
+  </Card>
+</CardGroup>
 
-```bash
-# Build and deploy to staging
-npm run build:staging
-npm run deploy:staging
+### Development Roadmap
 
-# Run smoke tests
-npm run test:smoke:staging
-
-# Check deployment status
-kubectl get pods -n awo-staging
+```mermaid
+timeline
+    title AWO Development Roadmap
+    
+    section Q3 2025 (MVP)
+        MVP Release : Modular monolith with core features
+                   : PWA applications
+                   : Basic Chama functionality
+    
+    section Q4 2025 (Scale)
+        Performance : Advanced caching strategies
+                   : Database optimization
+                   : Mobile performance improvements
+    
+    section Q1 2026 (Extract)
+        Service Extraction : DIVA Score Engine → Separate service
+                          : Notification Service → High-volume processing
+                          : Enhanced monitoring
+    
+    section Q2 2026 (Expand)
+        Multi-Region : Regional deployments
+                    : Advanced microservices
+                    : AI/ML integration
 ```
 
-### Production Deployment
+### Essential Commands Reference
 
 ```bash
-# Create production build
-npm run build:production
+# Development workflow
+npm run dev                    # Start all applications
+npm run build                  # Build all packages
+npm run test                   # Run all tests
+npm run type-check            # Type checking
+npm run lint                   # Code linting
 
-# Run full test suite
-npm run test:full
+# Database management
+npm run db:migrate            # Run migrations
+npm run db:seed               # Seed development data
+npm run db:reset              # Reset database
 
-# Deploy with blue-green strategy
-npm run deploy:production:blue-green
+# Package management
+npm run add-dep -- package    # Add dependency to workspace
+npm run upgrade-deps          # Upgrade all dependencies
+npm run clean                 # Clean all build artifacts
 
-# Monitor deployment
-npm run monitor:deployment
+# Deployment
+npm run deploy:staging        # Deploy to staging
+npm run deploy:production     # Deploy to production
+npm run health:check          # Check application health
+
+# Debugging
+npm run debug:backend         # Debug backend with inspector
+npm run logs:docker           # View Docker container logs
+npm run monitor:performance   # Performance monitoring
 ```
-
-<Warning>
-  **Production Deployment**: Always ensure all tests pass and get approval from at least two senior developers before deploying to production.
-</Warning>
-
-## Next Steps
-
-Once you're comfortable with the basics:
-
-1. **Explore Advanced Topics**: Learn about our microservices architecture
-2. **Contribute to Open Source**: Help improve our shared components
-3. **Join the Community**: Participate in our developer Discord
-4. **Mentor Others**: Help onboard new team members
 
 <Tip>
-  **Pro Tip**: Set up your development environment with our recommended tools and configurations for the best experience. Don't hesitate to ask questions in our developer channels\!
+**Pro Tip**: Set up your development environment with the recommended tools and extensions for the best developer experience. Don't hesitate to reach out to the community for help!
 </Tip>
 
 ---
 
-Happy coding\! 🚀
+**Happy coding with AWO! 🚀 Build amazing financial experiences for African women.**

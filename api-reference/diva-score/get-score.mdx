@@ -1,19 +1,12 @@
 ---
 title: "Get DIVA Score"
 api: "GET https://api.awo-platform.com/v1/diva-score/get-score"
-description: "Retrieve the user current DIVA score with detailed breakdown and insights"
+description: "Retrieve the user's current DIVA score with detailed breakdown and insights"
 ---
-
-import {
-  CardGroup,
-  ParamField,
-  ResponseField,
-  Expandable
-} from 'mintlify/components'
 
 ## Overview
 
-The DIVA Score is AWO's proprietary financial health assessment system that analyzes actual banking transaction data to provide a comprehensive view of a user financial behavior and wellbeing. DIVA stands for **Discipline**, **Income**, **Velocity**, and **Assets** - the four key components that make up the overall score.
+The DIVA Score is AWO's proprietary financial health assessment system that analyzes actual banking transaction data to provide a comprehensive view of a user's financial behavior and wellbeing. DIVA stands for **Discipline**, **Income**, **Velocity**, and **Assets** - the four key components that make up the overall score.
 
 Unlike traditional credit scores, the DIVA Score is:
 
@@ -52,7 +45,9 @@ The DIVA Score is calculated from four weighted components:
 ### Headers
 
 <ParamField header="Authorization" type="string" required>
-  Bearer token for the authenticated user **Format**: `Bearer {access_token}`
+  Bearer token for the authenticated user
+  
+  **Format**: `Bearer {access_token}`
 </ParamField>
 
 <ParamField header="X-API-Key" type="string" required>
@@ -60,7 +55,9 @@ The DIVA Score is calculated from four weighted components:
 </ParamField>
 
 <ParamField header="Accept" type="string">
-  Response format preference **Default**: `application/json`
+  Response format preference
+  
+  **Default**: `application/json`
 </ParamField>
 
 <ParamField header="X-Request-ID" type="string">
@@ -70,24 +67,35 @@ The DIVA Score is calculated from four weighted components:
 ### Query Parameters
 
 <ParamField query="include_history" type="boolean">
-  Include historical score data points **Default**: `false`
+  Include historical score data points
+  
+  **Default**: `false`
 </ParamField>
 
 <ParamField query="include_insights" type="boolean">
-  Include detailed insights and recommendations **Default**: `true`
+  Include detailed insights and recommendations
+  
+  **Default**: `true`
 </ParamField>
 
 <ParamField query="include_factors" type="boolean">
-  Include detailed breakdown of score factors **Default**: `true`
+  Include detailed breakdown of score factors
+  
+  **Default**: `true`
 </ParamField>
 
 <ParamField query="period" type="string">
-  Time period for analysis **Options**: `current`, `30d`, `90d`, `6m`, `1y`
+  Time period for analysis
+  
+  **Options**: `current`, `30d`, `90d`, `6m`, `1y`
+  
   **Default**: `current`
 </ParamField>
 
 <ParamField query="currency" type="string">
-  Currency for monetary values in response **Default**: User preferred currency
+  Currency for monetary values in response
+  
+  **Default**: User's preferred currency
 </ParamField>
 
 ## Response
@@ -97,187 +105,231 @@ The DIVA Score is calculated from four weighted components:
 </ResponseField>
 
 <ResponseField name="data" type="object">
-  <Expandable title="DIVA Score Data">
+  DIVA Score data object containing all score information
+
+  <ResponseField name="overallScore" type="number">
+    Overall DIVA score (0-1000)
+  </ResponseField>
+
+  <ResponseField name="scoreGrade" type="string">
+    Letter grade representation: `A+`, `A`, `B+`, `B`, `C+`, `C`, `D`, `F`
+  </ResponseField>
+
+  <ResponseField name="lastCalculated" type="string">
+    Timestamp when score was last calculated (ISO 8601)
+  </ResponseField>
+
+  <ResponseField name="dataAvailability" type="object">
+    Information about data availability for scoring
+
+    <ResponseField name="sufficientData" type="boolean">
+      Whether sufficient data exists for reliable scoring
+    </ResponseField>
+
+    <ResponseField name="monthsOfData" type="number">
+      Number of months of transaction data available
+    </ResponseField>
+
+    <ResponseField name="lastTransactionDate" type="string">
+      Date of most recent transaction analyzed
+    </ResponseField>
+
+    <ResponseField name="accountsAnalyzed" type="number">
+      Number of bank accounts included in analysis
+    </ResponseField>
+  </ResponseField>
+
+  <ResponseField name="components" type="object">
+    Breakdown of the four DIVA score components
+
+    <ResponseField name="discipline" type="object">
+      Discipline component details
+
+      <ResponseField name="score" type="number">
+        Component score (0-1000)
+      </ResponseField>
+
+      <ResponseField name="weight" type="number">
+        Weight in overall score (0.30)
+      </ResponseField>
+
+      <ResponseField name="contribution" type="number">
+        Contribution to overall score
+      </ResponseField>
+
+      <ResponseField name="trend" type="string">
+        Recent trend: `improving`, `stable`, `declining`
+      </ResponseField>
+    </ResponseField>
+
+    <ResponseField name="income" type="object">
+      Income component details
+
+      <ResponseField name="score" type="number">
+        Component score (0-1000)
+      </ResponseField>
+
+      <ResponseField name="weight" type="number">
+        Weight in overall score (0.25)
+      </ResponseField>
+
+      <ResponseField name="contribution" type="number">
+        Contribution to overall score
+      </ResponseField>
+
+      <ResponseField name="trend" type="string">
+        Recent trend: `improving`, `stable`, `declining`
+      </ResponseField>
+    </ResponseField>
+
+    <ResponseField name="velocity" type="object">
+      Velocity component details
+
+      <ResponseField name="score" type="number">
+        Component score (0-1000)
+      </ResponseField>
+
+      <ResponseField name="weight" type="number">
+        Weight in overall score (0.25)
+      </ResponseField>
+
+      <ResponseField name="contribution" type="number">
+        Contribution to overall score
+      </ResponseField>
+
+      <ResponseField name="trend" type="string">
+        Recent trend: `improving`, `stable`, `declining`
+      </ResponseField>
+    </ResponseField>
+
+    <ResponseField name="assets" type="object">
+      Assets component details
+
+      <ResponseField name="score" type="number">
+        Component score (0-1000)
+      </ResponseField>
+
+      <ResponseField name="weight" type="number">
+        Weight in overall score (0.20)
+      </ResponseField>
+
+      <ResponseField name="contribution" type="number">
+        Contribution to overall score
+      </ResponseField>
+
+      <ResponseField name="trend" type="string">
+        Recent trend: `improving`, `stable`, `declining`
+      </ResponseField>
+    </ResponseField>
+  </ResponseField>
+
+  <ResponseField name="insights" type="array">
+    Array of insights about the user's financial behavior (if included)
+
+    <ResponseField name="category" type="string">
+      Insight category: `strength`, `opportunity`, `warning`, `achievement`
+    </ResponseField>
+
+    <ResponseField name="title" type="string">
+      Short insight title
+    </ResponseField>
+
+    <ResponseField name="description" type="string">
+      Detailed insight description
+    </ResponseField>
+
+    <ResponseField name="impact" type="string">
+      Potential impact: `high`, `medium`, `low`
+    </ResponseField>
+
+    <ResponseField name="actionable" type="boolean">
+      Whether this insight has actionable recommendations
+    </ResponseField>
+  </ResponseField>
+
+  <ResponseField name="recommendations" type="array">
+    Array of recommendations for score improvement (if included)
+
+    <ResponseField name="category" type="string">
+      Recommendation category: `discipline`, `income`, `velocity`, `assets`
+    </ResponseField>
+
+    <ResponseField name="title" type="string">
+      Recommendation title
+    </ResponseField>
+
+    <ResponseField name="description" type="string">
+      Detailed recommendation
+    </ResponseField>
+
+    <ResponseField name="priority" type="string">
+      Priority level: `high`, `medium`, `low`
+    </ResponseField>
+
+    <ResponseField name="potentialImpact" type="number">
+      Expected score improvement (points)
+    </ResponseField>
+
+    <ResponseField name="timeframe" type="string">
+      Expected timeframe to see results
+    </ResponseField>
+
+    <ResponseField name="difficulty" type="string">
+      Implementation difficulty: `easy`, `moderate`, `challenging`
+    </ResponseField>
+  </ResponseField>
+
+  <ResponseField name="benchmarking" type="object">
+    Comparison with similar users
+
+    <ResponseField name="percentile" type="number">
+      User percentile ranking among similar users (0-100)
+    </ResponseField>
+
+    <ResponseField name="averageScore" type="number">
+      Average score for similar demographic
+    </ResponseField>
+
+    <ResponseField name="topPercentileScore" type="number">
+      Score needed to reach top 10th percentile
+    </ResponseField>
+
+    <ResponseField name="demographic" type="string">
+      Comparison demographic (e.g., "Women 25-35, South Africa")
+    </ResponseField>
+  </ResponseField>
+
+  <ResponseField name="factors" type="object">
+    Detailed breakdown of score factors (if included)
+
+    <ResponseField name="positive" type="array">
+      Factors contributing positively to the score
+    </ResponseField>
+
+    <ResponseField name="negative" type="array">
+      Factors contributing negatively to the score
+    </ResponseField>
+
+    <ResponseField name="neutral" type="array">
+      Neutral factors that could be improved
+    </ResponseField>
+  </ResponseField>
+
+  <ResponseField name="history" type="array">
+    Historical score data points (if included)
+
+    <ResponseField name="date" type="string">
+      Score calculation date
+    </ResponseField>
+
     <ResponseField name="overallScore" type="number">
-      Overall DIVA score (0-1000)
+      Overall score on that date
     </ResponseField>
-    <ResponseField name="scoreGrade" type="string">
-      Letter grade representation: `A+`, `A`, `B+`, `B`, `C+`, `C`, `D`, `F`
-    </ResponseField>
-    <ResponseField name="lastCalculated" type="string">
-      Timestamp when score was last calculated (ISO 8601)
-    </ResponseField>
-    <ResponseField name="dataAvailability" type="object">
-      <Expandable title="dataAvailability object">
-        <ResponseField name="sufficientData" type="boolean">
-          Whether sufficient data exists for reliable scoring
-        </ResponseField>
-        <ResponseField name="monthsOfData" type="number">
-          Number of months of transaction data available
-        </ResponseField>
-        <ResponseField name="lastTransactionDate" type="string">
-          Date of most recent transaction analyzed
-        </ResponseField>
-        <ResponseField name="accountsAnalyzed" type="number">
-          Number of bank accounts included in analysis
-        </ResponseField>
-      </Expandable>
-    </ResponseField>
+
     <ResponseField name="components" type="object">
-      <Expandable title="Score Components">
-        <ResponseField name="discipline" type="object">
-          <Expandable title="discipline component">
-            <ResponseField name="score" type="number">
-              Component score (0-1000)
-            </ResponseField>
-            <ResponseField name="weight" type="number">
-              Weight in overall score (0.30)
-            </ResponseField>
-            <ResponseField name="contribution" type="number">
-              Contribution to overall score
-            </ResponseField>
-            <ResponseField name="trend" type="string">
-              Recent trend: `improving`, `stable`, `declining`
-            </ResponseField>
-          </Expandable>
-        </ResponseField>
-        <ResponseField name="income" type="object">
-          <Expandable title="income component">
-            <ResponseField name="score" type="number">
-              Component score (0-1000)
-            </ResponseField>
-            <ResponseField name="weight" type="number">
-              Weight in overall score (0.25)
-            </ResponseField>
-            <ResponseField name="contribution" type="number">
-              Contribution to overall score
-            </ResponseField>
-            <ResponseField name="trend" type="string">
-              Recent trend: `improving`, `stable`, `declining`
-            </ResponseField>
-          </Expandable>
-        </ResponseField>
-        <ResponseField name="velocity" type="object">
-          <Expandable title="velocity component">
-            <ResponseField name="score" type="number">
-              Component score (0-1000)
-            </ResponseField>
-            <ResponseField name="weight" type="number">
-              Weight in overall score (0.25)
-            </ResponseField>
-            <ResponseField name="contribution" type="number">
-              Contribution to overall score
-            </ResponseField>
-            <ResponseField name="trend" type="string">
-              Recent trend: `improving`, `stable`, `declining`
-            </ResponseField>
-          </Expandable>
-        </ResponseField>
-        <ResponseField name="assets" type="object">
-          <Expandable title="assets component">
-            <ResponseField name="score" type="number">
-              Component score (0-1000)
-            </ResponseField>
-            <ResponseField name="weight" type="number">
-              Weight in overall score (0.20)
-            </ResponseField>
-            <ResponseField name="contribution" type="number">
-              Contribution to overall score
-            </ResponseField>
-            <ResponseField name="trend" type="string">
-              Recent trend: `improving`, `stable`, `declining`
-            </ResponseField>
-          </Expandable>
-        </ResponseField>
-      </Expandable>
+      Component scores on that date
     </ResponseField>
-    <ResponseField name="insights" type="array">
-      <Expandable title="insights array (if included)">
-        <ResponseField name="category" type="string">
-          Insight category: `strength`, `opportunity`, `warning`, `achievement`
-        </ResponseField>
-        <ResponseField name="title" type="string">
-          Short insight title
-        </ResponseField>
-        <ResponseField name="description" type="string">
-          Detailed insight description
-        </ResponseField>
-        <ResponseField name="impact" type="string">
-          Potential impact: `high`, `medium`, `low`
-        </ResponseField>
-        <ResponseField name="actionable" type="boolean">
-          Whether this insight has actionable recommendations
-        </ResponseField>
-      </Expandable>
-    </ResponseField>
-    <ResponseField name="recommendations" type="array">
-      <Expandable title="recommendations array (if included)">
-        <ResponseField name="category" type="string">
-          Recommendation category: `discipline`, `income`, `velocity`, `assets`
-        </ResponseField>
-        <ResponseField name="title" type="string">
-          Recommendation title
-        </ResponseField>
-        <ResponseField name="description" type="string">
-          Detailed recommendation
-        </ResponseField>
-        <ResponseField name="priority" type="string">
-          Priority level: `high`, `medium`, `low`
-        </ResponseField>
-        <ResponseField name="potentialImpact" type="number">
-          Expected score improvement (points)
-        </ResponseField>
-        <ResponseField name="timeframe" type="string">
-          Expected timeframe to see results
-        </ResponseField>
-        <ResponseField name="difficulty" type="string">
-          Implementation difficulty: `easy`, `moderate`, `challenging`
-        </ResponseField>
-      </Expandable>
-    </ResponseField>
-    <ResponseField name="benchmarking" type="object">
-      <Expandable title="benchmarking object">
-        <ResponseField name="percentile" type="number">
-          User percentile ranking among similar users (0-100)
-        </ResponseField>
-        <ResponseField name="averageScore" type="number">
-          Average score for similar demographic
-        </ResponseField>
-        <ResponseField name="topPercentileScore" type="number">
-          Score needed to reach top 10th percentile
-        </ResponseField>
-        <ResponseField name="demographic" type="string">
-          Comparison demographic (e.g., "Women 25-35, South Africa")
-        </ResponseField>
-      </Expandable>
-    </ResponseField>
-    <ResponseField name="factors" type="object">
-      <Expandable title="factors object (if included)">
-        <ResponseField name="positive" type="array">
-          Factors contributing positively to the score
-        </ResponseField>
-        <ResponseField name="negative" type="array">
-          Factors contributing negatively to the score
-        </ResponseField>
-        <ResponseField name="neutral" type="array">
-          Neutral factors that could be improved
-        </ResponseField>
-      </Expandable>
-    </ResponseField>
-    <ResponseField name="history" type="array">
-      <Expandable title="history array (if included)">
-        <ResponseField name="date" type="string">
-          Score calculation date
-        </ResponseField>
-        <ResponseField name="overallScore" type="number">
-          Overall score on that date
-        </ResponseField>
-        <ResponseField name="components" type="object">
-          Component scores on that date
-        </ResponseField>
-      </Expandable>
-    </ResponseField>
-  </Expandable>
+  </ResponseField>
 </ResponseField>
 
 <ResponseField name="requestId" type="string">
@@ -325,9 +377,7 @@ const getDIVAScore = async (options = {}) => {
 try {
   // Basic DIVA score
   const basicScore = await getDIVAScore();
-  console.log(
-    `Your DIVA Score: ${basicScore.data.overallScore} (${basicScore.data.scoreGrade})`
-  );
+  console.log(`Your DIVA Score: ${basicScore.data.overallScore} (${basicScore.data.scoreGrade})`);
 
   // Detailed score with history
   const detailedScore = await getDIVAScore({
@@ -338,163 +388,14 @@ try {
 
   console.log("Score Components:");
   const components = detailedScore.data.components;
-  console.log(
-    `- Discipline: ${components.discipline.score} (${components.discipline.trend})`
-  );
-  console.log(
-    `- Income: ${components.income.score} (${components.income.trend})`
-  );
-  console.log(
-    `- Velocity: ${components.velocity.score} (${components.velocity.trend})`
-  );
-  console.log(
-    `- Assets: ${components.assets.score} (${components.assets.trend})`
-  );
+  console.log(`- Discipline: ${components.discipline.score} (${components.discipline.trend})`);
+  console.log(`- Income: ${components.income.score} (${components.income.trend})`);
+  console.log(`- Velocity: ${components.velocity.score} (${components.velocity.trend})`);
+  console.log(`- Assets: ${components.assets.score} (${components.assets.trend})`);
 
-  // Display insights
-  if (detailedScore.data.insights.length > 0) {
-    console.log("\nKey Insights:");
-    detailedScore.data.insights.forEach((insight) => {
-      console.log(`- ${insight.title}: ${insight.description}`);
-    });
-  }
-
-  // Display recommendations
-  if (detailedScore.data.recommendations.length > 0) {
-    console.log("\nRecommendations:");
-    detailedScore.data.recommendations
-      .filter((rec) => rec.priority === "high")
-      .forEach((rec) => {
-        console.log(`- ${rec.title} (+${rec.potentialImpact} points)`);
-      });
-  }
 } catch (error) {
   console.error("DIVA Score error:", error.message);
 }
-
-// React component for DIVA Score display
-const DIVAScoreWidget = () => {
-  const [scoreData, setScoreData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const fetchScore = async () => {
-      try {
-        const result = await getDIVAScore({ includeInsights: true });
-        setScoreData(result.data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchScore();
-  }, []);
-
-  if (loading)
-    return <div className="loading">Calculating your DIVA Score...</div>;
-  if (error)
-    return <div className="error">Error loading DIVA Score: {error}</div>;
-  if (!scoreData) return <div className="no-data">No score data available</div>;
-
-  const getScoreColor = (score) => {
-    if (score >= 800) return "#10B981"; // Green
-    if (score >= 650) return "#F59E0B"; // Yellow
-    if (score >= 500) return "#EF4444"; // Red
-    return "#6B7280"; // Gray
-  };
-
-  return (
-    <div className="diva-score-widget">
-      <div className="score-header">
-        <h2>Your DIVA Score</h2>
-        <div
-          className="score-circle"
-          style={{ borderColor: getScoreColor(scoreData.overallScore) }}
-        >
-          <span className="score-value">{scoreData.overallScore}</span>
-          <span className="score-grade">{scoreData.scoreGrade}</span>
-        </div>
-      </div>
-
-      <div className="score-components">
-        {Object.entries(scoreData.components).map(([name, component]) => (
-          <div key={name} className="component">
-            <div className="component-header">
-              <span className="component-name">
-                {name.charAt(0).toUpperCase() + name.slice(1)}
-              </span>
-              <span className="component-score">{component.score}</span>
-            </div>
-            <div className="component-bar">
-              <div
-                className="component-fill"
-                style={{
-                  width: `${(component.score / 1000) * 100}%`,
-                  backgroundColor: getScoreColor(component.score),
-                }}
-              />
-            </div>
-            <span className={`trend ${component.trend}`}>
-              {component.trend === "improving"
-                ? "↗"
-                : component.trend === "declining"
-                ? "↘"
-                : "→"}{" "}
-              {component.trend}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {scoreData.benchmarking && (
-        <div className="benchmarking">
-          <h3>How You Compare</h3>
-          <p>
-            You're in the {scoreData.benchmarking.percentile}th percentile among{" "}
-            {scoreData.benchmarking.demographic.toLowerCase()}
-          </p>
-          <div className="benchmark-bar">
-            <div
-              className="benchmark-marker"
-              style={{ left: `${scoreData.benchmarking.percentile}%` }}
-            >
-              You
-            </div>
-          </div>
-        </div>
-      )}
-
-      {scoreData.recommendations && scoreData.recommendations.length > 0 && (
-        <div className="recommendations">
-          <h3>Recommended Actions</h3>
-          {scoreData.recommendations
-            .filter((rec) => rec.priority === "high")
-            .slice(0, 3)
-            .map((rec, index) => (
-              <div key={index} className="recommendation">
-                <h4>{rec.title}</h4>
-                <p>{rec.description}</p>
-                <div className="recommendation-meta">
-                  <span className="impact">+{rec.potentialImpact} points</span>
-                  <span className="timeframe">{rec.timeframe}</span>
-                </div>
-              </div>
-            ))}
-        </div>
-      )}
-
-      <div className="score-footer">
-        <small>
-          Last updated:{" "}
-          {new Date(scoreData.lastCalculated).toLocaleDateString()}
-        </small>
-      </div>
-    </div>
-  );
-};
 ```
 
 ```python Python
@@ -514,19 +415,7 @@ class AWODIVAScore:
                   include_factors: bool = True,
                   period: str = 'current',
                   currency: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Get user DIVA score with optional additional data
-
-        Args:
-            include_history: Include historical score data
-            include_insights: Include insights and analysis
-            include_factors: Include detailed factor breakdown
-            period: Time period for analysis
-            currency: Currency for monetary values
-
-        Returns:
-            Dictionary containing DIVA score data
-        """
+        """Get user DIVA score with optional additional data"""
         url = f'{self.base_url}/diva-score/get-score'
 
         headers = {
@@ -553,139 +442,11 @@ class AWODIVAScore:
 
         return result['data']
 
-    def get_score_summary(self) -> Dict[str, Any]:
-        """Get basic score summary"""
-        score_data = self.get_score(include_history=False, include_insights=False)
-
-        return {
-            'overall_score': score_data['overallScore'],
-            'grade': score_data['scoreGrade'],
-            'last_calculated': score_data['lastCalculated'],
-            'components': {
-                name: {
-                    'score': comp['score'],
-                    'trend': comp['trend']
-                }
-                for name, comp in score_data['components'].items()
-            },
-            'percentile': score_data.get('benchmarking', {}).get('percentile'),
-            'sufficient_data': score_data['dataAvailability']['sufficientData']
-        }
-
-    def get_top_recommendations(self, limit: int = 3) -> list:
-        """Get top priority recommendations"""
-        score_data = self.get_score(include_insights=True)
-
-        recommendations = score_data.get('recommendations', [])
-
-        # Sort by priority and potential impact
-        priority_order = {'high': 3, 'medium': 2, 'low': 1}
-        sorted_recs = sorted(
-            recommendations,
-            key=lambda x: (priority_order.get(x['priority'], 0), x['potentialImpact']),
-            reverse=True
-        )
-
-        return sorted_recs[:limit]
-
-    def analyze_trends(self) -> Dict[str, str]:
-        """Analyze score trends across components"""
-        score_data = self.get_score()
-        components = score_data['components']
-
-        trends = {}
-        for name, component in components.items():
-            trend = component['trend']
-            score = component['score']
-
-            if trend == 'improving':
-                trends[name] = f"Improving ({score}/1000)"
-            elif trend == 'declining':
-                trends[name] = f"Declining ({score}/1000)"
-            else:
-                trends[name] = f"Stable ({score}/1000)"
-
-        return trends
-
-    def format_score_report(self) -> str:
-        """Generate a formatted text report of the DIVA score"""
-        score_data = self.get_score(include_insights=True, include_factors=True)
-
-        report = []
-        report.append("="*50)
-        report.append("AWO DIVA SCORE REPORT")
-        report.append("="*50)
-        report.append("")
-
-        # Overall score
-        report.append(f"Overall Score: {score_data['overallScore']}/1000 (Grade: {score_data['scoreGrade']})")
-        report.append(f"Last Updated: {datetime.fromisoformat(score_data['lastCalculated'].replace('Z', '+00:00')).strftime('%Y-%m-%d %H:%M')}")
-        report.append("")
-
-        # Components
-        report.append("COMPONENT BREAKDOWN:")
-        report.append("-" * 30)
-        components = score_data['components']
-        for name, component in components.items():
-            trend_symbol = "↗" if component['trend'] == 'improving' else "↘" if component['trend'] == 'declining' else "→"
-            report.append(f"{name.capitalize():12} {component['score']:3}/1000 {trend_symbol} {component['trend']}")
-        report.append("")
-
-        # Benchmarking
-        if 'benchmarking' in score_data:
-            bench = score_data['benchmarking']
-            report.append(f"BENCHMARKING:")
-            report.append(f"You rank in the {bench['percentile']}th percentile")
-            report.append(f"Among: {bench['demographic']}")
-            report.append("")
-
-        # Top insights
-        insights = score_data.get('insights', [])
-        if insights:
-            report.append("KEY INSIGHTS:")
-            report.append("-" * 20)
-            for insight in insights[:3]:
-                report.append(f"• {insight['title']}")
-                report.append(f"  {insight['description']}")
-                report.append("")
-
-        # Top recommendations
-        recommendations = self.get_top_recommendations(3)
-        if recommendations:
-            report.append("TOP RECOMMENDATIONS:")
-            report.append("-" * 25)
-            for i, rec in enumerate(recommendations, 1):
-                report.append(f"{i}. {rec['title']} (+{rec['potentialImpact']} points)")
-                report.append(f"   {rec['description']}")
-                report.append(f"   Difficulty: {rec['difficulty']}, Timeframe: {rec['timeframe']}")
-                report.append("")
-
-        return "\n".join(report)
-
 # Usage example
 try:
     diva_score = AWODIVAScore(access_token, api_key)
-
-    # Get basic score summary
-    summary = diva_score.get_score_summary()
-    print(f"Your DIVA Score: {summary['overall_score']} ({summary['grade']})")
-    print(f"Percentile: {summary['percentile']}th")
-
-    # Analyze trends
-    trends = diva_score.analyze_trends()
-    print("\nComponent Trends:")
-    for component, trend in trends.items():
-        print(f"  {component.capitalize()}: {trend}")
-
-    # Get top recommendations
-    recommendations = diva_score.get_top_recommendations(3)
-    print(f"\nTop {len(recommendations)} Recommendations:")
-    for i, rec in enumerate(recommendations, 1):
-        print(f"  {i}. {rec['title']} (+{rec['potentialImpact']} points)")
-
-    # Generate full report
-    print("\n" + diva_score.format_score_report())
-
+    summary = diva_score.get_score()
+    print(f"Your DIVA Score: {summary['overallScore']} ({summary['scoreGrade']})")
 except Exception as error:
     print(f"DIVA Score error: {error}")
 ```
@@ -712,7 +473,6 @@ class AWODIVAScore {
         ];
 
         $options = array_merge($defaultOptions, $options);
-
         $url = $this->baseUrl . '/diva-score/get-score';
 
         $params = [
@@ -729,7 +489,6 @@ class AWODIVAScore {
         $url .= '?' . http_build_query($params);
 
         $curl = curl_init();
-
         curl_setopt_array($curl, [
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
@@ -748,7 +507,6 @@ class AWODIVAScore {
         }
 
         curl_close($curl);
-
         $data = json_decode($response, true);
 
         if ($httpCode !== 200) {
@@ -757,135 +515,20 @@ class AWODIVAScore {
 
         return $data['data'];
     }
-
-    public function getScoreSummary() {
-        $scoreData = $this->getScore([
-            'include_history' => false,
-            'include_insights' => false
-        ]);
-
-        $components = [];
-        foreach ($scoreData['components'] as $name => $component) {
-            $components[$name] = [
-                'score' => $component['score'],
-                'trend' => $component['trend']
-            ];
-        }
-
-        return [
-            'overall_score' => $scoreData['overallScore'],
-            'grade' => $scoreData['scoreGrade'],
-            'last_calculated' => $scoreData['lastCalculated'],
-            'components' => $components,
-            'percentile' => $scoreData['benchmarking']['percentile'] ?? null,
-            'sufficient_data' => $scoreData['dataAvailability']['sufficientData']
-        ];
-    }
-
-    public function getTopRecommendations($limit = 3) {
-        $scoreData = $this->getScore(['include_insights' => true]);
-        $recommendations = $scoreData['recommendations'] ?? [];
-
-        // Sort by priority and potential impact
-        usort($recommendations, function($a, $b) {
-            $priorityOrder = ['high' => 3, 'medium' => 2, 'low' => 1];
-            $aPriority = $priorityOrder[$a['priority']] ?? 0;
-            $bPriority = $priorityOrder[$b['priority']] ?? 0;
-
-            if ($aPriority === $bPriority) {
-                return $b['potentialImpact'] <=> $a['potentialImpact'];
-            }
-
-            return $bPriority <=> $aPriority;
-        });
-
-        return array_slice($recommendations, 0, $limit);
-    }
-
-    public function formatScoreReport() {
-        $scoreData = $this->getScore([
-            'include_insights' => true,
-            'include_factors' => true
-        ]);
-
-        $report = [];
-        $report[] = str_repeat("=", 50);
-        $report[] = "AWO DIVA SCORE REPORT";
-        $report[] = str_repeat("=", 50);
-        $report[] = "";
-
-        // Overall score
-        $report[] = sprintf("Overall Score: %d/1000 (Grade: %s)",
-            $scoreData['overallScore'], $scoreData['scoreGrade']);
-        $report[] = sprintf("Last Updated: %s",
-            date('Y-m-d H:i', strtotime($scoreData['lastCalculated'])));
-        $report[] = "";
-
-        // Components
-        $report[] = "COMPONENT BREAKDOWN:";
-        $report[] = str_repeat("-", 30);
-        foreach ($scoreData['components'] as $name => $component) {
-            $trendSymbol = $component['trend'] === 'improving' ? '↗' :
-                          ($component['trend'] === 'declining' ? '↘' : '→');
-            $report[] = sprintf("%-12s %3d/1000 %s %s",
-                ucfirst($name), $component['score'], $trendSymbol, $component['trend']);
-        }
-        $report[] = "";
-
-        // Benchmarking
-        if (isset($scoreData['benchmarking'])) {
-            $bench = $scoreData['benchmarking'];
-            $report[] = "BENCHMARKING:";
-            $report[] = sprintf("You rank in the %dth percentile", $bench['percentile']);
-            $report[] = sprintf("Among: %s", $bench['demographic']);
-            $report[] = "";
-        }
-
-        // Top recommendations
-        $recommendations = $this->getTopRecommendations(3);
-        if (!empty($recommendations)) {
-            $report[] = "TOP RECOMMENDATIONS:";
-            $report[] = str_repeat("-", 25);
-            foreach ($recommendations as $i => $rec) {
-                $report[] = sprintf("%d. %s (+%d points)",
-                    $i + 1, $rec['title'], $rec['potentialImpact']);
-                $report[] = sprintf("   %s", $rec['description']);
-                $report[] = sprintf("   Difficulty: %s, Timeframe: %s",
-                    $rec['difficulty'], $rec['timeframe']);
-                $report[] = "";
-            }
-        }
-
-        return implode("\n", $report);
-    }
 }
 
 // Usage example
 try {
     $divaScore = new AWODIVAScore($accessToken, $apiKey);
-
-    // Get basic score summary
-    $summary = $divaScore->getScoreSummary();
-    echo "Your DIVA Score: " . $summary['overall_score'] . " (" . $summary['grade'] . ")\n";
-    echo "Percentile: " . $summary['percentile'] . "th\n";
-
-    // Get top recommendations
-    $recommendations = $divaScore->getTopRecommendations(3);
-    echo "\nTop " . count($recommendations) . " Recommendations:\n";
-    foreach ($recommendations as $i => $rec) {
-        echo "  " . ($i + 1) . ". " . $rec['title'] . " (+" . $rec['potentialImpact'] . " points)\n";
-    }
-
-    // Generate full report
-    echo "\n" . $divaScore->formatScoreReport() . "\n";
-
+    $summary = $divaScore->getScore();
+    echo "Your DIVA Score: " . $summary['overallScore'] . " (" . $summary['scoreGrade'] . ")\n";
 } catch (Exception $e) {
     echo "DIVA Score error: " . $e->getMessage() . "\n";
 }
 ?>
 ```
 
-```curl cURL
+```bash cURL
 # Basic DIVA score
 curl -X GET https://api.awo-platform.com/v1/diva-score/get-score \
   -H "Authorization: Bearer your_access_token_here" \
@@ -1014,13 +657,6 @@ curl -X GET "https://api.awo-platform.com/v1/diva-score/get-score?currency=USD" 
         "description": "Your emergency savings cover only 1.5 months of expenses. Aim for 3-6 months for better financial security.",
         "impact": "medium",
         "actionable": true
-      },
-      {
-        "category": "achievement",
-        "title": "Income Growth Streak",
-        "description": "Your income has grown consistently over the past 4 months, showing positive career trajectory.",
-        "impact": "high",
-        "actionable": false
       }
     ],
     "recommendations": [
@@ -1032,24 +668,6 @@ curl -X GET "https://api.awo-platform.com/v1/diva-score/get-score?currency=USD" 
         "potentialImpact": 45,
         "timeframe": "6-12 months",
         "difficulty": "moderate"
-      },
-      {
-        "category": "velocity",
-        "title": "Optimize Cash Flow Timing",
-        "description": "Consider scheduling bill payments closer to income receipt dates to improve cash flow efficiency.",
-        "priority": "medium",
-        "potentialImpact": 25,
-        "timeframe": "1-3 months",
-        "difficulty": "easy"
-      },
-      {
-        "category": "income",
-        "title": "Diversify Income Sources",
-        "description": "Explore additional income streams like freelancing or investments to reduce dependency on single income source.",
-        "priority": "medium",
-        "potentialImpact": 35,
-        "timeframe": "3-6 months",
-        "difficulty": "challenging"
       }
     ],
     "benchmarking": {
@@ -1057,102 +675,13 @@ curl -X GET "https://api.awo-platform.com/v1/diva-score/get-score?currency=USD" 
       "averageScore": 650,
       "topPercentileScore": 850,
       "demographic": "Women 25-35, South Africa"
-    },
-    "factors": {
-      "positive": [
-        "Consistent bill payments (100% on-time rate)",
-        "No overdraft fees in past 6 months",
-        "Regular savings deposits",
-        "Income growth trend (+15% over 6 months)"
-      ],
-      "negative": [
-        "Low emergency fund balance",
-        "High variable expense ratio",
-        "Limited income diversification"
-      ],
-      "neutral": [
-        "Average investment allocation for demographic",
-        "Standard debt-to-income ratio"
-      ]
     }
   },
   "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H1"
 }
 ```
 
-```json Insufficient Data Response
-{
-  "success": true,
-  "data": {
-    "overallScore": null,
-    "scoreGrade": "Insufficient Data",
-    "lastCalculated": null,
-    "dataAvailability": {
-      "sufficientData": false,
-      "monthsOfData": 1,
-      "lastTransactionDate": "2023-06-27T14:30:00Z",
-      "accountsAnalyzed": 1
-    },
-    "components": {
-      "discipline": {
-        "score": null,
-        "weight": 0.3,
-        "contribution": null,
-        "trend": "unknown"
-      },
-      "income": {
-        "score": null,
-        "weight": 0.25,
-        "contribution": null,
-        "trend": "unknown"
-      },
-      "velocity": {
-        "score": null,
-        "weight": 0.25,
-        "contribution": null,
-        "trend": "unknown"
-      },
-      "assets": {
-        "score": null,
-        "weight": 0.2,
-        "contribution": null,
-        "trend": "unknown"
-      }
-    },
-    "insights": [
-      {
-        "category": "opportunity",
-        "title": "Connect More Accounts",
-        "description": "Link additional bank accounts to get a more comprehensive view of your financial health.",
-        "impact": "high",
-        "actionable": true
-      },
-      {
-        "category": "opportunity",
-        "title": "Allow More Time",
-        "description": "We need at least 3 months of transaction data to generate your DIVA score. Check back in a few weeks!",
-        "impact": "high",
-        "actionable": false
-      }
-    ],
-    "recommendations": [
-      {
-        "category": "general",
-        "title": "Connect Additional Bank Accounts",
-        "description": "Link your primary checking and savings accounts to get a complete picture of your finances.",
-        "priority": "high",
-        "potentialImpact": 0,
-        "timeframe": "immediate",
-        "difficulty": "easy"
-      }
-    ],
-    "benchmarking": null
-  },
-  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H2"
-}
-```
-
-```json Error Response - No Connected Accounts
+```json Error Response
 {
   "success": false,
   "message": "No connected bank accounts found",
@@ -1173,241 +702,240 @@ curl -X GET "https://api.awo-platform.com/v1/diva-score/get-score?currency=USD" 
 
 ## Score Ranges & Meanings
 
-<Tabs>
-  <Tab title="Score Ranges">
-    | Score | Grade | Description | Population % |
-    |-------|-------|-------------|--------------|
-    | 900-1000 | A+ | Exceptional financial health | Top 5% |
-    | 850-899 | A | Excellent financial management | Top 10% |
-    | 800-849 | A- | Very good financial discipline | Top 20% |
-    | 750-799 | B+ | Good financial habits | Top 35% |
-    | 700-749 | B | Above average financial health | Top 50% |
-    | 650-699 | B- | Average financial management | Top 65% |
-    | 600-649 | C+ | Below average, needs improvement | Top 80% |
-    | 550-599 | C | Poor financial habits | Top 90% |
-    | 500-549 | D | Very poor financial health | Top 95% |
-    | <500 | F | Critical financial situation | Bottom 5% |
-  </Tab>
-  
-  <Tab title="Benefits by Score">
-    **High Scores (800+):**
-    - Access to premium investment products
-    - Lower loan interest rates
-    - Higher transaction limits
-    - Priority customer support
-    - Advanced financial tools
-    
-    **Good Scores (650-799):**
-    - Standard investment options
-    - Competitive loan rates
-    - Enhanced savings tools
-    - Group investment opportunities
-    - Financial planning resources
-    
-    **Improving Scores (500-649):**
-    - Basic investment options
-    - Standard loan eligibility
-    - Guided improvement tools
-    - Educational content
-    - Savings challenges
-    
-    **Building Scores (<500):**
-    - Savings-focused tools
-    - No credit features
-    - Financial rehabilitation program
-    - Personal finance coaching
-    - Basic educational resources
-  </Tab>
-</Tabs>
+| Score Range | Grade | Description | Population % |
+|-------------|-------|-------------|--------------|
+| 900-1000 | A+ | Exceptional financial health | Top 5% |
+| 850-899 | A | Excellent financial management | Top 10% |
+| 800-849 | A- | Very good financial discipline | Top 20% |
+| 750-799 | B+ | Good financial habits | Top 35% |
+| 700-749 | B | Above average financial health | Top 50% |
+| 650-699 | B- | Average financial management | Top 65% |
+| 600-649 | C+ | Below average, needs improvement | Top 80% |
+| 550-599 | C | Poor financial habits | Top 90% |
+| 500-549 | D | Very poor financial health | Top 95% |
+| 0-499 | F | Critical financial situation | Bottom 5% |
+
+## Benefits by Score Range
+
+### High Scores (800+)
+- Access to premium investment products
+- Lower loan interest rates
+- Higher transaction limits
+- Priority customer support
+- Advanced financial tools
+
+### Good Scores (650-799)
+- Standard investment options
+- Competitive loan rates
+- Enhanced savings tools
+- Group investment opportunities
+- Financial planning resources
+
+### Improving Scores (500-649)
+- Basic investment options
+- Standard loan eligibility
+- Guided improvement tools
+- Educational content
+- Savings challenges
+
+### Building Scores (0-499)
+- Savings-focused tools
+- No credit features
+- Financial rehabilitation program
+- Personal finance coaching
+- Basic educational resources
 
 ## Data Requirements
 
-<Accordion title="Minimum Data Requirements">
-  - At least 1 connected bank account - Minimum 3 months of transaction history
-  - At least 50 transactions across the period - Regular income deposits
-  (salary, business income, etc.) - Various expense categories (housing, food,
-  transportation, etc.)
-</Accordion>
+### Minimum Requirements
+- At least 1 connected bank account
+- Minimum 3 months of transaction history
+- At least 50 transactions across the period
+- Regular income deposits (salary, business income, etc.)
+- Various expense categories (housing, food, transportation, etc.)
 
-<Accordion title="Optimal Data for Accuracy">
-  - 2+ connected bank accounts (primary checking and savings) - 6+ months of
-  transaction history - 200+ transactions across the period - Multiple income
-  sources - Comprehensive expense coverage - Investment account connections
-</Accordion>
+### Optimal Data for Accuracy
+- 2+ connected bank accounts (primary checking and savings)
+- 6+ months of transaction history
+- 200+ transactions across the period
+- Multiple income sources
+- Comprehensive expense coverage
+- Investment account connections
 
-<Accordion title="Data Processing Timeline">
-  - **Initial Connection**: 24-48 hours for data synchronization - **Score
-  Generation**: Additional 2-4 hours after data sync - **Score Updates**: Daily
-  recalculation as new data arrives - **Historical Analysis**: Continuous
-  improvement with more data
-</Accordion>
+### Data Processing Timeline
+- **Initial Connection**: 24-48 hours for data synchronization
+- **Score Generation**: Additional 2-4 hours after data sync
+- **Score Updates**: Daily recalculation as new data arrives
+- **Historical Analysis**: Continuous improvement with more data
 
 ## Error Handling
 
 ### HTTP Status Codes
 
-<ResponseField name="HTTP Status Codes" type="object">
-  <Expandable title="Status Codes">
-    <ResponseField name="200" type="Success">
-      DIVA score retrieved successfully
-    </ResponseField>
-    <ResponseField name="401" type="Unauthorized">
-      Invalid or expired access token
-    </ResponseField>
-    <ResponseField name="403" type="Forbidden">
-      Insufficient permissions or account not verified
-    </ResponseField>
-    <ResponseField name="404" type="Not Found">
-      User profile or score data not found
-    </ResponseField>
-    <ResponseField name="422" type="Unprocessable Entity">
-      Insufficient data to calculate score
-    </ResponseField>
-    <ResponseField name="429" type="Too Many Requests">
-      Rate limit exceeded
-    </ResponseField>
-    <ResponseField name="500" type="Internal Server Error">
-      Score calculation service error
-    </ResponseField>
-  </Expandable>
-</ResponseField>
+| Status Code | Description | Common Causes |
+|-------------|-------------|---------------|
+| 200 | Success | DIVA score retrieved successfully |
+| 401 | Unauthorized | Invalid or expired access token |
+| 403 | Forbidden | Insufficient permissions or account not verified |
+| 404 | Not Found | User profile or score data not found |
+| 422 | Unprocessable Entity | Insufficient data to calculate score |
+| 429 | Too Many Requests | Rate limit exceeded |
+| 500 | Internal Server Error | Score calculation service error |
 
 ### Common Error Codes
 
-| Code                      | Description                            | Resolution                                           |
-| ------------------------- | -------------------------------------- | ---------------------------------------------------- |
-| `NO_CONNECTED_ACCOUNTS`   | No bank accounts connected             | Connect bank accounts via /accounts/connect          |
-| `INSUFFICIENT_DATA`       | Not enough transaction data            | Wait for more data or connect additional accounts    |
-| `SCORE_CALCULATION_ERROR` | Error in score calculation             | Retry request or contact support                     |
-| `DATA_SYNC_IN_PROGRESS`   | Transaction data still synchronizing   | Wait for sync completion (check back in a few hours) |
-| `ACCOUNT_NOT_VERIFIED`    | User account not sufficiently verified | Complete KYC verification                            |
-| `SCORE_NOT_AVAILABLE`     | Score temporarily unavailable          | Service maintenance, try again later                 |
+| Code | Description | Resolution |
+|------|-------------|------------|
+| `NO_CONNECTED_ACCOUNTS` | No bank accounts connected | Connect bank accounts via /accounts/connect |
+| `INSUFFICIENT_DATA` | Not enough transaction data | Wait for more data or connect additional accounts |
+| `SCORE_CALCULATION_ERROR` | Error in score calculation | Retry request or contact support |
+| `DATA_SYNC_IN_PROGRESS` | Transaction data still synchronizing | Wait for sync completion (check back in a few hours) |
+| `ACCOUNT_NOT_VERIFIED` | User account not sufficiently verified | Complete KYC verification |
+| `SCORE_NOT_AVAILABLE` | Score temporarily unavailable | Service maintenance, try again later |
 
-## Score Factors Explained
+## DIVA Component Details
 
 ### Discipline Component (30%)
 
-<Accordion title="Payment Punctuality (40%)">
-  - On-time bill payments (utilities, rent, loans) - Avoiding late fees and
-  penalties - Consistent payment patterns - Credit utilization management
-</Accordion>
+**Payment Punctuality (40%)**
+- On-time bill payments (utilities, rent, loans)
+- Avoiding late fees and penalties
+- Consistent payment patterns
+- Credit utilization management
 
-<Accordion title="Savings Regularity (30%)">
-  - Consistent savings deposits - Savings rate as percentage of income -
-  Emergency fund maintenance - Goal-based savings behavior
-</Accordion>
+**Savings Regularity (30%)**
+- Consistent savings deposits
+- Savings rate as percentage of income
+- Emergency fund maintenance
+- Goal-based savings behavior
 
-<Accordion title="Overdraft Avoidance (20%)">
-  - Frequency of overdrafts - Overdraft fee amounts - Account balance management
-  - Cash flow planning effectiveness
-</Accordion>
+**Overdraft Avoidance (20%)**
+- Frequency of overdrafts
+- Overdraft fee amounts
+- Account balance management
+- Cash flow planning effectiveness
 
-<Accordion title="Budget Adherence (10%)">
-  - Spending within defined categories - Variance from expected spending
-  patterns - Discretionary spending control - Financial goal alignment
-</Accordion>
+**Budget Adherence (10%)**
+- Spending within defined categories
+- Variance from expected spending patterns
+- Discretionary spending control
+- Financial goal alignment
 
 ### Income Component (25%)
 
-<Accordion title="Income Consistency (40%)">
-  - Month-to-month income stability - Predictability of income timing - Seasonal
-  variation handling - Income source reliability
-</Accordion>
+**Income Consistency (40%)**
+- Month-to-month income stability
+- Predictability of income timing
+- Seasonal variation handling
+- Income source reliability
 
-<Accordion title="Growth Trajectory (30%)">
-  - Income growth over time - Career progression indicators - Skill development
-  investments - Professional advancement patterns
-</Accordion>
+**Growth Trajectory (30%)**
+- Income growth over time
+- Career progression indicators
+- Skill development investments
+- Professional advancement patterns
 
-<Accordion title="Source Diversification (20%)">
-  - Multiple income streams - Passive income development - Risk distribution
-  across sources - Business income stability
-</Accordion>
+**Source Diversification (20%)**
+- Multiple income streams
+- Passive income development
+- Risk distribution across sources
+- Business income stability
 
-<Accordion title="Income-to-Expense Ratio (10%)">
-  - Living below means - Expense management efficiency - Lifestyle inflation
-  control - Financial flexibility maintenance
-</Accordion>
+**Income-to-Expense Ratio (10%)**
+- Living below means
+- Expense management efficiency
+- Lifestyle inflation control
+- Financial flexibility maintenance
 
 ### Velocity Component (25%)
 
-<Accordion title="Cash Flow Timing (30%)">
-  - Alignment of income and expense timing - Float optimization - Payment
-  scheduling efficiency - Working capital management
-</Accordion>
+**Cash Flow Timing (30%)**
+- Alignment of income and expense timing
+- Float optimization
+- Payment scheduling efficiency
+- Working capital management
 
-<Accordion title="Transaction Efficiency (20%)">
-  - Digital payment adoption - Fee minimization strategies - Account
-  optimization - Financial tool utilization
-</Accordion>
+**Transaction Efficiency (20%)**
+- Digital payment adoption
+- Fee minimization strategies
+- Account optimization
+- Financial tool utilization
 
-<Accordion title="Fund Movement (20%)">
-  - Inter-account transfer patterns - Investment funding regularity - Savings
-  allocation efficiency - Capital deployment speed
-</Accordion>
+**Fund Movement (20%)**
+- Inter-account transfer patterns
+- Investment funding regularity
+- Savings allocation efficiency
+- Capital deployment speed
 
-<Accordion title="Liquidity Management (30%)">
-  - Emergency fund accessibility - Short-term savings maintenance - Credit
-  utilization optimization - Cash reserve management
-</Accordion>
+**Liquidity Management (30%)**
+- Emergency fund accessibility
+- Short-term savings maintenance
+- Credit utilization optimization
+- Cash reserve management
 
 ### Assets Component (20%)
 
-<Accordion title="Savings Accumulation (30%)">
-  - Total savings growth - Savings rate consistency - Goal achievement progress
-  - Wealth building trajectory
-</Accordion>
+**Savings Accumulation (30%)**
+- Total savings growth
+- Savings rate consistency
+- Goal achievement progress
+- Wealth building trajectory
 
-<Accordion title="Investment Balance (30%)">
-  - Investment account balances - Portfolio diversification - Risk-adjusted
-  returns - Investment discipline
-</Accordion>
+**Investment Balance (30%)**
+- Investment account balances
+- Portfolio diversification
+- Risk-adjusted returns
+- Investment discipline
 
-<Accordion title="Debt-to-Asset Ratio (20%)">
-  - Total debt relative to assets - Debt reduction progress - Leverage
-  management - Credit utilization
-</Accordion>
+**Debt-to-Asset Ratio (20%)**
+- Total debt relative to assets
+- Debt reduction progress
+- Leverage management
+- Credit utilization
 
-<Accordion title="Emergency Preparedness (20%)">
-  - Emergency fund adequacy - Insurance coverage - Financial risk mitigation -
-  Crisis resilience planning
-</Accordion>
+**Emergency Preparedness (20%)**
+- Emergency fund adequacy
+- Insurance coverage
+- Financial risk mitigation
+- Crisis resilience planning
 
 ## Best Practices
 
 ### For Developers
 
-<Accordion title="Caching Strategy">
-  - Cache DIVA scores for up to 4 hours (they update daily) - Invalidate cache
-  when users connect new accounts - Store component-level data for detailed
-  displays - Use appropriate cache headers for API responses
-</Accordion>
+**Caching Strategy**
+- Cache DIVA scores for up to 4 hours (they update daily)
+- Invalidate cache when users connect new accounts
+- Store component-level data for detailed displays
+- Use appropriate cache headers for API responses
 
-<Accordion title="User Experience">
-  - Show loading states during score calculation - Explain score components
-  clearly to users - Provide actionable recommendations - Track score
-  improvements over time - Celebrate achievements and milestones
-</Accordion>
+**User Experience**
+- Show loading states during score calculation
+- Explain score components clearly to users
+- Provide actionable recommendations
+- Track score improvements over time
+- Celebrate achievements and milestones
 
-<Accordion title="Error Handling">
-  - Handle insufficient data gracefully - Provide clear next steps for users -
-  Show progress toward score availability - Offer alternative features while
-  waiting for scores
-</Accordion>
+**Error Handling**
+- Handle insufficient data gracefully
+- Provide clear next steps for users
+- Show progress toward score availability
+- Offer alternative features while waiting for scores
 
 ### For Users
 
-<Accordion title="Improving Your Score">
-  - Connect all primary bank accounts for comprehensive analysis - Maintain
-  consistent savings habits - Pay bills on time to improve discipline score -
-  Diversify income sources when possible - Build and maintain emergency fund
-</Accordion>
+**Improving Your Score**
+- Connect all primary bank accounts for comprehensive analysis
+- Maintain consistent savings habits
+- Pay bills on time to improve discipline score
+- Diversify income sources when possible
+- Build and maintain emergency fund
 
-<Accordion title="Understanding Trends">
-  - Score trends show direction of change, not just current state - Small
-  improvements compound over time - Focus on high-impact recommendations first -
-  Track progress monthly, not daily
-</Accordion>
+**Understanding Trends**
+- Score trends show direction of change, not just current state
+- Small improvements compound over time
+- Focus on high-impact recommendations first
+- Track progress monthly, not daily
 
 ## Next Steps
 
