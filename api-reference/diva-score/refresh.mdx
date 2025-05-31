@@ -1,0 +1,527 @@
+---
+title: "Refresh DIVA Score"
+api: "POST /api/v1/diva/users/{userId}/refresh"
+description: "Trigger a fresh calculation of the DIVA score based on the latest transaction data"
+---
+
+# Refresh DIVA Score
+
+Triggers a fresh calculation of the user's DIVA score using the most recent transaction data. This endpoint should be used when new bank transactions are available or when a manual refresh is requested.
+
+<Warning>
+This operation is computationally intensive and has rate limiting applied. Users can only refresh their DIVA score once every 24 hours unless they have premium access.
+</Warning>
+
+## Endpoint
+
+<CodeGroup>
+```bash cURL
+curl -X POST "https://api.awo-platform.com/v1/diva/users/{userId}/refresh" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "includeInsights": true,
+    "includeRecommendations": true
+  }'
+```
+
+```javascript JavaScript SDK
+import { AWOClient } from '@awo/api-sdk';
+
+const client = new AWOClient({ 
+  apiKey: 'your-api-key',
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+const refreshedScore = await client.diva.refreshScore('user-id', {
+  includeInsights: true,
+  includeRecommendations: true
+});
+```
+
+```python Python SDK
+from awo_sdk import AWOClient
+
+client = AWOClient(
+    api_key="your-api-key",
+    base_url="https://api.awo-platform.com/v1"
+)
+
+refreshed_score = client.diva.refresh_score(
+    user_id="user-id",
+    include_insights=True,
+    include_recommendations=True
+)
+```
+</CodeGroup>
+
+## Path Parameters
+
+<ParamField path="userId" type="string" required>
+  The unique identifier of the user whose DIVA score should be refreshed
+</ParamField>
+
+## Request Body
+
+<ParamField body="includeInsights" type="boolean" default="true">
+  Whether to include detailed insights in the response
+</ParamField>
+
+<ParamField body="includeRecommendations" type="boolean" default="true">
+  Whether to include personalized recommendations in the response
+</ParamField>
+
+<ParamField body="forceRefresh" type="boolean" default="false">
+  Force refresh even if calculated recently (premium users only)
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the DIVA score record
+</ResponseField>
+
+<ResponseField name="userId" type="string">
+  The user ID this score belongs to
+</ResponseField>
+
+<ResponseField name="overallScore" type="number">
+  The overall DIVA score (0-100)
+</ResponseField>
+
+<ResponseField name="scores" type="object">
+  Breakdown of individual DIVA components
+  <Expandable title="scores object">
+    <ResponseField name="discipline" type="number">
+      Discipline score (0-100) - measures payment punctuality and consistency
+    </ResponseField>
+    <ResponseField name="income" type="number">
+      Income score (0-100) - evaluates income stability and growth
+    </ResponseField>
+    <ResponseField name="velocity" type="number">
+      Velocity score (0-100) - analyzes cash flow patterns and efficiency
+    </ResponseField>
+    <ResponseField name="assets" type="number">
+      Assets score (0-100) - tracks asset accumulation and protection
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="insights" type="array">
+  Array of personalized insights based on the analysis
+  <Expandable title="insight object">
+    <ResponseField name="category" type="string">
+      Category of insight: 'spending', 'income', 'savings', 'assets'
+    </ResponseField>
+    <ResponseField name="type" type="string">
+      Type of insight: 'positive', 'warning', 'improvement'
+    </ResponseField>
+    <ResponseField name="title" type="string">
+      Short title for the insight
+    </ResponseField>
+    <ResponseField name="description" type="string">
+      Detailed description of the insight
+    </ResponseField>
+    <ResponseField name="impact" type="string">
+      Potential impact: 'low', 'medium', 'high'
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="recommendations" type="array">
+  Array of actionable recommendations
+  <Expandable title="recommendation object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the recommendation
+    </ResponseField>
+    <ResponseField name="title" type="string">
+      Short title for the recommendation
+    </ResponseField>
+    <ResponseField name="description" type="string">
+      Detailed description and rationale
+    </ResponseField>
+    <ResponseField name="priority" type="string">
+      Priority level: 'low', 'medium', 'high', 'critical'
+    </ResponseField>
+    <ResponseField name="category" type="string">
+      Category: 'budget', 'savings', 'investment', 'debt'
+    </ResponseField>
+    <ResponseField name="estimatedImpact" type="number">
+      Estimated score improvement if implemented (0-20 points)
+    </ResponseField>
+    <ResponseField name="actionSteps" type="array">
+      Array of specific action steps to implement the recommendation
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Calculation metadata
+  <Expandable title="metadata object">
+    <ResponseField name="calculatedAt" type="string">
+      ISO timestamp of when the score was calculated
+    </ResponseField>
+    <ResponseField name="transactionsPeriod" type="object">
+      Time period of transactions analyzed
+    </ResponseField>
+    <ResponseField name="transactionsCount" type="number">
+      Number of transactions analyzed
+    </ResponseField>
+    <ResponseField name="confidence" type="number">
+      Confidence level of the score (0-100)
+    </ResponseField>
+    <ResponseField name="nextRefreshAllowed" type="string">
+      ISO timestamp of when next refresh is allowed
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Response Examples
+
+<ResponseExample>
+```json 200 - Success
+{
+  "id": "diva_7d12e4f8-9a3b-4c2d-8e1f-6g7h8i9j0k1l",
+  "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+  "overallScore": 72.5,
+  "scores": {
+    "discipline": 85.2,
+    "income": 68.1,
+    "velocity": 71.3,
+    "assets": 65.4
+  },
+  "insights": [
+    {
+      "category": "spending",
+      "type": "positive",
+      "title": "Consistent Bill Payments",
+      "description": "You've maintained perfect payment consistency for utilities and subscriptions over the past 6 months.",
+      "impact": "high"
+    },
+    {
+      "category": "income",
+      "type": "warning",
+      "title": "Income Volatility",
+      "description": "Your income has varied by more than 30% month-over-month. Consider diversifying income sources.",
+      "impact": "medium"
+    }
+  ],
+  "recommendations": [
+    {
+      "id": "rec_a1b2c3d4",
+      "title": "Build Emergency Fund",
+      "description": "Based on your spending patterns, we recommend building an emergency fund equivalent to 3-6 months of expenses.",
+      "priority": "high",
+      "category": "savings",
+      "estimatedImpact": 15.2,
+      "actionSteps": [
+        "Set up automatic transfer of R500 monthly to savings",
+        "Open a high-yield savings account",
+        "Track progress towards 3-month expense goal"
+      ]
+    }
+  ],
+  "metadata": {
+    "calculatedAt": "2025-05-31T10:30:00Z",
+    "transactionsPeriod": {
+      "from": "2024-11-30T00:00:00Z",
+      "to": "2025-05-31T00:00:00Z"
+    },
+    "transactionsCount": 1247,
+    "confidence": 94.7,
+    "nextRefreshAllowed": "2025-06-01T10:30:00Z"
+  }
+}
+```
+
+```json 429 - Rate Limited
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "DIVA score refresh rate limit exceeded",
+    "details": {
+      "allowedRefreshes": 1,
+      "period": "24 hours",
+      "nextAllowedRefresh": "2025-06-01T10:30:00Z",
+      "upgradeToUnlimited": "https://awo-platform.com/upgrade"
+    }
+  }
+}
+```
+
+```json 400 - Insufficient Data
+{
+  "error": {
+    "code": "INSUFFICIENT_TRANSACTION_DATA",
+    "message": "Insufficient transaction data to calculate DIVA score",
+    "details": {
+      "minimumTransactions": 50,
+      "currentTransactions": 23,
+      "minimumPeriod": "3 months",
+      "currentPeriod": "6 weeks",
+      "suggestions": [
+        "Connect additional bank accounts",
+        "Wait for more transaction history to accumulate",
+        "Manually upload transaction data"
+      ]
+    }
+  }
+}
+```
+</ResponseExample>
+
+## Rate Limiting
+
+<CardGroup cols={2}>
+  <Card title="Standard Users" icon="clock">
+    - **Rate**: 1 refresh per 24 hours
+    - **Reset**: Rolling 24-hour window
+    - **Quota**: Resets at time of last refresh
+  </Card>
+  <Card title="Premium Users" icon="crown">
+    - **Rate**: 5 refreshes per 24 hours
+    - **Reset**: Rolling 24-hour window
+    - **Force Refresh**: Available with `forceRefresh: true`
+  </Card>
+</CardGroup>
+
+## Error Codes
+
+| Code | Description | Action Required |
+|------|-------------|-----------------|
+| `RATE_LIMIT_EXCEEDED` | Too many refresh requests | Wait for cooldown period |
+| `INSUFFICIENT_TRANSACTION_DATA` | Not enough data for calculation | Connect more accounts or wait |
+| `BANK_CONNECTION_ERROR` | Unable to fetch latest transactions | Reconnect bank accounts |
+| `CALCULATION_FAILED` | Error during score calculation | Retry or contact support |
+| `USER_NOT_FOUND` | User ID does not exist | Verify user ID |
+
+## Webhook Events
+
+When a DIVA score refresh completes, the following webhook events are triggered:
+
+```json
+{
+  "event": "diva.score.refreshed",
+  "data": {
+    "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+    "scoreId": "diva_7d12e4f8-9a3b-4c2d-8e1f-6g7h8i9j0k1l",
+    "overallScore": 72.5,
+    "previousScore": 68.2,
+    "improvement": 4.3,
+    "calculatedAt": "2025-05-31T10:30:00Z"
+  }
+}
+```
+
+## SDK Examples
+
+<CodeGroup>
+```typescript TypeScript SDK
+import { AWOClient, DivaRefreshOptions } from '@awo/api-sdk';
+
+const client = new AWOClient({
+  apiKey: process.env.AWO_API_KEY!,
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+async function refreshUserDivaScore(userId: string) {
+  try {
+    const options: DivaRefreshOptions = {
+      includeInsights: true,
+      includeRecommendations: true
+    };
+    
+    const refreshedScore = await client.diva.refreshScore(userId, options);
+    
+    console.log(`DIVA Score refreshed: ${refreshedScore.overallScore}/100`);
+    console.log(`Confidence: ${refreshedScore.metadata.confidence}%`);
+    
+    return refreshedScore;
+  } catch (error) {
+    if (error.code === 'RATE_LIMIT_EXCEEDED') {
+      console.log(`Rate limited. Next refresh at: ${error.details.nextAllowedRefresh}`);
+    } else {
+      console.error('Failed to refresh DIVA score:', error.message);
+    }
+    throw error;
+  }
+}
+```
+
+```python Python SDK
+from awo_sdk import AWOClient, DivaRefreshOptions
+from awo_sdk.exceptions import RateLimitError, InsufficientDataError
+
+client = AWOClient(
+    api_key=os.environ['AWO_API_KEY'],
+    base_url='https://api.awo-platform.com/v1'
+)
+
+def refresh_user_diva_score(user_id: str):
+    try:
+        options = DivaRefreshOptions(
+            include_insights=True,
+            include_recommendations=True
+        )
+        
+        refreshed_score = client.diva.refresh_score(user_id, options)
+        
+        print(f"DIVA Score refreshed: {refreshed_score.overall_score}/100")
+        print(f"Confidence: {refreshed_score.metadata.confidence}%")
+        
+        return refreshed_score
+    
+    except RateLimitError as e:
+        print(f"Rate limited. Next refresh at: {e.next_allowed_refresh}")
+        raise
+    except InsufficientDataError as e:
+        print(f"Insufficient data: {e.message}")
+        print(f"Minimum transactions needed: {e.minimum_transactions}")
+        raise
+    except Exception as e:
+        print(f"Failed to refresh DIVA score: {e}")
+        raise
+```
+
+```javascript React Native
+import { useState } from 'react';
+import { AWOClient } from '@awo/react-native-sdk';
+
+export function useDivaRefresh() {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  
+  const refreshDivaScore = async (userId) => {
+    setIsRefreshing(true);
+    setError(null);
+    
+    try {
+      const refreshedScore = await AWOClient.diva.refreshScore(userId, {
+        includeInsights: true,
+        includeRecommendations: true
+      });
+      
+      return refreshedScore;
+    } catch (err) {
+      setError(err);
+      throw err;
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+  
+  return {
+    refreshDivaScore,
+    isRefreshing,
+    error
+  };
+}
+
+// Usage in component
+function DivaScoreCard({ userId }) {
+  const { refreshDivaScore, isRefreshing, error } = useDivaRefresh();
+  
+  const handleRefresh = async () => {
+    try {
+      const newScore = await refreshDivaScore(userId);
+      // Update UI with new score
+    } catch (error) {
+      // Handle error (show message, etc.)
+    }
+  };
+  
+  return (
+    <TouchableOpacity 
+      onPress={handleRefresh} 
+      disabled={isRefreshing}
+    >
+      <Text>{isRefreshing ? 'Refreshing...' : 'Refresh Score'}</Text>
+    </TouchableOpacity>
+  );
+}
+```
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Optimal Refresh Timing">
+    **When to refresh DIVA scores:**
+    
+    - After connecting new bank accounts
+    - When users report significant financial changes
+    - Weekly automated refreshes for active users
+    - Before important financial decisions (loan applications, etc.)
+    
+    **When NOT to refresh:**
+    
+    - During low transaction periods (holidays, etc.)
+    - For inactive users (< 10 transactions/month)
+    - More than once per day for standard users
+  </Accordion>
+  
+  <Accordion title="Error Handling">
+    **Graceful degradation:**
+    
+    ```javascript
+    async function safeRefreshDivaScore(userId) {
+      try {
+        return await client.diva.refreshScore(userId);
+      } catch (error) {
+        if (error.code === 'RATE_LIMIT_EXCEEDED') {
+          // Show current score with refresh timer
+          return client.diva.getScore(userId);
+        } else if (error.code === 'INSUFFICIENT_TRANSACTION_DATA') {
+          // Guide user to connect more accounts
+          return { error: 'needs_more_data', action: 'connect_accounts' };
+        } else {
+          // Log error and show cached score
+          console.error('Refresh failed:', error);
+          return client.diva.getCachedScore(userId);
+        }
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Performance Optimization">
+    **Reduce calculation time:**
+    
+    - Use incremental calculations when possible
+    - Cache frequently accessed data
+    - Implement background processing for non-urgent refreshes
+    - Batch refresh operations for multiple users
+    
+    **Monitor performance:**
+    
+    ```javascript
+    const refreshMetrics = {
+      startTime: Date.now(),
+      transactionsAnalyzed: 0,
+      calculationDuration: 0
+    };
+    
+    // Track refresh performance
+    client.diva.on('refresh:start', (data) => {
+      refreshMetrics.startTime = Date.now();
+      refreshMetrics.transactionsAnalyzed = data.transactionCount;
+    });
+    
+    client.diva.on('refresh:complete', (data) => {
+      refreshMetrics.calculationDuration = Date.now() - refreshMetrics.startTime;
+      
+      // Log slow refreshes
+      if (refreshMetrics.calculationDuration > 10000) {
+        console.warn('Slow DIVA refresh detected:', refreshMetrics);
+      }
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Endpoints
+
+- [Get DIVA Score](/api-reference/diva-score/get-score) - Retrieve current score
+- [DIVA Score History](/api-reference/diva-score/history) - View score evolution
+- [DIVA Insights](/api-reference/diva-score/insights) - Get detailed insights
+- [Connect Bank Account](/api-reference/accounts/connect) - Add transaction data sources

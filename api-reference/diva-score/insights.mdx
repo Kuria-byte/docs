@@ -1,0 +1,1201 @@
+---
+title: "Get DIVA Insights"
+api: "GET /api/v1/diva/users/{userId}/insights"
+description: "Retrieve detailed financial insights and personalized recommendations based on DIVA score analysis"
+---
+
+# Get DIVA Insights
+
+Retrieves detailed financial insights and personalized recommendations based on the user's DIVA score analysis. This endpoint provides actionable advice to help users improve their financial health.
+
+<Info>
+Insights are generated using advanced analytics and machine learning algorithms that analyze spending patterns, income trends, and financial behaviors to provide personalized recommendations.
+</Info>
+
+## Endpoint
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://api.awo-platform.com/v1/diva/users/{userId}/insights?category=all&priority=high&limit=10" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+```javascript JavaScript SDK
+import { AWOClient } from '@awo/api-sdk';
+
+const client = new AWOClient({ 
+  apiKey: 'your-api-key',
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+const insights = await client.diva.getInsights('user-id', {
+  category: 'all',
+  priority: 'high',
+  limit: 10,
+  includeActionPlan: true
+});
+```
+
+```python Python SDK
+from awo_sdk import AWOClient
+
+client = AWOClient(
+    api_key="your-api-key",
+    base_url="https://api.awo-platform.com/v1"
+)
+
+insights = client.diva.get_insights(
+    user_id="user-id",
+    category="all",
+    priority="high",
+    limit=10,
+    include_action_plan=True
+)
+```
+</CodeGroup>
+
+## Path Parameters
+
+<ParamField path="userId" type="string" required>
+  The unique identifier of the user whose insights to retrieve
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="category" type="string" default="all">
+  Filter insights by category
+  - `all` - All insight categories
+  - `spending` - Spending pattern insights
+  - `income` - Income stability and growth insights
+  - `savings` - Savings behavior insights
+  - `debt` - Debt management insights
+  - `assets` - Asset building insights
+  - `budgeting` - Budget optimization insights
+</ParamField>
+
+<ParamField query="priority" type="string" default="all">
+  Filter by priority level
+  - `all` - All priorities
+  - `critical` - Critical financial issues requiring immediate attention
+  - `high` - High priority recommendations
+  - `medium` - Medium priority suggestions
+  - `low` - Low priority optimizations
+</ParamField>
+
+<ParamField query="type" type="string" default="all">
+  Filter by insight type
+  - `all` - All insight types
+  - `positive` - Positive financial behaviors to maintain
+  - `warning` - Warning signs requiring attention
+  - `improvement` - Areas for improvement
+  - `opportunity` - Growth opportunities
+</ParamField>
+
+<ParamField query="limit" type="integer" default="20">
+  Maximum number of insights to return (1-50)
+</ParamField>
+
+<ParamField query="includeActionPlan" type="boolean" default="true">
+  Include detailed action plans for recommendations
+</ParamField>
+
+<ParamField query="includeImpactEstimate" type="boolean" default="true">
+  Include estimated impact on DIVA score
+</ParamField>
+
+<ParamField query="personalizedLevel" type="string" default="high">
+  Level of personalization
+  - `basic` - Generic insights based on score
+  - `medium` - Moderately personalized insights
+  - `high` - Highly personalized with specific recommendations
+</ParamField>
+
+## Response
+
+<ResponseField name="userId" type="string">
+  The user ID these insights belong to
+</ResponseField>
+
+<ResponseField name="generatedAt" type="string">
+  ISO timestamp when insights were generated
+</ResponseField>
+
+<ResponseField name="basedOnScore" type="object">
+  The DIVA score these insights are based on
+  <Expandable title="score object">
+    <ResponseField name="overallScore" type="number">
+      Overall DIVA score used for insights
+    </ResponseField>
+    <ResponseField name="scoreDate" type="string">
+      Date of the score used for analysis
+    </ResponseField>
+    <ResponseField name="confidence" type="number">
+      Confidence level of the underlying score
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="insights" type="array">
+  Array of financial insights and recommendations
+  <Expandable title="insight object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the insight
+    </ResponseField>
+    <ResponseField name="category" type="string">
+      Category: 'spending', 'income', 'savings', 'debt', 'assets', 'budgeting'
+    </ResponseField>
+    <ResponseField name="type" type="string">
+      Type: 'positive', 'warning', 'improvement', 'opportunity'
+    </ResponseField>
+    <ResponseField name="priority" type="string">
+      Priority: 'critical', 'high', 'medium', 'low'
+    </ResponseField>
+    <ResponseField name="title" type="string">
+      Short, descriptive title for the insight
+    </ResponseField>
+    <ResponseField name="description" type="string">
+      Detailed explanation of the insight
+    </ResponseField>
+    <ResponseField name="reasoning" type="string">
+      Explanation of why this insight was generated
+    </ResponseField>
+    <ResponseField name="impact" type="object">
+      Expected impact if recommendation is followed
+      <Expandable title="impact object">
+        <ResponseField name="scoreImprovement" type="number">
+          Estimated DIVA score improvement (0-30 points)
+        </ResponseField>
+        <ResponseField name="timeToImpact" type="string">
+          Expected time to see impact ('immediate', 'weeks', 'months')
+        </ResponseField>
+        <ResponseField name="financialImpact" type="object">
+          Estimated financial impact
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="actionPlan" type="object">
+      Detailed action plan to implement the recommendation
+      <Expandable title="actionPlan object">
+        <ResponseField name="steps" type="array">
+          Array of specific action steps
+        </ResponseField>
+        <ResponseField name="timeframe" type="string">
+          Recommended timeframe for implementation
+        </ResponseField>
+        <ResponseField name="difficulty" type="string">
+          Implementation difficulty: 'easy', 'medium', 'hard'
+        </ResponseField>
+        <ResponseField name="resources" type="array">
+          Helpful resources and tools
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="relatedComponent" type="string">
+      Which DIVA component this most affects: 'discipline', 'income', 'velocity', 'assets'
+    </ResponseField>
+    <ResponseField name="urgency" type="string">
+      How urgent this is: 'immediate', 'this_week', 'this_month', 'this_quarter'
+    </ResponseField>
+    <ResponseField name="tags" type="array">
+      Relevant tags for categorization and filtering
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="summary" type="object">
+  Summary of insights and overall recommendations
+  <Expandable title="summary object">
+    <ResponseField name="totalInsights" type="number">
+      Total number of insights generated
+    </ResponseField>
+    <ResponseField name="priorityBreakdown" type="object">
+      Count of insights by priority level
+    </ResponseField>
+    <ResponseField name="categoryBreakdown" type="object">
+      Count of insights by category
+    </ResponseField>
+    <ResponseField name="topRecommendation" type="object">
+      The most impactful recommendation
+    </ResponseField>
+    <ResponseField name="quickWins" type="array">
+      Easy-to-implement recommendations with immediate impact
+    </ResponseField>
+    <ResponseField name="potentialScoreIncrease" type="number">
+      Total potential score increase if all recommendations implemented
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Response Examples
+
+<ResponseExample>
+```json 200 - Success
+{
+  "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+  "generatedAt": "2025-05-31T10:30:00Z",
+  "basedOnScore": {
+    "overallScore": 72.5,
+    "scoreDate": "2025-05-31T09:00:00Z",
+    "confidence": 94.7
+  },
+  "insights": [
+    {
+      "id": "insight_1a2b3c4d",
+      "category": "savings",
+      "type": "improvement",
+      "priority": "high",
+      "title": "Build Emergency Fund",
+      "description": "You currently have minimal emergency savings. Building an emergency fund will significantly improve your financial stability and DIVA score.",
+      "reasoning": "Analysis shows irregular income patterns and low savings velocity. An emergency fund would provide crucial financial buffer.",
+      "impact": {
+        "scoreImprovement": 15.2,
+        "timeToImpact": "months",
+        "financialImpact": {
+          "amount": "R15,000",
+          "description": "Target emergency fund amount",
+          "monthlyContribution": "R1,250"
+        }
+      },
+      "actionPlan": {
+        "steps": [
+          "Open a high-yield savings account dedicated to emergency fund",
+          "Set up automatic transfer of R1,250 monthly from checking account",
+          "Start with target of R7,500 (3 months of essential expenses)",
+          "Gradually build to R15,000 (6 months of expenses)",
+          "Review and adjust monthly contribution quarterly"
+        ],
+        "timeframe": "12 months",
+        "difficulty": "medium",
+        "resources": [
+          {
+            "title": "High-Yield Savings Account Comparison",
+            "url": "https://awo-platform.com/resources/savings-accounts",
+            "type": "tool"
+          },
+          {
+            "title": "Emergency Fund Calculator",
+            "url": "https://awo-platform.com/tools/emergency-fund-calculator",
+            "type": "calculator"
+          }
+        ]
+      },
+      "relatedComponent": "assets",
+      "urgency": "this_month",
+      "tags": ["emergency_fund", "savings", "financial_security", "asset_building"]
+    },
+    {
+      "id": "insight_2b3c4d5e",
+      "category": "spending",
+      "type": "warning",
+      "priority": "high",
+      "title": "High Dining Out Expenses",
+      "description": "Your dining out expenses are 40% above the recommended budget allocation for your income level.",
+      "reasoning": "Transaction analysis shows R3,200 monthly spending on restaurants and takeout, which is significantly impacting your savings potential.",
+      "impact": {
+        "scoreImprovement": 8.5,
+        "timeToImpact": "weeks",
+        "financialImpact": {
+          "amount": "R1,280",
+          "description": "Potential monthly savings",
+          "percentage": "40% reduction"
+        }
+      },
+      "actionPlan": {
+        "steps": [
+          "Set monthly dining out budget of R2,000",
+          "Use budgeting app to track dining expenses",
+          "Plan 2-3 home-cooked meals per week",
+          "Choose 1-2 special dining occasions per month",
+          "Explore meal prep options for busy weeks"
+        ],
+        "timeframe": "4 weeks",
+        "difficulty": "easy",
+        "resources": [
+          {
+            "title": "Meal Planning Template",
+            "url": "https://awo-platform.com/resources/meal-planning",
+            "type": "template"
+          },
+          {
+            "title": "Budget Tracking App Integration",
+            "url": "https://awo-platform.com/apps/budget-tracker",
+            "type": "app"
+          }
+        ]
+      },
+      "relatedComponent": "velocity",
+      "urgency": "this_week",
+      "tags": ["dining", "budget", "spending_reduction", "velocity_improvement"]
+    },
+    {
+      "id": "insight_3c4d5e6f",
+      "category": "income",
+      "type": "opportunity",
+      "priority": "medium",
+      "title": "Income Diversification Opportunity",
+      "description": "Your income relies entirely on salary. Diversifying income sources could improve stability and growth potential.",
+      "reasoning": "Single income source creates vulnerability. Your skill profile suggests potential for freelance or side income opportunities.",
+      "impact": {
+        "scoreImprovement": 12.3,
+        "timeToImpact": "months",
+        "financialImpact": {
+          "amount": "R2,500 - R5,000",
+          "description": "Potential monthly additional income",
+          "percentage": "15-30% income increase"
+        }
+      },
+      "actionPlan": {
+        "steps": [
+          "Identify marketable skills and expertise",
+          "Research freelance opportunities in your field",
+          "Start with 5-10 hours per week side projects",
+          "Build portfolio and client testimonials",
+          "Consider online course creation or consulting"
+        ],
+        "timeframe": "6 months",
+        "difficulty": "medium",
+        "resources": [
+          {
+            "title": "Freelance Platform Guide",
+            "url": "https://awo-platform.com/resources/freelancing",
+            "type": "guide"
+          },
+          {
+            "title": "Side Hustle Ideas for Your Industry",
+            "url": "https://awo-platform.com/resources/side-hustles",
+            "type": "ideas"
+          }
+        ]
+      },
+      "relatedComponent": "income",
+      "urgency": "this_quarter",
+      "tags": ["income_diversification", "side_hustle", "freelance", "income_growth"]
+    },
+    {
+      "id": "insight_4d5e6f7g",
+      "category": "debt",
+      "type": "positive",
+      "priority": "low",
+      "title": "Excellent Credit Card Management",
+      "description": "You consistently pay credit card balances in full and on time. This discipline is positively impacting your DIVA score.",
+      "reasoning": "Analysis shows 100% on-time payments and zero carried balances over the past 12 months.",
+      "impact": {
+        "scoreImprovement": 0,
+        "timeToImpact": "immediate",
+        "financialImpact": {
+          "amount": "R0",
+          "description": "Continue current excellent behavior",
+          "savings": "Avoiding R2,400+ annual interest charges"
+        }
+      },
+      "actionPlan": {
+        "steps": [
+          "Continue current payment discipline",
+          "Consider requesting credit limit increases to improve utilization ratio",
+          "Use rewards credit cards for regular purchases",
+          "Monitor credit score quarterly",
+          "Maintain utilization below 10% of available credit"
+        ],
+        "timeframe": "ongoing",
+        "difficulty": "easy",
+        "resources": [
+          {
+            "title": "Credit Score Monitoring",
+            "url": "https://awo-platform.com/tools/credit-monitor",
+            "type": "tool"
+          }
+        ]
+      },
+      "relatedComponent": "discipline",
+      "urgency": "this_quarter",
+      "tags": ["credit_management", "payment_discipline", "positive_behavior"]
+    }
+  ],
+  "summary": {
+    "totalInsights": 4,
+    "priorityBreakdown": {
+      "critical": 0,
+      "high": 2,
+      "medium": 1,
+      "low": 1
+    },
+    "categoryBreakdown": {
+      "savings": 1,
+      "spending": 1,
+      "income": 1,
+      "debt": 1,
+      "assets": 0,
+      "budgeting": 0
+    },
+    "topRecommendation": {
+      "id": "insight_1a2b3c4d",
+      "title": "Build Emergency Fund",
+      "reason": "Highest potential score improvement (15.2 points)"
+    },
+    "quickWins": [
+      {
+        "id": "insight_2b3c4d5e",
+        "title": "Reduce Dining Out Expenses",
+        "reason": "Easy to implement with immediate impact"
+      }
+    ],
+    "potentialScoreIncrease": 36.0
+  }
+}
+```
+
+```json 200 - Filtered by Category (Spending)
+{
+  "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+  "generatedAt": "2025-05-31T10:30:00Z",
+  "basedOnScore": {
+    "overallScore": 72.5,
+    "scoreDate": "2025-05-31T09:00:00Z",
+    "confidence": 94.7
+  },
+  "insights": [
+    {
+      "id": "insight_2b3c4d5e",
+      "category": "spending",
+      "type": "warning",
+      "priority": "high",
+      "title": "High Dining Out Expenses",
+      "description": "Your dining out expenses are 40% above the recommended budget allocation for your income level.",
+      "reasoning": "Transaction analysis shows R3,200 monthly spending on restaurants and takeout, which is significantly impacting your savings potential.",
+      "impact": {
+        "scoreImprovement": 8.5,
+        "timeToImpact": "weeks",
+        "financialImpact": {
+          "amount": "R1,280",
+          "description": "Potential monthly savings",
+          "percentage": "40% reduction"
+        }
+      },
+      "actionPlan": {
+        "steps": [
+          "Set monthly dining out budget of R2,000",
+          "Use budgeting app to track dining expenses",
+          "Plan 2-3 home-cooked meals per week",
+          "Choose 1-2 special dining occasions per month",
+          "Explore meal prep options for busy weeks"
+        ],
+        "timeframe": "4 weeks",
+        "difficulty": "easy",
+        "resources": [
+          {
+            "title": "Meal Planning Template",
+            "url": "https://awo-platform.com/resources/meal-planning",
+            "type": "template"
+          }
+        ]
+      },
+      "relatedComponent": "velocity",
+      "urgency": "this_week",
+      "tags": ["dining", "budget", "spending_reduction", "velocity_improvement"]
+    }
+  ],
+  "summary": {
+    "totalInsights": 1,
+    "priorityBreakdown": {
+      "critical": 0,
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    "categoryBreakdown": {
+      "spending": 1
+    },
+    "topRecommendation": {
+      "id": "insight_2b3c4d5e",
+      "title": "Reduce Dining Out Expenses",
+      "reason": "Only spending insight available"
+    },
+    "quickWins": [
+      {
+        "id": "insight_2b3c4d5e",
+        "title": "Reduce Dining Out Expenses",
+        "reason": "Easy to implement with immediate impact"
+      }
+    ],
+    "potentialScoreIncrease": 8.5
+  }
+}
+```
+
+```json 404 - No Insights Available
+{
+  "error": {
+    "code": "INSUFFICIENT_DATA_FOR_INSIGHTS",
+    "message": "Insufficient transaction data to generate meaningful insights",
+    "details": {
+      "minimumTransactions": 100,
+      "currentTransactions": 45,
+      "minimumPeriod": "3 months",
+      "currentPeriod": "6 weeks",
+      "suggestions": [
+        "Connect additional bank accounts",
+        "Wait for more transaction history to accumulate",
+        "Use basic DIVA score recommendations instead"
+      ]
+    }
+  }
+}
+```
+</ResponseExample>
+
+## Error Codes
+
+| Code | Description | Resolution |
+|------|-------------|------------|
+| `INSUFFICIENT_DATA_FOR_INSIGHTS` | Not enough data to generate insights | Connect more accounts or wait for data |
+| `INSIGHTS_NOT_READY` | Insights are being generated | Retry in a few minutes |
+| `INVALID_CATEGORY` | Invalid category parameter | Use valid category value |
+| `INVALID_PRIORITY` | Invalid priority parameter | Use valid priority value |
+| `USER_NOT_FOUND` | User ID does not exist | Verify user ID |
+
+## SDK Examples
+
+<CodeGroup>
+```typescript TypeScript SDK
+import { AWOClient, DivaInsightsOptions } from '@awo/api-sdk';
+
+const client = new AWOClient({
+  apiKey: process.env.AWO_API_KEY!,
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+async function getUserInsights(userId: string) {
+  try {
+    const options: DivaInsightsOptions = {
+      category: 'all',
+      priority: 'high',
+      limit: 10,
+      includeActionPlan: true,
+      includeImpactEstimate: true
+    };
+    
+    const insights = await client.diva.getInsights(userId, options);
+    
+    // Process insights by priority
+    const criticalInsights = insights.insights.filter(i => i.priority === 'critical');
+    const highPriorityInsights = insights.insights.filter(i => i.priority === 'high');
+    
+    console.log(`Total insights: ${insights.summary.totalInsights}`);
+    console.log(`Potential score increase: ${insights.summary.potentialScoreIncrease} points`);
+    
+    // Get quick wins
+    const quickWins = insights.summary.quickWins;
+    console.log(`Quick wins available: ${quickWins.length}`);
+    
+    return insights;
+  } catch (error) {
+    console.error('Failed to get insights:', error.message);
+    throw error;
+  }
+}
+
+// Get category-specific insights
+async function getSpendingInsights(userId: string) {
+  const insights = await client.diva.getInsights(userId, {
+    category: 'spending',
+    priority: 'all',
+    includeActionPlan: true
+  });
+  
+  return insights.insights.map(insight => ({
+    title: insight.title,
+    description: insight.description,
+    impact: insight.impact.scoreImprovement,
+    difficulty: insight.actionPlan.difficulty,
+    timeframe: insight.actionPlan.timeframe
+  }));
+}
+
+// Prioritize insights for user dashboard
+async function getDashboardInsights(userId: string) {
+  const insights = await client.diva.getInsights(userId, {
+    limit: 5,
+    priority: 'high'
+  });
+  
+  // Sort by impact potential
+  const sortedInsights = insights.insights.sort((a, b) => 
+    b.impact.scoreImprovement - a.impact.scoreImprovement
+  );
+  
+  return {
+    topInsight: sortedInsights[0],
+    quickWins: insights.summary.quickWins.slice(0, 3),
+    totalPotential: insights.summary.potentialScoreIncrease
+  };
+}
+```
+
+```python Python SDK
+from awo_sdk import AWOClient, DivaInsightsOptions
+from typing import List, Dict
+
+client = AWOClient(
+    api_key=os.environ['AWO_API_KEY'],
+    base_url='https://api.awo-platform.com/v1'
+)
+
+def get_user_insights(user_id: str) -> Dict:
+    try:
+        options = DivaInsightsOptions(
+            category='all',
+            priority='high',
+            limit=10,
+            include_action_plan=True,
+            include_impact_estimate=True
+        )
+        
+        insights = client.diva.get_insights(user_id, options)
+        
+        # Analyze insights
+        critical_insights = [i for i in insights.insights if i.priority == 'critical']
+        high_priority_insights = [i for i in insights.insights if i.priority == 'high']
+        
+        print(f"Total insights: {insights.summary.total_insights}")
+        print(f"Potential score increase: {insights.summary.potential_score_increase} points")
+        
+        return insights
+    
+    except Exception as e:
+        print(f"Failed to get insights: {e}")
+        raise
+
+def create_action_plan_summary(insights: Dict) -> List[Dict]:
+    """Create a simplified action plan summary"""
+    action_items = []
+    
+    for insight in insights['insights']:
+        if insight['priority'] in ['critical', 'high']:
+            action_items.append({
+                'title': insight['title'],
+                'category': insight['category'],
+                'impact': insight['impact']['score_improvement'],
+                'difficulty': insight['action_plan']['difficulty'],
+                'timeframe': insight['action_plan']['timeframe'],
+                'urgency': insight['urgency'],
+                'steps': insight['action_plan']['steps'][:3]  # First 3 steps
+            })
+    
+    # Sort by impact potential
+    action_items.sort(key=lambda x: x['impact'], reverse=True)
+    
+    return action_items
+
+def generate_insights_report(user_id: str) -> str:
+    """Generate a formatted insights report"""
+    insights = get_user_insights(user_id)
+    
+    report = f"""
+    DIVA Insights Report
+    User ID: {insights['user_id']}
+    Generated: {insights['generated_at']}
+    
+    SUMMARY:
+    - Total Insights: {insights['summary']['total_insights']}
+    - Potential Score Increase: {insights['summary']['potential_score_increase']} points
+    - High Priority Items: {insights['summary']['priority_breakdown']['high']}
+    - Critical Items: {insights['summary']['priority_breakdown']['critical']}
+    
+    TOP RECOMMENDATION:
+    {insights['summary']['top_recommendation']['title']}
+    
+    QUICK WINS:
+    """
+    
+    for quick_win in insights['summary']['quick_wins']:
+        report += f"- {quick_win['title']}\n"
+    
+    report += "\nDETAILED INSIGHTS:\n"
+    
+    for insight in insights['insights']:
+        if insight['priority'] in ['critical', 'high']:
+            report += f"""
+            {insight['title']} ({insight['priority'].upper()})
+            Category: {insight['category']}
+            Impact: +{insight['impact']['score_improvement']} points
+            Timeframe: {insight['action_plan']['timeframe']}
+            
+            Description: {insight['description']}
+            
+            Action Steps:
+            """
+            for i, step in enumerate(insight['action_plan']['steps'][:3], 1):
+                report += f"  {i}. {step}\n"
+    
+    return report
+
+# Usage example
+if __name__ == "__main__":
+    user_id = "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p"
+    
+    try:
+        insights = get_user_insights(user_id)
+        action_plan = create_action_plan_summary(insights)
+        report = generate_insights_report(user_id)
+        
+        print("Action Plan Summary:")
+        for item in action_plan[:3]:  # Top 3 actions
+            print(f"- {item['title']} (Impact: +{item['impact']} points)")
+        
+        # Save report to file
+        with open(f"insights_report_{user_id}.txt", "w") as f:
+            f.write(report)
+            
+    except Exception as e:
+        print(f"Error generating insights: {e}")
+```
+
+```javascript React Native
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  ScrollView, 
+  TouchableOpacity, 
+  ActivityIndicator,
+  Alert 
+} from 'react-native';
+import { AWOClient } from '@awo/react-native-sdk';
+
+export function DivaInsightsScreen({ userId }) {
+  const [insights, setInsights] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  useEffect(() => {
+    loadInsights();
+  }, [userId, selectedCategory]);
+
+  const loadInsights = async () => {
+    try {
+      setLoading(true);
+      const insightData = await AWOClient.diva.getInsights(userId, {
+        category: selectedCategory,
+        priority: 'high',
+        limit: 10,
+        includeActionPlan: true
+      });
+      setInsights(insightData);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInsightAction = (insight) => {
+    Alert.alert(
+      insight.title,
+      `Impact: +${insight.impact.scoreImprovement} points\n\n${insight.description}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'View Action Plan', 
+          onPress: () => showActionPlan(insight) 
+        }
+      ]
+    );
+  };
+
+  const showActionPlan = (insight) => {
+    const steps = insight.actionPlan.steps.join('\n• ');
+    Alert.alert(
+      'Action Plan',
+      `Difficulty: ${insight.actionPlan.difficulty}\nTimeframe: ${insight.actionPlan.timeframe}\n\nSteps:\n• ${steps}`,
+      [{ text: 'Got it!' }]
+    );
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'critical': return '#FF3B30';
+      case 'high': return '#FF9500';
+      case 'medium': return '#FFCC00';
+      case 'low': return '#34C759';
+      default: return '#8E8E93';
+    }
+  };
+
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case 'positive': return '✅';
+      case 'warning': return '⚠️';
+      case 'improvement': return '📈';
+      case 'opportunity': return '💡';
+      default: return 'ℹ️';
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+        <Text>Loading insights...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Error: {error}</Text>
+        <TouchableOpacity onPress={loadInsights} style={{ marginTop: 16 }}>
+          <Text style={{ color: '#007AFF' }}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={{ flex: 1, padding: 16 }}>
+      {/* Summary Card */}
+      <View style={{
+        backgroundColor: '#F2F2F7',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 20
+      }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>
+          Insights Summary
+        </Text>
+        <Text>Total Insights: {insights.summary.totalInsights}</Text>
+        <Text>Potential Score Increase: +{insights.summary.potentialScoreIncrease} points</Text>
+        
+        {insights.summary.quickWins.length > 0 && (
+          <View style={{ marginTop: 12 }}>
+            <Text style={{ fontWeight: '600', marginBottom: 4 }}>Quick Wins:</Text>
+            {insights.summary.quickWins.map((win, index) => (
+              <Text key={index} style={{ color: '#34C759' }}>
+                • {win.title}
+              </Text>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Category Filter */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={{ marginBottom: 20 }}
+      >
+        {['all', 'spending', 'savings', 'income', 'debt'].map((category) => (
+          <TouchableOpacity
+            key={category}
+            onPress={() => setSelectedCategory(category)}
+            style={{
+              backgroundColor: selectedCategory === category ? '#007AFF' : '#F2F2F7',
+              borderRadius: 20,
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              marginRight: 8
+            }}
+          >
+            <Text style={{
+              color: selectedCategory === category ? 'white' : 'black',
+              textTransform: 'capitalize'
+            }}>
+              {category}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Insights List */}
+      {insights.insights.map((insight, index) => (
+        <TouchableOpacity
+          key={insight.id}
+          onPress={() => handleInsightAction(insight)}
+          style={{
+            backgroundColor: 'white',
+            borderRadius: 12,
+            padding: 16,
+            marginBottom: 12,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 3
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={{ fontSize: 20, marginRight: 8 }}>
+                  {getTypeIcon(insight.type)}
+                </Text>
+                <Text style={{ fontSize: 16, fontWeight: '600', flex: 1 }}>
+                  {insight.title}
+                </Text>
+                <View style={{
+                  backgroundColor: getPriorityColor(insight.priority),
+                  borderRadius: 12,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2
+                }}>
+                  <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>
+                    {insight.priority.toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+              
+              <Text style={{ color: '#8E8E93', marginBottom: 8 }}>
+                {insight.description}
+              </Text>
+              
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ color: '#34C759', fontWeight: '600' }}>
+                  +{insight.impact.scoreImprovement} points
+                </Text>
+                <Text style={{ color: '#8E8E93', fontSize: 12 }}>
+                  {insight.actionPlan.difficulty} • {insight.actionPlan.timeframe}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      ))}
+      
+      {insights.insights.length === 0 && (
+        <View style={{ 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          padding: 40 
+        }}>
+          <Text style={{ fontSize: 18, color: '#8E8E93' }}>
+            No insights available for this category
+          </Text>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+// Hook for insights data
+export function useDivaInsights(userId, options = {}) {
+  const [insights, setInsights] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchInsights = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await AWOClient.diva.getInsights(userId, {
+        category: 'all',
+        priority: 'high',
+        limit: 10,
+        includeActionPlan: true,
+        ...options
+      });
+      setInsights(data);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      fetchInsights();
+    }
+  }, [userId, JSON.stringify(options)]);
+
+  return {
+    insights,
+    loading,
+    error,
+    refetch: fetchInsights
+  };
+}
+```
+</CodeGroup>
+
+## Use Cases & Examples
+
+<AccordionGroup>
+  <Accordion title="Personal Finance Dashboard">
+    ```javascript
+    // Display top 3 insights on user dashboard
+    async function getDashboardInsights(userId) {
+      const insights = await client.diva.getInsights(userId, {
+        priority: 'high',
+        limit: 3
+      });
+      
+      return insights.insights.map(insight => ({
+        title: insight.title,
+        type: insight.type,
+        impact: insight.impact.scoreImprovement,
+        urgency: insight.urgency,
+        quickAction: insight.actionPlan.steps[0] // First step
+      }));
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Financial Health Coaching">
+    ```javascript
+    // Generate weekly coaching recommendations
+    async function getWeeklyCoachingPlan(userId) {
+      const insights = await client.diva.getInsights(userId, {
+        urgency: 'this_week',
+        includeActionPlan: true
+      });
+      
+      const thisWeekActions = insights.insights
+        .filter(i => i.urgency === 'this_week')
+        .sort((a, b) => b.impact.scoreImprovement - a.impact.scoreImprovement)
+        .slice(0, 3);
+      
+      return {
+        weeklyFocus: thisWeekActions[0]?.relatedComponent || 'overall',
+        actions: thisWeekActions.map(insight => ({
+          goal: insight.title,
+          steps: insight.actionPlan.steps.slice(0, 2),
+          expectedImpact: insight.impact.scoreImprovement,
+          difficulty: insight.actionPlan.difficulty
+        }))
+      };
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Category-Specific Analysis">
+    ```javascript
+    // Analyze spending patterns and provide recommendations
+    async function analyzeSpendingPatterns(userId) {
+      const spendingInsights = await client.diva.getInsights(userId, {
+        category: 'spending',
+        includeActionPlan: true
+      });
+      
+      const analysis = {
+        totalPotentialSavings: 0,
+        recommendations: [],
+        quickWins: []
+      };
+      
+      spendingInsights.insights.forEach(insight => {
+        if (insight.impact.financialImpact?.amount) {
+          analysis.totalPotentialSavings += parseFloat(
+            insight.impact.financialImpact.amount.replace(/[R,]/g, '')
+          );
+        }
+        
+        if (insight.actionPlan.difficulty === 'easy') {
+          analysis.quickWins.push({
+            title: insight.title,
+            savings: insight.impact.financialImpact?.amount,
+            timeframe: insight.actionPlan.timeframe
+          });
+        }
+        
+        analysis.recommendations.push({
+          category: insight.category,
+          title: insight.title,
+          priority: insight.priority,
+          actions: insight.actionPlan.steps
+        });
+      });
+      
+      return analysis;
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Goal-Based Recommendations">
+    ```javascript
+    // Generate insights for specific financial goals
+    async function getGoalBasedInsights(userId, goal) {
+      const allInsights = await client.diva.getInsights(userId, {
+        includeActionPlan: true,
+        includeImpactEstimate: true
+      });
+      
+      const goalMappings = {
+        'emergency_fund': ['savings', 'spending'],
+        'debt_payoff': ['debt', 'spending'],
+        'investment': ['assets', 'income'],
+        'budget_optimization': ['spending', 'budgeting']
+      };
+      
+      const relevantCategories = goalMappings[goal] || ['all'];
+      
+      const goalInsights = allInsights.insights.filter(insight =>
+        relevantCategories.includes(insight.category) ||
+        insight.tags.some(tag => tag.includes(goal))
+      );
+      
+      return {
+        goal,
+        totalImpact: goalInsights.reduce((sum, insight) => 
+          sum + insight.impact.scoreImprovement, 0
+        ),
+        actionPlan: goalInsights.map(insight => ({
+          title: insight.title,
+          steps: insight.actionPlan.steps,
+          timeframe: insight.actionPlan.timeframe,
+          impact: insight.impact.scoreImprovement
+        })),
+        estimatedTimeToGoal: calculateTimeToGoal(goalInsights)
+      };
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Insight Prioritization" icon="sort">
+    **Display Strategy:**
+    
+    - Show critical insights first
+    - Limit to 3-5 insights on dashboard
+    - Group by category for detailed views
+    - Highlight quick wins prominently
+  </Card>
+  
+  <Card title="Action Plan Implementation" icon="check-circle">
+    **User Guidance:**
+    
+    - Break down complex plans into weekly goals
+    - Provide progress tracking tools
+    - Send reminder notifications
+    - Celebrate completed actions
+  </Card>
+  
+  <Card title="Performance Monitoring" icon="chart-line">
+    **Track Effectiveness:**
+    
+    - Monitor which insights users act on
+    - Measure actual score improvements
+    - A/B test insight presentations
+    - Refine recommendation algorithms
+  </Card>
+  
+  <Card title="Personalization" icon="user">
+    **Enhance Relevance:**
+    
+    - Use demographic data for context
+    - Consider user goals and preferences
+    - Adapt language and examples
+    - Account for local financial products
+  </Card>
+</CardGroup>
+
+## Related Endpoints
+
+- [Get Current DIVA Score](/api-reference/diva-score/get-score) - Current score details
+- [Refresh DIVA Score](/api-reference/diva-score/refresh) - Trigger new calculation
+- [DIVA Score History](/api-reference/diva-score/history) - Historical score data
+- [List Transactions](/api-reference/transactions/list) - View transaction patterns used for insights

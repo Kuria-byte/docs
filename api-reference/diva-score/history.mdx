@@ -1,0 +1,953 @@
+---
+title: "Get DIVA Score History"
+api: "GET /api/v1/diva/users/{userId}/history"
+description: "Retrieve historical DIVA score data to track financial progress over time"
+---
+
+# Get DIVA Score History
+
+Retrieves the historical DIVA score data for a user, allowing you to track financial progress and identify trends over time. This endpoint supports various time periods and granularity options.
+
+## Endpoint
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://api.awo-platform.com/v1/diva/users/{userId}/history?period=6months&granularity=monthly" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+```javascript JavaScript SDK
+import { AWOClient } from '@awo/api-sdk';
+
+const client = new AWOClient({ 
+  apiKey: 'your-api-key',
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+const history = await client.diva.getHistory('user-id', {
+  period: '6months',
+  granularity: 'monthly',
+  includeInsights: true
+});
+```
+
+```python Python SDK
+from awo_sdk import AWOClient
+
+client = AWOClient(
+    api_key="your-api-key",
+    base_url="https://api.awo-platform.com/v1"
+)
+
+history = client.diva.get_history(
+    user_id="user-id",
+    period="6months",
+    granularity="monthly",
+    include_insights=True
+)
+```
+</CodeGroup>
+
+## Path Parameters
+
+<ParamField path="userId" type="string" required>
+  The unique identifier of the user whose DIVA score history to retrieve
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="period" type="string" default="3months">
+  Time period for history retrieval
+  - `1month` - Last 30 days
+  - `3months` - Last 90 days
+  - `6months` - Last 180 days
+  - `1year` - Last 365 days
+  - `all` - All available history
+  - Custom: `YYYY-MM-DD:YYYY-MM-DD` (from:to format)
+</ParamField>
+
+<ParamField query="granularity" type="string" default="weekly">
+  Data point frequency
+  - `daily` - Daily score snapshots (max 90 days)
+  - `weekly` - Weekly aggregated scores
+  - `monthly` - Monthly aggregated scores
+  - `quarterly` - Quarterly aggregated scores
+</ParamField>
+
+<ParamField query="includeInsights" type="boolean" default="false">
+  Include historical insights for each data point
+</ParamField>
+
+<ParamField query="includeBreakdown" type="boolean" default="true">
+  Include individual DIVA component scores (D.I.V.A)
+</ParamField>
+
+<ParamField query="compareToAverage" type="boolean" default="false">
+  Include comparison to platform average for user's demographic
+</ParamField>
+
+<ParamField query="format" type="string" default="json">
+  Response format: `json`, `csv` (for data export)
+</ParamField>
+
+## Response
+
+<ResponseField name="userId" type="string">
+  The user ID this history belongs to
+</ResponseField>
+
+<ResponseField name="period" type="object">
+  The time period covered by this history
+  <Expandable title="period object">
+    <ResponseField name="from" type="string">
+      ISO timestamp of the earliest data point
+    </ResponseField>
+    <ResponseField name="to" type="string">
+      ISO timestamp of the latest data point
+    </ResponseField>
+    <ResponseField name="granularity" type="string">
+      The granularity of data points returned
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="dataPoints" type="array">
+  Array of historical DIVA score data points
+  <Expandable title="dataPoint object">
+    <ResponseField name="date" type="string">
+      ISO timestamp for this data point
+    </ResponseField>
+    <ResponseField name="overallScore" type="number">
+      Overall DIVA score for this period (0-100)
+    </ResponseField>
+    <ResponseField name="scores" type="object">
+      Breakdown of individual DIVA components
+      <Expandable title="scores breakdown">
+        <ResponseField name="discipline" type="number">
+          Discipline score (0-100)
+        </ResponseField>
+        <ResponseField name="income" type="number">
+          Income score (0-100)
+        </ResponseField>
+        <ResponseField name="velocity" type="number">
+          Velocity score (0-100)
+        </ResponseField>
+        <ResponseField name="assets" type="number">
+          Assets score (0-100)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="insights" type="array">
+      Key insights for this period (if requested)
+    </ResponseField>
+    <ResponseField name="transactionCount" type="number">
+      Number of transactions analyzed for this period
+    </ResponseField>
+    <ResponseField name="confidence" type="number">
+      Confidence level of the score (0-100)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="trends" type="object">
+  Trend analysis of the score evolution
+  <Expandable title="trends object">
+    <ResponseField name="overall" type="object">
+      Overall score trend
+      <Expandable title="overall trend">
+        <ResponseField name="direction" type="string">
+          'improving', 'declining', 'stable'
+        </ResponseField>
+        <ResponseField name="change" type="number">
+          Total change over the period
+        </ResponseField>
+        <ResponseField name="changePercent" type="number">
+          Percentage change over the period
+        </ResponseField>
+        <ResponseField name="slope" type="number">
+          Trend slope (positive = improving)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="components" type="object">
+      Individual component trends (D.I.V.A)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="statistics" type="object">
+  Statistical summary of the history
+  <Expandable title="statistics object">
+    <ResponseField name="average" type="number">
+      Average score over the period
+    </ResponseField>
+    <ResponseField name="highest" type="object">
+      Highest score details
+    </ResponseField>
+    <ResponseField name="lowest" type="object">
+      Lowest score details
+    </ResponseField>
+    <ResponseField name="volatility" type="number">
+      Score volatility index (0-100)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="benchmarks" type="object">
+  Comparison to platform benchmarks (if requested)
+  <Expandable title="benchmarks object">
+    <ResponseField name="userDemographic" type="object">
+      Comparison to similar users
+    </ResponseField>
+    <ResponseField name="countryAverage" type="number">
+      Country average for comparison
+    </ResponseField>
+    <ResponseField name="percentile" type="number">
+      User's percentile ranking
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Response Examples
+
+<ResponseExample>
+```json 200 - Success (Monthly Granularity)
+{
+  "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+  "period": {
+    "from": "2024-11-30T00:00:00Z",
+    "to": "2025-05-31T23:59:59Z",
+    "granularity": "monthly"
+  },
+  "dataPoints": [
+    {
+      "date": "2024-12-01T00:00:00Z",
+      "overallScore": 65.2,
+      "scores": {
+        "discipline": 78.5,
+        "income": 62.1,
+        "velocity": 68.3,
+        "assets": 52.0
+      },
+      "insights": [
+        {
+          "type": "improvement",
+          "message": "Your payment discipline improved significantly this month"
+        }
+      ],
+      "transactionCount": 234,
+      "confidence": 87.5
+    },
+    {
+      "date": "2025-01-01T00:00:00Z",
+      "overallScore": 68.7,
+      "scores": {
+        "discipline": 82.1,
+        "income": 65.4,
+        "velocity": 70.2,
+        "assets": 57.1
+      },
+      "insights": [
+        {
+          "type": "positive",
+          "message": "Steady income growth detected"
+        }
+      ],
+      "transactionCount": 267,
+      "confidence": 92.1
+    },
+    {
+      "date": "2025-02-01T00:00:00Z",
+      "overallScore": 71.3,
+      "scores": {
+        "discipline": 85.7,
+        "income": 68.2,
+        "velocity": 72.8,
+        "assets": 58.6
+      },
+      "transactionCount": 289,
+      "confidence": 94.3
+    },
+    {
+      "date": "2025-03-01T00:00:00Z",
+      "overallScore": 69.8,
+      "scores": {
+        "discipline": 83.2,
+        "income": 66.7,
+        "velocity": 71.1,
+        "assets": 58.2
+      },
+      "insights": [
+        {
+          "type": "warning",
+          "message": "Slight dip in overall score due to increased spending"
+        }
+      ],
+      "transactionCount": 312,
+      "confidence": 95.7
+    },
+    {
+      "date": "2025-04-01T00:00:00Z",
+      "overallScore": 72.5,
+      "scores": {
+        "discipline": 85.2,
+        "income": 68.1,
+        "velocity": 73.4,
+        "assets": 63.3
+      },
+      "transactionCount": 298,
+      "confidence": 93.8
+    },
+    {
+      "date": "2025-05-01T00:00:00Z",
+      "overallScore": 74.1,
+      "scores": {
+        "discipline": 86.8,
+        "income": 70.2,
+        "velocity": 74.7,
+        "assets": 64.7
+      },
+      "insights": [
+        {
+          "type": "positive",
+          "message": "Strong improvement in asset building"
+        }
+      ],
+      "transactionCount": 285,
+      "confidence": 96.2
+    }
+  ],
+  "trends": {
+    "overall": {
+      "direction": "improving",
+      "change": 8.9,
+      "changePercent": 13.6,
+      "slope": 1.47
+    },
+    "components": {
+      "discipline": {
+        "direction": "improving",
+        "change": 8.3,
+        "slope": 1.38
+      },
+      "income": {
+        "direction": "improving",
+        "change": 8.1,
+        "slope": 1.35
+      },
+      "velocity": {
+        "direction": "improving",
+        "change": 6.4,
+        "slope": 1.07
+      },
+      "assets": {
+        "direction": "improving",
+        "change": 12.7,
+        "slope": 2.12
+      }
+    }
+  },
+  "statistics": {
+    "average": 70.3,
+    "highest": {
+      "score": 74.1,
+      "date": "2025-05-01T00:00:00Z"
+    },
+    "lowest": {
+      "score": 65.2,
+      "date": "2024-12-01T00:00:00Z"
+    },
+    "volatility": 12.4
+  },
+  "benchmarks": {
+    "userDemographic": {
+      "averageScore": 67.8,
+      "userVsAverage": 6.3,
+      "demographic": "Female, 25-34, South Africa, Urban"
+    },
+    "countryAverage": 64.2,
+    "percentile": 78
+  }
+}
+```
+
+```json 200 - Success (Daily Granularity - Last 30 Days)
+{
+  "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+  "period": {
+    "from": "2025-05-01T00:00:00Z",
+    "to": "2025-05-31T23:59:59Z",
+    "granularity": "daily"
+  },
+  "dataPoints": [
+    {
+      "date": "2025-05-01T00:00:00Z",
+      "overallScore": 72.1,
+      "scores": {
+        "discipline": 85.3,
+        "income": 68.2,
+        "velocity": 72.8,
+        "assets": 62.1
+      },
+      "transactionCount": 12,
+      "confidence": 85.4
+    },
+    {
+      "date": "2025-05-02T00:00:00Z",
+      "overallScore": 72.3,
+      "scores": {
+        "discipline": 85.1,
+        "income": 68.4,
+        "velocity": 73.1,
+        "assets": 62.6
+      },
+      "transactionCount": 8,
+      "confidence": 87.2
+    }
+    // ... more daily data points
+  ],
+  "trends": {
+    "overall": {
+      "direction": "improving",
+      "change": 2.4,
+      "changePercent": 3.3,
+      "slope": 0.08
+    }
+  },
+  "statistics": {
+    "average": 72.7,
+    "highest": {
+      "score": 74.8,
+      "date": "2025-05-28T00:00:00Z"
+    },
+    "lowest": {
+      "score": 71.2,
+      "date": "2025-05-03T00:00:00Z"
+    },
+    "volatility": 4.2
+  }
+}
+```
+
+```json 404 - No History Found
+{
+  "error": {
+    "code": "NO_HISTORY_FOUND",
+    "message": "No DIVA score history found for the specified period",
+    "details": {
+      "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "requestedPeriod": "6months",
+      "availablePeriod": "2months",
+      "firstScoreDate": "2025-03-15T00:00:00Z",
+      "suggestions": [
+        "Try a shorter period",
+        "Check if user has sufficient transaction history",
+        "Ensure user has connected bank accounts"
+      ]
+    }
+  }
+}
+```
+</ResponseExample>
+
+## CSV Export Format
+
+When requesting `format=csv`, the response will be a CSV file with the following structure:
+
+```csv
+Date,Overall Score,Discipline,Income,Velocity,Assets,Transaction Count,Confidence
+2024-12-01,65.2,78.5,62.1,68.3,52.0,234,87.5
+2025-01-01,68.7,82.1,65.4,70.2,57.1,267,92.1
+2025-02-01,71.3,85.7,68.2,72.8,58.6,289,94.3
+2025-03-01,69.8,83.2,66.7,71.1,58.2,312,95.7
+2025-04-01,72.5,85.2,68.1,73.4,63.3,298,93.8
+2025-05-01,74.1,86.8,70.2,74.7,64.7,285,96.2
+```
+
+## Error Codes
+
+| Code | Description | Resolution |
+|------|-------------|------------|
+| `NO_HISTORY_FOUND` | No score history for the period | Try shorter period or wait for more data |
+| `INVALID_PERIOD_FORMAT` | Invalid period parameter format | Use valid period format |
+| `PERIOD_TOO_LONG` | Requested period exceeds limits | Maximum 2 years for history |
+| `GRANULARITY_INCOMPATIBLE` | Granularity incompatible with period | Daily max 90 days, weekly max 1 year |
+| `USER_NOT_FOUND` | User ID does not exist | Verify user ID |
+
+## SDK Examples
+
+<CodeGroup>
+```typescript TypeScript SDK
+import { AWOClient, DivaHistoryOptions } from '@awo/api-sdk';
+
+const client = new AWOClient({
+  apiKey: process.env.AWO_API_KEY!,
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+async function getDivaScoreHistory(userId: string) {
+  try {
+    const options: DivaHistoryOptions = {
+      period: '6months',
+      granularity: 'monthly',
+      includeInsights: true,
+      includeBreakdown: true,
+      compareToAverage: true
+    };
+    
+    const history = await client.diva.getHistory(userId, options);
+    
+    // Analyze trends
+    console.log(`Score trend: ${history.trends.overall.direction}`);
+    console.log(`Total improvement: ${history.trends.overall.change} points`);
+    
+    // Find best and worst performing months
+    const bestMonth = history.statistics.highest;
+    const worstMonth = history.statistics.lowest;
+    
+    console.log(`Best month: ${bestMonth.date} (${bestMonth.score})`);
+    console.log(`Worst month: ${worstMonth.date} (${worstMonth.score})`);
+    
+    return history;
+  } catch (error) {
+    console.error('Failed to get DIVA history:', error.message);
+    throw error;
+  }
+}
+
+// Visualize score progression
+async function getScoreProgression(userId: string) {
+  const history = await client.diva.getHistory(userId, {
+    period: '1year',
+    granularity: 'monthly'
+  });
+  
+  return history.dataPoints.map(point => ({
+    date: new Date(point.date),
+    score: point.overallScore,
+    discipline: point.scores.discipline,
+    income: point.scores.income,
+    velocity: point.scores.velocity,
+    assets: point.scores.assets
+  }));
+}
+```
+
+```python Python SDK
+from awo_sdk import AWOClient, DivaHistoryOptions
+import pandas as pd
+import matplotlib.pyplot as plt
+
+client = AWOClient(
+    api_key=os.environ['AWO_API_KEY'],
+    base_url='https://api.awo-platform.com/v1'
+)
+
+def get_diva_score_history(user_id: str):
+    try:
+        options = DivaHistoryOptions(
+            period='6months',
+            granularity='monthly',
+            include_insights=True,
+            include_breakdown=True,
+            compare_to_average=True
+        )
+        
+        history = client.diva.get_history(user_id, options)
+        
+        # Analyze trends
+        print(f"Score trend: {history.trends.overall.direction}")
+        print(f"Total improvement: {history.trends.overall.change} points")
+        
+        return history
+    
+    except Exception as e:
+        print(f"Failed to get DIVA history: {e}")
+        raise
+
+def visualize_score_history(user_id: str):
+    """Create a visualization of DIVA score history"""
+    history = get_diva_score_history(user_id)
+    
+    # Convert to DataFrame for easy plotting
+    data = []
+    for point in history.data_points:
+        data.append({
+            'date': point.date,
+            'overall': point.overall_score,
+            'discipline': point.scores.discipline,
+            'income': point.scores.income,
+            'velocity': point.scores.velocity,
+            'assets': point.scores.assets
+        })
+    
+    df = pd.DataFrame(data)
+    df['date'] = pd.to_datetime(df['date'])
+    
+    # Create the plot
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+    
+    # Plot overall score
+    ax1.plot(df['date'], df['overall'], marker='o', linewidth=2, label='Overall Score')
+    ax1.set_title('DIVA Score History')
+    ax1.set_ylabel('Score')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend()
+    
+    # Plot component scores
+    ax2.plot(df['date'], df['discipline'], marker='s', label='Discipline')
+    ax2.plot(df['date'], df['income'], marker='^', label='Income')
+    ax2.plot(df['date'], df['velocity'], marker='d', label='Velocity')
+    ax2.plot(df['date'], df['assets'], marker='o', label='Assets')
+    ax2.set_title('DIVA Component Scores')
+    ax2.set_ylabel('Score')
+    ax2.set_xlabel('Date')
+    ax2.grid(True, alpha=0.3)
+    ax2.legend()
+    
+    plt.tight_layout()
+    plt.show()
+    
+    return df
+
+# Export to CSV
+def export_diva_history(user_id: str, filename: str):
+    """Export DIVA history to CSV"""
+    response = client.diva.get_history_csv(user_id, {
+        'period': '1year',
+        'granularity': 'monthly'
+    })
+    
+    with open(filename, 'w') as f:
+        f.write(response.content)
+    
+    print(f"DIVA history exported to {filename}")
+```
+
+```javascript React Native
+import React, { useState, useEffect } from 'react';
+import { View, Text, ActivityIndicator } from 'react-native';
+import { LineChart } from 'react-native-chart-kit';
+import { AWOClient } from '@awo/react-native-sdk';
+
+export function DivaHistoryChart({ userId, period = '6months' }) {
+  const [history, setHistory] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    loadHistory();
+  }, [userId, period]);
+
+  const loadHistory = async () => {
+    try {
+      setLoading(true);
+      const historyData = await AWOClient.diva.getHistory(userId, {
+        period,
+        granularity: 'monthly',
+        includeBreakdown: true
+      });
+      setHistory(historyData);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <ActivityIndicator size="large" />;
+  }
+
+  if (error) {
+    return <Text>Error: {error}</Text>;
+  }
+
+  const chartData = {
+    labels: history.dataPoints.map(point => 
+      new Date(point.date).toLocaleDateString('en-US', { month: 'short' })
+    ),
+    datasets: [
+      {
+        data: history.dataPoints.map(point => point.overallScore),
+        color: (opacity = 1) => `rgba(255, 99, 132, ${opacity})`,
+        strokeWidth: 2
+      }
+    ]
+  };
+
+  const chartConfig = {
+    backgroundColor: '#ffffff',
+    backgroundGradientFrom: '#ffffff',
+    backgroundGradientTo: '#ffffff',
+    decimalPlaces: 1,
+    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+    style: {
+      borderRadius: 16
+    },
+    propsForDots: {
+      r: '6',
+      strokeWidth: '2',
+      stroke: '#ffa726'
+    }
+  };
+
+  return (
+    <View>
+      <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
+        DIVA Score History
+      </Text>
+      
+      <LineChart
+        data={chartData}
+        width={350}
+        height={220}
+        chartConfig={chartConfig}
+        bezier
+        style={{
+          marginVertical: 8,
+          borderRadius: 16
+        }}
+      />
+      
+      <View style={{ marginTop: 16 }}>
+        <Text>
+          Trend: {history.trends.overall.direction} 
+          ({history.trends.overall.change > 0 ? '+' : ''}{history.trends.overall.change.toFixed(1)} points)
+        </Text>
+        <Text>
+          Average Score: {history.statistics.average.toFixed(1)}
+        </Text>
+        <Text>
+          Volatility: {history.statistics.volatility.toFixed(1)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// Hook for DIVA history data
+export function useDivaHistory(userId, options = {}) {
+  const [history, setHistory] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchHistory = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await AWOClient.diva.getHistory(userId, options);
+      setHistory(data);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      fetchHistory();
+    }
+  }, [userId, JSON.stringify(options)]);
+
+  return {
+    history,
+    loading,
+    error,
+    refetch: fetchHistory
+  };
+}
+```
+</CodeGroup>
+
+## Data Visualization Examples
+
+<AccordionGroup>
+  <Accordion title="Score Trend Visualization">
+    ```javascript
+    // Chart.js configuration for DIVA score history
+    const chartConfig = {
+      type: 'line',
+      data: {
+        labels: history.dataPoints.map(point => 
+          new Date(point.date).toLocaleDateString()
+        ),
+        datasets: [
+          {
+            label: 'Overall DIVA Score',
+            data: history.dataPoints.map(point => point.overallScore),
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.1
+          },
+          {
+            label: 'Discipline',
+            data: history.dataPoints.map(point => point.scores.discipline),
+            borderColor: 'rgb(255, 99, 132)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            tension: 0.1
+          },
+          {
+            label: 'Income',
+            data: history.dataPoints.map(point => point.scores.income),
+            borderColor: 'rgb(54, 162, 235)',
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            tension: 0.1
+          },
+          {
+            label: 'Velocity',
+            data: history.dataPoints.map(point => point.scores.velocity),
+            borderColor: 'rgb(255, 205, 86)',
+            backgroundColor: 'rgba(255, 205, 86, 0.2)',
+            tension: 0.1
+          },
+          {
+            label: 'Assets',
+            data: history.dataPoints.map(point => point.scores.assets),
+            borderColor: 'rgb(153, 102, 255)',
+            backgroundColor: 'rgba(153, 102, 255, 0.2)',
+            tension: 0.1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: 'DIVA Score History'
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 100
+          }
+        }
+      }
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="Progress Analysis">
+    ```javascript
+    // Analyze score progression patterns
+    function analyzeScoreProgression(history) {
+      const dataPoints = history.dataPoints;
+      const analysis = {
+        totalProgress: 0,
+        averageMonthlyChange: 0,
+        bestPerformingComponent: '',
+        consistencyScore: 0,
+        trendStrength: 0
+      };
+
+      if (dataPoints.length < 2) {
+        return analysis;
+      }
+
+      // Calculate total progress
+      const firstScore = dataPoints[0].overallScore;
+      const lastScore = dataPoints[dataPoints.length - 1].overallScore;
+      analysis.totalProgress = lastScore - firstScore;
+
+      // Calculate average monthly change
+      const monthlyChanges = [];
+      for (let i = 1; i < dataPoints.length; i++) {
+        const change = dataPoints[i].overallScore - dataPoints[i-1].overallScore;
+        monthlyChanges.push(change);
+      }
+      analysis.averageMonthlyChange = monthlyChanges.reduce((a, b) => a + b, 0) / monthlyChanges.length;
+
+      // Find best performing component
+      const componentChanges = {
+        discipline: dataPoints[dataPoints.length - 1].scores.discipline - dataPoints[0].scores.discipline,
+        income: dataPoints[dataPoints.length - 1].scores.income - dataPoints[0].scores.income,
+        velocity: dataPoints[dataPoints.length - 1].scores.velocity - dataPoints[0].scores.velocity,
+        assets: dataPoints[dataPoints.length - 1].scores.assets - dataPoints[0].scores.assets
+      };
+      analysis.bestPerformingComponent = Object.keys(componentChanges)
+        .reduce((a, b) => componentChanges[a] > componentChanges[b] ? a : b);
+
+      // Calculate consistency (lower volatility = higher consistency)
+      const scores = dataPoints.map(p => p.overallScore);
+      const mean = scores.reduce((a, b) => a + b) / scores.length;
+      const variance = scores.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / scores.length;
+      const standardDeviation = Math.sqrt(variance);
+      analysis.consistencyScore = Math.max(0, 100 - (standardDeviation * 10));
+
+      // Calculate trend strength (R-squared)
+      const xValues = dataPoints.map((_, index) => index);
+      const yValues = scores;
+      const correlation = calculateCorrelation(xValues, yValues);
+      analysis.trendStrength = Math.pow(correlation, 2) * 100;
+
+      return analysis;
+    }
+
+    function calculateCorrelation(x, y) {
+      const n = x.length;
+      const sumX = x.reduce((a, b) => a + b);
+      const sumY = y.reduce((a, b) => a + b);
+      const sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
+      const sumXX = x.reduce((sum, xi) => sum + xi * xi, 0);
+      const sumYY = y.reduce((sum, yi) => sum + yi * yi, 0);
+      
+      const numerator = n * sumXY - sumX * sumY;
+      const denominator = Math.sqrt((n * sumXX - sumX * sumX) * (n * sumYY - sumY * sumY));
+      
+      return denominator === 0 ? 0 : numerator / denominator;
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Optimal Period Selection" icon="calendar">
+    **Recommended periods by use case:**
+    
+    - **Dashboard Overview**: 3-6 months, monthly granularity
+    - **Detailed Analysis**: 1 year, monthly granularity  
+    - **Recent Changes**: 1 month, daily granularity
+    - **Long-term Trends**: 2 years, quarterly granularity
+  </Card>
+  
+  <Card title="Performance Optimization" icon="zap">
+    **Optimize API calls:**
+    
+    - Cache history data for 1 hour
+    - Use appropriate granularity for the display
+    - Request insights only when needed
+    - Implement progressive loading for long periods
+  </Card>
+  
+  <Card title="Data Interpretation" icon="chart-line">
+    **Understanding score trends:**
+    
+    - Focus on 3+ month trends vs daily fluctuations
+    - Consider transaction count for confidence
+    - Account for seasonal patterns
+    - Compare to demographic benchmarks
+  </Card>
+  
+  <Card title="User Experience" icon="users">
+    **Display recommendations:**
+    
+    - Show trend direction prominently
+    - Highlight best performing components
+    - Provide context for score changes
+    - Enable easy period switching
+  </Card>
+</CardGroup>
+
+## Related Endpoints
+
+- [Get Current DIVA Score](/api-reference/diva-score/get-score) - Current score details
+- [Refresh DIVA Score](/api-reference/diva-score/refresh) - Trigger new calculation  
+- [Get DIVA Insights](/api-reference/diva-score/insights) - Detailed insights and recommendations
+- [List Transactions](/api-reference/transactions/list) - View underlying transaction data

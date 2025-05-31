@@ -1,0 +1,1207 @@
+---
+title: "Update User Profile"
+api: "PUT /api/v1/users/{userId}"
+description: "Update user profile information including personal details, preferences, and settings"
+---
+
+# Update User Profile
+
+Updates a user's profile information including personal details, preferences, and account settings. This endpoint supports partial updates and includes validation for all fields.
+
+<Warning>
+Some profile changes may trigger KYC re-verification processes. Users will be notified of any additional verification requirements.
+</Warning>
+
+## Endpoint
+
+<CodeGroup>
+```bash cURL
+curl -X PUT "https://api.awo-platform.com/v1/users/{userId}" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "firstName": "Jane",
+    "lastName": "Doe",
+    "email": "jane.doe@example.com",
+    "phoneNumber": "+27123456789",
+    "dateOfBirth": "1990-05-15",
+    "preferences": {
+      "currency": "ZAR",
+      "language": "en",
+      "notifications": {
+        "email": true,
+        "sms": false,
+        "push": true
+      }
+    }
+  }'
+```
+
+```javascript JavaScript SDK
+import { AWOClient } from '@awo/api-sdk';
+
+const client = new AWOClient({ 
+  apiKey: 'your-api-key',
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+const updatedUser = await client.users.update('user-id', {
+  firstName: 'Jane',
+  lastName: 'Doe',
+  email: 'jane.doe@example.com',
+  preferences: {
+    currency: 'ZAR',
+    language: 'en',
+    notifications: {
+      email: true,
+      sms: false,
+      push: true
+    }
+  }
+});
+```
+
+```python Python SDK
+from awo_sdk import AWOClient
+
+client = AWOClient(
+    api_key="your-api-key",
+    base_url="https://api.awo-platform.com/v1"
+)
+
+updated_user = client.users.update("user-id", {
+    "first_name": "Jane",
+    "last_name": "Doe", 
+    "email": "jane.doe@example.com",
+    "preferences": {
+        "currency": "ZAR",
+        "language": "en",
+        "notifications": {
+            "email": True,
+            "sms": False,
+            "push": True
+        }
+    }
+})
+```
+</CodeGroup>
+
+## Path Parameters
+
+<ParamField path="userId" type="string" required>
+  The unique identifier of the user to update
+</ParamField>
+
+## Request Body
+
+<ParamField body="firstName" type="string">
+  User's first name (2-50 characters, letters only)
+</ParamField>
+
+<ParamField body="lastName" type="string">
+  User's last name (2-50 characters, letters only)
+</ParamField>
+
+<ParamField body="email" type="string">
+  User's email address (must be valid email format)
+</ParamField>
+
+<ParamField body="phoneNumber" type="string">
+  User's phone number (international format: +country_code_number)
+</ParamField>
+
+<ParamField body="dateOfBirth" type="string">
+  Date of birth in ISO format (YYYY-MM-DD)
+</ParamField>
+
+<ParamField body="gender" type="string">
+  Gender (M, F, or O for other)
+</ParamField>
+
+<ParamField body="city" type="string">
+  City of residence
+</ParamField>
+
+<ParamField body="preferences" type="object">
+  User preferences and settings
+  <Expandable title="preferences object">
+    <ParamField body="currency" type="string">
+      Preferred currency (ZAR, USD, KES, etc.)
+    </ParamField>
+    <ParamField body="language" type="string">
+      Preferred language (en, af, zu, sw, etc.)
+    </ParamField>
+    <ParamField body="timezone" type="string">
+      User's timezone (e.g., "Africa/Johannesburg")
+    </ParamField>
+    <ParamField body="notifications" type="object">
+      Notification preferences
+      <Expandable title="notifications object">
+        <ParamField body="email" type="boolean">
+          Enable email notifications
+        </ParamField>
+        <ParamField body="sms" type="boolean">
+          Enable SMS notifications
+        </ParamField>
+        <ParamField body="push" type="boolean">
+          Enable push notifications
+        </ParamField>
+        <ParamField body="marketing" type="boolean">
+          Enable marketing communications
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    <ParamField body="privacy" type="object">
+      Privacy settings
+      <Expandable title="privacy object">
+        <ParamField body="profileVisibility" type="string">
+          Profile visibility: 'public', 'private', 'chama_only'
+        </ParamField>
+        <ParamField body="dataSharing" type="boolean">
+          Allow anonymized data sharing for insights
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="emergencyContact" type="object">
+  Emergency contact information
+  <Expandable title="emergencyContact object">
+    <ParamField body="name" type="string">
+      Emergency contact's full name
+    </ParamField>
+    <ParamField body="phoneNumber" type="string">
+      Emergency contact's phone number
+    </ParamField>
+    <ParamField body="relationship" type="string">
+      Relationship to user (spouse, parent, sibling, friend, etc.)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the user
+</ResponseField>
+
+<ResponseField name="phoneNumber" type="string">
+  User's phone number (primary identifier)
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address
+</ResponseField>
+
+<ResponseField name="firstName" type="string">
+  User's first name
+</ResponseField>
+
+<ResponseField name="lastName" type="string">
+  User's last name
+</ResponseField>
+
+<ResponseField name="dateOfBirth" type="string">
+  Date of birth in ISO format
+</ResponseField>
+
+<ResponseField name="gender" type="string">
+  Gender (M, F, or O)
+</ResponseField>
+
+<ResponseField name="country" type="string">
+  Country of residence (ISO 2-letter code)
+</ResponseField>
+
+<ResponseField name="city" type="string">
+  City of residence
+</ResponseField>
+
+<ResponseField name="kycStatus" type="string">
+  KYC verification status: 'PENDING', 'VERIFIED', 'REJECTED', 'EXPIRED'
+</ResponseField>
+
+<ResponseField name="kycLevel" type="number">
+  KYC verification level (1-3)
+</ResponseField>
+
+<ResponseField name="preferences" type="object">
+  User preferences and settings
+  <Expandable title="preferences object">
+    <ResponseField name="currency" type="string">
+      Preferred currency
+    </ResponseField>
+    <ResponseField name="language" type="string">
+      Preferred language
+    </ResponseField>
+    <ResponseField name="timezone" type="string">
+      User's timezone
+    </ResponseField>
+    <ResponseField name="notifications" type="object">
+      Notification preferences
+    </ResponseField>
+    <ResponseField name="privacy" type="object">
+      Privacy settings
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="emergencyContact" type="object">
+  Emergency contact information
+</ResponseField>
+
+<ResponseField name="profileCompletion" type="object">
+  Profile completion status
+  <Expandable title="profileCompletion object">
+    <ResponseField name="percentage" type="number">
+      Profile completion percentage (0-100)
+    </ResponseField>
+    <ResponseField name="missingFields" type="array">
+      Array of missing required fields
+    </ResponseField>
+    <ResponseField name="recommendations" type="array">
+      Recommended fields to complete
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="verificationStatus" type="object">
+  Account verification status
+  <Expandable title="verificationStatus object">
+    <ResponseField name="email" type="boolean">
+      Email verification status
+    </ResponseField>
+    <ResponseField name="phone" type="boolean">
+      Phone verification status
+    </ResponseField>
+    <ResponseField name="identity" type="boolean">
+      Identity verification status
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO timestamp of account creation
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO timestamp of last profile update
+</ResponseField>
+
+## Response Examples
+
+<ResponseExample>
+```json 200 - Success
+{
+  "id": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+  "phoneNumber": "+27123456789",
+  "email": "jane.doe@example.com",
+  "firstName": "Jane",
+  "lastName": "Doe",
+  "dateOfBirth": "1990-05-15",
+  "gender": "F",
+  "country": "ZA",
+  "city": "Cape Town",
+  "kycStatus": "VERIFIED",
+  "kycLevel": 2,
+  "preferences": {
+    "currency": "ZAR",
+    "language": "en",
+    "timezone": "Africa/Johannesburg",
+    "notifications": {
+      "email": true,
+      "sms": false,
+      "push": true,
+      "marketing": false
+    },
+    "privacy": {
+      "profileVisibility": "private",
+      "dataSharing": true
+    }
+  },
+  "emergencyContact": {
+    "name": "John Doe",
+    "phoneNumber": "+27987654321",
+    "relationship": "spouse"
+  },
+  "profileCompletion": {
+    "percentage": 95,
+    "missingFields": [],
+    "recommendations": [
+      "Consider adding professional information",
+      "Upload profile picture"
+    ]
+  },
+  "verificationStatus": {
+    "email": true,
+    "phone": true,
+    "identity": true
+  },
+  "createdAt": "2025-01-15T10:30:00Z",
+  "updatedAt": "2025-05-31T14:22:00Z"
+}
+```
+
+```json 400 - Validation Error
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid input data provided",
+    "details": {
+      "fields": {
+        "email": [
+          "Email format is invalid"
+        ],
+        "phoneNumber": [
+          "Phone number must be in international format (+country_code_number)"
+        ],
+        "dateOfBirth": [
+          "User must be at least 18 years old"
+        ]
+      }
+    }
+  }
+}
+```
+
+```json 409 - Conflict (Email/Phone Already Exists)
+{
+  "error": {
+    "code": "RESOURCE_CONFLICT",
+    "message": "Email address is already associated with another account",
+    "details": {
+      "conflictingField": "email",
+      "value": "jane.doe@example.com",
+      "suggestions": [
+        "Use a different email address",
+        "If this is your email, try logging in instead",
+        "Contact support if you believe this is an error"
+      ]
+    }
+  }
+}
+```
+
+```json 422 - KYC Re-verification Required
+{
+  "error": {
+    "code": "KYC_REVERIFICATION_REQUIRED",
+    "message": "Profile changes require identity re-verification",
+    "details": {
+      "triggeredBy": [
+        "dateOfBirth",
+        "lastName"
+      ],
+      "requiredActions": [
+        "Submit identity document",
+        "Complete video verification"
+      ],
+      "kycUrl": "https://awo-platform.com/kyc/reverify",
+      "estimatedTime": "2-3 business days"
+    }
+  }
+}
+```
+</ResponseExample>
+
+## Field Validation Rules
+
+### Personal Information
+
+<Tabs>
+  <Tab title="Name Fields">
+    ```typescript
+    const nameValidation = {
+      firstName: {
+        minLength: 2,
+        maxLength: 50,
+        pattern: /^[a-zA-Z\s'-]+$/,
+        required: true
+      },
+      lastName: {
+        minLength: 2,
+        maxLength: 50,
+        pattern: /^[a-zA-Z\s'-]+$/,
+        required: true
+      }
+    };
+    
+    // Valid examples:
+    // "Jane", "Mary-Ann", "O'Connor", "Van der Merwe"
+    
+    // Invalid examples:
+    // "J@ne", "123John", "A", "VeryLongNameThatExceedsTheFiftyCharacterLimit"
+    ```
+  </Tab>
+  
+  <Tab title="Contact Information">
+    ```typescript
+    const contactValidation = {
+      email: {
+        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        maxLength: 255,
+        unique: true
+      },
+      phoneNumber: {
+        pattern: /^\+[1-9]\d{1,14}$/,
+        unique: true,
+        examples: [
+          "+27123456789", // South Africa
+          "+254712345678", // Kenya  
+          "+260971234567", // Zambia
+          "+267712345678"  // Botswana
+        ]
+      }
+    };
+    
+    // Phone number validation by country:
+    const countryPhonePatterns = {
+      ZA: /^\+27[1-9]\d{8}$/, // South Africa
+      KE: /^\+254[1-9]\d{8}$/, // Kenya
+      ZM: /^\+260[1-9]\d{8}$/, // Zambia
+      BW: /^\+267[1-9]\d{7}$/  // Botswana
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Date & Demographics">
+    ```typescript
+    const demographicValidation = {
+      dateOfBirth: {
+        format: 'YYYY-MM-DD',
+        minimumAge: 18,
+        maximumAge: 120,
+        validation: (date) => {
+          const birth = new Date(date);
+          const today = new Date();
+          const age = today.getFullYear() - birth.getFullYear();
+          
+          if (age < 18) return 'User must be at least 18 years old';
+          if (age > 120) return 'Invalid birth date';
+          if (birth > today) return 'Birth date cannot be in the future';
+          
+          return null; // Valid
+        }
+      },
+      gender: {
+        enum: ['M', 'F', 'O'],
+        required: false
+      }
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Update Scenarios
+
+### 1. Basic Profile Update
+
+```typescript
+// Update basic information
+const basicUpdate = {
+  firstName: 'Jane',
+  lastName: 'Smith',
+  city: 'Johannesburg'
+};
+
+const result = await client.users.update(userId, basicUpdate);
+console.log('Profile updated successfully:', result.updatedAt);
+```
+
+### 2. Preferences Update
+
+```typescript
+// Update user preferences
+const preferencesUpdate = {
+  preferences: {
+    currency: 'USD',
+    language: 'af', // Afrikaans
+    notifications: {
+      email: true,
+      sms: false,
+      push: true,
+      marketing: false
+    },
+    privacy: {
+      profileVisibility: 'chama_only',
+      dataSharing: false
+    }
+  }
+};
+
+const result = await client.users.update(userId, preferencesUpdate);
+```
+
+### 3. Emergency Contact Update
+
+```typescript
+// Add or update emergency contact
+const emergencyContactUpdate = {
+  emergencyContact: {
+    name: 'Sarah Johnson',
+    phoneNumber: '+27987654321',
+    relationship: 'sister'
+  }
+};
+
+const result = await client.users.update(userId, emergencyContactUpdate);
+```
+
+### 4. Partial Field Updates
+
+```typescript
+// Only update specific fields (partial update)
+const partialUpdate = {
+  email: 'newemail@example.com'
+  // Only email will be updated, other fields remain unchanged
+};
+
+const result = await client.users.update(userId, partialUpdate);
+```
+
+## KYC Impact
+
+Certain profile changes may trigger KYC re-verification:
+
+<CardGroup cols={2}>
+  <Card title="Low Impact Changes" icon="check-circle">
+    **No KYC Re-verification Required:**
+    
+    - Email address
+    - Phone number  
+    - City
+    - Preferences
+    - Emergency contact
+    - Notification settings
+  </Card>
+  
+  <Card title="High Impact Changes" icon="exclamation-triangle">
+    **KYC Re-verification Required:**
+    
+    - First name or last name
+    - Date of birth
+    - Gender (if changing from/to specific values)
+    - Country of residence
+  </Card>
+</CardGroup>
+
+### Handling KYC Re-verification
+
+```typescript
+try {
+  const updatedUser = await client.users.update(userId, {
+    lastName: 'NewLastName',
+    dateOfBirth: '1991-06-20'
+  });
+} catch (error) {
+  if (error.code === 'KYC_REVERIFICATION_REQUIRED') {
+    // Handle KYC re-verification workflow
+    const kycDetails = error.details;
+    
+    console.log('KYC re-verification required due to:', kycDetails.triggeredBy);
+    console.log('Required actions:', kycDetails.requiredActions);
+    
+    // Redirect user to KYC process
+    window.location.href = kycDetails.kycUrl;
+  } else {
+    // Handle other errors
+    console.error('Update failed:', error.message);
+  }
+}
+```
+
+## Error Codes
+
+| Code | Description | Resolution |
+|------|-------------|------------|
+| `VALIDATION_ERROR` | Input validation failed | Fix validation errors in request body |
+| `RESOURCE_CONFLICT` | Email/phone already exists | Use different email/phone or merge accounts |
+| `KYC_REVERIFICATION_REQUIRED` | Changes require KYC re-verification | Complete KYC process |
+| `INSUFFICIENT_PERMISSIONS` | User cannot update this profile | Check user permissions |
+| `RATE_LIMIT_EXCEEDED` | Too many update requests | Wait before making more requests |
+| `USER_NOT_FOUND` | User ID does not exist | Verify user ID |
+
+## SDK Examples
+
+<CodeGroup>
+```typescript TypeScript SDK
+import { AWOClient, UpdateUserRequest, KYCReverificationError } from '@awo/api-sdk';
+
+const client = new AWOClient({
+  apiKey: process.env.AWO_API_KEY!,
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+class UserProfileManager {
+  async updateUserProfile(userId: string, updates: UpdateUserRequest) {
+    try {
+      const updatedUser = await client.users.update(userId, updates);
+      
+      console.log('Profile updated successfully');
+      console.log(`Completion: ${updatedUser.profileCompletion.percentage}%`);
+      
+      return updatedUser;
+    } catch (error) {
+      if (error instanceof KYCReverificationError) {
+        return this.handleKYCReverification(error);
+      } else {
+        console.error('Update failed:', error.message);
+        throw error;
+      }
+    }
+  }
+
+  private async handleKYCReverification(error: KYCReverificationError) {
+    console.log('KYC re-verification required');
+    console.log('Triggered by:', error.details.triggeredBy);
+    
+    // Show user notification about KYC requirement
+    this.showKYCNotification(error.details);
+    
+    return {
+      success: false,
+      requiresKYC: true,
+      kycUrl: error.details.kycUrl,
+      estimatedTime: error.details.estimatedTime
+    };
+  }
+
+  async updatePreferences(userId: string, preferences: UserPreferences) {
+    const updates = { preferences };
+    return this.updateUserProfile(userId, updates);
+  }
+
+  async updateNotificationSettings(userId: string, notifications: NotificationSettings) {
+    const updates = {
+      preferences: {
+        notifications
+      }
+    };
+    return this.updateUserProfile(userId, updates);
+  }
+
+  async validateProfileCompletion(userId: string): Promise<ProfileCompletionStatus> {
+    const user = await client.users.getProfile(userId);
+    
+    return {
+      percentage: user.profileCompletion.percentage,
+      isComplete: user.profileCompletion.percentage >= 90,
+      missingFields: user.profileCompletion.missingFields,
+      recommendations: user.profileCompletion.recommendations
+    };
+  }
+}
+
+// Usage
+const profileManager = new UserProfileManager();
+
+const result = await profileManager.updateUserProfile('user-123', {
+  firstName: 'Jane',
+  email: 'jane@example.com',
+  preferences: {
+    currency: 'ZAR',
+    notifications: {
+      email: true,
+      push: true
+    }
+  }
+});
+
+if (result.requiresKYC) {
+  console.log('Redirecting to KYC verification...');
+  window.location.href = result.kycUrl;
+}
+```
+
+```python Python SDK
+from awo_sdk import AWOClient, UpdateUserRequest
+from awo_sdk.exceptions import KYCReverificationError, ValidationError
+
+client = AWOClient(
+    api_key=os.environ['AWO_API_KEY'],
+    base_url='https://api.awo-platform.com/v1'
+)
+
+class UserProfileManager:
+    def __init__(self):
+        self.client = client
+
+    def update_user_profile(self, user_id: str, updates: dict):
+        try:
+            updated_user = self.client.users.update(user_id, updates)
+            
+            print(f"Profile updated successfully")
+            print(f"Completion: {updated_user.profile_completion.percentage}%")
+            
+            return updated_user
+            
+        except KYCReverificationError as error:
+            return self.handle_kyc_reverification(error)
+        except ValidationError as error:
+            print(f"Validation errors: {error.details.fields}")
+            raise
+        except Exception as error:
+            print(f"Update failed: {error}")
+            raise
+
+    def handle_kyc_reverification(self, error):
+        print("KYC re-verification required")
+        print(f"Triggered by: {error.details.triggered_by}")
+        
+        # Notify user about KYC requirement
+        self.show_kyc_notification(error.details)
+        
+        return {
+            'success': False,
+            'requires_kyc': True,
+            'kyc_url': error.details.kyc_url,
+            'estimated_time': error.details.estimated_time
+        }
+
+    def update_preferences(self, user_id: str, preferences: dict):
+        updates = {'preferences': preferences}
+        return self.update_user_profile(user_id, updates)
+
+    def update_notification_settings(self, user_id: str, notifications: dict):
+        updates = {
+            'preferences': {
+                'notifications': notifications
+            }
+        }
+        return self.update_user_profile(user_id, updates)
+
+    def batch_update_users(self, user_updates: list):
+        """Update multiple users in batch"""
+        results = []
+        
+        for user_update in user_updates:
+            try:
+                result = self.update_user_profile(
+                    user_update['user_id'], 
+                    user_update['updates']
+                )
+                results.append({
+                    'user_id': user_update['user_id'],
+                    'success': True,
+                    'data': result
+                })
+            except Exception as error:
+                results.append({
+                    'user_id': user_update['user_id'],
+                    'success': False,
+                    'error': str(error)
+                })
+        
+        return results
+
+# Usage
+profile_manager = UserProfileManager()
+
+try:
+    result = profile_manager.update_user_profile('user-123', {
+        'first_name': 'Jane',
+        'email': 'jane@example.com',
+        'preferences': {
+            'currency': 'ZAR',
+            'notifications': {
+                'email': True,
+                'push': True
+            }
+        }
+    })
+    
+    if result.get('requires_kyc'):
+        print(f"Redirecting to KYC verification: {result['kyc_url']}")
+    else:
+        print("Profile updated successfully!")
+        
+except Exception as e:
+    print(f"Failed to update profile: {e}")
+```
+
+```javascript React Native
+import React, { useState } from 'react';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  Switch,
+  Alert,
+  ScrollView 
+} from 'react-native';
+import { AWOClient } from '@awo/react-native-sdk';
+
+export function ProfileEditScreen({ userId, navigation }) {
+  const [profile, setProfile] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    city: '',
+    preferences: {
+      notifications: {
+        email: true,
+        sms: false,
+        push: true
+      }
+    }
+  });
+  const [loading, setLoading] = useState(false);
+
+  const updateProfile = async () => {
+    try {
+      setLoading(true);
+      
+      const updatedUser = await AWOClient.users.update(userId, profile);
+      
+      Alert.alert(
+        'Success',
+        'Profile updated successfully!',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+      
+    } catch (error) {
+      if (error.code === 'KYC_REVERIFICATION_REQUIRED') {
+        Alert.alert(
+          'Verification Required',
+          'Your changes require identity re-verification. You will be redirected to complete this process.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Continue', 
+              onPress: () => navigation.navigate('KYCVerification', { 
+                url: error.details.kycUrl 
+              })
+            }
+          ]
+        );
+      } else if (error.code === 'VALIDATION_ERROR') {
+        const errorMessages = Object.values(error.details.fields)
+          .flat()
+          .join('\n');
+        
+        Alert.alert('Validation Error', errorMessages);
+      } else {
+        Alert.alert('Error', error.message || 'Failed to update profile');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateField = (field, value) => {
+    setProfile(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const updateNestedField = (path, value) => {
+    setProfile(prev => {
+      const newProfile = { ...prev };
+      const keys = path.split('.');
+      let current = newProfile;
+      
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) current[keys[i]] = {};
+        current = current[keys[i]];
+      }
+      
+      current[keys[keys.length - 1]] = value;
+      return newProfile;
+    });
+  };
+
+  return (
+    <ScrollView style={{ flex: 1, padding: 16 }}>
+      {/* Personal Information */}
+      <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
+        Personal Information
+      </Text>
+      
+      <View style={{ marginBottom: 16 }}>
+        <Text style={{ marginBottom: 8 }}>First Name</Text>
+        <TextInput
+          style={{
+            borderWidth: 1,
+            borderColor: '#ccc',
+            borderRadius: 8,
+            padding: 12,
+            fontSize: 16
+          }}
+          value={profile.firstName}
+          onChangeText={(value) => updateField('firstName', value)}
+          placeholder="Enter first name"
+        />
+      </View>
+      
+      <View style={{ marginBottom: 16 }}>
+        <Text style={{ marginBottom: 8 }}>Last Name</Text>
+        <TextInput
+          style={{
+            borderWidth: 1,
+            borderColor: '#ccc',
+            borderRadius: 8,
+            padding: 12,
+            fontSize: 16
+          }}
+          value={profile.lastName}
+          onChangeText={(value) => updateField('lastName', value)}
+          placeholder="Enter last name"
+        />
+      </View>
+      
+      <View style={{ marginBottom: 16 }}>
+        <Text style={{ marginBottom: 8 }}>Email</Text>
+        <TextInput
+          style={{
+            borderWidth: 1,
+            borderColor: '#ccc',
+            borderRadius: 8,
+            padding: 12,
+            fontSize: 16
+          }}
+          value={profile.email}
+          onChangeText={(value) => updateField('email', value)}
+          placeholder="Enter email address"
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+      </View>
+      
+      <View style={{ marginBottom: 24 }}>
+        <Text style={{ marginBottom: 8 }}>City</Text>
+        <TextInput
+          style={{
+            borderWidth: 1,
+            borderColor: '#ccc',
+            borderRadius: 8,
+            padding: 12,
+            fontSize: 16
+          }}
+          value={profile.city}
+          onChangeText={(value) => updateField('city', value)}
+          placeholder="Enter city"
+        />
+      </View>
+
+      {/* Notification Preferences */}
+      <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
+        Notification Preferences
+      </Text>
+      
+      <View style={{ 
+        flexDirection: 'row', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: 12
+      }}>
+        <Text>Email Notifications</Text>
+        <Switch
+          value={profile.preferences.notifications.email}
+          onValueChange={(value) => 
+            updateNestedField('preferences.notifications.email', value)
+          }
+        />
+      </View>
+      
+      <View style={{ 
+        flexDirection: 'row', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: 12
+      }}>
+        <Text>SMS Notifications</Text>
+        <Switch
+          value={profile.preferences.notifications.sms}
+          onValueChange={(value) => 
+            updateNestedField('preferences.notifications.sms', value)
+          }
+        />
+      </View>
+      
+      <View style={{ 
+        flexDirection: 'row', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: 24
+      }}>
+        <Text>Push Notifications</Text>
+        <Switch
+          value={profile.preferences.notifications.push}
+          onValueChange={(value) => 
+            updateNestedField('preferences.notifications.push', value)
+          }
+        />
+      </View>
+
+      {/* Save Button */}
+      <TouchableOpacity
+        style={{
+          backgroundColor: '#007AFF',
+          padding: 16,
+          borderRadius: 8,
+          alignItems: 'center',
+          marginBottom: 32
+        }}
+        onPress={updateProfile}
+        disabled={loading}
+      >
+        <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>
+          {loading ? 'Updating...' : 'Save Changes'}
+        </Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+// Hook for profile updates
+export function useProfileUpdate() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const updateProfile = async (userId, updates) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await AWOClient.users.update(userId, updates);
+      return result;
+    } catch (err) {
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    updateProfile,
+    loading,
+    error
+  };
+}
+```
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Validation & User Experience">
+    **Client-Side Validation:**
+    
+    - Implement real-time validation for better UX
+    - Show field-specific error messages
+    - Use progressive validation (validate as user types)
+    - Provide helpful format examples for phone numbers
+    
+    ```typescript
+    const validateField = (field: string, value: string): string | null => {
+      switch (field) {
+        case 'email':
+          return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) 
+            ? null 
+            : 'Please enter a valid email address';
+        case 'phoneNumber':
+          return /^\+[1-9]\d{1,14}$/.test(value)
+            ? null
+            : 'Please enter phone number in international format (+27123456789)';
+        case 'firstName':
+        case 'lastName':
+          return /^[a-zA-Z\s'-]{2,50}$/.test(value)
+            ? null
+            : 'Name must be 2-50 characters, letters only';
+        default:
+          return null;
+      }
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="Security Considerations">
+    **Secure Profile Updates:**
+    
+    - Always verify user identity for sensitive changes
+    - Implement rate limiting for update requests
+    - Log all profile changes for audit purposes
+    - Use secure transmission for all data
+    
+    ```typescript
+    // Example: Secure update with audit logging
+    const secureProfileUpdate = async (userId: string, updates: UpdateUserRequest) => {
+      // Verify user session
+      await verifyUserSession(userId);
+      
+      // Check for sensitive changes
+      const sensitiveFields = ['dateOfBirth', 'firstName', 'lastName'];
+      const hasSensitiveChanges = Object.keys(updates).some(key => 
+        sensitiveFields.includes(key)
+      );
+      
+      if (hasSensitiveChanges) {
+        // Require additional verification
+        await requireStrongAuth(userId);
+      }
+      
+      // Log the update attempt
+      await auditLog({
+        userId,
+        action: 'profile_update',
+        fields: Object.keys(updates),
+        timestamp: new Date(),
+        ipAddress: getClientIP()
+      });
+      
+      // Perform update
+      return await client.users.update(userId, updates);
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="Error Handling Strategies">
+    **Graceful Error Handling:**
+    
+    - Provide clear, actionable error messages
+    - Handle network failures gracefully
+    - Implement retry mechanisms for transient failures
+    - Offer alternative solutions when possible
+    
+    ```typescript
+    const handleUpdateError = (error: any) => {
+      switch (error.code) {
+        case 'VALIDATION_ERROR':
+          // Show field-specific errors
+          showFieldErrors(error.details.fields);
+          break;
+          
+        case 'RESOURCE_CONFLICT':
+          // Email/phone already exists
+          showConflictDialog(error.details);
+          break;
+          
+        case 'KYC_REVERIFICATION_REQUIRED':
+          // Guide user through KYC process
+          showKYCDialog(error.details);
+          break;
+          
+        case 'RATE_LIMIT_EXCEEDED':
+          // Show cooldown message
+          showRateLimitMessage(error.details.retryAfter);
+          break;
+          
+        default:
+          // Generic error handling
+          showGenericError('Unable to update profile. Please try again.');
+      }
+    };
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Endpoints
+
+- [Get User Profile](/api-reference/users/profile) - Retrieve current user profile
+- [User KYC Verification](/api-reference/users/kyc) - Complete identity verification
+- [Authentication](/api-reference/auth/login) - User authentication endpoints
+- [Account Settings](/api-reference/users/settings) - Additional account configuration
