@@ -1,0 +1,1168 @@
+---
+title: "List Transactions"
+api: "GET /api/v1/transactions"
+description: "Retrieve transaction history with filtering, categorization, and analysis features"
+---
+
+# List Transactions
+
+Retrieves transaction history for connected bank accounts with comprehensive filtering options, automatic categorization, and analysis features. This endpoint supports real-time transaction data and provides the foundation for DIVA score calculations.
+
+<Info>
+Transaction data is automatically categorized using machine learning algorithms. Categories can be customized and corrected to improve accuracy over time.
+</Info>
+
+## Endpoint
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://api.awo-platform.com/v1/transactions?userId={userId}&fromDate=2025-01-01&toDate=2025-05-31&limit=50" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+```javascript JavaScript SDK
+import { AWOClient } from '@awo/api-sdk';
+
+const client = new AWOClient({ 
+  apiKey: 'your-api-key',
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+const transactions = await client.transactions.list({
+  userId: 'user-id',
+  fromDate: '2025-01-01',
+  toDate: '2025-05-31',
+  category: 'food_and_dining',
+  includeAnalysis: true,
+  limit: 50
+});
+```
+
+```python Python SDK
+from awo_sdk import AWOClient
+from datetime import datetime, timedelta
+
+client = AWOClient(
+    api_key="your-api-key",
+    base_url="https://api.awo-platform.com/v1"
+)
+
+# Get last 30 days of transactions
+end_date = datetime.now()
+start_date = end_date - timedelta(days=30)
+
+transactions = client.transactions.list(
+    user_id="user-id",
+    from_date=start_date.strftime('%Y-%m-%d'),
+    to_date=end_date.strftime('%Y-%m-%d'),
+    include_analysis=True,
+    limit=100
+)
+```
+</CodeGroup>
+
+## Query Parameters
+
+<ParamField query="userId" type="string">
+  Filter transactions by user ID (required for admin access, optional for user access)
+</ParamField>
+
+<ParamField query="accountId" type="string">
+  Filter transactions by specific account ID
+</ParamField>
+
+<ParamField query="fromDate" type="string">
+  Start date for transaction range (ISO format: YYYY-MM-DD)
+</ParamField>
+
+<ParamField query="toDate" type="string">
+  End date for transaction range (ISO format: YYYY-MM-DD)
+</ParamField>
+
+<ParamField query="category" type="string">
+  Filter by transaction category
+  - `food_and_dining` - Restaurant, grocery, food delivery
+  - `transportation` - Fuel, public transport, ride-sharing
+  - `shopping` - Retail, online shopping, clothing
+  - `entertainment` - Movies, concerts, games, streaming
+  - `bills_and_utilities` - Rent, electricity, water, internet
+  - `healthcare` - Medical, pharmacy, insurance
+  - `education` - Tuition, books, training
+  - `transfer` - Bank transfers, peer-to-peer payments
+  - `income` - Salary, freelance, investment income
+  - `other` - Uncategorized transactions
+</ParamField>
+
+<ParamField query="subcategory" type="string">
+  Filter by more specific subcategory (e.g., 'groceries', 'restaurants')
+</ParamField>
+
+<ParamField query="transactionType" type="string">
+  Filter by transaction type
+  - `all` - All transaction types
+  - `debit` - Outgoing transactions (expenses)
+  - `credit` - Incoming transactions (income)
+  - `transfer` - Account transfers
+</ParamField>
+
+<ParamField query="minAmount" type="number">
+  Minimum transaction amount (absolute value)
+</ParamField>
+
+<ParamField query="maxAmount" type="number">
+  Maximum transaction amount (absolute value)
+</ParamField>
+
+<ParamField query="merchantName" type="string">
+  Filter by merchant name (partial match)
+</ParamField>
+
+<ParamField query="description" type="string">
+  Filter by transaction description (partial match)
+</ParamField>
+
+<ParamField query="isRecurring" type="boolean">
+  Filter recurring vs one-time transactions
+</ParamField>
+
+<ParamField query="includeAnalysis" type="boolean" default="false">
+  Include transaction analysis and insights
+</ParamField>
+
+<ParamField query="includeCategorization" type="boolean" default="true">
+  Include automatic categorization details
+</ParamField>
+
+<ParamField query="includeLocation" type="boolean" default="false">
+  Include transaction location data (if available)
+</ParamField>
+
+<ParamField query="sortBy" type="string" default="date">
+  Sort transactions by field
+  - `date` - Transaction date (newest first)
+  - `amount` - Transaction amount (highest first)
+  - `merchant` - Merchant name (alphabetical)
+  - `category` - Category name (alphabetical)
+</ParamField>
+
+<ParamField query="sortOrder" type="string" default="desc">
+  Sort order: `asc` (ascending) or `desc` (descending)
+</ParamField>
+
+<ParamField query="limit" type="integer" default="50">
+  Maximum number of transactions to return (1-500)
+</ParamField>
+
+<ParamField query="offset" type="integer" default="0">
+  Number of transactions to skip for pagination
+</ParamField>
+
+## Response
+
+<ResponseField name="transactions" type="array">
+  Array of transaction records
+  <Expandable title="transaction object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the transaction
+    </ResponseField>
+    <ResponseField name="userId" type="string">
+      ID of the user who owns this transaction
+    </ResponseField>
+    <ResponseField name="accountId" type="string">
+      ID of the account this transaction belongs to
+    </ResponseField>
+    <ResponseField name="externalId" type="string">
+      External transaction ID from the bank
+    </ResponseField>
+    <ResponseField name="amount" type="number">
+      Transaction amount (positive for income, negative for expenses)
+    </ResponseField>
+    <ResponseField name="currency" type="string">
+      Transaction currency (ISO 4217 code)
+    </ResponseField>
+    <ResponseField name="date" type="string">
+      Transaction date (ISO timestamp)
+    </ResponseField>
+    <ResponseField name="description" type="string">
+      Original transaction description from bank
+    </ResponseField>
+    <ResponseField name="merchantName" type="string">
+      Cleaned merchant name
+    </ResponseField>
+    <ResponseField name="category" type="string">
+      Primary transaction category
+    </ResponseField>
+    <ResponseField name="subcategory" type="string">
+      More specific subcategory
+    </ResponseField>
+    <ResponseField name="type" type="string">
+      Transaction type: 'debit', 'credit', 'transfer'
+    </ResponseField>
+    <ResponseField name="status" type="string">
+      Transaction status: 'posted', 'pending', 'failed'
+    </ResponseField>
+    <ResponseField name="categorization" type="object">
+      Categorization details
+      <Expandable title="categorization object">
+        <ResponseField name="confidence" type="number">
+          Confidence score for category assignment (0-1)
+        </ResponseField>
+        <ResponseField name="method" type="string">
+          Categorization method: 'automatic', 'manual', 'rule_based'
+        </ResponseField>
+        <ResponseField name="isUserCorrected" type="boolean">
+          Whether user has manually corrected the category
+        </ResponseField>
+        <ResponseField name="alternativeCategories" type="array">
+          Other possible categories with confidence scores
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="recurringInfo" type="object">
+      Recurring transaction information
+      <Expandable title="recurringInfo object">
+        <ResponseField name="isRecurring" type="boolean">
+          Whether this is part of a recurring pattern
+        </ResponseField>
+        <ResponseField name="frequency" type="string">
+          Frequency: 'weekly', 'monthly', 'quarterly', 'yearly'
+        </ResponseField>
+        <ResponseField name="nextExpectedDate" type="string">
+          Next expected occurrence date
+        </ResponseField>
+        <ResponseField name="groupId" type="string">
+          ID linking related recurring transactions
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="location" type="object">
+      Transaction location data (if available)
+      <Expandable title="location object">
+        <ResponseField name="city" type="string">
+          Transaction city
+        </ResponseField>
+        <ResponseField name="region" type="string">
+          State/province/region
+        </ResponseField>
+        <ResponseField name="country" type="string">
+          Country code (ISO 2-letter)
+        </ResponseField>
+        <ResponseField name="coordinates" type="object">
+          GPS coordinates (if available)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="account" type="object">
+      Basic account information
+      <Expandable title="account object">
+        <ResponseField name="id" type="string">
+          Account ID
+        </ResponseField>
+        <ResponseField name="name" type="string">
+          Account name
+        </ResponseField>
+        <ResponseField name="type" type="string">
+          Account type
+        </ResponseField>
+        <ResponseField name="institutionName" type="string">
+          Bank/institution name
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="tags" type="array">
+      User-defined tags for transaction organization
+    </ResponseField>
+    <ResponseField name="notes" type="string">
+      User-added notes or comments
+    </ResponseField>
+    <ResponseField name="createdAt" type="string">
+      ISO timestamp of when transaction was added to system
+    </ResponseField>
+    <ResponseField name="updatedAt" type="string">
+      ISO timestamp of last transaction update
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination information
+  <Expandable title="pagination object">
+    <ResponseField name="total" type="number">
+      Total number of transactions matching filters
+    </ResponseField>
+    <ResponseField name="limit" type="number">
+      Number of transactions per page
+    </ResponseField>
+    <ResponseField name="offset" type="number">
+      Number of transactions skipped
+    </ResponseField>
+    <ResponseField name="hasMore" type="boolean">
+      Whether more transactions are available
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="summary" type="object">
+  Transaction summary statistics
+  <Expandable title="summary object">
+    <ResponseField name="totalAmount" type="number">
+      Sum of all transaction amounts
+    </ResponseField>
+    <ResponseField name="totalIncome" type="number">
+      Sum of all positive transactions
+    </ResponseField>
+    <ResponseField name="totalExpenses" type="number">
+      Sum of all negative transactions (absolute value)
+    </ResponseField>
+    <ResponseField name="netAmount" type="number">
+      Net amount (income - expenses)
+    </ResponseField>
+    <ResponseField name="transactionCount" type="number">
+      Total number of transactions in result set
+    </ResponseField>
+    <ResponseField name="averageAmount" type="number">
+      Average transaction amount
+    </ResponseField>
+    <ResponseField name="categoryBreakdown" type="object">
+      Spending breakdown by category
+    </ResponseField>
+    <ResponseField name="monthlyTrends" type="array">
+      Monthly transaction trends (if date range spans multiple months)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="analysis" type="object">
+  Transaction analysis and insights (if requested)
+  <Expandable title="analysis object">
+    <ResponseField name="spendingPatterns" type="object">
+      Spending pattern analysis
+    </ResponseField>
+    <ResponseField name="unusualTransactions" type="array">
+      Transactions that deviate from normal patterns
+    </ResponseField>
+    <ResponseField name="recurringDetection" type="object">
+      Detected recurring payment patterns
+    </ResponseField>
+    <ResponseField name="categoryInsights" type="array">
+      Insights about spending by category
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Response Examples
+
+<ResponseExample>
+```json 200 - Success
+{
+  "transactions": [
+    {
+      "id": "txn_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "accountId": "acc_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "externalId": "absa_txn_789012345",
+      "amount": -85.50,
+      "currency": "ZAR",
+      "date": "2025-05-31T14:30:00Z",
+      "description": "WOOLWORTHS SANDTON CITY",
+      "merchantName": "Woolworths",
+      "category": "food_and_dining",
+      "subcategory": "groceries",
+      "type": "debit",
+      "status": "posted",
+      "categorization": {
+        "confidence": 0.95,
+        "method": "automatic",
+        "isUserCorrected": false,
+        "alternativeCategories": [
+          { "category": "shopping", "confidence": 0.75 },
+          { "category": "other", "confidence": 0.20 }
+        ]
+      },
+      "recurringInfo": {
+        "isRecurring": false,
+        "frequency": null,
+        "nextExpectedDate": null,
+        "groupId": null
+      },
+      "location": {
+        "city": "Sandton",
+        "region": "Gauteng",
+        "country": "ZA",
+        "coordinates": {
+          "latitude": -26.1088,
+          "longitude": 28.0584
+        }
+      },
+      "account": {
+        "id": "acc_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+        "name": "Primary Checking",
+        "type": "checking",
+        "institutionName": "ABSA Bank"
+      },
+      "tags": ["groceries", "weekly_shopping"],
+      "notes": "Weekly grocery shopping",
+      "createdAt": "2025-05-31T15:00:00Z",
+      "updatedAt": "2025-05-31T15:00:00Z"
+    },
+    {
+      "id": "txn_2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q",
+      "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "accountId": "acc_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "externalId": "absa_txn_789012346",
+      "amount": 25000.00,
+      "currency": "ZAR",
+      "date": "2025-05-31T09:00:00Z",
+      "description": "SALARY DEPOSIT - TECH COMPANY",
+      "merchantName": "Tech Company",
+      "category": "income",
+      "subcategory": "salary",
+      "type": "credit",
+      "status": "posted",
+      "categorization": {
+        "confidence": 0.99,
+        "method": "automatic",
+        "isUserCorrected": false,
+        "alternativeCategories": []
+      },
+      "recurringInfo": {
+        "isRecurring": true,
+        "frequency": "monthly",
+        "nextExpectedDate": "2025-06-30T09:00:00Z",
+        "groupId": "recurring_salary_123"
+      },
+      "location": null,
+      "account": {
+        "id": "acc_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+        "name": "Primary Checking",
+        "type": "checking",
+        "institutionName": "ABSA Bank"
+      },
+      "tags": ["salary", "income"],
+      "notes": null,
+      "createdAt": "2025-05-31T10:00:00Z",
+      "updatedAt": "2025-05-31T10:00:00Z"
+    },
+    {
+      "id": "txn_3c4d5e6f-7g8h-9i0j-1k2l-3m4n5o6p7q8r",
+      "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "accountId": "acc_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "externalId": "absa_txn_789012347",
+      "amount": -1200.00,
+      "currency": "ZAR",
+      "date": "2025-05-30T16:45:00Z",
+      "description": "ESKOM PREPAID ELECTRICITY",
+      "merchantName": "Eskom",
+      "category": "bills_and_utilities",
+      "subcategory": "electricity",
+      "type": "debit",
+      "status": "posted",
+      "categorization": {
+        "confidence": 0.98,
+        "method": "automatic",
+        "isUserCorrected": false,
+        "alternativeCategories": [
+          { "category": "other", "confidence": 0.15 }
+        ]
+      },
+      "recurringInfo": {
+        "isRecurring": true,
+        "frequency": "monthly",
+        "nextExpectedDate": "2025-06-30T16:45:00Z",
+        "groupId": "recurring_electricity_456"
+      },
+      "location": null,
+      "account": {
+        "id": "acc_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+        "name": "Primary Checking",
+        "type": "checking",
+        "institutionName": "ABSA Bank"
+      },
+      "tags": ["utilities", "electricity"],
+      "notes": "Monthly electricity payment",
+      "createdAt": "2025-05-30T17:00:00Z",
+      "updatedAt": "2025-05-30T17:00:00Z"
+    }
+  ],
+  "pagination": {
+    "total": 347,
+    "limit": 50,
+    "offset": 0,
+    "hasMore": true
+  },
+  "summary": {
+    "totalAmount": 23714.50,
+    "totalIncome": 25000.00,
+    "totalExpenses": 1285.50,
+    "netAmount": 23714.50,
+    "transactionCount": 3,
+    "averageAmount": 7904.83,
+    "categoryBreakdown": {
+      "income": 25000.00,
+      "food_and_dining": 85.50,
+      "bills_and_utilities": 1200.00
+    },
+    "monthlyTrends": [
+      {
+        "month": "2025-05",
+        "income": 25000.00,
+        "expenses": 1285.50,
+        "net": 23714.50,
+        "transactionCount": 3
+      }
+    ]
+  },
+  "analysis": {
+    "spendingPatterns": {
+      "averageDailySpending": 42.85,
+      "weekdayVsWeekend": {
+        "weekday": 75.2,
+        "weekend": 68.3
+      },
+      "timeOfDayDistribution": {
+        "morning": 0.35,
+        "afternoon": 0.45,
+        "evening": 0.20
+      }
+    },
+    "unusualTransactions": [],
+    "recurringDetection": {
+      "monthlyRecurring": 2,
+      "weeklyRecurring": 0,
+      "totalRecurringAmount": 26200.00
+    },
+    "categoryInsights": [
+      {
+        "category": "food_and_dining",
+        "percentage": 3.4,
+        "trend": "stable",
+        "averageAmount": 85.50
+      },
+      {
+        "category": "bills_and_utilities", 
+        "percentage": 4.8,
+        "trend": "stable",
+        "averageAmount": 1200.00
+      }
+    ]
+  }
+}
+```
+
+```json 200 - Success (Filtered by Category)
+{
+  "transactions": [
+    {
+      "id": "txn_4d5e6f7g-8h9i-0j1k-2l3m-4n5o6p7q8r9s",
+      "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "accountId": "acc_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "externalId": "absa_txn_789012348",
+      "amount": -45.00,
+      "currency": "ZAR",
+      "date": "2025-05-29T12:30:00Z",
+      "description": "UBER EATS",
+      "merchantName": "Uber Eats",
+      "category": "food_and_dining",
+      "subcategory": "food_delivery",
+      "type": "debit",
+      "status": "posted",
+      "categorization": {
+        "confidence": 0.97,
+        "method": "automatic",
+        "isUserCorrected": false,
+        "alternativeCategories": []
+      },
+      "recurringInfo": {
+        "isRecurring": false,
+        "frequency": null,
+        "nextExpectedDate": null,
+        "groupId": null
+      },
+      "location": {
+        "city": "Cape Town",
+        "region": "Western Cape",
+        "country": "ZA",
+        "coordinates": null
+      },
+      "account": {
+        "id": "acc_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+        "name": "Primary Checking",
+        "type": "checking",
+        "institutionName": "ABSA Bank"
+      },
+      "tags": ["food_delivery", "lunch"],
+      "notes": "Lunch delivery",
+      "createdAt": "2025-05-29T13:00:00Z",
+      "updatedAt": "2025-05-29T13:00:00Z"
+    }
+  ],
+  "pagination": {
+    "total": 24,
+    "limit": 50,
+    "offset": 0,
+    "hasMore": false
+  },
+  "summary": {
+    "totalAmount": -1285.50,
+    "totalIncome": 0,
+    "totalExpenses": 1285.50,
+    "netAmount": -1285.50,
+    "transactionCount": 24,
+    "averageAmount": -53.56,
+    "categoryBreakdown": {
+      "food_and_dining": 1285.50
+    },
+    "monthlyTrends": [
+      {
+        "month": "2025-05",
+        "income": 0,
+        "expenses": 1285.50,
+        "net": -1285.50,
+        "transactionCount": 24
+      }
+    ]
+  }
+}
+```
+
+```json 400 - Invalid Date Range
+{
+  "error": {
+    "code": "INVALID_DATE_RANGE",
+    "message": "Invalid date range specified",
+    "details": {
+      "fromDate": "2025-06-01",
+      "toDate": "2025-05-01",
+      "issue": "fromDate cannot be after toDate",
+      "maxRangeAllowed": "2 years"
+    }
+  }
+}
+```
+
+```json 429 - Rate Limited
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Too many transaction requests",
+    "details": {
+      "limit": 100,
+      "window": "1 hour",
+      "retryAfter": 1800,
+      "suggestion": "Use pagination and caching to reduce API calls"
+    }
+  }
+}
+```
+</ResponseExample>
+
+## Transaction Categories
+
+<Tabs>
+  <Tab title="Primary Categories">
+    **Main Transaction Categories:**
+    
+    - **income** - Salary, freelance payments, investment returns
+    - **food_and_dining** - Restaurants, groceries, food delivery
+    - **transportation** - Fuel, public transport, ride-sharing, parking
+    - **shopping** - Retail purchases, online shopping, clothing
+    - **bills_and_utilities** - Rent, electricity, water, internet, phone
+    - **entertainment** - Movies, concerts, games, streaming services
+    - **healthcare** - Medical appointments, pharmacy, insurance
+    - **education** - Tuition, books, courses, training
+    - **transfer** - Bank transfers, peer-to-peer payments
+    - **other** - Uncategorized or miscellaneous transactions
+  </Tab>
+  
+  <Tab title="Subcategories">
+    **Detailed Subcategories:**
+    
+    ```json
+    {
+      "food_and_dining": [
+        "groceries",
+        "restaurants", 
+        "fast_food",
+        "food_delivery",
+        "coffee_shops",
+        "bars_and_nightlife"
+      ],
+      "transportation": [
+        "fuel",
+        "public_transport",
+        "ride_sharing",
+        "parking",
+        "vehicle_maintenance",
+        "tolls"
+      ],
+      "bills_and_utilities": [
+        "rent",
+        "electricity",
+        "water",
+        "internet",
+        "mobile_phone",
+        "insurance",
+        "municipal_services"
+      ],
+      "shopping": [
+        "clothing",
+        "electronics",
+        "home_and_garden",
+        "online_shopping",
+        "pharmacy",
+        "general_merchandise"
+      ]
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Category Rules">
+    **Automatic Categorization Rules:**
+    
+    ```typescript
+    const categorizationRules = {
+      // Merchant-based rules
+      merchantRules: [
+        { merchants: ['WOOLWORTHS', 'PICK N PAY', 'CHECKERS'], category: 'food_and_dining', subcategory: 'groceries' },
+        { merchants: ['SHELL', 'BP', 'ENGEN'], category: 'transportation', subcategory: 'fuel' },
+        { merchants: ['UBER', 'BOLT'], category: 'transportation', subcategory: 'ride_sharing' },
+        { merchants: ['NETFLIX', 'SPOTIFY', 'DSTV'], category: 'entertainment', subcategory: 'streaming' }
+      ],
+      
+      // Description-based rules
+      descriptionRules: [
+        { pattern: /SALARY|PAYROLL/i, category: 'income', subcategory: 'salary' },
+        { pattern: /ESKOM|ELECTRICITY/i, category: 'bills_and_utilities', subcategory: 'electricity' },
+        { pattern: /TRANSFER|PAYMENT/i, category: 'transfer', subcategory: 'bank_transfer' }
+      ],
+      
+      // Amount-based rules
+      amountRules: [
+        { range: [10000, Infinity], keywords: ['SALARY'], category: 'income', subcategory: 'salary' },
+        { range: [0, 50], keywords: ['PARKING'], category: 'transportation', subcategory: 'parking' }
+      ]
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Filtering Examples
+
+<CodeGroup>
+```typescript Get Recent Expenses
+// Get all expenses from last 30 days
+const recentExpenses = await client.transactions.list({
+  userId: 'user-123',
+  fromDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  toDate: new Date().toISOString().split('T')[0],
+  transactionType: 'debit',
+  sortBy: 'date',
+  sortOrder: 'desc',
+  limit: 100
+});
+
+console.log(`Found ${recentExpenses.pagination.total} expenses totaling ${recentExpenses.summary.totalExpenses}`);
+```
+
+```typescript Category Analysis
+// Analyze spending by category for the current month
+const monthlySpending = await client.transactions.list({
+  userId: 'user-123',
+  fromDate: '2025-05-01',
+  toDate: '2025-05-31',
+  transactionType: 'debit',
+  includeAnalysis: true
+});
+
+const categorySpending = monthlySpending.summary.categoryBreakdown;
+const sortedCategories = Object.entries(categorySpending)
+  .sort(([,a], [,b]) => b - a)
+  .slice(0, 5);
+
+console.log('Top 5 spending categories:');
+sortedCategories.forEach(([category, amount]) => {
+  console.log(`${category}: ${amount.toLocaleString()}`);
+});
+```
+
+```typescript Recurring Transactions
+// Find all recurring transactions
+const recurringTransactions = await client.transactions.list({
+  userId: 'user-123',
+  isRecurring: true,
+  sortBy: 'amount',
+  sortOrder: 'desc'
+});
+
+const monthlyRecurringTotal = recurringTransactions.transactions
+  .filter(t => t.recurringInfo.frequency === 'monthly')
+  .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+console.log(`Monthly recurring expenses: ${monthlyRecurringTotal.toLocaleString()}`);
+```
+
+```python Large Transactions
+# Find large transactions (over R5000)
+large_transactions = client.transactions.list(
+    user_id='user-123',
+    min_amount=5000,
+    from_date='2025-01-01',
+    to_date='2025-05-31',
+    sort_by='amount',
+    sort_order='desc'
+)
+
+print(f"Found {len(large_transactions.transactions)} large transactions")
+
+for txn in large_transactions.transactions[:5]:
+    print(f"{txn.date}: {txn.merchant_name} - {txn.currency} {txn.amount:,.2f}")
+```
+
+```javascript Merchant Analysis
+// Analyze spending by merchant
+const merchantSpending = await client.transactions.list({
+  userId: 'user-123',
+  fromDate: '2025-01-01',
+  toDate: '2025-05-31',
+  transactionType: 'debit'
+});
+
+// Group by merchant
+const merchantTotals = merchantSpending.transactions.reduce((acc, txn) => {
+  const merchant = txn.merchantName || 'Unknown';
+  acc[merchant] = (acc[merchant] || 0) + Math.abs(txn.amount);
+  return acc;
+}, {});
+
+// Sort by spending amount
+const topMerchants = Object.entries(merchantTotals)
+  .sort(([,a], [,b]) => b - a)
+  .slice(0, 10);
+
+console.log('Top 10 merchants by spending:');
+topMerchants.forEach(([merchant, total]) => {
+  console.log(`${merchant}: ${total.toLocaleString()}`);
+});
+```
+</CodeGroup>
+
+## Advanced Use Cases
+
+<AccordionGroup>
+  <Accordion title="Spending Pattern Analysis">
+    **Analyze user spending patterns:**
+    
+    ```typescript
+    class SpendingAnalyzer {
+      async analyzeSpendingPatterns(userId: string) {
+        // Get 6 months of transaction data
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        
+        const transactions = await client.transactions.list({
+          userId,
+          fromDate: sixMonthsAgo.toISOString().split('T')[0],
+          toDate: new Date().toISOString().split('T')[0],
+          transactionType: 'debit',
+          includeAnalysis: true,
+          limit: 1000
+        });
+        
+        return {
+          monthlyAverage: this.calculateMonthlyAverage(transactions.transactions),
+          categoryTrends: this.analyzeCategoryTrends(transactions.transactions),
+          weeklyPatterns: this.analyzeWeeklyPatterns(transactions.transactions),
+          unusualSpending: this.detectUnusualSpending(transactions.transactions)
+        };
+      }
+      
+      private calculateMonthlyAverage(transactions: Transaction[]) {
+        const monthlyTotals = new Map();
+        
+        transactions.forEach(txn => {
+          const month = txn.date.substring(0, 7); // YYYY-MM
+          const current = monthlyTotals.get(month) || 0;
+          monthlyTotals.set(month, current + Math.abs(txn.amount));
+        });
+        
+        const totals = Array.from(monthlyTotals.values());
+        return totals.reduce((sum, total) => sum + total, 0) / totals.length;
+      }
+      
+      private analyzeWeeklyPatterns(transactions: Transaction[]) {
+        const weekdaySpending = new Array(7).fill(0);
+        const weekdayCounts = new Array(7).fill(0);
+        
+        transactions.forEach(txn => {
+          const dayOfWeek = new Date(txn.date).getDay();
+          weekdaySpending[dayOfWeek] += Math.abs(txn.amount);
+          weekdayCounts[dayOfWeek]++;
+        });
+        
+        return weekdaySpending.map((total, day) => ({
+          day: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day],
+          averageSpending: weekdayCounts[day] > 0 ? total / weekdayCounts[day] : 0,
+          totalSpending: total,
+          transactionCount: weekdayCounts[day]
+        }));
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Budget Tracking">
+    **Track spending against budgets:**
+    
+    ```typescript
+    class BudgetTracker {
+      async trackBudgetProgress(userId: string, budgets: CategoryBudget[]) {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const [year, month] = currentMonth.split('-');
+        
+        const monthlyTransactions = await client.transactions.list({
+          userId,
+          fromDate: `${year}-${month}-01`,
+          toDate: new Date().toISOString().split('T')[0],
+          transactionType: 'debit'
+        });
+        
+        const categorySpending = monthlyTransactions.summary.categoryBreakdown;
+        
+        return budgets.map(budget => {
+          const spent = categorySpending[budget.category] || 0;
+          const remaining = budget.amount - spent;
+          const percentUsed = (spent / budget.amount) * 100;
+          
+          return {
+            category: budget.category,
+            budgeted: budget.amount,
+            spent,
+            remaining,
+            percentUsed,
+            status: this.getBudgetStatus(percentUsed),
+            projectedOverrun: this.calculateProjectedOverrun(spent, budget.amount)
+          };
+        });
+      }
+      
+      private getBudgetStatus(percentUsed: number): string {
+        if (percentUsed <= 50) return 'on_track';
+        if (percentUsed <= 80) return 'warning';
+        if (percentUsed <= 100) return 'approaching_limit';
+        return 'over_budget';
+      }
+      
+      private calculateProjectedOverrun(currentSpent: number, budget: number): number {
+        const today = new Date();
+        const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+        const daysPassed = today.getDate();
+        
+        const dailyAverage = currentSpent / daysPassed;
+        const projectedMonthlySpent = dailyAverage * daysInMonth;
+        
+        return Math.max(0, projectedMonthlySpent - budget);
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Income Analysis">
+    **Analyze income streams and stability:**
+    
+    ```typescript
+    class IncomeAnalyzer {
+      async analyzeIncomeStreams(userId: string) {
+        const transactions = await client.transactions.list({
+          userId,
+          fromDate: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          toDate: new Date().toISOString().split('T')[0],
+          category: 'income',
+          includeAnalysis: true
+        });
+        
+        const incomeStreams = this.groupIncomeBySource(transactions.transactions);
+        const monthlyIncome = this.calculateMonthlyIncome(transactions.transactions);
+        
+        return {
+          totalAnnualIncome: transactions.summary.totalIncome,
+          averageMonthlyIncome: monthlyIncome.average,
+          incomeStability: this.calculateIncomeStability(monthlyIncome.monthly),
+          incomeStreams: Object.entries(incomeStreams).map(([source, data]) => ({
+            source,
+            totalAmount: data.total,
+            percentage: (data.total / transactions.summary.totalIncome) * 100,
+            frequency: data.frequency,
+            isRecurring: data.isRecurring
+          })),
+          growthTrend: this.calculateGrowthTrend(monthlyIncome.monthly)
+        };
+      }
+      
+      private groupIncomeBySource(transactions: Transaction[]) {
+        return transactions.reduce((acc, txn) => {
+          const source = txn.merchantName || 'Unknown Source';
+          if (!acc[source]) {
+            acc[source] = {
+              total: 0,
+              count: 0,
+              isRecurring: false,
+              frequency: 'irregular'
+            };
+          }
+          
+          acc[source].total += txn.amount;
+          acc[source].count++;
+          acc[source].isRecurring = txn.recurringInfo?.isRecurring || false;
+          acc[source].frequency = txn.recurringInfo?.frequency || 'irregular';
+          
+          return acc;
+        }, {});
+      }
+      
+      private calculateIncomeStability(monthlyIncomes: number[]): number {
+        if (monthlyIncomes.length < 3) return 0;
+        
+        const average = monthlyIncomes.reduce((sum, income) => sum + income, 0) / monthlyIncomes.length;
+        const variance = monthlyIncomes.reduce((sum, income) => sum + Math.pow(income - average, 2), 0) / monthlyIncomes.length;
+        const standardDeviation = Math.sqrt(variance);
+        
+        // Coefficient of variation (lower is more stable)
+        const coefficientOfVariation = standardDeviation / average;
+        
+        // Convert to stability score (0-100, higher is more stable)
+        return Math.max(0, 100 - (coefficientOfVariation * 100));
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="DIVA Score Data Preparation">
+    **Prepare transaction data for DIVA scoring:**
+    
+    ```typescript
+    class DivaDataPreparator {
+      async prepareTransactionDataForDiva(userId: string) {
+        // Get comprehensive transaction data for DIVA calculation
+        const transactions = await client.transactions.list({
+          userId,
+          fromDate: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          toDate: new Date().toISOString().split('T')[0],
+          includeAnalysis: true,
+          limit: 5000 // Large limit to get comprehensive data
+        });
+        
+        return {
+          disciplineData: this.extractDisciplineData(transactions.transactions),
+          incomeData: this.extractIncomeData(transactions.transactions),
+          velocityData: this.extractVelocityData(transactions.transactions),
+          assetsData: this.extractAssetsData(transactions.transactions),
+          dataQuality: this.assessDataQuality(transactions.transactions)
+        };
+      }
+      
+      private extractDisciplineData(transactions: Transaction[]) {
+        const billPayments = transactions.filter(txn => 
+          txn.category === 'bills_and_utilities' && txn.recurringInfo?.isRecurring
+        );
+        
+        const creditTransactions = transactions.filter(txn =>
+          txn.account.type === 'credit'
+        );
+        
+        return {
+          billPaymentConsistency: this.calculatePaymentConsistency(billPayments),
+          creditUtilization: this.calculateCreditUtilization(creditTransactions),
+          recurringPaymentReliability: this.analyzeRecurringReliability(billPayments)
+        };
+      }
+      
+      private extractIncomeData(transactions: Transaction[]) {
+        const incomeTransactions = transactions.filter(txn => 
+          txn.category === 'income'
+        );
+        
+        return {
+          monthlyIncomes: this.groupByMonth(incomeTransactions),
+          incomeStability: this.calculateIncomeStability(incomeTransactions),
+          incomeDiversification: this.calculateIncomeDiversification(incomeTransactions),
+          growthTrend: this.calculateIncomeGrowthTrend(incomeTransactions)
+        };
+      }
+      
+      private extractVelocityData(transactions: Transaction[]) {
+        const expenseTransactions = transactions.filter(txn => 
+          txn.type === 'debit' && txn.category !== 'transfer'
+        );
+        
+        return {
+          monthlySpending: this.groupByMonth(expenseTransactions),
+          spendingPatterns: this.analyzeSpendingPatterns(expenseTransactions),
+          cashFlowEfficiency: this.calculateCashFlowEfficiency(transactions),
+          budgetAdherence: this.analyzeBudgetAdherence(expenseTransactions)
+        };
+      }
+      
+      private extractAssetsData(transactions: Transaction[]) {
+        const savingsTransfers = transactions.filter(txn =>
+          (txn.category === 'transfer' && txn.account.type === 'savings') ||
+          (txn.category === 'income' && txn.subcategory === 'investment')
+        );
+        
+        return {
+          savingsRate: this.calculateSavingsRate(transactions),
+          assetAccumulation: this.trackAssetAccumulation(savingsTransfers),
+          emergencyFundBuilding: this.analyzeEmergencyFundBuilding(transactions),
+          investmentActivity: this.analyzeInvestmentActivity(transactions)
+        };
+      }
+      
+      private assessDataQuality(transactions: Transaction[]) {
+        const total = transactions.length;
+        const categorized = transactions.filter(txn => 
+          txn.category !== 'other' && txn.categorization.confidence > 0.7
+        ).length;
+        
+        const timeSpan = this.calculateTimeSpan(transactions);
+        const hasRecurringData = transactions.some(txn => txn.recurringInfo?.isRecurring);
+        
+        return {
+          completeness: total > 100 ? 100 : (total / 100) * 100,
+          categorizationRate: (categorized / total) * 100,
+          timeSpanDays: timeSpan,
+          hasRecurringData,
+          confidenceScore: this.calculateOverallConfidence(transactions)
+        };
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Error Handling
+
+<CardGroup cols={2}>
+  <Card title="Common Errors" icon="exclamation-triangle">
+    **Typical Issues:**
+    
+    - Invalid date ranges
+    - Unsupported filter combinations
+    - Rate limiting for large requests
+    - Missing transaction data permissions
+  </Card>
+  
+  <Card title="Best Practices" icon="lightbulb">
+    **Optimization Tips:**
+    
+    - Use appropriate date ranges (avoid very large spans)
+    - Implement pagination for large result sets
+    - Cache frequently accessed data
+    - Use specific filters to reduce response size
+  </Card>
+</CardGroup>
+
+## Related Endpoints
+
+- [Categorize Transaction](/api-reference/transactions/categorize) - Update transaction categories
+- [Get Transaction Details](/api-reference/transactions/details) - Detailed transaction information
+- [List Bank Accounts](/api-reference/accounts/list) - View connected accounts
+- [Get DIVA Score](/api-reference/diva-score/get-score) - Financial health analysis based on transactions

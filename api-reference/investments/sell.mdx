@@ -1,0 +1,864 @@
+---
+title: "Sell Investment"
+api: "POST /investments/sell"
+description: "Sell investment holdings with real-time pricing, tax optimization, and flexible redemption options"
+---
+
+# Sell Investment
+
+Execute the sale of investment holdings with real-time pricing, automatic tax optimization, and flexible settlement options. This endpoint handles the complete redemption process from order placement to fund disbursement.
+
+## Endpoint
+
+<api-endpoint method="POST" url="/investments/sell" />
+
+## Authentication
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for user authentication
+  ```
+  Authorization: Bearer {access_token}
+  ```
+</ParamField>
+
+## Request Body
+
+<ParamField body="investment_id" type="string" required>
+  Unique identifier for the investment holding to sell
+</ParamField>
+
+<ParamField body="sell_type" type="string" required>
+  Type of sell order
+  - `amount` - Sell to achieve specific monetary amount
+  - `units` - Sell a specific number of units/shares
+  - `percentage` - Sell a percentage of holdings
+  - `all` - Sell entire holding
+</ParamField>
+
+<ParamField body="amount" type="number">
+  Target sale amount (required if sell_type is 'amount')
+</ParamField>
+
+<ParamField body="units" type="number">
+  Number of units to sell (required if sell_type is 'units')
+</ParamField>
+
+<ParamField body="percentage" type="number">
+  Percentage of holding to sell (required if sell_type is 'percentage', 1-100)
+</ParamField>
+
+<ParamField body="order_type" type="string" default="market">
+  Order execution type
+  - `market` - Execute at current market price
+  - `limit` - Execute only at specified price or better
+  - `stop_loss` - Execute when price falls to stop price
+</ParamField>
+
+<ParamField body="limit_price" type="number">
+  Minimum price per unit (required if order_type is 'limit')
+</ParamField>
+
+<ParamField body="stop_price" type="number">
+  Stop loss trigger price (required if order_type is 'stop_loss')
+</ParamField>
+
+<ParamField body="settlement_method" type="object" required>
+  Where to send the sale proceeds
+  
+  <Expandable title="settlement_method" defaultOpen>
+    <ParamField body="type" type="string" required>
+      Settlement method type
+      - `bank_transfer` - Transfer to linked bank account
+      - `wallet` - Credit to AWO wallet
+      - `reinvest` - Reinvest in another product
+    </ParamField>
+    
+    <ParamField body="account_id" type="string">
+      Bank account ID (for bank_transfer)
+    </ParamField>
+    
+    <ParamField body="reinvest_product_id" type="string">
+      Product to reinvest in (for reinvest)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="tax_optimization" type="object">
+  Tax optimization preferences
+  
+  <Expandable title="tax_optimization">
+    <ParamField body="method" type="string" default="fifo">
+      Tax lot selection method
+      - `fifo` - First In, First Out
+      - `lifo` - Last In, First Out
+      - `tax_optimized` - Minimize tax impact
+      - `specific_lots` - Sell specific tax lots
+    </ParamField>
+    
+    <ParamField body="lot_ids" type="array">
+      Specific tax lot IDs to sell (for specific_lots method)
+    </ParamField>
+    
+    <ParamField body="harvest_losses" type="boolean" default="true">
+      Automatically harvest tax losses where beneficial
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="reason" type="string">
+  Reason for selling (optional, for analytics)
+  - `profit_taking` - Taking profits
+  - `rebalancing` - Portfolio rebalancing
+  - `cash_need` - Need cash for expenses
+  - `risk_reduction` - Reducing risk exposure
+  - `goal_reached` - Financial goal achieved
+  - `other` - Other reason
+</ParamField>
+
+<ParamField body="notes" type="string">
+  Optional notes for the transaction
+</ParamField>
+
+<ParamField body="confirm_tax_implications" type="boolean" required>
+  Confirmation that user understands tax implications
+</ParamField>
+
+## Response
+
+<ResponseField name="transaction_id" type="string" required>
+  Unique identifier for the sell transaction
+</ResponseField>
+
+<ResponseField name="order_id" type="string" required>
+  Sell order identifier
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Transaction status: `pending`, `processing`, `completed`, `failed`, `cancelled`
+</ResponseField>
+
+<ResponseField name="sale_details" type="object" required>
+  Details of the investment sale
+  
+  <Expandable title="sale_details" defaultOpen>
+    <ResponseField name="investment_id" type="string" required>
+      Investment holding identifier
+    </ResponseField>
+    
+    <ResponseField name="product_name" type="string" required>
+      Investment product name
+    </ResponseField>
+    
+    <ResponseField name="units_sold" type="number" required>
+      Number of units/shares sold
+    </ResponseField>
+    
+    <ResponseField name="units_remaining" type="number" required>
+      Number of units remaining after sale
+    </ResponseField>
+    
+    <ResponseField name="sell_price" type="number" required>
+      Price per unit at execution
+    </ResponseField>
+    
+    <ResponseField name="gross_proceeds" type="number" required>
+      Total sale amount before fees
+    </ResponseField>
+    
+    <ResponseField name="currency" type="string" required>
+      Sale currency
+    </ResponseField>
+    
+    <ResponseField name="execution_time" type="string" required>
+      ISO 8601 timestamp of order execution
+    </ResponseField>
+    
+    <ResponseField name="market_value_at_sale" type="number" required>
+      Market value of units at time of sale
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="cost_basis" type="object" required>
+  Cost basis and gain/loss calculation
+  
+  <Expandable title="cost_basis">
+    <ResponseField name="total_cost_basis" type="number" required>
+      Total cost basis of units sold
+    </ResponseField>
+    
+    <ResponseField name="average_cost_per_unit" type="number" required>
+      Average cost per unit sold
+    </ResponseField>
+    
+    <ResponseField name="realized_gain_loss" type="number" required>
+      Realized gain/loss amount
+    </ResponseField>
+    
+    <ResponseField name="realized_gain_loss_percentage" type="number" required>
+      Realized gain/loss percentage
+    </ResponseField>
+    
+    <ResponseField name="tax_lots_sold" type="array" required>
+      Details of tax lots sold
+      
+      <Expandable title="tax_lots_sold[]">
+        <ResponseField name="lot_id" type="string" required>
+          Tax lot identifier
+        </ResponseField>
+        
+        <ResponseField name="purchase_date" type="string" required>
+          Original purchase date
+        </ResponseField>
+        
+        <ResponseField name="purchase_price" type="number" required>
+          Original purchase price per unit
+        </ResponseField>
+        
+        <ResponseField name="units_sold" type="number" required>
+          Units sold from this lot
+        </ResponseField>
+        
+        <ResponseField name="gain_loss" type="number" required>
+          Gain/loss for this lot
+        </ResponseField>
+        
+        <ResponseField name="holding_period" type="string" required>
+          Holding period: `short_term` (<1 year), `long_term` (≥1 year)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="fees" type="object" required>
+  Breakdown of fees and charges
+  
+  <Expandable title="fees">
+    <ResponseField name="transaction_fee" type="number" required>
+      Platform transaction fee
+    </ResponseField>
+    
+    <ResponseField name="early_redemption_fee" type="number" required>
+      Early redemption fee (if applicable)
+    </ResponseField>
+    
+    <ResponseField name="exit_fee" type="number" required>
+      Fund exit fee
+    </ResponseField>
+    
+    <ResponseField name="transfer_fee" type="number" required>
+      Bank transfer fee
+    </ResponseField>
+    
+    <ResponseField name="total_fees" type="number" required>
+      Total fees deducted
+    </ResponseField>
+    
+    <ResponseField name="fee_currency" type="string" required>
+      Currency for fee amounts
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="settlement" type="object" required>
+  Settlement and payment information
+  
+  <Expandable title="settlement">
+    <ResponseField name="settlement_method" type="string" required>
+      Settlement method used
+    </ResponseField>
+    
+    <ResponseField name="net_proceeds" type="number" required>
+      Net proceeds after fees
+    </ResponseField>
+    
+    <ResponseField name="settlement_date" type="string" required>
+      Expected settlement date (ISO 8601)
+    </ResponseField>
+    
+    <ResponseField name="settlement_reference" type="string">
+      Settlement reference number
+    </ResponseField>
+    
+    <ResponseField name="settlement_account" type="object">
+      Settlement account details (for bank transfers)
+      
+      <Expandable title="settlement_account">
+        <ResponseField name="account_id" type="string" required>
+          Bank account identifier
+        </ResponseField>
+        
+        <ResponseField name="account_name" type="string" required>
+          Account holder name
+        </ResponseField>
+        
+        <ResponseField name="account_number" type="string" required>
+          Account number (masked)
+        </ResponseField>
+        
+        <ResponseField name="bank_name" type="string" required>
+          Bank name
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="reinvestment_details" type="object">
+      Reinvestment details (if applicable)
+      
+      <Expandable title="reinvestment_details">
+        <ResponseField name="new_investment_id" type="string" required>
+          New investment identifier
+        </ResponseField>
+        
+        <ResponseField name="product_id" type="string" required>
+          New product identifier
+        </ResponseField>
+        
+        <ResponseField name="product_name" type="string" required>
+          New product name
+        </ResponseField>
+        
+        <ResponseField name="units_purchased" type="number" required>
+          Units purchased with proceeds
+        </ResponseField>
+        
+        <ResponseField name="purchase_price" type="number" required>
+          Purchase price per unit
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="portfolio_impact" type="object" required>
+  Impact on user's portfolio
+  
+  <Expandable title="portfolio_impact">
+    <ResponseField name="new_allocation" type="object" required>
+      Updated portfolio allocation percentages
+    </ResponseField>
+    
+    <ResponseField name="total_portfolio_value" type="number" required>
+      Updated total portfolio value
+    </ResponseField>
+    
+    <ResponseField name="cash_allocation" type="number" required>
+      New cash allocation percentage
+    </ResponseField>
+    
+    <ResponseField name="diversification_score" type="number" required>
+      Updated portfolio diversification score (0-100)
+    </ResponseField>
+    
+    <ResponseField name="risk_level" type="string" required>
+      Updated portfolio risk level: `low`, `medium`, `high`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="tax_implications" type="object" required>
+  Tax implications of the sale
+  
+  <Expandable title="tax_implications">
+    <ResponseField name="taxable_gain" type="number" required>
+      Taxable capital gain
+    </ResponseField>
+    
+    <ResponseField name="tax_loss_harvested" type="number" required>
+      Tax loss harvested (if any)
+    </ResponseField>
+    
+    <ResponseField name="estimated_tax_liability" type="number">
+      Estimated tax liability
+    </ResponseField>
+    
+    <ResponseField name="tax_year" type="number" required>
+      Tax year for the transaction
+    </ResponseField>
+    
+    <ResponseField name="short_term_gains" type="number" required>
+      Short-term capital gains
+    </ResponseField>
+    
+    <ResponseField name="long_term_gains" type="number" required>
+      Long-term capital gains
+    </ResponseField>
+    
+    <ResponseField name="tax_documents_available" type="boolean" required>
+      Whether tax documents are available for download
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="diva_impact" type="object">
+  Impact on DIVA score
+  
+  <Expandable title="diva_impact">
+    <ResponseField name="assets_score_change" type="number">
+      Change in Assets component of DIVA score
+    </ResponseField>
+    
+    <ResponseField name="velocity_score_change" type="number">
+      Change in Velocity component
+    </ResponseField>
+    
+    <ResponseField name="projected_score_change" type="number">
+      Projected overall DIVA score change
+    </ResponseField>
+    
+    <ResponseField name="score_update_date" type="string">
+      When DIVA score will be updated (ISO 8601)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="confirmations" type="object" required>
+  Confirmation and receipt information
+  
+  <Expandable title="confirmations">
+    <ResponseField name="email_sent" type="boolean" required>
+      Whether confirmation email was sent
+    </ResponseField>
+    
+    <ResponseField name="sms_sent" type="boolean" required>
+      Whether confirmation SMS was sent
+    </ResponseField>
+    
+    <ResponseField name="receipt_url" type="string">
+      URL to download transaction receipt
+    </ResponseField>
+    
+    <ResponseField name="tax_document_url" type="string">
+      URL to download tax document
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="created_at" type="string" required>
+  Transaction creation timestamp (ISO 8601)
+</ResponseField>
+
+<ResponseField name="updated_at" type="string" required>
+  Last update timestamp (ISO 8601)
+</ResponseField>
+
+## Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X POST "https://api.awo-platform.com/investments/sell" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "investment_id": "inv_1a2b3c4d5e6f7g8h",
+    "sell_type": "percentage",
+    "percentage": 50,
+    "order_type": "market",
+    "settlement_method": {
+      "type": "bank_transfer",
+      "account_id": "acc_user_checking_001"
+    },
+    "tax_optimization": {
+      "method": "tax_optimized",
+      "harvest_losses": true
+    },
+    "reason": "profit_taking",
+    "notes": "Taking profits after good performance",
+    "confirm_tax_implications": true
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/investments/sell', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer ' + accessToken,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    investment_id: 'inv_1a2b3c4d5e6f7g8h',
+    sell_type: 'percentage',
+    percentage: 50,
+    order_type: 'market',
+    settlement_method: {
+      type: 'bank_transfer',
+      account_id: 'acc_user_checking_001'
+    },
+    tax_optimization: {
+      method: 'tax_optimized',
+      harvest_losses: true
+    },
+    reason: 'profit_taking',
+    notes: 'Taking profits after good performance',
+    confirm_tax_implications: true
+  })
+});
+
+const transaction = await response.json();
+```
+
+```python Python
+import requests
+
+headers = {
+    'Authorization': f'Bearer {access_token}',
+    'Content-Type': 'application/json'
+}
+
+data = {
+    'investment_id': 'inv_1a2b3c4d5e6f7g8h',
+    'sell_type': 'percentage',
+    'percentage': 50,
+    'order_type': 'market',
+    'settlement_method': {
+        'type': 'bank_transfer',
+        'account_id': 'acc_user_checking_001'
+    },
+    'tax_optimization': {
+        'method': 'tax_optimized',
+        'harvest_losses': True
+    },
+    'reason': 'profit_taking',
+    'notes': 'Taking profits after good performance',
+    'confirm_tax_implications': True
+}
+
+response = requests.post(
+    'https://api.awo-platform.com/investments/sell',
+    headers=headers,
+    json=data
+)
+
+transaction = response.json()
+```
+</CodeGroup>
+
+## Example Response
+
+<CodeGroup>
+```json 201 Created
+{
+  "transaction_id": "txn_sell_9z8y7x6w5v4u3t2s",
+  "order_id": "ord_sell_b2c3d4e5f6g7h8i9",
+  "status": "processing",
+  "sale_details": {
+    "investment_id": "inv_1a2b3c4d5e6f7g8h",
+    "product_name": "Satrix Top 40 ETF",
+    "units_sold": 50.25,
+    "units_remaining": 50.25,
+    "sell_price": 95.80,
+    "gross_proceeds": 4813.95,
+    "currency": "ZAR",
+    "execution_time": "2025-06-02T15:42:18Z",
+    "market_value_at_sale": 4813.95
+  },
+  "cost_basis": {
+    "total_cost_basis": 4286.25,
+    "average_cost_per_unit": 85.30,
+    "realized_gain_loss": 527.70,
+    "realized_gain_loss_percentage": 12.31,
+    "tax_lots_sold": [
+      {
+        "lot_id": "lot_001_20240815",
+        "purchase_date": "2024-08-15T09:00:00Z",
+        "purchase_price": 85.30,
+        "units_sold": 50.25,
+        "gain_loss": 527.70,
+        "holding_period": "long_term"
+      }
+    ]
+  },
+  "fees": {
+    "transaction_fee": 15.00,
+    "early_redemption_fee": 0.00,
+    "exit_fee": 0.00,
+    "transfer_fee": 5.50,
+    "total_fees": 20.50,
+    "fee_currency": "ZAR"
+  },
+  "settlement": {
+    "settlement_method": "bank_transfer",
+    "net_proceeds": 4793.45,
+    "settlement_date": "2025-06-05T09:00:00Z",
+    "settlement_reference": "AWO-SELL-20250602-001",
+    "settlement_account": {
+      "account_id": "acc_user_checking_001",
+      "account_name": "Jane Doe",
+      "account_number": "****7890",
+      "bank_name": "Standard Bank"
+    }
+  },
+  "portfolio_impact": {
+    "new_allocation": {
+      "etf": 25.3,
+      "bond": 35.2,
+      "money_market": 22.5,
+      "cash": 17.0
+    },
+    "total_portfolio_value": 25956.55,
+    "cash_allocation": 17.0,
+    "diversification_score": 72,
+    "risk_level": "medium"
+  },
+  "tax_implications": {
+    "taxable_gain": 527.70,
+    "tax_loss_harvested": 0.00,
+    "estimated_tax_liability": 92.35,
+    "tax_year": 2025,
+    "short_term_gains": 0.00,
+    "long_term_gains": 527.70,
+    "tax_documents_available": true
+  },
+  "diva_impact": {
+    "assets_score_change": -1.2,
+    "velocity_score_change": 0.8,
+    "projected_score_change": -0.2,
+    "score_update_date": "2025-06-05T02:00:00Z"
+  },
+  "confirmations": {
+    "email_sent": true,
+    "sms_sent": true,
+    "receipt_url": "https://api.awo-platform.com/documents/receipts/txn_sell_9z8y7x6w5v4u3t2s.pdf",
+    "tax_document_url": "https://api.awo-platform.com/documents/tax/capital_gains_2025_001.pdf"
+  },
+  "created_at": "2025-06-02T15:42:18Z",
+  "updated_at": "2025-06-02T15:42:18Z"
+}
+```
+
+```json 400 Bad Request - Insufficient Holdings
+{
+  "error": {
+    "code": "INSUFFICIENT_HOLDINGS",
+    "message": "Insufficient units available for sale",
+    "details": {
+      "requested_units": 100.00,
+      "available_units": 75.50,
+      "investment_id": "inv_1a2b3c4d5e6f7g8h"
+    }
+  }
+}
+```
+
+```json 400 Bad Request - Invalid Investment
+{
+  "error": {
+    "code": "INVALID_INVESTMENT",
+    "message": "Investment not found or not owned by user",
+    "details": {
+      "investment_id": "inv_invalid_12345",
+      "user_id": "usr_7x8y9z0a1b2c3d4e"
+    }
+  }
+}
+```
+
+```json 400 Bad Request - Market Closed
+{
+  "error": {
+    "code": "MARKET_CLOSED",
+    "message": "Market is closed for trading",
+    "details": {
+      "market_status": "closed",
+      "next_open_time": "2025-06-03T09:00:00Z",
+      "timezone": "SAST"
+    }
+  }
+}
+```
+
+```json 400 Bad Request - Lock Period
+{
+  "error": {
+    "code": "INVESTMENT_LOCKED",
+    "message": "Investment is in lock-up period",
+    "details": {
+      "lock_end_date": "2025-08-15T00:00:00Z",
+      "days_remaining": 74,
+      "early_redemption_fee": 250.00
+    }
+  }
+}
+```
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Invalid or expired access token",
+    "details": "Please authenticate with a valid bearer token"
+  }
+}
+```
+
+```json 429 Too Many Requests
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Too many sell requests",
+    "details": "Rate limit: 20 sell transactions per hour"
+  }
+}
+```
+</CodeGroup>
+
+## Error Codes
+
+<ResponseField name="INSUFFICIENT_HOLDINGS" type="400">
+  User doesn't have enough units to sell
+</ResponseField>
+
+<ResponseField name="INVALID_INVESTMENT" type="400">
+  Investment not found or not owned by user
+</ResponseField>
+
+<ResponseField name="INVALID_SELL_AMOUNT" type="400">
+  Sell amount or percentage is invalid
+</ResponseField>
+
+<ResponseField name="MARKET_CLOSED" type="400">
+  Market is closed for the investment product
+</ResponseField>
+
+<ResponseField name="INVESTMENT_LOCKED" type="400">
+  Investment is in lock-up period
+</ResponseField>
+
+<ResponseField name="MINIMUM_HOLDING_REQUIRED" type="400">
+  Cannot sell below minimum holding requirement
+</ResponseField>
+
+<ResponseField name="UNAUTHORIZED" type="401">
+  Invalid or expired access token
+</ResponseField>
+
+<ResponseField name="ACCOUNT_SUSPENDED" type="403">
+  User account is suspended or restricted
+</ResponseField>
+
+<ResponseField name="RATE_LIMIT_EXCEEDED" type="429">
+  Too many sell requests - rate limit exceeded
+</ResponseField>
+
+<ResponseField name="SETTLEMENT_ERROR" type="502">
+  Error processing settlement with external provider
+</ResponseField>
+
+<ResponseField name="INTERNAL_SERVER_ERROR" type="500">
+  Internal server error occurred
+</ResponseField>
+
+## Validation Rules
+
+<AccordionGroup>
+  <Accordion title="Sell Amount Validation">
+    - Must be positive number
+    - Cannot exceed available holdings
+    - Percentage must be between 1-100
+    - Remaining holding must meet minimum requirements
+    - Must account for any lock-up periods
+  </Accordion>
+  
+  <Accordion title="Settlement Account Validation">
+    - Bank account must be verified and active
+    - Account must belong to the authenticated user
+    - Account must support the settlement currency
+    - International transfers may require additional verification
+  </Accordion>
+  
+  <Accordion title="Tax Optimization Rules">
+    - FIFO: Sell oldest lots first
+    - LIFO: Sell newest lots first  
+    - Tax Optimized: Minimize tax liability
+    - Specific Lots: Must own the specified lots
+  </Accordion>
+  
+  <Accordion title="Lock-up Periods">
+    - Some investments have minimum holding periods
+    - Early redemption may incur penalties
+    - Lock-up periods vary by product type
+    - Check product terms before investing
+  </Accordion>
+</AccordionGroup>
+
+## Tax Considerations
+
+<Tabs>
+  <Tab title="Capital Gains Tax">
+    - **South Africa**: 18% effective rate for individuals
+    - **Long-term**: Holdings >12 months may qualify for preferential rates
+    - **Annual Exclusion**: R40,000 capital gains exemption
+    - **Tax Loss Harvesting**: Automatically offset gains with losses
+  </Tab>
+  
+  <Tab title="Withholding Tax">
+    - **Dividends**: 20% withholding tax in South Africa
+    - **Foreign Investments**: May be subject to foreign withholding tax
+    - **Tax Treaties**: May reduce withholding rates
+    - **Tax Credits**: Foreign taxes may be creditable
+  </Tab>
+  
+  <Tab title="Reporting Requirements">
+    - **Tax Certificates**: Available for download after settlement
+    - **Annual Statements**: Provided for tax year reporting
+    - **CGT Events**: Reported to SARS where required
+    - **Professional Advice**: Recommended for complex situations
+  </Tab>
+</Tabs>
+
+## Rate Limits
+
+- **20 sell transactions per hour** per user
+- **100 sell requests per day** per user
+- **Higher limits available** for verified institutional users
+
+## Settlement Times
+
+<Tabs>
+  <Tab title="Domestic Investments">
+    - **ETFs**: T+3 (3 business days)
+    - **Unit Trusts**: T+0 to T+3 depending on fund
+    - **Money Market**: T+0 (same day)
+    - **Bank Transfer**: Additional 1-2 business days
+  </Tab>
+  
+  <Tab title="International Investments">
+    - **US Markets**: T+2 (2 business days)
+    - **European Markets**: T+2 (2 business days)
+    - **Emerging Markets**: T+2 to T+5 depending on market
+    - **Currency Conversion**: Additional processing time
+  </Tab>
+  
+  <Tab title="Settlement Considerations">
+    - **Market Hours**: Sales outside hours queued for next trading day
+    - **Public Holidays**: May delay settlement
+    - **Bank Processing**: Additional time for bank transfers
+    - **Large Transactions**: May require additional verification
+  </Tab>
+</Tabs>
+
+## Notes
+
+<Note>
+**Tax Implications**: Selling investments may trigger capital gains tax. Consider consulting a tax advisor for your specific situation.
+</Note>
+
+<Tip>
+**Tax Optimization**: Use our automatic tax optimization to minimize your tax liability through strategic lot selection and loss harvesting.
+</Tip>
+
+<Warning>
+**Lock-up Periods**: Some investments have minimum holding periods. Early redemption may incur penalties.
+</Warning>
+
+<Info>
+**Settlement Times**: Settlement times vary by investment type and market. Bank transfers may take additional time.
+</Info>
+
+## Related Endpoints
+
+- [Get Investment Portfolio](/api-reference/investments/portfolio) - View current holdings
+- [Buy Investment](/api-reference/investments/buy) - Purchase new investments
+- [Get Investment Products](/api-reference/investments/products) - Browse available investments
+- [Get Transaction History](/api-reference/transactions/list) - View transaction history

@@ -1,0 +1,1374 @@
+---
+title: "List Bank Accounts"
+api: "GET /api/v1/accounts"
+description: "Retrieve a list of connected bank accounts for a user with balances and account details"
+---
+
+# List Bank Accounts
+
+Retrieves all bank accounts connected to a user's AWO profile, including account balances, transaction summaries, and connection status. This endpoint supports filtering and includes real-time balance information.
+
+<Info>
+Account data is updated in real-time through Open Banking connections. Some banks may have delayed balance updates due to processing times.
+</Info>
+
+## Endpoint
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://api.awo-platform.com/v1/accounts?userId={userId}&status=active&includeBalances=true" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+```javascript JavaScript SDK
+import { AWOClient } from '@awo/api-sdk';
+
+const client = new AWOClient({ 
+  apiKey: 'your-api-key',
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+const accounts = await client.accounts.list({
+  userId: 'user-id',
+  status: 'active',
+  includeBalances: true,
+  includeTransactionSummary: true
+});
+```
+
+```python Python SDK
+from awo_sdk import AWOClient
+
+client = AWOClient(
+    api_key="your-api-key",
+    base_url="https://api.awo-platform.com/v1"
+)
+
+accounts = client.accounts.list(
+    user_id="user-id",
+    status="active",
+    include_balances=True,
+    include_transaction_summary=True
+)
+```
+</CodeGroup>
+
+## Query Parameters
+
+<ParamField query="userId" type="string">
+  Filter accounts by user ID (required for admin access, optional for user access)
+</ParamField>
+
+<ParamField query="status" type="string" default="all">
+  Filter by connection status
+  - `all` - All accounts regardless of status
+  - `active` - Only actively connected accounts
+  - `inactive` - Temporarily disconnected accounts
+  - `error` - Accounts with connection errors
+  - `pending` - Accounts pending connection
+</ParamField>
+
+<ParamField query="accountType" type="string" default="all">
+  Filter by account type
+  - `all` - All account types
+  - `checking` - Checking/current accounts
+  - `savings` - Savings accounts
+  - `credit` - Credit card accounts
+  - `investment` - Investment accounts
+  - `loan` - Loan accounts
+</ParamField>
+
+<ParamField query="institutionId" type="string">
+  Filter accounts by specific financial institution
+</ParamField>
+
+<ParamField query="includeBalances" type="boolean" default="true">
+  Include current account balances in response
+</ParamField>
+
+<ParamField query="includeTransactionSummary" type="boolean" default="false">
+  Include transaction summary statistics
+</ParamField>
+
+<ParamField query="includeInstitutionDetails" type="boolean" default="true">
+  Include detailed information about the financial institution
+</ParamField>
+
+<ParamField query="refreshBalances" type="boolean" default="false">
+  Force refresh of account balances from bank (may increase response time)
+</ParamField>
+
+<ParamField query="limit" type="integer" default="50">
+  Maximum number of accounts to return (1-100)
+</ParamField>
+
+<ParamField query="offset" type="integer" default="0">
+  Number of accounts to skip for pagination
+</ParamField>
+
+## Response
+
+<ResponseField name="accounts" type="array">
+  Array of connected bank accounts
+  <Expandable title="account object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the account
+    </ResponseField>
+    <ResponseField name="userId" type="string">
+      ID of the user who owns this account
+    </ResponseField>
+    <ResponseField name="institutionId" type="string">
+      Identifier of the financial institution
+    </ResponseField>
+    <ResponseField name="accountId" type="string">
+      External account identifier from the bank
+    </ResponseField>
+    <ResponseField name="accountNumber" type="string">
+      Masked account number (e.g., "****1234")
+    </ResponseField>
+    <ResponseField name="accountType" type="string">
+      Type of account: 'checking', 'savings', 'credit', 'investment', 'loan'
+    </ResponseField>
+    <ResponseField name="accountSubtype" type="string">
+      More specific account subtype (e.g., 'credit_card', 'mortgage', 'auto_loan')
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      User-friendly account name
+    </ResponseField>
+    <ResponseField name="officialName" type="string">
+      Official account name from the institution
+    </ResponseField>
+    <ResponseField name="currency" type="string">
+      Account currency (ISO 4217 code)
+    </ResponseField>
+    <ResponseField name="balances" type="object">
+      Current account balances
+      <Expandable title="balances object">
+        <ResponseField name="available" type="number">
+          Available balance for spending
+        </ResponseField>
+        <ResponseField name="current" type="number">
+          Current account balance
+        </ResponseField>
+        <ResponseField name="limit" type="number">
+          Credit limit (for credit accounts)
+        </ResponseField>
+        <ResponseField name="lastUpdated" type="string">
+          ISO timestamp of last balance update
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="institution" type="object">
+      Financial institution details
+      <Expandable title="institution object">
+        <ResponseField name="id" type="string">
+          Institution identifier
+        </ResponseField>
+        <ResponseField name="name" type="string">
+          Institution name
+        </ResponseField>
+        <ResponseField name="logo" type="string">
+          URL to institution logo
+        </ResponseField>
+        <ResponseField name="color" type="string">
+          Brand color (hex code)
+        </ResponseField>
+        <ResponseField name="country" type="string">
+          Country code (ISO 2-letter)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="connectionStatus" type="string">
+      Connection status: 'active', 'inactive', 'error', 'pending'
+    </ResponseField>
+    <ResponseField name="lastSyncAt" type="string">
+      ISO timestamp of last successful data sync
+    </ResponseField>
+    <ResponseField name="nextSyncAt" type="string">
+      ISO timestamp of next scheduled sync
+    </ResponseField>
+    <ResponseField name="transactionSummary" type="object">
+      Transaction summary statistics (if requested)
+      <Expandable title="transactionSummary object">
+        <ResponseField name="totalTransactions" type="number">
+          Total number of transactions
+        </ResponseField>
+        <ResponseField name="lastTransactionDate" type="string">
+          Date of most recent transaction
+        </ResponseField>
+        <ResponseField name="monthlyAverage" type="object">
+          Monthly transaction averages
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="permissions" type="array">
+      Array of granted permissions for this account
+    </ResponseField>
+    <ResponseField name="metadata" type="object">
+      Additional account metadata
+      <Expandable title="metadata object">
+        <ResponseField name="isRecommendedForDiva" type="boolean">
+          Whether this account is recommended for DIVA score calculation
+        </ResponseField>
+        <ResponseField name="isPrimary" type="boolean">
+          Whether this is marked as the user's primary account
+        </ResponseField>
+        <ResponseField name="tags" type="array">
+          User-defined tags for account organization
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="connectedAt" type="string">
+      ISO timestamp of when account was first connected
+    </ResponseField>
+    <ResponseField name="updatedAt" type="string">
+      ISO timestamp of last account update
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination information
+  <Expandable title="pagination object">
+    <ResponseField name="total" type="number">
+      Total number of accounts
+    </ResponseField>
+    <ResponseField name="limit" type="number">
+      Number of accounts per page
+    </ResponseField>
+    <ResponseField name="offset" type="number">
+      Number of accounts skipped
+    </ResponseField>
+    <ResponseField name="hasMore" type="boolean">
+      Whether more accounts are available
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="summary" type="object">
+  Account summary statistics
+  <Expandable title="summary object">
+    <ResponseField name="totalAccounts" type="number">
+      Total number of connected accounts
+    </ResponseField>
+    <ResponseField name="activeAccounts" type="number">
+      Number of actively connected accounts
+    </ResponseField>
+    <ResponseField name="totalBalance" type="object">
+      Combined balance across all accounts by currency
+    </ResponseField>
+    <ResponseField name="institutionCount" type="number">
+      Number of different institutions connected
+    </ResponseField>
+    <ResponseField name="accountTypes" type="object">
+      Count of accounts by type
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Response Examples
+
+<ResponseExample>
+```json 200 - Success
+{
+  "accounts": [
+    {
+      "id": "acc_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "institutionId": "inst_absa_za",
+      "accountId": "absa_acc_123456789",
+      "accountNumber": "****7890",
+      "accountType": "checking",
+      "accountSubtype": "current_account",
+      "name": "Primary Checking",
+      "officialName": "ABSA Cheque Account",
+      "currency": "ZAR",
+      "balances": {
+        "available": 15750.50,
+        "current": 16250.50,
+        "limit": null,
+        "lastUpdated": "2025-05-31T14:30:00Z"
+      },
+      "institution": {
+        "id": "inst_absa_za",
+        "name": "ABSA Bank",
+        "logo": "https://cdn.awo-platform.com/institutions/absa-logo.png",
+        "color": "#CC0000",
+        "country": "ZA"
+      },
+      "connectionStatus": "active",
+      "lastSyncAt": "2025-05-31T14:30:00Z",
+      "nextSyncAt": "2025-05-31T18:30:00Z",
+      "transactionSummary": {
+        "totalTransactions": 347,
+        "lastTransactionDate": "2025-05-31T12:15:00Z",
+        "monthlyAverage": {
+          "transactions": 28,
+          "income": 25000.00,
+          "expenses": 18750.00
+        }
+      },
+      "permissions": [
+        "read_account_details",
+        "read_balances", 
+        "read_transactions"
+      ],
+      "metadata": {
+        "isRecommendedForDiva": true,
+        "isPrimary": true,
+        "tags": ["main", "salary"]
+      },
+      "connectedAt": "2025-01-15T10:30:00Z",
+      "updatedAt": "2025-05-31T14:30:00Z"
+    },
+    {
+      "id": "acc_2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q",
+      "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "institutionId": "inst_fnb_za",
+      "accountId": "fnb_acc_987654321",
+      "accountNumber": "****2468",
+      "accountType": "savings",
+      "accountSubtype": "savings_account",
+      "name": "Emergency Savings",
+      "officialName": "FNB Easy Save Account",
+      "currency": "ZAR",
+      "balances": {
+        "available": 8900.00,
+        "current": 8900.00,
+        "limit": null,
+        "lastUpdated": "2025-05-31T13:45:00Z"
+      },
+      "institution": {
+        "id": "inst_fnb_za",
+        "name": "First National Bank",
+        "logo": "https://cdn.awo-platform.com/institutions/fnb-logo.png",
+        "color": "#1A365D",
+        "country": "ZA"
+      },
+      "connectionStatus": "active",
+      "lastSyncAt": "2025-05-31T13:45:00Z",
+      "nextSyncAt": "2025-05-31T17:45:00Z",
+      "transactionSummary": {
+        "totalTransactions": 24,
+        "lastTransactionDate": "2025-05-28T09:20:00Z",
+        "monthlyAverage": {
+          "transactions": 2,
+          "income": 1500.00,
+          "expenses": 200.00
+        }
+      },
+      "permissions": [
+        "read_account_details",
+        "read_balances",
+        "read_transactions"
+      ],
+      "metadata": {
+        "isRecommendedForDiva": true,
+        "isPrimary": false,
+        "tags": ["emergency", "savings"]
+      },
+      "connectedAt": "2025-02-20T15:20:00Z",
+      "updatedAt": "2025-05-31T13:45:00Z"
+    },
+    {
+      "id": "acc_3c4d5e6f-7g8h-9i0j-1k2l-3m4n5o6p7q8r",
+      "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "institutionId": "inst_absa_za",
+      "accountId": "absa_cc_456789123",
+      "accountNumber": "****1357",
+      "accountType": "credit",
+      "accountSubtype": "credit_card",
+      "name": "ABSA Credit Card",
+      "officialName": "ABSA Gold Credit Card",
+      "currency": "ZAR",
+      "balances": {
+        "available": 7250.00,
+        "current": -2750.00,
+        "limit": 10000.00,
+        "lastUpdated": "2025-05-31T16:00:00Z"
+      },
+      "institution": {
+        "id": "inst_absa_za",
+        "name": "ABSA Bank",
+        "logo": "https://cdn.awo-platform.com/institutions/absa-logo.png",
+        "color": "#CC0000",
+        "country": "ZA"
+      },
+      "connectionStatus": "active",
+      "lastSyncAt": "2025-05-31T16:00:00Z",
+      "nextSyncAt": "2025-05-31T20:00:00Z",
+      "transactionSummary": {
+        "totalTransactions": 156,
+        "lastTransactionDate": "2025-05-31T14:30:00Z",
+        "monthlyAverage": {
+          "transactions": 13,
+          "income": 0,
+          "expenses": 3200.00
+        }
+      },
+      "permissions": [
+        "read_account_details",
+        "read_balances",
+        "read_transactions"
+      ],
+      "metadata": {
+        "isRecommendedForDiva": true,
+        "isPrimary": false,
+        "tags": ["credit", "shopping"]
+      },
+      "connectedAt": "2025-01-15T10:35:00Z",
+      "updatedAt": "2025-05-31T16:00:00Z"
+    }
+  ],
+  "pagination": {
+    "total": 3,
+    "limit": 50,
+    "offset": 0,
+    "hasMore": false
+  },
+  "summary": {
+    "totalAccounts": 3,
+    "activeAccounts": 3,
+    "totalBalance": {
+      "ZAR": 22400.50
+    },
+    "institutionCount": 2,
+    "accountTypes": {
+      "checking": 1,
+      "savings": 1,
+      "credit": 1,
+      "investment": 0,
+      "loan": 0
+    }
+  }
+}
+```
+
+```json 200 - Success (Filtered by Status)
+{
+  "accounts": [
+    {
+      "id": "acc_4d5e6f7g-8h9i-0j1k-2l3m-4n5o6p7q8r9s",
+      "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "institutionId": "inst_standard_za",
+      "accountId": "std_acc_111222333",
+      "accountNumber": "****5678",
+      "accountType": "checking",
+      "accountSubtype": "current_account",
+      "name": "Standard Bank Account",
+      "officialName": "Standard Bank Current Account",
+      "currency": "ZAR",
+      "balances": {
+        "available": null,
+        "current": null,
+        "limit": null,
+        "lastUpdated": null
+      },
+      "institution": {
+        "id": "inst_standard_za",
+        "name": "Standard Bank",
+        "logo": "https://cdn.awo-platform.com/institutions/standard-logo.png",
+        "color": "#0066CC",
+        "country": "ZA"
+      },
+      "connectionStatus": "error",
+      "lastSyncAt": "2025-05-28T10:15:00Z",
+      "nextSyncAt": null,
+      "transactionSummary": null,
+      "permissions": [
+        "read_account_details"
+      ],
+      "metadata": {
+        "isRecommendedForDiva": false,
+        "isPrimary": false,
+        "tags": []
+      },
+      "connectedAt": "2025-05-25T14:20:00Z",
+      "updatedAt": "2025-05-28T10:15:00Z"
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "limit": 50,
+    "offset": 0,
+    "hasMore": false
+  },
+  "summary": {
+    "totalAccounts": 1,
+    "activeAccounts": 0,
+    "totalBalance": {
+      "ZAR": 0
+    },
+    "institutionCount": 1,
+    "accountTypes": {
+      "checking": 1,
+      "savings": 0,
+      "credit": 0,
+      "investment": 0,
+      "loan": 0
+    }
+  }
+}
+```
+
+```json 401 - Unauthorized
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Invalid or expired access token",
+    "details": {
+      "tokenExpired": true,
+      "refreshTokenRequired": true
+    }
+  }
+}
+```
+
+```json 403 - Forbidden
+{
+  "error": {
+    "code": "INSUFFICIENT_PERMISSIONS",
+    "message": "User does not have permission to access accounts",
+    "details": {
+      "requiredPermissions": ["read:accounts"],
+      "userPermissions": ["read:profile"]
+    }
+  }
+}
+```
+</ResponseExample>
+
+## Account Connection Status
+
+<CardGroup cols={2}>
+  <Card title="Active Status" icon="check-circle">
+    **Successfully Connected:**
+    
+    - Real-time balance updates
+    - Transaction sync working
+    - Full data access available
+    - Regular automatic refreshes
+  </Card>
+  
+  <Card title="Error Status" icon="exclamation-triangle">
+    **Connection Issues:**
+    
+    - Authentication expired
+    - Bank maintenance mode
+    - Permission revoked
+    - Technical connectivity issues
+  </Card>
+  
+  <Card title="Inactive Status" icon="pause-circle">
+    **Temporarily Disconnected:**
+    
+    - User-initiated disconnection
+    - Temporary bank restrictions
+    - Scheduled maintenance
+    - Can be easily reconnected
+  </Card>
+  
+  <Card title="Pending Status" icon="clock">
+    **Connection in Progress:**
+    
+    - Initial setup incomplete
+    - Waiting for bank approval
+    - Multi-factor auth required
+    - Institution verification pending
+  </Card>
+</CardGroup>
+
+## SDK Examples
+
+<CodeGroup>
+```typescript TypeScript SDK
+import { AWOClient, AccountListOptions } from '@awo/api-sdk';
+
+const client = new AWOClient({
+  apiKey: process.env.AWO_API_KEY!,
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+class AccountManager {
+  async getUserAccounts(userId: string, options?: AccountListOptions) {
+    try {
+      const accounts = await client.accounts.list({
+        userId,
+        includeBalances: true,
+        includeTransactionSummary: true,
+        ...options
+      });
+      
+      console.log(`Found ${accounts.summary.totalAccounts} accounts`);
+      console.log(`Total balance: ${Object.entries(accounts.summary.totalBalance)
+        .map(([currency, amount]) => `${currency} ${amount}`)
+        .join(', ')}`);
+      
+      return accounts;
+    } catch (error) {
+      console.error('Failed to get accounts:', error.message);
+      throw error;
+    }
+  }
+
+  async getActiveAccounts(userId: string) {
+    return this.getUserAccounts(userId, {
+      status: 'active'
+    });
+  }
+
+  async getPrimaryAccount(userId: string) {
+    const accounts = await this.getUserAccounts(userId);
+    return accounts.accounts.find(account => account.metadata.isPrimary);
+  }
+
+  async getAccountsByType(userId: string, accountType: string) {
+    return this.getUserAccounts(userId, {
+      accountType
+    });
+  }
+
+  async refreshAccountBalances(userId: string) {
+    return this.getUserAccounts(userId, {
+      refreshBalances: true
+    });
+  }
+
+  // Get accounts with connection issues
+  async getProblematicAccounts(userId: string) {
+    const errorAccounts = await this.getUserAccounts(userId, {
+      status: 'error'
+    });
+    
+    const inactiveAccounts = await this.getUserAccounts(userId, {
+      status: 'inactive'
+    });
+    
+    return {
+      errorAccounts: errorAccounts.accounts,
+      inactiveAccounts: inactiveAccounts.accounts,
+      totalIssues: errorAccounts.summary.totalAccounts + inactiveAccounts.summary.totalAccounts
+    };
+  }
+
+  // Calculate financial overview
+  async getFinancialOverview(userId: string) {
+    const accounts = await this.getUserAccounts(userId, {
+      status: 'active',
+      includeTransactionSummary: true
+    });
+    
+    const overview = {
+      totalAssets: 0,
+      totalLiabilities: 0,
+      netWorth: 0,
+      monthlyIncome: 0,
+      monthlyExpenses: 0,
+      accounts: {
+        checking: 0,
+        savings: 0,
+        credit: 0,
+        investment: 0
+      }
+    };
+    
+    accounts.accounts.forEach(account => {
+      const balance = account.balances.current || 0;
+      
+      if (['checking', 'savings', 'investment'].includes(account.accountType)) {
+        overview.totalAssets += balance;
+        overview.accounts[account.accountType as keyof typeof overview.accounts] += balance;
+      } else if (['credit', 'loan'].includes(account.accountType)) {
+        overview.totalLiabilities += Math.abs(balance);
+      }
+      
+      if (account.transactionSummary) {
+        overview.monthlyIncome += account.transactionSummary.monthlyAverage.income || 0;
+        overview.monthlyExpenses += account.transactionSummary.monthlyAverage.expenses || 0;
+      }
+    });
+    
+    overview.netWorth = overview.totalAssets - overview.totalLiabilities;
+    
+    return overview;
+  }
+}
+
+// Usage
+const accountManager = new AccountManager();
+
+// Get all active accounts
+const activeAccounts = await accountManager.getActiveAccounts('user-123');
+
+// Get financial overview
+const overview = await accountManager.getFinancialOverview('user-123');
+console.log(`Net Worth: ZAR ${overview.netWorth.toLocaleString()}`);
+
+// Check for connection issues
+const issues = await accountManager.getProblematicAccounts('user-123');
+if (issues.totalIssues > 0) {
+  console.log(`${issues.totalIssues} accounts need attention`);
+}
+```
+
+```python Python SDK
+from awo_sdk import AWOClient, AccountListOptions
+from typing import List, Dict, Optional
+
+client = AWOClient(
+    api_key=os.environ['AWO_API_KEY'],
+    base_url='https://api.awo-platform.com/v1'
+)
+
+class AccountManager:
+    def __init__(self):
+        self.client = client
+
+    def get_user_accounts(self, user_id: str, options: Optional[Dict] = None):
+        try:
+            accounts = self.client.accounts.list(
+                user_id=user_id,
+                include_balances=True,
+                include_transaction_summary=True,
+                **(options or {})
+            )
+            
+            print(f"Found {accounts.summary.total_accounts} accounts")
+            
+            total_balances = []
+            for currency, amount in accounts.summary.total_balance.items():
+                total_balances.append(f"{currency} {amount:,.2f}")
+            print(f"Total balance: {', '.join(total_balances)}")
+            
+            return accounts
+            
+        except Exception as error:
+            print(f"Failed to get accounts: {error}")
+            raise
+
+    def get_active_accounts(self, user_id: str):
+        return self.get_user_accounts(user_id, {'status': 'active'})
+
+    def get_primary_account(self, user_id: str):
+        accounts = self.get_user_accounts(user_id)
+        for account in accounts.accounts:
+            if account.metadata.is_primary:
+                return account
+        return None
+
+    def get_accounts_by_type(self, user_id: str, account_type: str):
+        return self.get_user_accounts(user_id, {'account_type': account_type})
+
+    def refresh_account_balances(self, user_id: str):
+        return self.get_user_accounts(user_id, {'refresh_balances': True})
+
+    def get_financial_overview(self, user_id: str):
+        accounts = self.get_user_accounts(user_id, {
+            'status': 'active',
+            'include_transaction_summary': True
+        })
+        
+        overview = {
+            'total_assets': 0,
+            'total_liabilities': 0,
+            'net_worth': 0,
+            'monthly_income': 0,
+            'monthly_expenses': 0,
+            'accounts': {
+                'checking': 0,
+                'savings': 0,
+                'credit': 0,
+                'investment': 0
+            }
+        }
+        
+        for account in accounts.accounts:
+            balance = account.balances.current or 0
+            
+            if account.account_type in ['checking', 'savings', 'investment']:
+                overview['total_assets'] += balance
+                overview['accounts'][account.account_type] += balance
+            elif account.account_type in ['credit', 'loan']:
+                overview['total_liabilities'] += abs(balance)
+            
+            if account.transaction_summary:
+                monthly_avg = account.transaction_summary.monthly_average
+                overview['monthly_income'] += monthly_avg.get('income', 0)
+                overview['monthly_expenses'] += monthly_avg.get('expenses', 0)
+        
+        overview['net_worth'] = overview['total_assets'] - overview['total_liabilities']
+        
+        return overview
+
+    def analyze_account_health(self, user_id: str):
+        """Analyze the health of user's account connections"""
+        all_accounts = self.get_user_accounts(user_id)
+        
+        health_report = {
+            'total_accounts': len(all_accounts.accounts),
+            'healthy_accounts': 0,
+            'issues': [],
+            'recommendations': []
+        }
+        
+        for account in all_accounts.accounts:
+            if account.connection_status == 'active':
+                health_report['healthy_accounts'] += 1
+            else:
+                health_report['issues'].append({
+                    'account_id': account.id,
+                    'account_name': account.name,
+                    'issue': account.connection_status,
+                    'last_sync': account.last_sync_at
+                })
+        
+        # Generate recommendations
+        if health_report['issues']:
+            health_report['recommendations'].append(
+                "Reconnect accounts with connection issues"
+            )
+        
+        if health_report['healthy_accounts'] < 2:
+            health_report['recommendations'].append(
+                "Consider connecting additional accounts for better DIVA score accuracy"
+            )
+        
+        return health_report
+
+# Usage
+account_manager = AccountManager()
+
+# Get financial overview
+overview = account_manager.get_financial_overview('user-123')
+print(f"Net Worth: ZAR {overview['net_worth']:,.2f}")
+print(f"Monthly Cash Flow: ZAR {overview['monthly_income'] - overview['monthly_expenses']:,.2f}")
+
+# Analyze account health
+health = account_manager.analyze_account_health('user-123')
+print(f"Account Health: {health['healthy_accounts']}/{health['total_accounts']} accounts connected")
+
+if health['issues']:
+    print("Issues found:")
+    for issue in health['issues']:
+        print(f"- {issue['account_name']}: {issue['issue']}")
+```
+
+```javascript React Native
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
+  Alert
+} from 'react-native';
+import { AWOClient } from '@awo/react-native-sdk';
+
+export function AccountsListScreen({ userId, navigation }) {
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [summary, setSummary] = useState(null);
+  const [filter, setFilter] = useState('all');
+
+  useEffect(() => {
+    loadAccounts();
+  }, [userId, filter]);
+
+  const loadAccounts = async () => {
+    try {
+      const options = {
+        userId,
+        includeBalances: true,
+        includeTransactionSummary: true
+      };
+      
+      if (filter !== 'all') {
+        options.status = filter;
+      }
+      
+      const accountsData = await AWOClient.accounts.list(options);
+      setAccounts(accountsData.accounts);
+      setSummary(accountsData.summary);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load accounts');
+      console.error(error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadAccounts();
+  };
+
+  const refreshBalances = async () => {
+    try {
+      setLoading(true);
+      const accountsData = await AWOClient.accounts.list({
+        userId,
+        refreshBalances: true,
+        includeBalances: true
+      });
+      setAccounts(accountsData.accounts);
+      setSummary(accountsData.summary);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to refresh balances');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getAccountIcon = (accountType) => {
+    switch (accountType) {
+      case 'checking': return '🏦';
+      case 'savings': return '💰';
+      case 'credit': return '💳';
+      case 'investment': return '📈';
+      case 'loan': return '🏠';
+      default: return '💼';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active': return '#22C55E';
+      case 'inactive': return '#EAB308';
+      case 'error': return '#EF4444';
+      case 'pending': return '#3B82F6';
+      default: return '#6B7280';
+    }
+  };
+
+  const formatBalance = (balance, currency) => {
+    if (balance === null || balance === undefined) return 'N/A';
+    return `${currency} ${balance.toLocaleString('en-ZA', { 
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2 
+    })}`;
+  };
+
+  const renderAccount = ({ item: account }) => (
+    <TouchableOpacity
+      style={{
+        backgroundColor: 'white',
+        marginHorizontal: 16,
+        marginVertical: 8,
+        borderRadius: 12,
+        padding: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3
+      }}
+      onPress={() => navigation.navigate('AccountDetails', { accountId: account.id })}
+    >
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+            <Text style={{ fontSize: 20, marginRight: 8 }}>
+              {getAccountIcon(account.accountType)}
+            </Text>
+            <Text style={{ fontSize: 16, fontWeight: '600', flex: 1 }}>
+              {account.name}
+            </Text>
+            <View 
+              style={{
+                backgroundColor: getStatusColor(account.connectionStatus),
+                borderRadius: 12,
+                paddingHorizontal: 8,
+                paddingVertical: 2
+              }}
+            >
+              <Text style={{ color: 'white', fontSize: 10, fontWeight: '600' }}>
+                {account.connectionStatus.toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          
+          <Text style={{ fontSize: 14, color: '#6B7280', marginBottom: 4 }}>
+            {account.institution.name} • {account.accountNumber}
+          </Text>
+          
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1F2937' }}>
+              {formatBalance(account.balances.available || account.balances.current, account.currency)}
+            </Text>
+            
+            {account.metadata.isPrimary && (
+              <View style={{
+                backgroundColor: '#3B82F6',
+                borderRadius: 6,
+                paddingHorizontal: 6,
+                paddingVertical: 2
+              }}>
+                <Text style={{ color: 'white', fontSize: 10, fontWeight: '600' }}>
+                  PRIMARY
+                </Text>
+              </View>
+            )}
+          </View>
+          
+          {account.balances.lastUpdated && (
+            <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 4 }}>
+              Updated: {new Date(account.balances.lastUpdated).toLocaleString()}
+            </Text>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderFilterButton = (status, label) => (
+    <TouchableOpacity
+      style={{
+        backgroundColor: filter === status ? '#3B82F6' : '#F3F4F6',
+        borderRadius: 20,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        marginRight: 8
+      }}
+      onPress={() => setFilter(status)}
+    >
+      <Text style={{
+        color: filter === status ? 'white' : '#374151',
+        fontWeight: '600'
+      }}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  if (loading && accounts.length === 0) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={{ marginTop: 16, color: '#6B7280' }}>Loading accounts...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+      {/* Summary Card */}
+      {summary && (
+        <View style={{
+          backgroundColor: 'white',
+          margin: 16,
+          borderRadius: 12,
+          padding: 16,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3
+        }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>
+            Account Summary
+          </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1F2937' }}>
+                {summary.totalAccounts}
+              </Text>
+              <Text style={{ fontSize: 14, color: '#6B7280' }}>Total Accounts</Text>
+            </View>
+            <View>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#22C55E' }}>
+                {summary.activeAccounts}
+              </Text>
+              <Text style={{ fontSize: 14, color: '#6B7280' }}>Active</Text>
+            </View>
+            <View>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#3B82F6' }}>
+                {summary.institutionCount}
+              </Text>
+              <Text style={{ fontSize: 14, color: '#6B7280' }}>Banks</Text>
+            </View>
+          </View>
+          
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#3B82F6',
+              borderRadius: 8,
+              padding: 12,
+              marginTop: 16,
+              alignItems: 'center'
+            }}
+            onPress={refreshBalances}
+            disabled={loading}
+          >
+            <Text style={{ color: 'white', fontWeight: '600' }}>
+              {loading ? 'Refreshing...' : 'Refresh All Balances'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Filter Buttons */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={[
+            { status: 'all', label: 'All' },
+            { status: 'active', label: 'Active' },
+            { status: 'inactive', label: 'Inactive' },
+            { status: 'error', label: 'Issues' }
+          ]}
+          renderItem={({ item }) => renderFilterButton(item.status, item.label)}
+          keyExtractor={(item) => item.status}
+        />
+      </View>
+
+      {/* Accounts List */}
+      <FlatList
+        data={accounts}
+        renderItem={renderAccount}
+        keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <View style={{ 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            paddingVertical: 40 
+          }}>
+            <Text style={{ fontSize: 18, color: '#6B7280' }}>
+              No accounts found
+            </Text>
+            <Text style={{ fontSize: 14, color: '#9CA3AF', textAlign: 'center', marginTop: 8 }}>
+              Connect your bank accounts to start tracking your financial health
+            </Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#3B82F6',
+                borderRadius: 8,
+                paddingHorizontal: 20,
+                paddingVertical: 12,
+                marginTop: 16
+              }}
+              onPress={() => navigation.navigate('ConnectAccount')}
+            >
+              <Text style={{ color: 'white', fontWeight: '600' }}>
+                Connect Account
+              </Text>
+            </TouchableOpacity>
+          </View>
+        }
+      />
+    </View>
+  );
+}
+
+// Hook for account data
+export function useAccounts(userId, options = {}) {
+  const [accounts, setAccounts] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchAccounts = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await AWOClient.accounts.list({
+        userId,
+        includeBalances: true,
+        ...options
+      });
+      setAccounts(data.accounts);
+      setSummary(data.summary);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      fetchAccounts();
+    }
+  }, [userId, JSON.stringify(options)]);
+
+  return {
+    accounts,
+    summary,
+    loading,
+    error,
+    refetch: fetchAccounts
+  };
+}
+```
+</CodeGroup>
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Financial Dashboard">
+    **Display user's financial overview:**
+    
+    ```typescript
+    // Get accounts for dashboard display
+    const dashboardData = await client.accounts.list({
+      userId: 'user-123',
+      status: 'active',
+      includeBalances: true,
+      includeTransactionSummary: true
+    });
+    
+    // Calculate key metrics
+    const metrics = {
+      totalBalance: Object.values(dashboardData.summary.totalBalance)[0] || 0,
+      accountCount: dashboardData.summary.activeAccounts,
+      lastUpdate: Math.min(...dashboardData.accounts.map(acc => 
+        new Date(acc.balances.lastUpdated).getTime()
+      ))
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="Account Health Monitoring">
+    **Monitor connection status and issues:**
+    
+    ```typescript
+    // Check for accounts that need attention
+    const healthCheck = async (userId: string) => {
+      const allAccounts = await client.accounts.list({ userId });
+      
+      const issues = allAccounts.accounts.filter(account => 
+        account.connectionStatus !== 'active'
+      );
+      
+      const staleBalances = allAccounts.accounts.filter(account => {
+        const lastUpdate = new Date(account.balances.lastUpdated);
+        const hoursSinceUpdate = (Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60);
+        return hoursSinceUpdate > 24; // More than 24 hours old
+      });
+      
+      return {
+        issues: issues.length,
+        staleBalances: staleBalances.length,
+        totalAccounts: allAccounts.summary.totalAccounts
+      };
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="DIVA Score Data Source">
+    **Select accounts for DIVA calculation:**
+    
+    ```typescript
+    // Get accounts recommended for DIVA scoring
+    const divaAccounts = await client.accounts.list({
+      userId: 'user-123',
+      status: 'active'
+    });
+    
+    const recommendedAccounts = divaAccounts.accounts.filter(account => 
+      account.metadata.isRecommendedForDiva
+    );
+    
+    console.log(`Using ${recommendedAccounts.length} accounts for DIVA calculation`);
+    ```
+  </Accordion>
+
+  <Accordion title="Balance Alerts">
+    **Monitor account balances for alerts:**
+    
+    ```typescript
+    // Check for low balance alerts
+    const checkBalanceAlerts = async (userId: string) => {
+      const accounts = await client.accounts.list({
+        userId,
+        status: 'active',
+        includeBalances: true
+      });
+      
+      const alerts = [];
+      
+      accounts.accounts.forEach(account => {
+        const balance = account.balances.available || account.balances.current;
+        
+        if (account.accountType === 'checking' && balance < 1000) {
+          alerts.push({
+            type: 'low_balance',
+            account: account.name,
+            balance,
+            threshold: 1000
+          });
+        }
+        
+        if (account.accountType === 'credit') {
+          const utilization = Math.abs(balance) / account.balances.limit;
+          if (utilization > 0.8) {
+            alerts.push({
+              type: 'high_credit_utilization',
+              account: account.name,
+              utilization: utilization * 100,
+              threshold: 80
+            });
+          }
+        }
+      });
+      
+      return alerts;
+    };
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Performance Optimization" icon="zap">
+    **Efficient Data Loading:**
+    
+    - Cache account data for 15-30 minutes
+    - Use pagination for users with many accounts
+    - Only request transaction summaries when needed
+    - Implement background balance refresh
+  </Card>
+  
+  <Card title="Error Handling" icon="shield">
+    **Robust Error Management:**
+    
+    - Handle connection timeouts gracefully
+    - Provide clear status indicators
+    - Offer reconnection options for failed accounts
+    - Implement retry logic for temporary failures
+  </Card>
+  
+  <Card title="User Experience" icon="users">
+    **Intuitive Interface:**
+    
+    - Group accounts by institution
+    - Show primary account prominently
+    - Use clear status indicators
+    - Enable easy account filtering
+  </Card>
+  
+  <Card title="Security" icon="lock">
+    **Data Protection:**
+    
+    - Mask sensitive account numbers
+    - Implement proper access controls
+    - Log all account data access
+    - Use secure connections only
+  </Card>
+</CardGroup>
+
+## Related Endpoints
+
+- [Connect Bank Account](/api-reference/accounts/connect) - Add new bank accounts
+- [Get Account Details](/api-reference/accounts/details) - Detailed account information
+- [List Transactions](/api-reference/transactions/list) - Account transaction history
+- [Refresh Account Data](/api-reference/accounts/refresh) - Force account data update

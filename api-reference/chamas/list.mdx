@@ -1,0 +1,1690 @@
+---
+title: "List Chamas"
+api: "GET /api/v1/chamas"
+description: "Retrieve user's chama groups with member details, contribution status, and payout schedules"
+---
+
+# List Chamas
+
+Retrieves all chama (savings group) memberships for a user, including active and past participations. This endpoint provides comprehensive information about group dynamics, contribution schedules, payout rotations, and member activity.
+
+<Info>
+Chamas are digitized traditional savings groups (stokvels) popular across Africa. Members contribute regularly and receive payouts in rotation, with blockchain transparency ensuring trust and accountability.
+</Info>
+
+## Endpoint
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://api.awo-platform.com/v1/chamas?userId={userId}&status=active&includeMembers=true" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+```javascript JavaScript SDK
+import { AWOClient } from '@awo/api-sdk';
+
+const client = new AWOClient({ 
+  apiKey: 'your-api-key',
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+const chamas = await client.chamas.list({
+  userId: 'user-id',
+  status: 'active',
+  includeMembers: true,
+  includeUpcomingPayouts: true
+});
+```
+
+```python Python SDK
+from awo_sdk import AWOClient
+
+client = AWOClient(
+    api_key="your-api-key",
+    base_url="https://api.awo-platform.com/v1"
+)
+
+chamas = client.chamas.list(
+    user_id="user-id",
+    status="active",
+    include_members=True,
+    include_upcoming_payouts=True
+)
+```
+</CodeGroup>
+
+## Query Parameters
+
+<ParamField query="userId" type="string">
+  Filter chamas by user ID (required for admin access, optional for user access)
+</ParamField>
+
+<ParamField query="status" type="string" default="all">
+  Filter by chama status
+  - `all` - All chamas regardless of status
+  - `active` - Currently active chamas
+  - `forming` - Chamas still recruiting members
+  - `completed` - Finished chama cycles
+  - `paused` - Temporarily inactive chamas
+  - `cancelled` - Cancelled chamas
+</ParamField>
+
+<ParamField query="role" type="string" default="all">
+  Filter by user's role in the chama
+  - `all` - All roles
+  - `admin` - User is chama administrator
+  - `member` - User is regular member
+  - `treasurer` - User is chama treasurer
+</ParamField>
+
+<ParamField query="contributionFrequency" type="string">
+  Filter by contribution frequency
+  - `weekly` - Weekly contributions
+  - `monthly` - Monthly contributions
+  - `quarterly` - Quarterly contributions
+</ParamField>
+
+<ParamField query="includeMembers" type="boolean" default="false">
+  Include member details and activity
+</ParamField>
+
+<ParamField query="includeContributions" type="boolean" default="false">
+  Include contribution history and status
+</ParamField>
+
+<ParamField query="includeUpcomingPayouts" type="boolean" default="false">
+  Include upcoming payout schedule
+</ParamField>
+
+<ParamField query="includeFinancials" type="boolean" default="true">
+  Include financial summary and balances
+</ParamField>
+
+<ParamField query="sortBy" type="string" default="created_date">
+  Sort chamas by field
+  - `created_date` - Date chama was created
+  - `next_payout` - Next payout date
+  - `contribution_amount` - Contribution amount
+  - `member_count` - Number of members
+  - `name` - Chama name (alphabetical)
+</ParamField>
+
+<ParamField query="sortOrder" type="string" default="desc">
+  Sort order: `asc` (ascending) or `desc` (descending)
+</ParamField>
+
+<ParamField query="limit" type="integer" default="20">
+  Maximum number of chamas to return (1-100)
+</ParamField>
+
+<ParamField query="offset" type="integer" default="0">
+  Number of chamas to skip for pagination
+</ParamField>
+
+## Response
+
+<ResponseField name="chamas" type="array">
+  Array of chama group records
+  <Expandable title="chama object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the chama
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Chama group name
+    </ResponseField>
+    <ResponseField name="description" type="string">
+      Description of the chama's purpose and goals
+    </ResponseField>
+    <ResponseField name="type" type="string">
+      Type of chama: 'rotating_savings', 'investment_club', 'emergency_fund', 'goal_based'
+    </ResponseField>
+    <ResponseField name="status" type="string">
+      Current status: 'forming', 'active', 'completed', 'paused', 'cancelled'
+    </ResponseField>
+    <ResponseField name="creatorId" type="string">
+      User ID of the chama creator/founder
+    </ResponseField>
+    <ResponseField name="contributionAmount" type="number">
+      Required contribution amount per cycle
+    </ResponseField>
+    <ResponseField name="currency" type="string">
+      Currency for contributions (ISO 4217 code)
+    </ResponseField>
+    <ResponseField name="frequency" type="string">
+      Contribution frequency: 'weekly', 'monthly', 'quarterly'
+    </ResponseField>
+    <ResponseField name="memberLimit" type="number">
+      Maximum number of members allowed
+    </ResponseField>
+    <ResponseField name="currentMembers" type="number">
+      Current number of active members
+    </ResponseField>
+    <ResponseField name="cycleCount" type="number">
+      Number of completed payout cycles
+    </ResponseField>
+    <ResponseField name="totalCycles" type="number">
+      Total cycles planned (equals member count for rotating savings)
+    </ResponseField>
+    <ResponseField name="userMembership" type="object">
+      Current user's membership details
+      <Expandable title="userMembership object">
+        <ResponseField name="id" type="string">
+          Membership record ID
+        </ResponseField>
+        <ResponseField name="role" type="string">
+          User's role: 'admin', 'treasurer', 'member'
+        </ResponseField>
+        <ResponseField name="joinedAt" type="string">
+          ISO timestamp of when user joined
+        </ResponseField>
+        <ResponseField name="payoutPosition" type="number">
+          Position in payout rotation (for rotating savings)
+        </ResponseField>
+        <ResponseField name="contributionStatus" type="string">
+          Current contribution status: 'current', 'behind', 'ahead'
+        </ResponseField>
+        <ResponseField name="totalContributed" type="number">
+          Total amount contributed to date
+        </ResponseField>
+        <ResponseField name="missedContributions" type="number">
+          Number of missed contribution cycles
+        </ResponseField>
+        <ResponseField name="nextContributionDue" type="string">
+          ISO timestamp of next contribution due date
+        </ResponseField>
+        <ResponseField name="lastPayoutReceived" type="string">
+          ISO timestamp of last payout received (if any)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="financials" type="object">
+      Financial summary and balances
+      <Expandable title="financials object">
+        <ResponseField name="totalPoolBalance" type="number">
+          Current total balance in the chama pool
+        </ResponseField>
+        <ResponseField name="totalContributed" type="number">
+          Total amount contributed by all members
+        </ResponseField>
+        <ResponseField name="totalPaidOut" type="number">
+          Total amount paid out to members
+        </ResponseField>
+        <ResponseField name="interestEarned" type="number">
+          Interest earned on pooled funds
+        </ResponseField>
+        <ResponseField name="monthlyTarget" type="number">
+          Target monthly collection amount
+        </ResponseField>
+        <ResponseField name="collectionRate" type="number">
+          Percentage of contributions collected on time
+        </ResponseField>
+        <ResponseField name="lastUpdated" type="string">
+          ISO timestamp of last financial update
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="schedule" type="object">
+      Contribution and payout schedule
+      <Expandable title="schedule object">
+        <ResponseField name="contributionDay" type="string">
+          Day of week/month for contributions
+        </ResponseField>
+        <ResponseField name="payoutDay" type="string">
+          Day of week/month for payouts
+        </ResponseField>
+        <ResponseField name="nextContributionDate" type="string">
+          ISO timestamp of next contribution collection
+        </ResponseField>
+        <ResponseField name="nextPayoutDate" type="string">
+          ISO timestamp of next payout
+        </ResponseField>
+        <ResponseField name="nextPayoutRecipient" type="object">
+          Details of next payout recipient
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="members" type="array">
+      Member details (if includeMembers=true)
+      <Expandable title="member object">
+        <ResponseField name="userId" type="string">
+          Member's user ID
+        </ResponseField>
+        <ResponseField name="firstName" type="string">
+          Member's first name
+        </ResponseField>
+        <ResponseField name="role" type="string">
+          Member's role in the chama
+        </ResponseField>
+        <ResponseField name="payoutPosition" type="number">
+          Position in payout rotation
+        </ResponseField>
+        <ResponseField name="contributionStatus" type="string">
+          Current contribution status
+        </ResponseField>
+        <ResponseField name="totalContributed" type="number">
+          Total amount contributed
+        </ResponseField>
+        <ResponseField name="joinedAt" type="string">
+          Date joined the chama
+        </ResponseField>
+        <ResponseField name="lastActivity" type="string">
+          Date of last activity
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="upcomingPayouts" type="array">
+      Upcoming payout schedule (if includeUpcomingPayouts=true)
+      <Expandable title="upcomingPayout object">
+        <ResponseField name="cycleNumber" type="number">
+          Payout cycle number
+        </ResponseField>
+        <ResponseField name="recipientId" type="string">
+          User ID of payout recipient
+        </ResponseField>
+        <ResponseField name="recipientName" type="string">
+          Name of payout recipient
+        </ResponseField>
+        <ResponseField name="amount" type="number">
+          Expected payout amount
+        </ResponseField>
+        <ResponseField name="scheduledDate" type="string">
+          Scheduled payout date
+        </ResponseField>
+        <ResponseField name="status" type="string">
+          Payout status: 'scheduled', 'due', 'processing', 'completed'
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="rules" type="object">
+      Chama rules and governance
+      <Expandable title="rules object">
+        <ResponseField name="latePenalty" type="number">
+          Penalty for late contributions
+        </ResponseField>
+        <ResponseField name="maxMissedContributions" type="number">
+          Maximum allowed missed contributions
+        </ResponseField>
+        <ResponseField name="earlyWithdrawalPenalty" type="number">
+          Penalty for early withdrawal
+        </ResponseField>
+        <ResponseField name="votingThreshold" type="number">
+          Percentage required for voting decisions
+        </ResponseField>
+        <ResponseField name="allowLateJoining" type="boolean">
+          Whether new members can join after start
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="blockchain" type="object">
+      Blockchain transparency details
+      <Expandable title="blockchain object">
+        <ResponseField name="contractAddress" type="string">
+          Smart contract address
+        </ResponseField>
+        <ResponseField name="transactionHash" type="string">
+          Latest transaction hash
+        </ResponseField>
+        <ResponseField name="blockNumber" type="number">
+          Current block number
+        </ResponseField>
+        <ResponseField name="isVerified" type="boolean">
+          Whether blockchain records are verified
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="createdAt" type="string">
+      ISO timestamp of chama creation
+    </ResponseField>
+    <ResponseField name="updatedAt" type="string">
+      ISO timestamp of last update
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination information
+  <Expandable title="pagination object">
+    <ResponseField name="total" type="number">
+      Total number of chamas
+    </ResponseField>
+    <ResponseField name="limit" type="number">
+      Number of chamas per page
+    </ResponseField>
+    <ResponseField name="offset" type="number">
+      Number of chamas skipped
+    </ResponseField>
+    <ResponseField name="hasMore" type="boolean">
+      Whether more chamas are available
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="summary" type="object">
+  User's chama activity summary
+  <Expandable title="summary object">
+    <ResponseField name="totalChamas" type="number">
+      Total number of chamas user has joined
+    </ResponseField>
+    <ResponseField name="activeChamas" type="number">
+      Number of currently active chamas
+    </ResponseField>
+    <ResponseField name="totalContributed" type="number">
+      Total amount contributed across all chamas
+    </ResponseField>
+    <ResponseField name="totalReceived" type="number">
+      Total amount received from payouts
+    </ResponseField>
+    <ResponseField name="pendingContributions" type="number">
+      Amount of pending contributions due
+    </ResponseField>
+    <ResponseField name="nextPayoutExpected" type="object">
+      Details of next expected payout
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Response Examples
+
+<ResponseExample>
+```json 200 - Success
+{
+  "chamas": [
+    {
+      "id": "chama_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "name": "Women Entrepreneurs Circle",
+      "description": "Monthly savings group for women entrepreneurs in Cape Town",
+      "type": "rotating_savings",
+      "status": "active",
+      "creatorId": "user_creator123",
+      "contributionAmount": 1000.00,
+      "currency": "ZAR",
+      "frequency": "monthly",
+      "memberLimit": 12,
+      "currentMembers": 10,
+      "cycleCount": 3,
+      "totalCycles": 12,
+      "userMembership": {
+        "id": "membership_abc123",
+        "role": "member",
+        "joinedAt": "2025-02-01T10:00:00Z",
+        "payoutPosition": 7,
+        "contributionStatus": "current",
+        "totalContributed": 3000.00,
+        "missedContributions": 0,
+        "nextContributionDue": "2025-06-01T00:00:00Z",
+        "lastPayoutReceived": null
+      },
+      "financials": {
+        "totalPoolBalance": 12500.00,
+        "totalContributed": 30000.00,
+        "totalPaidOut": 17500.00,
+        "interestEarned": 125.00,
+        "monthlyTarget": 10000.00,
+        "collectionRate": 95.5,
+        "lastUpdated": "2025-05-31T16:00:00Z"
+      },
+      "schedule": {
+        "contributionDay": "1st of month",
+        "payoutDay": "15th of month",
+        "nextContributionDate": "2025-06-01T00:00:00Z",
+        "nextPayoutDate": "2025-06-15T12:00:00Z",
+        "nextPayoutRecipient": {
+          "userId": "user_member456",
+          "firstName": "Sarah",
+          "amount": 10000.00
+        }
+      },
+      "members": [
+        {
+          "userId": "user_creator123",
+          "firstName": "Nomsa",
+          "role": "admin",
+          "payoutPosition": 1,
+          "contributionStatus": "current",
+          "totalContributed": 3000.00,
+          "joinedAt": "2025-01-15T10:00:00Z",
+          "lastActivity": "2025-05-31T14:30:00Z"
+        },
+        {
+          "userId": "user_member456",
+          "firstName": "Sarah",
+          "role": "treasurer",
+          "payoutPosition": 4,
+          "contributionStatus": "current",
+          "totalContributed": 3000.00,
+          "joinedAt": "2025-01-20T11:00:00Z",
+          "lastActivity": "2025-05-30T09:15:00Z"
+        },
+        {
+          "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+          "firstName": "Thandiwe",
+          "role": "member",
+          "payoutPosition": 7,
+          "contributionStatus": "current",
+          "totalContributed": 3000.00,
+          "joinedAt": "2025-02-01T10:00:00Z",
+          "lastActivity": "2025-05-31T08:00:00Z"
+        }
+      ],
+      "upcomingPayouts": [
+        {
+          "cycleNumber": 4,
+          "recipientId": "user_member456",
+          "recipientName": "Sarah",
+          "amount": 10000.00,
+          "scheduledDate": "2025-06-15T12:00:00Z",
+          "status": "scheduled"
+        },
+        {
+          "cycleNumber": 5,
+          "recipientId": "user_member789",
+          "recipientName": "Priya",
+          "amount": 10000.00,
+          "scheduledDate": "2025-07-15T12:00:00Z",
+          "status": "scheduled"
+        }
+      ],
+      "rules": {
+        "latePenalty": 50.00,
+        "maxMissedContributions": 2,
+        "earlyWithdrawalPenalty": 0.1,
+        "votingThreshold": 0.6,
+        "allowLateJoining": false
+      },
+      "blockchain": {
+        "contractAddress": "0x742d35Cc6BF00532434343c3a0",
+        "transactionHash": "0x8f4a2b5c3d7e9f1a6b8c2d4e7f9g",
+        "blockNumber": 15678432,
+        "isVerified": true
+      },
+      "createdAt": "2025-01-15T10:00:00Z",
+      "updatedAt": "2025-05-31T16:00:00Z"
+    },
+    {
+      "id": "chama_2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q",
+      "name": "Tech Sisters Investment Club",
+      "description": "Investment-focused group for women in technology",
+      "type": "investment_club",
+      "status": "active",
+      "creatorId": "user_tech_lead",
+      "contributionAmount": 2500.00,
+      "currency": "ZAR",
+      "frequency": "monthly",
+      "memberLimit": 8,
+      "currentMembers": 6,
+      "cycleCount": 6,
+      "totalCycles": null,
+      "userMembership": {
+        "id": "membership_def456",
+        "role": "admin",
+        "joinedAt": "2025-01-01T12:00:00Z",
+        "payoutPosition": null,
+        "contributionStatus": "current",
+        "totalContributed": 15000.00,
+        "missedContributions": 0,
+        "nextContributionDue": "2025-06-01T00:00:00Z",
+        "lastPayoutReceived": null
+      },
+      "financials": {
+        "totalPoolBalance": 45000.00,
+        "totalContributed": 90000.00,
+        "totalPaidOut": 0,
+        "interestEarned": 2250.00,
+        "monthlyTarget": 15000.00,
+        "collectionRate": 100.0,
+        "lastUpdated": "2025-05-31T18:00:00Z"
+      },
+      "schedule": {
+        "contributionDay": "1st of month",
+        "payoutDay": "Quarterly review",
+        "nextContributionDate": "2025-06-01T00:00:00Z",
+        "nextPayoutDate": "2025-09-30T12:00:00Z",
+        "nextPayoutRecipient": null
+      },
+      "members": [
+        {
+          "userId": "user_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+          "firstName": "Thandiwe",
+          "role": "admin",
+          "payoutPosition": null,
+          "contributionStatus": "current",
+          "totalContributed": 15000.00,
+          "joinedAt": "2025-01-01T12:00:00Z",
+          "lastActivity": "2025-05-31T17:45:00Z"
+        }
+      ],
+      "upcomingPayouts": [],
+      "rules": {
+        "latePenalty": 100.00,
+        "maxMissedContributions": 1,
+        "earlyWithdrawalPenalty": 0.05,
+        "votingThreshold": 0.75,
+        "allowLateJoining": true
+      },
+      "blockchain": {
+        "contractAddress": "0x853e46D5f6FC9a8D0f11B7C3b2",
+        "transactionHash": "0x9g5b3c6d8e0f2a7c9d5e8f0g1h",
+        "blockNumber": 15678445,
+        "isVerified": true
+      },
+      "createdAt": "2025-01-01T12:00:00Z",
+      "updatedAt": "2025-05-31T18:00:00Z"
+    }
+  ],
+  "pagination": {
+    "total": 2,
+    "limit": 20,
+    "offset": 0,
+    "hasMore": false
+  },
+  "summary": {
+    "totalChamas": 2,
+    "activeChamas": 2,
+    "totalContributed": 18000.00,
+    "totalReceived": 0,
+    "pendingContributions": 3500.00,
+    "nextPayoutExpected": {
+      "chamaId": "chama_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+      "chamaName": "Women Entrepreneurs Circle",
+      "amount": 10000.00,
+      "expectedDate": "2025-10-15T12:00:00Z"
+    }
+  }
+}
+```
+
+```json 200 - Success (Empty Result)
+{
+  "chamas": [],
+  "pagination": {
+    "total": 0,
+    "limit": 20,
+    "offset": 0,
+    "hasMore": false
+  },
+  "summary": {
+    "totalChamas": 0,
+    "activeChamas": 0,
+    "totalContributed": 0,
+    "totalReceived": 0,
+    "pendingContributions": 0,
+    "nextPayoutExpected": null
+  }
+}
+```
+
+```json 403 - Insufficient Permissions
+{
+  "error": {
+    "code": "INSUFFICIENT_PERMISSIONS",
+    "message": "User does not have permission to view chama information",
+    "details": {
+      "requiredPermissions": ["read:chamas"],
+      "userPermissions": ["read:profile"]
+    }
+  }
+}
+```
+</ResponseExample>
+
+## Chama Types & Features
+
+<CardGroup cols={2}>
+  <Card title="Rotating Savings" icon="rotate-cw">
+    **Traditional Stokvel Model:**
+    
+    - Fixed member count
+    - Equal contributions
+    - Rotating payout schedule
+    - Each member receives one lump sum
+    - Transparent blockchain tracking
+  </Card>
+  
+  <Card title="Investment Club" icon="trending-up">
+    **Collective Investment:**
+    
+    - Pool funds for investments
+    - Shared returns based on contribution
+    - Flexible membership
+    - Professional investment guidance
+    - Performance tracking
+  </Card>
+  
+  <Card title="Emergency Fund" icon="shield">
+    **Community Safety Net:**
+    
+    - Rapid disbursement for emergencies
+    - Flexible contribution amounts
+    - Need-based payouts
+    - Community voting on requests
+    - Quick access protocols
+  </Card>
+  
+  <Card title="Goal-Based Savings" icon="target">
+    **Specific Objectives:**
+    
+    - Defined savings goals
+    - Milestone tracking
+    - Motivational features
+    - Group accountability
+    - Achievement rewards
+  </Card>
+</CardGroup>
+
+## SDK Examples
+
+<CodeGroup>
+```typescript TypeScript SDK
+import { AWOClient, ChamaListOptions } from '@awo/api-sdk';
+
+const client = new AWOClient({
+  apiKey: process.env.AWO_API_KEY!,
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+class ChamaManager {
+  async getUserChamas(userId: string, options?: ChamaListOptions) {
+    try {
+      const chamas = await client.chamas.list({
+        userId,
+        status: 'active',
+        includeMembers: true,
+        includeFinancials: true,
+        includeUpcomingPayouts: true,
+        ...options
+      });
+      
+      console.log(`Found ${chamas.summary.activeChamas} active chamas`);
+      console.log(`Total contributed: ${chamas.summary.totalContributed.toLocaleString()}`);
+      
+      return chamas;
+    } catch (error) {
+      console.error('Failed to get chamas:', error.message);
+      throw error;
+    }
+  }
+
+  async getChamasByType(userId: string, type: string) {
+    const chamas = await this.getUserChamas(userId);
+    return chamas.chamas.filter(chama => chama.type === type);
+  }
+
+  async getUpcomingContributions(userId: string) {
+    const chamas = await this.getUserChamas(userId, { status: 'active' });
+    
+    const upcomingContributions = chamas.chamas
+      .filter(chama => chama.userMembership.nextContributionDue)
+      .map(chama => ({
+        chamaId: chama.id,
+        chamaName: chama.name,
+        amount: chama.contributionAmount,
+        dueDate: chama.userMembership.nextContributionDue,
+        status: chama.userMembership.contributionStatus,
+        daysUntilDue: this.calculateDaysUntilDue(chama.userMembership.nextContributionDue)
+      }))
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    
+    return upcomingContributions;
+  }
+
+  async getExpectedPayouts(userId: string) {
+    const chamas = await this.getUserChamas(userId, { 
+      status: 'active',
+      includeUpcomingPayouts: true 
+    });
+    
+    const expectedPayouts = [];
+    
+    chamas.chamas.forEach(chama => {
+      if (chama.type === 'rotating_savings') {
+        const userPayout = chama.upcomingPayouts?.find(
+          payout => payout.recipientId === userId
+        );
+        
+        if (userPayout) {
+          expectedPayouts.push({
+            chamaId: chama.id,
+            chamaName: chama.name,
+            amount: userPayout.amount,
+            scheduledDate: userPayout.scheduledDate,
+            cycleNumber: userPayout.cycleNumber,
+            position: chama.userMembership.payoutPosition
+          });
+        }
+      }
+    });
+    
+    return expectedPayouts.sort((a, b) => 
+      new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()
+    );
+  }
+
+  async getChamaPerformanceMetrics(userId: string) {
+    const chamas = await this.getUserChamas(userId, {
+      includeFinancials: true,
+      includeContributions: true
+    });
+    
+    const metrics = {
+      totalChamas: chamas.summary.totalChamas,
+      activeChamas: chamas.summary.activeChamas,
+      totalContributed: chamas.summary.totalContributed,
+      totalReceived: chamas.summary.totalReceived,
+      netPosition: chamas.summary.totalReceived - chamas.summary.totalContributed,
+      averageContributionCompliance: 0,
+      mostActiveChama: null,
+      roiAnalysis: {}
+    };
+    
+    // Calculate average contribution compliance
+    const totalPossibleContributions = chamas.chamas.reduce((sum, chama) => 
+      sum + (chama.cycleCount * chama.contributionAmount), 0
+    );
+    
+    if (totalPossibleContributions > 0) {
+      metrics.averageContributionCompliance = 
+        (chamas.summary.totalContributed / totalPossibleContributions) * 100;
+    }
+    
+    // Find most active chama
+    if (chamas.chamas.length > 0) {
+      metrics.mostActiveChama = chamas.chamas.reduce((most, current) => 
+        current.userMembership.totalContributed > most.userMembership.totalContributed 
+          ? current 
+          : most
+      );
+    }
+    
+    // Calculate ROI for investment clubs
+    chamas.chamas
+      .filter(chama => chama.type === 'investment_club')
+      .forEach(chama => {
+        const contributed = chama.userMembership.totalContributed;
+        const interestEarned = chama.financials.interestEarned;
+        const roi = contributed > 0 ? (interestEarned / contributed) * 100 : 0;
+        
+        metrics.roiAnalysis[chama.id] = {
+          chamaName: chama.name,
+          contributed,
+          interestEarned,
+          roi: parseFloat(roi.toFixed(2))
+        };
+      });
+    
+    return metrics;
+  }
+
+  private calculateDaysUntilDue(dueDateString: string): number {
+    const dueDate = new Date(dueDateString);
+    const today = new Date();
+    const diffTime = dueDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }
+}
+
+// Usage
+const chamaManager = new ChamaManager();
+
+// Get all active chamas
+const activeChamas = await chamaManager.getUserChamas('user-123', { status: 'active' });
+
+// Get upcoming contributions
+const contributions = await chamaManager.getUpcomingContributions('user-123');
+console.log('Next contribution due:', contributions[0]?.dueDate);
+
+// Get expected payouts
+const payouts = await chamaManager.getExpectedPayouts('user-123');
+console.log('Next payout expected:', payouts[0]?.scheduledDate);
+
+// Get performance metrics
+const metrics = await chamaManager.getChamaPerformanceMetrics('user-123');
+console.log(`ROI from investment clubs: ${JSON.stringify(metrics.roiAnalysis, null, 2)}`);
+```
+
+```python Python SDK
+from awo_sdk import AWOClient, ChamaListOptions
+from datetime import datetime, timedelta
+from typing import List, Dict, Optional
+
+client = AWOClient(
+    api_key=os.environ['AWO_API_KEY'],
+    base_url='https://api.awo-platform.com/v1'
+)
+
+class ChamaManager:
+    def __init__(self):
+        self.client = client
+
+    def get_user_chamas(self, user_id: str, options: Optional[Dict] = None):
+        try:
+            default_options = {
+                'user_id': user_id,
+                'status': 'active',
+                'include_members': True,
+                'include_financials': True,
+                'include_upcoming_payouts': True
+            }
+            
+            if options:
+                default_options.update(options)
+            
+            chamas = self.client.chamas.list(**default_options)
+            
+            print(f"Found {chamas.summary.active_chamas} active chamas")
+            print(f"Total contributed: {chamas.summary.total_contributed:,.2f}")
+            
+            return chamas
+            
+        except Exception as error:
+            print(f"Failed to get chamas: {error}")
+            raise
+
+    def get_chamas_by_type(self, user_id: str, chama_type: str):
+        chamas = self.get_user_chamas(user_id)
+        return [chama for chama in chamas.chamas if chama.type == chama_type]
+
+    def get_upcoming_contributions(self, user_id: str):
+        chamas = self.get_user_chamas(user_id, {'status': 'active'})
+        
+        upcoming_contributions = []
+        
+        for chama in chamas.chamas:
+            if chama.user_membership.next_contribution_due:
+                days_until_due = self.calculate_days_until_due(
+                    chama.user_membership.next_contribution_due
+                )
+                
+                upcoming_contributions.append({
+                    'chama_id': chama.id,
+                    'chama_name': chama.name,
+                    'amount': chama.contribution_amount,
+                    'due_date': chama.user_membership.next_contribution_due,
+                    'status': chama.user_membership.contribution_status,
+                    'days_until_due': days_until_due,
+                    'is_overdue': days_until_due < 0
+                })
+        
+        # Sort by due date
+        upcoming_contributions.sort(key=lambda x: x['due_date'])
+        
+        return upcoming_contributions
+
+    def get_expected_payouts(self, user_id: str):
+        chamas = self.get_user_chamas(user_id, {
+            'status': 'active',
+            'include_upcoming_payouts': True
+        })
+        
+        expected_payouts = []
+        
+        for chama in chamas.chamas:
+            if chama.type == 'rotating_savings' and chama.upcoming_payouts:
+                user_payout = next((
+                    payout for payout in chama.upcoming_payouts 
+                    if payout.recipient_id == user_id
+                ), None)
+                
+                if user_payout:
+                    expected_payouts.append({
+                        'chama_id': chama.id,
+                        'chama_name': chama.name,
+                        'amount': user_payout.amount,
+                        'scheduled_date': user_payout.scheduled_date,
+                        'cycle_number': user_payout.cycle_number,
+                        'position': chama.user_membership.payout_position
+                    })
+        
+        # Sort by scheduled date
+        expected_payouts.sort(key=lambda x: x['scheduled_date'])
+        
+        return expected_payouts
+
+    def analyze_chama_health(self, user_id: str):
+        """Analyze the health and performance of user's chamas"""
+        chamas = self.get_user_chamas(user_id, {'include_financials': True})
+        
+        analysis = {
+            'overall_health': 'good',
+            'total_chamas': chamas.summary.total_chamas,
+            'active_chamas': chamas.summary.active_chamas,
+            'health_metrics': {},
+            'recommendations': []
+        }
+        
+        health_scores = []
+        
+        for chama in chamas.chamas:
+            if chama.status == 'active':
+                # Calculate health score based on multiple factors
+                collection_rate = chama.financials.collection_rate / 100
+                member_retention = chama.current_members / chama.member_limit
+                user_compliance = 1.0 - (chama.user_membership.missed_contributions / max(chama.cycle_count, 1))
+                
+                health_score = (collection_rate * 0.4 + member_retention * 0.3 + user_compliance * 0.3) * 100
+                health_scores.append(health_score)
+                
+                analysis['health_metrics'][chama.id] = {
+                    'chama_name': chama.name,
+                    'health_score': round(health_score, 1),
+                    'collection_rate': chama.financials.collection_rate,
+                    'member_retention': round(member_retention * 100, 1),
+                    'user_compliance': round(user_compliance * 100, 1),
+                    'financial_health': self.assess_financial_health(chama)
+                }
+        
+        # Overall health assessment
+        if health_scores:
+            avg_health = sum(health_scores) / len(health_scores)
+            if avg_health >= 80:
+                analysis['overall_health'] = 'excellent'
+            elif avg_health >= 60:
+                analysis['overall_health'] = 'good'
+            elif avg_health >= 40:
+                analysis['overall_health'] = 'fair'
+            else:
+                analysis['overall_health'] = 'poor'
+        
+        # Generate recommendations
+        analysis['recommendations'] = self.generate_recommendations(chamas.chamas)
+        
+        return analysis
+
+    def assess_financial_health(self, chama):
+        """Assess the financial health of a chama"""
+        expected_balance = chama.contribution_amount * chama.current_members * chama.cycle_count
+        actual_contributions = chama.financials.total_contributed
+        
+        if expected_balance > 0:
+            financial_score = (actual_contributions / expected_balance) * 100
+        else:
+            financial_score = 100
+        
+        if financial_score >= 95:
+            return 'excellent'
+        elif financial_score >= 85:
+            return 'good'
+        elif financial_score >= 70:
+            return 'fair'
+        else:
+            return 'poor'
+
+    def generate_recommendations(self, chamas: List):
+        """Generate actionable recommendations"""
+        recommendations = []
+        
+        # Check for low participation
+        low_participation_chamas = [
+            chama for chama in chamas 
+            if chama.status == 'active' and chama.financials.collection_rate < 80
+        ]
+        
+        if low_participation_chamas:
+            recommendations.append({
+                'type': 'low_participation',
+                'message': f"Consider reviewing commitment in {len(low_participation_chamas)} chama(s) with low contribution rates",
+                'action': 'Review chama rules and member engagement'
+            })
+        
+        # Check for missed contributions
+        user_behind = [
+            chama for chama in chamas 
+            if chama.user_membership.contribution_status == 'behind'
+        ]
+        
+        if user_behind:
+            recommendations.append({
+                'type': 'missed_contributions',
+                'message': f"You're behind on contributions in {len(user_behind)} chama(s)",
+                'action': 'Make catch-up payments to avoid penalties'
+            })
+        
+        # Check for diversification
+        if len(chamas) == 1:
+            recommendations.append({
+                'type': 'diversification',
+                'message': "Consider joining additional chamas to diversify your savings strategy",
+                'action': 'Explore different chama types (investment clubs, emergency funds)'
+            })
+        
+        return recommendations
+
+    def calculate_days_until_due(self, due_date_string: str) -> int:
+        due_date = datetime.fromisoformat(due_date_string.replace('Z', '+00:00'))
+        today = datetime.now(due_date.tzinfo)
+        diff = due_date - today
+        return diff.days
+
+# Usage
+chama_manager = ChamaManager()
+
+# Get chama health analysis
+health_analysis = chama_manager.analyze_chama_health('user-123')
+print(f"Overall chama health: {health_analysis['overall_health']}")
+
+for recommendation in health_analysis['recommendations']:
+    print(f"Recommendation: {recommendation['message']}")
+
+# Get upcoming financial obligations
+contributions = chama_manager.get_upcoming_contributions('user-123')
+overdue = [c for c in contributions if c['is_overdue']]
+
+if overdue:
+    print(f"Warning: {len(overdue)} overdue contributions")
+
+# Expected returns
+payouts = chama_manager.get_expected_payouts('user-123')
+if payouts:
+    next_payout = payouts[0]
+    print(f"Next payout: {next_payout['amount']:,.2f} from {next_payout['chama_name']}")
+```
+
+```javascript React Native
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
+  Alert
+} from 'react-native';
+import { AWOClient } from '@awo/react-native-sdk';
+
+export function ChamasListScreen({ userId, navigation }) {
+  const [chamas, setChamas] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState('active');
+
+  useEffect(() => {
+    loadChamas();
+  }, [userId, filter]);
+
+  const loadChamas = async () => {
+    try {
+      const chamasData = await AWOClient.chamas.list({
+        userId,
+        status: filter,
+        includeMembers: true,
+        includeFinancials: true,
+        includeUpcomingPayouts: true
+      });
+      
+      setChamas(chamasData.chamas);
+      setSummary(chamasData.summary);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load chamas');
+      console.error(error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadChamas();
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active': return '#22C55E';
+      case 'forming': return '#3B82F6';
+      case 'completed': return '#6B7280';
+      case 'paused': return '#EAB308';
+      case 'cancelled': return '#EF4444';
+      default: return '#6B7280';
+    }
+  };
+
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case 'rotating_savings': return '🔄';
+      case 'investment_club': return '📈';
+      case 'emergency_fund': return '🛡️';
+      case 'goal_based': return '🎯';
+      default: return '💼';
+    }
+  };
+
+  const formatCurrency = (amount, currency = 'ZAR') => {
+    return `${currency} ${amount.toLocaleString('en-ZA', { 
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2 
+    })}`;
+  };
+
+  const calculateProgress = (chama) => {
+    if (chama.type === 'rotating_savings') {
+      return (chama.cycleCount / chama.totalCycles) * 100;
+    }
+    return (chama.currentMembers / chama.memberLimit) * 100;
+  };
+
+  const getNextEvent = (chama) => {
+    const nextContribution = chama.userMembership.nextContributionDue;
+    const nextPayout = chama.schedule.nextPayoutDate;
+    
+    if (nextContribution && nextPayout) {
+      const contributionDate = new Date(nextContribution);
+      const payoutDate = new Date(nextPayout);
+      
+      if (contributionDate < payoutDate) {
+        return {
+          type: 'contribution',
+          date: contributionDate,
+          amount: chama.contributionAmount
+        };
+      } else {
+        return {
+          type: 'payout',
+          date: payoutDate,
+          recipient: chama.schedule.nextPayoutRecipient?.firstName
+        };
+      }
+    }
+    
+    return null;
+  };
+
+  const renderChama = ({ item: chama }) => {
+    const progress = calculateProgress(chama);
+    const nextEvent = getNextEvent(chama);
+    const isUserNext = chama.schedule.nextPayoutRecipient?.userId === userId;
+
+    return (
+      <TouchableOpacity
+        style={{
+          backgroundColor: 'white',
+          marginHorizontal: 16,
+          marginVertical: 8,
+          borderRadius: 12,
+          padding: 16,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3
+        }}
+        onPress={() => navigation.navigate('ChamaDetails', { chamaId: chama.id })}
+      >
+        {/* Header */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={{ fontSize: 20, marginRight: 8 }}>
+                {getTypeIcon(chama.type)}
+              </Text>
+              <Text style={{ fontSize: 16, fontWeight: '600', flex: 1 }}>
+                {chama.name}
+              </Text>
+            </View>
+            
+            <Text style={{ fontSize: 14, color: '#6B7280', marginBottom: 8 }}>
+              {chama.currentMembers}/{chama.memberLimit} members
+            </Text>
+          </View>
+          
+          <View style={{
+            backgroundColor: getStatusColor(chama.status),
+            borderRadius: 12,
+            paddingHorizontal: 8,
+            paddingVertical: 2
+          }}>
+            <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>
+              {chama.status.toUpperCase()}
+            </Text>
+          </View>
+        </View>
+
+        {/* Financial Summary */}
+        <View style={{ 
+          backgroundColor: '#F9FAFB', 
+          borderRadius: 8, 
+          padding: 12, 
+          marginBottom: 12 
+        }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Text style={{ fontSize: 14, color: '#374151' }}>Your Contribution</Text>
+            <Text style={{ fontSize: 14, fontWeight: '600' }}>
+              {formatCurrency(chama.userMembership.totalContributed, chama.currency)}
+            </Text>
+          </View>
+          
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Text style={{ fontSize: 14, color: '#374151' }}>Pool Balance</Text>
+            <Text style={{ fontSize: 14, fontWeight: '600' }}>
+              {formatCurrency(chama.financials.totalPoolBalance, chama.currency)}
+            </Text>
+          </View>
+          
+          {chama.type === 'rotating_savings' && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 14, color: '#374151' }}>Your Position</Text>
+              <Text style={{ fontSize: 14, fontWeight: '600' }}>
+                #{chama.userMembership.payoutPosition}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Progress Bar */}
+        <View style={{ marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+            <Text style={{ fontSize: 12, color: '#6B7280' }}>
+              {chama.type === 'rotating_savings' ? 'Cycle Progress' : 'Member Progress'}
+            </Text>
+            <Text style={{ fontSize: 12, color: '#6B7280' }}>
+              {Math.round(progress)}%
+            </Text>
+          </View>
+          
+          <View style={{ 
+            width: '100%', 
+            height: 6, 
+            backgroundColor: '#E5E7EB', 
+            borderRadius: 3 
+          }}>
+            <View style={{
+              width: `${progress}%`,
+              height: '100%',
+              backgroundColor: '#3B82F6',
+              borderRadius: 3
+            }} />
+          </View>
+        </View>
+
+        {/* Next Event */}
+        {nextEvent && (
+          <View style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingTop: 12,
+            borderTopWidth: 1,
+            borderTopColor: '#E5E7EB'
+          }}>
+            <Text style={{ fontSize: 14, color: '#374151' }}>
+              Next {nextEvent.type}:
+            </Text>
+            
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 14, fontWeight: '600' }}>
+                {nextEvent.date.toLocaleDateString()}
+              </Text>
+              
+              {nextEvent.type === 'contribution' ? (
+                <Text style={{ fontSize: 12, color: '#EF4444' }}>
+                  {formatCurrency(nextEvent.amount, chama.currency)}
+                </Text>
+              ) : (
+                <Text style={{ fontSize: 12, color: isUserNext ? '#22C55E' : '#6B7280' }}>
+                  {isUserNext ? 'Your turn!' : `${nextEvent.recipient || 'TBD'}'s turn`}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Overdue Warning */}
+        {chama.userMembership.contributionStatus === 'behind' && (
+          <View style={{
+            backgroundColor: '#FEF2F2',
+            borderColor: '#FECACA',
+            borderWidth: 1,
+            borderRadius: 6,
+            padding: 8,
+            marginTop: 8
+          }}>
+            <Text style={{ color: '#DC2626', fontSize: 12, fontWeight: '600' }}>
+              ⚠️ You have {chama.userMembership.missedContributions} missed contribution(s)
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  const renderFilter = (status, label, count) => (
+    <TouchableOpacity
+      style={{
+        backgroundColor: filter === status ? '#3B82F6' : '#F3F4F6',
+        borderRadius: 20,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        marginRight: 8,
+        flexDirection: 'row',
+        alignItems: 'center'
+      }}
+      onPress={() => setFilter(status)}
+    >
+      <Text style={{
+        color: filter === status ? 'white' : '#374151',
+        fontWeight: '600',
+        marginRight: count !== undefined ? 4 : 0
+      }}>
+        {label}
+      </Text>
+      {count !== undefined && (
+        <View style={{
+          backgroundColor: filter === status ? 'rgba(255,255,255,0.3)' : '#D1D5DB',
+          borderRadius: 10,
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+          minWidth: 20,
+          alignItems: 'center'
+        }}>
+          <Text style={{
+            color: filter === status ? 'white' : '#374151',
+            fontSize: 12,
+            fontWeight: '600'
+          }}>
+            {count}
+          </Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+
+  if (loading && chamas.length === 0) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={{ marginTop: 16, color: '#6B7280' }}>Loading chamas...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+      {/* Summary Card */}
+      {summary && (
+        <View style={{
+          backgroundColor: 'white',
+          margin: 16,
+          borderRadius: 12,
+          padding: 16,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3
+        }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>
+            Your Chama Summary
+          </Text>
+          
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#1F2937' }}>
+                {summary.activeChamas}
+              </Text>
+              <Text style={{ fontSize: 14, color: '#6B7280' }}>Active</Text>
+            </View>
+            
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#22C55E' }}>
+                {formatCurrency(summary.totalContributed)}
+              </Text>
+              <Text style={{ fontSize: 14, color: '#6B7280' }}>Contributed</Text>
+            </View>
+            
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#3B82F6' }}>
+                {formatCurrency(summary.totalReceived)}
+              </Text>
+              <Text style={{ fontSize: 14, color: '#6B7280' }}>Received</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Filter Buttons */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={[
+            { status: 'active', label: 'Active', count: summary?.activeChamas },
+            { status: 'forming', label: 'Forming', count: undefined },
+            { status: 'completed', label: 'Completed', count: undefined },
+            { status: 'all', label: 'All', count: summary?.totalChamas }
+          ]}
+          renderItem={({ item }) => renderFilter(item.status, item.label, item.count)}
+          keyExtractor={(item) => item.status}
+        />
+      </View>
+
+      {/* Chamas List */}
+      <FlatList
+        data={chamas}
+        renderItem={renderChama}
+        keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <View style={{ 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            paddingVertical: 40 
+          }}>
+            <Text style={{ fontSize: 18, color: '#6B7280', marginBottom: 8 }}>
+              No chamas found
+            </Text>
+            <Text style={{ fontSize: 14, color: '#9CA3AF', textAlign: 'center', marginBottom: 16 }}>
+              Join or create a chama to start saving with your community
+            </Text>
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#3B82F6',
+                borderRadius: 8,
+                paddingHorizontal: 20,
+                paddingVertical: 12
+              }}
+              onPress={() => navigation.navigate('CreateChama')}
+            >
+              <Text style={{ color: 'white', fontWeight: '600' }}>
+                Create Chama
+              </Text>
+            </TouchableOpacity>
+          </View>
+        }
+      />
+    </View>
+  );
+}
+
+// Hook for chama data
+export function useChamas(userId, options = {}) {
+  const [chamas, setChamas] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchChamas = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await AWOClient.chamas.list({
+        userId,
+        includeFinancials: true,
+        ...options
+      });
+      setChamas(data.chamas);
+      setSummary(data.summary);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      fetchChamas();
+    }
+  }, [userId, JSON.stringify(options)]);
+
+  return {
+    chamas,
+    summary,
+    loading,
+    error,
+    refetch: fetchChamas
+  };
+}
+```
+</CodeGroup>
+
+## Use Cases & Analytics
+
+<AccordionGroup>
+  <Accordion title="Chama Performance Tracking">
+    **Monitor chama health and performance:**
+    
+    ```typescript
+    class ChamaAnalytics {
+      async generatePerformanceReport(userId: string) {
+        const chamas = await client.chamas.list({
+          userId,
+          includeFinancials: true,
+          includeMembers: true
+        });
+        
+        return {
+          overallPerformance: this.calculateOverallPerformance(chamas.chamas),
+          individualAnalysis: chamas.chamas.map(chama => ({
+            chamaId: chama.id,
+            name: chama.name,
+            healthScore: this.calculateHealthScore(chama),
+            financialMetrics: this.calculateFinancialMetrics(chama),
+            memberEngagement: this.analyzeMemberEngagement(chama),
+            recommendations: this.generateRecommendations(chama)
+          })),
+          trends: this.identifyTrends(chamas.chamas),
+          riskAssessment: this.assessRisks(chamas.chamas)
+        };
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Contribution Planning">
+    **Plan and track contributions:**
+    
+    ```typescript
+    class ContributionPlanner {
+      async createContributionCalendar(userId: string) {
+        const chamas = await client.chamas.list({
+          userId,
+          status: 'active',
+          includeUpcomingPayouts: true
+        });
+        
+        const calendar = new Map();
+        
+        chamas.chamas.forEach(chama => {
+          const nextDue = chama.userMembership.nextContributionDue;
+          if (nextDue) {
+            const dateKey = nextDue.split('T')[0];
+            if (!calendar.has(dateKey)) {
+              calendar.set(dateKey, []);
+            }
+            
+            calendar.get(dateKey).push({
+              chamaId: chama.id,
+              chamaName: chama.name,
+              amount: chama.contributionAmount,
+              currency: chama.currency,
+              frequency: chama.frequency
+            });
+          }
+        });
+        
+        return Array.from(calendar.entries()).map(([date, contributions]) => ({
+          date,
+          contributions,
+          totalAmount: contributions.reduce((sum, c) => sum + c.amount, 0)
+        }));
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Payout Optimization">
+    **Optimize payout scheduling:**
+    
+    ```typescript
+    class PayoutOptimizer {
+      async optimizePayoutSchedule(chamaId: string) {
+        const chama = await client.chamas.get(chamaId, {
+          includeMembers: true,
+          includeFinancials: true
+        });
+        
+        if (chama.type !== 'rotating_savings') {
+          throw new Error('Payout optimization only available for rotating savings');
+        }
+        
+        return {
+          currentSchedule: chama.upcomingPayouts,
+          optimizedSchedule: this.calculateOptimalSchedule(chama),
+          impactAnalysis: this.analyzeScheduleImpact(chama),
+          memberPreferences: this.analyzeMemberPreferences(chama.members)
+        };
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Member Engagement" icon="users">
+    **Keep Members Active:**
+    
+    - Regular communication updates
+    - Transparent financial reporting
+    - Celebrate milestones and achievements
+    - Address issues promptly
+  </Card>
+  
+  <Card title="Financial Health" icon="heart">
+    **Maintain Healthy Finances:**
+    
+    - Monitor contribution rates closely
+    - Implement fair penalty systems
+    - Diversify investment strategies
+    - Regular financial audits
+  </Card>
+  
+  <Card title="Risk Management" icon="shield">
+    **Minimize Risks:**
+    
+    - Thorough member vetting
+    - Clear rules and governance
+    - Emergency fund provisions
+    - Blockchain transparency
+  </Card>
+  
+  <Card title="Growth Strategy" icon="trending-up">
+    **Scale Effectively:**
+    
+    - Start with trusted networks
+    - Gradual membership expansion
+    - Multiple chama participation
+    - Success story sharing
+  </Card>
+</CardGroup>
+
+## Related Endpoints
+
+- [Create Chama](/api-reference/chamas/create) - Start a new chama group
+- [Chama Details](/api-reference/chamas/details) - Get detailed chama information
+- [Make Contribution](/api-reference/chamas/contribute) - Contribute to chama
+- [Manage Members](/api-reference/chamas/members) - Add/remove chama members

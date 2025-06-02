@@ -1,0 +1,1360 @@
+---
+title: "Categorize Transactions"
+api: "PUT /api/v1/transactions/{transactionId}/category"
+description: "Update transaction category and improve automatic categorization accuracy"
+---
+
+# Categorize Transactions
+
+Updates the category of a specific transaction and provides feedback to improve the automatic categorization system. User corrections help train the machine learning model for better future categorization accuracy.
+
+<Info>
+Manual categorization corrections improve the accuracy of automatic categorization for similar future transactions. The system learns from user feedback to provide better suggestions.
+</Info>
+
+## Endpoint
+
+<CodeGroup>
+```bash cURL
+curl -X PUT "https://api.awo-platform.com/v1/transactions/{transactionId}/category" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "category": "food_and_dining",
+    "subcategory": "groceries",
+    "confidence": "high",
+    "userNote": "Weekly grocery shopping at Woolworths"
+  }'
+```
+
+```javascript JavaScript SDK
+import { AWOClient } from '@awo/api-sdk';
+
+const client = new AWOClient({ 
+  apiKey: 'your-api-key',
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+const updatedTransaction = await client.transactions.categorize('transaction-id', {
+  category: 'food_and_dining',
+  subcategory: 'groceries',
+  confidence: 'high',
+  userNote: 'Weekly grocery shopping'
+});
+```
+
+```python Python SDK
+from awo_sdk import AWOClient
+
+client = AWOClient(
+    api_key="your-api-key",
+    base_url="https://api.awo-platform.com/v1"
+)
+
+updated_transaction = client.transactions.categorize(
+    transaction_id="transaction-id",
+    category="food_and_dining",
+    subcategory="groceries",
+    confidence="high",
+    user_note="Weekly grocery shopping"
+)
+```
+</CodeGroup>
+
+## Path Parameters
+
+<ParamField path="transactionId" type="string" required>
+  The unique identifier of the transaction to categorize
+</ParamField>
+
+## Request Body
+
+<ParamField body="category" type="string" required>
+  Primary transaction category
+  - `income` - Salary, freelance, investment income
+  - `food_and_dining` - Restaurants, groceries, food delivery
+  - `transportation` - Fuel, public transport, ride-sharing
+  - `shopping` - Retail, online shopping, clothing
+  - `bills_and_utilities` - Rent, electricity, water, internet
+  - `entertainment` - Movies, concerts, games, streaming
+  - `healthcare` - Medical, pharmacy, insurance
+  - `education` - Tuition, books, training
+  - `transfer` - Bank transfers, payments to friends
+  - `other` - Miscellaneous or uncategorized
+</ParamField>
+
+<ParamField body="subcategory" type="string">
+  More specific subcategory within the primary category
+</ParamField>
+
+<ParamField body="confidence" type="string" default="medium">
+  User confidence in this categorization
+  - `low` - Uncertain about the categorization
+  - `medium` - Reasonably confident
+  - `high` - Very confident in the categorization
+</ParamField>
+
+<ParamField body="userNote" type="string">
+  Optional note explaining the categorization choice
+</ParamField>
+
+<ParamField body="tags" type="array">
+  Optional array of custom tags for this transaction
+</ParamField>
+
+<ParamField body="applyToSimilar" type="boolean" default="false">
+  Whether to apply this categorization to similar transactions automatically
+</ParamField>
+
+<ParamField body="createRule" type="boolean" default="false">
+  Whether to create a categorization rule based on this correction
+</ParamField>
+
+<ParamField body="ruleScope" type="string" default="merchant">
+  Scope for the categorization rule (if createRule is true)
+  - `merchant` - Apply to transactions from the same merchant
+  - `description` - Apply to transactions with similar descriptions
+  - `amount_range` - Apply to transactions in similar amount range
+  - `custom` - Custom rule definition
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the transaction
+</ResponseField>
+
+<ResponseField name="category" type="string">
+  Updated primary category
+</ResponseField>
+
+<ResponseField name="subcategory" type="string">
+  Updated subcategory
+</ResponseField>
+
+<ResponseField name="categorization" type="object">
+  Updated categorization details
+  <Expandable title="categorization object">
+    <ResponseField name="confidence" type="number">
+      System confidence in the categorization (0-1)
+    </ResponseField>
+    <ResponseField name="method" type="string">
+      Categorization method: 'manual', 'automatic', 'rule_based'
+    </ResponseField>
+    <ResponseField name="isUserCorrected" type="boolean">
+      Whether this was manually corrected by the user
+    </ResponseField>
+    <ResponseField name="userNote" type="string">
+      User-provided note about the categorization
+    </ResponseField>
+    <ResponseField name="correctedAt" type="string">
+      ISO timestamp of when the correction was made
+    </ResponseField>
+    <ResponseField name="previousCategory" type="string">
+      The previous category before correction
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="tags" type="array">
+  Array of tags associated with this transaction
+</ResponseField>
+
+<ResponseField name="similarTransactionsUpdated" type="number">
+  Number of similar transactions updated (if applyToSimilar was true)
+</ResponseField>
+
+<ResponseField name="ruleCreated" type="object">
+  Details of the categorization rule created (if createRule was true)
+  <Expandable title="ruleCreated object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the created rule
+    </ResponseField>
+    <ResponseField name="scope" type="string">
+      Rule scope (merchant, description, etc.)
+    </ResponseField>
+    <ResponseField name="criteria" type="object">
+      Rule matching criteria
+    </ResponseField>
+    <ResponseField name="action" type="object">
+      Categorization action to apply
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="learningImpact" type="object">
+  Impact on the machine learning model
+  <Expandable title="learningImpact object">
+    <ResponseField name="modelConfidenceImprovement" type="number">
+      Estimated improvement in model confidence for similar transactions
+    </ResponseField>
+    <ResponseField name="affectedFutureTransactions" type="number">
+      Estimated number of future transactions that will benefit from this correction
+    </ResponseField>
+    <ResponseField name="trainingDataPoints" type="number">
+      Number of training data points contributed to the model
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO timestamp of when the transaction was updated
+</ResponseField>
+
+## Response Examples
+
+<ResponseExample>
+```json 200 - Success
+{
+  "id": "txn_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+  "category": "food_and_dining",
+  "subcategory": "groceries",
+  "categorization": {
+    "confidence": 0.95,
+    "method": "manual",
+    "isUserCorrected": true,
+    "userNote": "Weekly grocery shopping at Woolworths",
+    "correctedAt": "2025-05-31T16:30:00Z",
+    "previousCategory": "shopping"
+  },
+  "tags": ["groceries", "weekly_shopping", "essentials"],
+  "similarTransactionsUpdated": 0,
+  "ruleCreated": null,
+  "learningImpact": {
+    "modelConfidenceImprovement": 0.12,
+    "affectedFutureTransactions": 25,
+    "trainingDataPoints": 1
+  },
+  "updatedAt": "2025-05-31T16:30:00Z"
+}
+```
+
+```json 200 - Success with Rule Creation
+{
+  "id": "txn_2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q",
+  "category": "transportation",
+  "subcategory": "fuel",
+  "categorization": {
+    "confidence": 0.98,
+    "method": "manual",
+    "isUserCorrected": true,
+    "userNote": "Gas station fuel purchase",
+    "correctedAt": "2025-05-31T16:35:00Z",
+    "previousCategory": "other"
+  },
+  "tags": ["fuel", "car_expenses"],
+  "similarTransactionsUpdated": 3,
+  "ruleCreated": {
+    "id": "rule_abc123def456",
+    "scope": "merchant",
+    "criteria": {
+      "merchantName": "SHELL",
+      "amountRange": {
+        "min": 200,
+        "max": 2000
+      }
+    },
+    "action": {
+      "category": "transportation",
+      "subcategory": "fuel",
+      "confidence": 0.9
+    }
+  },
+  "learningImpact": {
+    "modelConfidenceImprovement": 0.18,
+    "affectedFutureTransactions": 45,
+    "trainingDataPoints": 4
+  },
+  "updatedAt": "2025-05-31T16:35:00Z"
+}
+```
+
+```json 400 - Invalid Category
+{
+  "error": {
+    "code": "INVALID_CATEGORY",
+    "message": "Invalid category specified",
+    "details": {
+      "category": "invalid_category",
+      "validCategories": [
+        "income",
+        "food_and_dining", 
+        "transportation",
+        "shopping",
+        "bills_and_utilities",
+        "entertainment",
+        "healthcare",
+        "education",
+        "transfer",
+        "other"
+      ]
+    }
+  }
+}
+```
+
+```json 404 - Transaction Not Found
+{
+  "error": {
+    "code": "TRANSACTION_NOT_FOUND",
+    "message": "Transaction not found or not accessible",
+    "details": {
+      "transactionId": "invalid-transaction-id",
+      "suggestions": [
+        "Verify the transaction ID is correct",
+        "Ensure you have access to this transaction",
+        "Check if the transaction has been deleted"
+      ]
+    }
+  }
+}
+```
+
+```json 409 - Already Categorized
+{
+  "error": {
+    "code": "ALREADY_CATEGORIZED",
+    "message": "Transaction already has the specified category",
+    "details": {
+      "currentCategory": "food_and_dining",
+      "currentSubcategory": "groceries",
+      "requestedCategory": "food_and_dining",
+      "requestedSubcategory": "groceries",
+      "lastCorrectedAt": "2025-05-30T10:15:00Z"
+    }
+  }
+}
+```
+</ResponseExample>
+
+## Batch Categorization
+
+For updating multiple transactions at once, use the batch endpoint:
+
+<CodeGroup>
+```bash Batch cURL
+curl -X PUT "https://api.awo-platform.com/v1/transactions/batch/category" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "updates": [
+      {
+        "transactionId": "txn_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+        "category": "food_and_dining",
+        "subcategory": "groceries"
+      },
+      {
+        "transactionId": "txn_2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q",
+        "category": "transportation",
+        "subcategory": "fuel"
+      }
+    ]
+  }'
+```
+
+```javascript Batch JavaScript
+const batchUpdate = await client.transactions.categorizeBatch([
+  {
+    transactionId: 'txn_1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p',
+    category: 'food_and_dining',
+    subcategory: 'groceries'
+  },
+  {
+    transactionId: 'txn_2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q',
+    category: 'transportation',
+    subcategory: 'fuel'
+  }
+]);
+
+console.log(`Updated ${batchUpdate.successCount} transactions`);
+```
+</CodeGroup>
+
+## Categorization Rules
+
+<Tabs>
+  <Tab title="Rule Types">
+    **Automatic Rule Creation:**
+    
+    ```typescript
+    interface CategorizationRule {
+      id: string;
+      scope: 'merchant' | 'description' | 'amount_range' | 'custom';
+      criteria: {
+        merchantName?: string;
+        descriptionPattern?: string;
+        amountRange?: {
+          min: number;
+          max: number;
+        };
+        customConditions?: object;
+      };
+      action: {
+        category: string;
+        subcategory?: string;
+        confidence: number;
+      };
+      priority: number;
+      isActive: boolean;
+      createdBy: 'user' | 'system';
+      createdAt: string;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Rule Examples">
+    **Common Rule Patterns:**
+    
+    ```json
+    {
+      "merchantRules": [
+        {
+          "scope": "merchant",
+          "criteria": { "merchantName": "WOOLWORTHS" },
+          "action": { "category": "food_and_dining", "subcategory": "groceries" }
+        },
+        {
+          "scope": "merchant", 
+          "criteria": { "merchantName": "SHELL" },
+          "action": { "category": "transportation", "subcategory": "fuel" }
+        }
+      ],
+      "descriptionRules": [
+        {
+          "scope": "description",
+          "criteria": { "descriptionPattern": "SALARY|PAYROLL" },
+          "action": { "category": "income", "subcategory": "salary" }
+        },
+        {
+          "scope": "description",
+          "criteria": { "descriptionPattern": "ESKOM|ELECTRICITY" },
+          "action": { "category": "bills_and_utilities", "subcategory": "electricity" }
+        }
+      ],
+      "amountRules": [
+        {
+          "scope": "amount_range",
+          "criteria": { 
+            "amountRange": { "min": 50, "max": 200 },
+            "merchantName": "UBER"
+          },
+          "action": { "category": "transportation", "subcategory": "ride_sharing" }
+        }
+      ]
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Custom Rules">
+    **Advanced Rule Configuration:**
+    
+    ```typescript
+    // Create complex categorization rule
+    const customRule = {
+      scope: 'custom',
+      criteria: {
+        customConditions: {
+          and: [
+            { field: 'merchantName', operator: 'contains', value: 'RESTAURANT' },
+            { field: 'amount', operator: 'between', value: [100, 1000] },
+            { field: 'timeOfDay', operator: 'between', value: ['18:00', '23:00'] }
+          ]
+        }
+      },
+      action: {
+        category: 'food_and_dining',
+        subcategory: 'restaurants',
+        confidence: 0.85
+      },
+      priority: 100
+    };
+
+    await client.transactions.createCategorizationRule(customRule);
+    ```
+  </Tab>
+</Tabs>
+
+## SDK Examples
+
+<CodeGroup>
+```typescript TypeScript SDK
+import { AWOClient, CategorizeTransactionRequest } from '@awo/api-sdk';
+
+const client = new AWOClient({
+  apiKey: process.env.AWO_API_KEY!,
+  baseURL: 'https://api.awo-platform.com/v1'
+});
+
+class TransactionCategorizer {
+  async categorizeTransaction(
+    transactionId: string, 
+    category: string, 
+    subcategory?: string,
+    options?: {
+      createRule?: boolean;
+      applyToSimilar?: boolean;
+      userNote?: string;
+    }
+  ) {
+    try {
+      const request: CategorizeTransactionRequest = {
+        category,
+        subcategory,
+        confidence: 'high',
+        ...options
+      };
+
+      const result = await client.transactions.categorize(transactionId, request);
+      
+      console.log(`Transaction categorized as ${result.category}/${result.subcategory}`);
+      
+      if (result.similarTransactionsUpdated > 0) {
+        console.log(`Updated ${result.similarTransactionsUpdated} similar transactions`);
+      }
+      
+      if (result.ruleCreated) {
+        console.log(`Created categorization rule: ${result.ruleCreated.id}`);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Failed to categorize transaction:', error.message);
+      throw error;
+    }
+  }
+
+  async batchCategorize(updates: Array<{
+    transactionId: string;
+    category: string;
+    subcategory?: string;
+  }>) {
+    try {
+      const result = await client.transactions.categorizeBatch(updates);
+      
+      console.log(`Successfully updated: ${result.successCount}`);
+      console.log(`Failed updates: ${result.failureCount}`);
+      
+      if (result.failures.length > 0) {
+        console.log('Failed transactions:', result.failures);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Batch categorization failed:', error.message);
+      throw error;
+    }
+  }
+
+  async smartCategorize(transactionId: string) {
+    // Get transaction details first
+    const transaction = await client.transactions.get(transactionId);
+    
+    // Suggest category based on merchant and description
+    const suggestion = this.suggestCategory(transaction);
+    
+    if (suggestion.confidence > 0.8) {
+      return this.categorizeTransaction(
+        transactionId,
+        suggestion.category,
+        suggestion.subcategory,
+        {
+          createRule: true,
+          applyToSimilar: true,
+          userNote: `Auto-categorized based on ${suggestion.reasoning}`
+        }
+      );
+    } else {
+      throw new Error('Unable to confidently categorize transaction');
+    }
+  }
+
+  private suggestCategory(transaction: any): {
+    category: string;
+    subcategory?: string;
+    confidence: number;
+    reasoning: string;
+  } {
+    const merchantName = transaction.merchantName?.toLowerCase() || '';
+    const description = transaction.description?.toLowerCase() || '';
+    
+    // Grocery stores
+    if (['woolworths', 'pick n pay', 'checkers', 'spar'].some(store => 
+        merchantName.includes(store))) {
+      return {
+        category: 'food_and_dining',
+        subcategory: 'groceries',
+        confidence: 0.95,
+        reasoning: 'merchant name matches grocery store'
+      };
+    }
+    
+    // Fuel stations
+    if (['shell', 'bp', 'engen', 'caltex'].some(station => 
+        merchantName.includes(station))) {
+      return {
+        category: 'transportation',
+        subcategory: 'fuel',
+        confidence: 0.95,
+        reasoning: 'merchant name matches fuel station'
+      };
+    }
+    
+    // Salary deposits
+    if (description.includes('salary') || description.includes('payroll')) {
+      return {
+        category: 'income',
+        subcategory: 'salary',
+        confidence: 0.9,
+        reasoning: 'description indicates salary payment'
+      };
+    }
+    
+    return {
+      category: 'other',
+      confidence: 0.3,
+      reasoning: 'no confident match found'
+    };
+  }
+}
+
+// Usage
+const categorizer = new TransactionCategorizer();
+
+// Single transaction
+await categorizer.categorizeTransaction(
+  'txn_123',
+  'food_and_dining',
+  'groceries',
+  {
+    createRule: true,
+    userNote: 'Weekly grocery shopping'
+  }
+);
+
+// Batch categorization
+await categorizer.batchCategorize([
+  { transactionId: 'txn_1', category: 'food_and_dining', subcategory: 'groceries' },
+  { transactionId: 'txn_2', category: 'transportation', subcategory: 'fuel' },
+  { transactionId: 'txn_3', category: 'entertainment', subcategory: 'streaming' }
+]);
+
+// Smart categorization
+await categorizer.smartCategorize('txn_456');
+```
+
+```python Python SDK
+from awo_sdk import AWOClient, CategorizeTransactionRequest
+from typing import List, Dict, Optional
+
+client = AWOClient(
+    api_key=os.environ['AWO_API_KEY'],
+    base_url='https://api.awo-platform.com/v1'
+)
+
+class TransactionCategorizer:
+    def __init__(self):
+        self.client = client
+
+    def categorize_transaction(
+        self, 
+        transaction_id: str, 
+        category: str, 
+        subcategory: Optional[str] = None,
+        create_rule: bool = False,
+        apply_to_similar: bool = False,
+        user_note: Optional[str] = None
+    ):
+        try:
+            request = {
+                'category': category,
+                'subcategory': subcategory,
+                'confidence': 'high',
+                'create_rule': create_rule,
+                'apply_to_similar': apply_to_similar,
+                'user_note': user_note
+            }
+
+            result = self.client.transactions.categorize(transaction_id, request)
+            
+            print(f"Transaction categorized as {result.category}/{result.subcategory}")
+            
+            if result.similar_transactions_updated > 0:
+                print(f"Updated {result.similar_transactions_updated} similar transactions")
+            
+            if result.rule_created:
+                print(f"Created categorization rule: {result.rule_created.id}")
+            
+            return result
+            
+        except Exception as error:
+            print(f"Failed to categorize transaction: {error}")
+            raise
+
+    def batch_categorize(self, updates: List[Dict]):
+        try:
+            result = self.client.transactions.categorize_batch(updates)
+            
+            print(f"Successfully updated: {result.success_count}")
+            print(f"Failed updates: {result.failure_count}")
+            
+            if result.failures:
+                print("Failed transactions:", result.failures)
+            
+            return result
+            
+        except Exception as error:
+            print(f"Batch categorization failed: {error}")
+            raise
+
+    def analyze_categorization_accuracy(self, user_id: str):
+        """Analyze how well automatic categorization is working"""
+        
+        # Get recent transactions
+        transactions = self.client.transactions.list(
+            user_id=user_id,
+            limit=100,
+            include_categorization=True
+        )
+        
+        analysis = {
+            'total_transactions': len(transactions.transactions),
+            'auto_categorized': 0,
+            'user_corrected': 0,
+            'high_confidence': 0,
+            'low_confidence': 0,
+            'category_accuracy': {}
+        }
+        
+        for txn in transactions.transactions:
+            cat = txn.categorization
+            
+            if cat.method == 'automatic':
+                analysis['auto_categorized'] += 1
+            
+            if cat.is_user_corrected:
+                analysis['user_corrected'] += 1
+            
+            if cat.confidence > 0.8:
+                analysis['high_confidence'] += 1
+            elif cat.confidence < 0.5:
+                analysis['low_confidence'] += 1
+            
+            # Track accuracy by category
+            category = txn.category
+            if category not in analysis['category_accuracy']:
+                analysis['category_accuracy'][category] = {
+                    'total': 0,
+                    'corrected': 0,
+                    'accuracy': 0
+                }
+            
+            analysis['category_accuracy'][category]['total'] += 1
+            if cat.is_user_corrected:
+                analysis['category_accuracy'][category]['corrected'] += 1
+        
+        # Calculate accuracy percentages
+        for category_data in analysis['category_accuracy'].values():
+            if category_data['total'] > 0:
+                accuracy = 1 - (category_data['corrected'] / category_data['total'])
+                category_data['accuracy'] = round(accuracy * 100, 2)
+        
+        return analysis
+
+    def suggest_improvements(self, user_id: str):
+        """Suggest categorization improvements"""
+        
+        analysis = self.analyze_categorization_accuracy(user_id)
+        suggestions = []
+        
+        # Low accuracy categories
+        for category, data in analysis['category_accuracy'].items():
+            if data['accuracy'] < 70 and data['total'] > 5:
+                suggestions.append({
+                    'type': 'low_accuracy_category',
+                    'category': category,
+                    'accuracy': data['accuracy'],
+                    'suggestion': f"Consider creating custom rules for {category} transactions"
+                })
+        
+        # High correction rate
+        correction_rate = (analysis['user_corrected'] / analysis['total_transactions']) * 100
+        if correction_rate > 20:
+            suggestions.append({
+                'type': 'high_correction_rate',
+                'rate': correction_rate,
+                'suggestion': "Consider training the model with more examples"
+            })
+        
+        # Low confidence predictions
+        low_confidence_rate = (analysis['low_confidence'] / analysis['total_transactions']) * 100
+        if low_confidence_rate > 15:
+            suggestions.append({
+                'type': 'low_confidence',
+                'rate': low_confidence_rate,
+                'suggestion': "Review and correct low-confidence categorizations"
+            })
+        
+        return suggestions
+
+# Usage
+categorizer = TransactionCategorizer()
+
+# Single transaction categorization
+categorizer.categorize_transaction(
+    transaction_id='txn_123',
+    category='food_and_dining',
+    subcategory='groceries',
+    create_rule=True,
+    user_note='Weekly grocery shopping'
+)
+
+# Batch categorization
+updates = [
+    {'transaction_id': 'txn_1', 'category': 'food_and_dining', 'subcategory': 'groceries'},
+    {'transaction_id': 'txn_2', 'category': 'transportation', 'subcategory': 'fuel'},
+    {'transaction_id': 'txn_3', 'category': 'entertainment', 'subcategory': 'streaming'}
+]
+categorizer.batch_categorize(updates)
+
+# Analyze accuracy
+accuracy = categorizer.analyze_categorization_accuracy('user-123')
+print(f"Overall accuracy: {accuracy}")
+
+# Get improvement suggestions
+improvements = categorizer.suggest_improvements('user-123')
+for suggestion in improvements:
+    print(f"Suggestion: {suggestion['suggestion']}")
+```
+
+```javascript React Native
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Modal,
+  FlatList,
+  TextInput,
+  Alert
+} from 'react-native';
+import { AWOClient } from '@awo/react-native-sdk';
+
+const CATEGORIES = [
+  { id: 'income', name: 'Income', icon: '💰' },
+  { id: 'food_and_dining', name: 'Food & Dining', icon: '🍽️' },
+  { id: 'transportation', name: 'Transportation', icon: '🚗' },
+  { id: 'shopping', name: 'Shopping', icon: '🛍️' },
+  { id: 'bills_and_utilities', name: 'Bills & Utilities', icon: '📋' },
+  { id: 'entertainment', name: 'Entertainment', icon: '🎬' },
+  { id: 'healthcare', name: 'Healthcare', icon: '🏥' },
+  { id: 'education', name: 'Education', icon: '📚' },
+  { id: 'transfer', name: 'Transfer', icon: '💸' },
+  { id: 'other', name: 'Other', icon: '📁' }
+];
+
+export function CategoryPickerModal({ 
+  visible, 
+  transaction, 
+  onClose, 
+  onCategorize 
+}) {
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [subcategory, setSubcategory] = useState('');
+  const [userNote, setUserNote] = useState('');
+  const [createRule, setCreateRule] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleCategorize = async () => {
+    if (!selectedCategory) {
+      Alert.alert('Error', 'Please select a category');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await AWOClient.transactions.categorize(transaction.id, {
+        category: selectedCategory.id,
+        subcategory: subcategory || undefined,
+        userNote: userNote || undefined,
+        createRule,
+        confidence: 'high'
+      });
+
+      Alert.alert(
+        'Success',
+        `Transaction categorized as ${selectedCategory.name}${subcategory ? ` - ${subcategory}` : ''}`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              onCategorize(result);
+              onClose();
+            }
+          }
+        ]
+      );
+
+      if (result.similarTransactionsUpdated > 0) {
+        Alert.alert(
+          'Additional Updates',
+          `Also updated ${result.similarTransactionsUpdated} similar transactions`
+        );
+      }
+
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Failed to categorize transaction');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderCategory = ({ item }) => (
+    <TouchableOpacity
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        backgroundColor: selectedCategory?.id === item.id ? '#E3F2FD' : 'white',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0'
+      }}
+      onPress={() => setSelectedCategory(item)}
+    >
+      <Text style={{ fontSize: 24, marginRight: 12 }}>{item.icon}</Text>
+      <Text style={{ 
+        fontSize: 16, 
+        fontWeight: selectedCategory?.id === item.id ? '600' : 'normal'
+      }}>
+        {item.name}
+      </Text>
+      {selectedCategory?.id === item.id && (
+        <Text style={{ marginLeft: 'auto', color: '#1976D2' }}>✓</Text>
+      )}
+    </TouchableOpacity>
+  );
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+      <View style={{ flex: 1, backgroundColor: 'white' }}>
+        {/* Header */}
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: 16,
+          borderBottomWidth: 1,
+          borderBottomColor: '#E0E0E0'
+        }}>
+          <TouchableOpacity onPress={onClose}>
+            <Text style={{ color: '#1976D2', fontSize: 16 }}>Cancel</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 18, fontWeight: '600' }}>Categorize Transaction</Text>
+          <TouchableOpacity onPress={handleCategorize} disabled={loading || !selectedCategory}>
+            <Text style={{ 
+              color: loading || !selectedCategory ? '#CCC' : '#1976D2', 
+              fontSize: 16,
+              fontWeight: '600'
+            }}>
+              {loading ? 'Saving...' : 'Save'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Transaction Details */}
+        <View style={{ padding: 16, backgroundColor: '#F5F5F5' }}>
+          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 4 }}>
+            {transaction.merchantName || transaction.description}
+          </Text>
+          <Text style={{ fontSize: 14, color: '#666' }}>
+            {transaction.currency} {Math.abs(transaction.amount).toLocaleString()}
+          </Text>
+          <Text style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
+            {new Date(transaction.date).toLocaleDateString()}
+          </Text>
+        </View>
+
+        {/* Category List */}
+        <FlatList
+          data={CATEGORIES}
+          renderItem={renderCategory}
+          keyExtractor={(item) => item.id}
+          style={{ flex: 1 }}
+        />
+
+        {/* Additional Options */}
+        {selectedCategory && (
+          <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: '#E0E0E0' }}>
+            <TextInput
+              style={{
+                borderWidth: 1,
+                borderColor: '#DDD',
+                borderRadius: 8,
+                padding: 12,
+                marginBottom: 12,
+                fontSize: 16
+              }}
+              placeholder="Subcategory (optional)"
+              value={subcategory}
+              onChangeText={setSubcategory}
+            />
+            
+            <TextInput
+              style={{
+                borderWidth: 1,
+                borderColor: '#DDD',
+                borderRadius: 8,
+                padding: 12,
+                marginBottom: 12,
+                fontSize: 16,
+                minHeight: 60
+              }}
+              placeholder="Add a note (optional)"
+              value={userNote}
+              onChangeText={setUserNote}
+              multiline
+            />
+
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 8
+              }}
+              onPress={() => setCreateRule(!createRule)}
+            >
+              <View style={{
+                width: 20,
+                height: 20,
+                borderWidth: 2,
+                borderColor: '#1976D2',
+                borderRadius: 4,
+                marginRight: 8,
+                backgroundColor: createRule ? '#1976D2' : 'transparent'
+              }}>
+                {createRule && (
+                  <Text style={{ color: 'white', textAlign: 'center', lineHeight: 16 }}>✓</Text>
+                )}
+              </View>
+              <Text style={{ fontSize: 14 }}>
+                Create rule for similar transactions
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+// Transaction item with categorization option
+export function TransactionItem({ transaction, onUpdate }) {
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const handleCategorize = (result) => {
+    onUpdate(result);
+  };
+
+  const getCategoryColor = (category) => {
+    const colors = {
+      income: '#4CAF50',
+      food_and_dining: '#FF9800',
+      transportation: '#2196F3',
+      shopping: '#E91E63',
+      bills_and_utilities: '#9C27B0',
+      entertainment: '#FF5722',
+      healthcare: '#009688',
+      education: '#795548',
+      transfer: '#607D8B',
+      other: '#757575'
+    };
+    return colors[category] || '#757575';
+  };
+
+  return (
+    <>
+      <TouchableOpacity
+        style={{
+          backgroundColor: 'white',
+          padding: 16,
+          marginHorizontal: 16,
+          marginVertical: 4,
+          borderRadius: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.1,
+          shadowRadius: 2,
+          elevation: 2
+        }}
+        onPress={() => setModalVisible(true)}
+      >
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 4 }}>
+              {transaction.merchantName || transaction.description}
+            </Text>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <View style={{
+                backgroundColor: getCategoryColor(transaction.category),
+                borderRadius: 12,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                marginRight: 8
+              }}>
+                <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>
+                  {transaction.category.replace('_', ' ').toUpperCase()}
+                </Text>
+              </View>
+              
+              {transaction.categorization.isUserCorrected && (
+                <Text style={{ fontSize: 12, color: '#4CAF50' }}>✓ Corrected</Text>
+              )}
+            </View>
+            
+            <Text style={{ fontSize: 14, color: '#666' }}>
+              {new Date(transaction.date).toLocaleDateString()}
+            </Text>
+          </View>
+          
+          <Text style={{
+            fontSize: 16,
+            fontWeight: '600',
+            color: transaction.amount > 0 ? '#4CAF50' : '#F44336'
+          }}>
+            {transaction.currency} {Math.abs(transaction.amount).toLocaleString()}
+          </Text>
+        </View>
+      </TouchableOpacity>
+
+      <CategoryPickerModal
+        visible={modalVisible}
+        transaction={transaction}
+        onClose={() => setModalVisible(false)}
+        onCategorize={handleCategorize}
+      />
+    </>
+  );
+}
+```
+</CodeGroup>
+
+## Categorization Analytics
+
+<AccordionGroup>
+  <Accordion title="Accuracy Tracking">
+    **Monitor categorization performance:**
+    
+    ```typescript
+    class CategorizationAnalytics {
+      async getAccuracyMetrics(userId: string) {
+        const transactions = await client.transactions.list({
+          userId,
+          limit: 1000,
+          includeCategorization: true
+        });
+        
+        const metrics = {
+          totalTransactions: transactions.pagination.total,
+          automaticallyCategorized: 0,
+          userCorrected: 0,
+          highConfidence: 0,
+          accuracyByCategory: new Map(),
+          averageConfidence: 0
+        };
+        
+        let totalConfidence = 0;
+        
+        transactions.transactions.forEach(txn => {
+          const cat = txn.categorization;
+          
+          if (cat.method === 'automatic') {
+            metrics.automaticallyCategorized++;
+          }
+          
+          if (cat.isUserCorrected) {
+            metrics.userCorrected++;
+          }
+          
+          if (cat.confidence > 0.8) {
+            metrics.highConfidence++;
+          }
+          
+          totalConfidence += cat.confidence;
+          
+          // Track accuracy by category
+          const category = txn.category;
+          if (!metrics.accuracyByCategory.has(category)) {
+            metrics.accuracyByCategory.set(category, { total: 0, corrected: 0 });
+          }
+          
+          const categoryData = metrics.accuracyByCategory.get(category);
+          categoryData.total++;
+          if (cat.isUserCorrected) {
+            categoryData.corrected++;
+          }
+        });
+        
+        metrics.averageConfidence = totalConfidence / transactions.transactions.length;
+        
+        // Calculate accuracy percentages
+        for (const [category, data] of metrics.accuracyByCategory) {
+          data.accuracy = ((data.total - data.corrected) / data.total) * 100;
+        }
+        
+        return metrics;
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Rule Management">
+    **Manage categorization rules:**
+    
+    ```typescript
+    class RuleManager {
+      async getUserRules(userId: string) {
+        return client.transactions.getCategorizationRules({ userId });
+      }
+      
+      async createMerchantRule(merchantName: string, category: string, subcategory?: string) {
+        return client.transactions.createCategorizationRule({
+          scope: 'merchant',
+          criteria: { merchantName },
+          action: { category, subcategory, confidence: 0.9 },
+          priority: 100
+        });
+      }
+      
+      async bulkCreateRules(rules: CategorizationRule[]) {
+        const results = [];
+        
+        for (const rule of rules) {
+          try {
+            const created = await client.transactions.createCategorizationRule(rule);
+            results.push({ success: true, rule: created });
+          } catch (error) {
+            results.push({ success: false, error: error.message });
+          }
+        }
+        
+        return results;
+      }
+      
+      async optimizeRules(userId: string) {
+        // Get user's correction history
+        const corrections = await this.getUserCorrections(userId);
+        
+        // Identify patterns for rule creation
+        const ruleOpportunities = this.identifyRuleOpportunities(corrections);
+        
+        // Create rules for high-frequency patterns
+        const newRules = [];
+        for (const opportunity of ruleOpportunities) {
+          if (opportunity.frequency > 3 && opportunity.accuracy > 0.9) {
+            newRules.push(await this.createMerchantRule(
+              opportunity.merchantName,
+              opportunity.category,
+              opportunity.subcategory
+            ));
+          }
+        }
+        
+        return {
+          opportunitiesFound: ruleOpportunities.length,
+          rulesCreated: newRules.length,
+          rules: newRules
+        };
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Learning Impact">
+    **Track machine learning improvements:**
+    
+    ```typescript
+    class LearningTracker {
+      async trackLearningImpact(userId: string) {
+        const userCorrections = await this.getUserCorrections(userId);
+        
+        return {
+          contributedDataPoints: userCorrections.length,
+          modelImprovements: await this.calculateModelImprovements(userCorrections),
+          benefitedUsers: await this.estimateBenefitedUsers(userCorrections),
+          accuracyGains: await this.measureAccuracyGains(userCorrections)
+        };
+      }
+      
+      private async calculateModelImprovements(corrections: UserCorrection[]) {
+        // Group corrections by merchant/pattern
+        const patterns = new Map();
+        
+        corrections.forEach(correction => {
+          const key = `${correction.merchantName}_${correction.category}`;
+          if (!patterns.has(key)) {
+            patterns.set(key, { count: 0, confidence: 0 });
+          }
+          
+          const pattern = patterns.get(key);
+          pattern.count++;
+          pattern.confidence = Math.min(0.95, pattern.confidence + 0.1);
+        });
+        
+        return {
+          patternsLearned: patterns.size,
+          averageConfidenceGain: Array.from(patterns.values())
+            .reduce((sum, p) => sum + p.confidence, 0) / patterns.size,
+          totalTrainingExamples: corrections.length
+        };
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Accuracy Improvement" icon="target">
+    **Enhance Categorization:**
+    
+    - Correct obvious miscategorizations first
+    - Create rules for frequent merchants
+    - Use descriptive notes for training
+    - Review and approve suggested categories
+  </Card>
+  
+  <Card title="Rule Management" icon="cog">
+    **Effective Rules:**
+    
+    - Start with merchant-based rules
+    - Use amount ranges for ambiguous merchants
+    - Set appropriate confidence levels
+    - Regular rule review and cleanup
+  </Card>
+  
+  <Card title="User Experience" icon="users">
+    **Smooth Workflow:**
+    
+    - Batch similar transactions together
+    - Provide category suggestions
+    - Show categorization confidence
+    - Enable quick corrections
+  </Card>
+  
+  <Card title="Data Quality" icon="chart-line">
+    **Maintain Quality:**
+    
+    - Monitor correction rates by category
+    - Track user engagement with categorization
+    - Identify low-confidence predictions
+    - Provide feedback to users
+  </Card>
+</CardGroup>
+
+## Related Endpoints
+
+- [List Transactions](/api-reference/transactions/list) - View transactions to categorize
+- [Get Transaction Details](/api-reference/transactions/details) - Detailed transaction information
+- [Get DIVA Score](/api-reference/diva-score/get-score) - See how categorization affects DIVA score
+- [Create Categorization Rules](/api-reference/transactions/rules) - Manage automatic categorization rules

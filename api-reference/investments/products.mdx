@@ -1,0 +1,697 @@
+---
+title: "Get Investment Products"
+api: "GET /investments/products"
+description: "Retrieve available investment products curated for African markets with personalized recommendations"
+---
+
+# Get Investment Products
+
+Discover investment opportunities curated specifically for African markets. This endpoint returns available investment products with personalized recommendations based on the user's DIVA score, risk profile, and investment goals.
+
+## Endpoint
+
+<api-endpoint method="GET" url="/investments/products" />
+
+## Authentication
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token for user authentication (required for personalized recommendations)
+  ```
+  Authorization: Bearer {access_token}
+  ```
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="category" type="string">
+  Filter by investment category
+  - `equity` - Equity funds and stocks
+  - `bond` - Bond funds and fixed income
+  - `money_market` - Money market funds
+  - `etf` - Exchange-traded funds
+  - `crypto` - Cryptocurrency options
+  - `alternative` - Alternative investments
+</ParamField>
+
+<ParamField query="risk_level" type="string">
+  Filter by risk level
+  - `low` - Low risk, stable returns
+  - `medium` - Moderate risk, balanced growth
+  - `high` - High risk, growth potential
+</ParamField>
+
+<ParamField query="min_investment" type="number">
+  Minimum investment amount filter (in user's currency)
+</ParamField>
+
+<ParamField query="max_investment" type="number">
+  Maximum investment amount filter (in user's currency)
+</ParamField>
+
+<ParamField query="geography" type="string">
+  Geographic focus filter
+  - `south_africa` - South African markets
+  - `africa` - African markets
+  - `global` - Global markets
+  - `emerging` - Emerging markets
+</ParamField>
+
+<ParamField query="esg" type="boolean" default="false">
+  Filter for ESG (Environmental, Social, Governance) compliant investments
+</ParamField>
+
+<ParamField query="halal" type="boolean" default="false">
+  Filter for Sharia-compliant investments
+</ParamField>
+
+<ParamField query="currency" type="string" default="ZAR">
+  Display currency for amounts
+  - `ZAR` - South African Rand
+  - `KES` - Kenyan Shilling
+  - `USD` - US Dollar
+</ParamField>
+
+<ParamField query="sort" type="string" default="recommended">
+  Sort order for results
+  - `recommended` - Personalized recommendations first
+  - `performance` - Best performing first
+  - `min_investment` - Lowest minimum investment first
+  - `risk` - Lowest risk first
+  - `fees` - Lowest fees first
+</ParamField>
+
+<ParamField query="page" type="number" default="1">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="limit" type="number" default="20">
+  Number of products per page (max 50)
+</ParamField>
+
+## Response
+
+<ResponseField name="products" type="array" required>
+  Array of available investment products
+  
+  <Expandable title="products[]" defaultOpen>
+    <ResponseField name="product_id" type="string" required>
+      Unique identifier for the investment product
+    </ResponseField>
+    
+    <ResponseField name="name" type="string" required>
+      Investment product name
+    </ResponseField>
+    
+    <ResponseField name="description" type="string" required>
+      Detailed product description
+    </ResponseField>
+    
+    <ResponseField name="provider" type="string" required>
+      Investment provider/fund manager name
+    </ResponseField>
+    
+    <ResponseField name="category" type="string" required>
+      Investment category: `equity`, `bond`, `money_market`, `etf`, `crypto`, `alternative`
+    </ResponseField>
+    
+    <ResponseField name="risk_level" type="string" required>
+      Risk level: `low`, `medium`, `high`
+    </ResponseField>
+    
+    <ResponseField name="geography" type="string" required>
+      Geographic focus: `south_africa`, `africa`, `global`, `emerging`
+    </ResponseField>
+    
+    <ResponseField name="currency" type="string" required>
+      Product base currency
+    </ResponseField>
+    
+    <ResponseField name="minimum_investment" type="number" required>
+      Minimum investment amount
+    </ResponseField>
+    
+    <ResponseField name="maximum_investment" type="number">
+      Maximum investment amount (null if no limit)
+    </ResponseField>
+    
+    <ResponseField name="current_price" type="number" required>
+      Current unit price
+    </ResponseField>
+    
+    <ResponseField name="price_change_24h" type="number" required>
+      24-hour price change percentage
+    </ResponseField>
+    
+    <ResponseField name="fees" type="object" required>
+      Fee structure information
+      
+      <Expandable title="fees">
+        <ResponseField name="management_fee" type="number" required>
+          Annual management fee percentage
+        </ResponseField>
+        
+        <ResponseField name="performance_fee" type="number">
+          Performance fee percentage (if applicable)
+        </ResponseField>
+        
+        <ResponseField name="entry_fee" type="number">
+          Entry/purchase fee percentage
+        </ResponseField>
+        
+        <ResponseField name="exit_fee" type="number">
+          Exit/redemption fee percentage
+        </ResponseField>
+        
+        <ResponseField name="total_expense_ratio" type="number" required>
+          Total expense ratio (TER) percentage
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="performance" type="object" required>
+      Historical performance data
+      
+      <Expandable title="performance">
+        <ResponseField name="ytd_return" type="number" required>
+          Year-to-date return percentage
+        </ResponseField>
+        
+        <ResponseField name="one_year_return" type="number" required>
+          1-year return percentage
+        </ResponseField>
+        
+        <ResponseField name="three_year_return" type="number">
+          3-year annualized return percentage
+        </ResponseField>
+        
+        <ResponseField name="five_year_return" type="number">
+          5-year annualized return percentage
+        </ResponseField>
+        
+        <ResponseField name="inception_return" type="number" required>
+          Annualized return since inception
+        </ResponseField>
+        
+        <ResponseField name="volatility" type="number" required>
+          Annualized volatility percentage
+        </ResponseField>
+        
+        <ResponseField name="sharpe_ratio" type="number">
+          Risk-adjusted return measure
+        </ResponseField>
+        
+        <ResponseField name="max_drawdown" type="number">
+          Maximum historical decline percentage
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="fund_details" type="object">
+      Additional fund information
+      
+      <Expandable title="fund_details">
+        <ResponseField name="assets_under_management" type="number">
+          Total AUM in base currency
+        </ResponseField>
+        
+        <ResponseField name="inception_date" type="string">
+          Fund inception date (ISO 8601)
+        </ResponseField>
+        
+        <ResponseField name="distribution_frequency" type="string">
+          Dividend distribution frequency: `monthly`, `quarterly`, `annually`, `none`
+        </ResponseField>
+        
+        <ResponseField name="distribution_yield" type="number">
+          Current distribution yield percentage
+        </ResponseField>
+        
+        <ResponseField name="liquidity" type="string">
+          Liquidity terms: `daily`, `weekly`, `monthly`, `quarterly`
+        </ResponseField>
+        
+        <ResponseField name="benchmark" type="string">
+          Benchmark index name
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="flags" type="object" required>
+      Product characteristics flags
+      
+      <Expandable title="flags">
+        <ResponseField name="esg_compliant" type="boolean" required>
+          ESG compliance flag
+        </ResponseField>
+        
+        <ResponseField name="halal_compliant" type="boolean" required>
+          Sharia compliance flag
+        </ResponseField>
+        
+        <ResponseField name="tax_efficient" type="boolean" required>
+          Tax efficiency flag
+        </ResponseField>
+        
+        <ResponseField name="new_product" type="boolean" required>
+          New product flag (launched within 6 months)
+        </ResponseField>
+        
+        <ResponseField name="featured" type="boolean" required>
+          Featured product flag
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="recommendation" type="object">
+      Personalized recommendation (only for authenticated users)
+      
+      <Expandable title="recommendation">
+        <ResponseField name="score" type="number" required>
+          Recommendation score (0-100)
+        </ResponseField>
+        
+        <ResponseField name="reason" type="string" required>
+          Reason for recommendation
+        </ResponseField>
+        
+        <ResponseField name="fit_percentage" type="number" required>
+          Fit with user's profile percentage
+        </ResponseField>
+        
+        <ResponseField name="suggested_allocation" type="number">
+          Suggested portfolio allocation percentage
+        </ResponseField>
+        
+        <ResponseField name="diva_alignment" type="string" required>
+          How product aligns with DIVA score: `excellent`, `good`, `fair`, `poor`
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="availability" type="object" required>
+      Product availability information
+      
+      <Expandable title="availability">
+        <ResponseField name="countries" type="array" required>
+          Array of available countries (ISO 2-letter codes)
+        </ResponseField>
+        
+        <ResponseField name="platforms" type="array" required>
+          Available trading platforms
+        </ResponseField>
+        
+        <ResponseField name="trading_hours" type="object">
+          Trading hours information
+        </ResponseField>
+        
+        <ResponseField name="settlement_period" type="string" required>
+          Settlement period: `T+0`, `T+1`, `T+2`, `T+3`
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string" required>
+      Last update timestamp (ISO 8601)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object" required>
+  Pagination information
+  
+  <Expandable title="pagination">
+    <ResponseField name="current_page" type="number" required>
+      Current page number
+    </ResponseField>
+    
+    <ResponseField name="total_pages" type="number" required>
+      Total number of pages
+    </ResponseField>
+    
+    <ResponseField name="total_products" type="number" required>
+      Total number of products matching filters
+    </ResponseField>
+    
+    <ResponseField name="per_page" type="number" required>
+      Products per page
+    </ResponseField>
+    
+    <ResponseField name="has_next" type="boolean" required>
+      Whether there's a next page
+    </ResponseField>
+    
+    <ResponseField name="has_previous" type="boolean" required>
+      Whether there's a previous page
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="filters_applied" type="object" required>
+  Summary of applied filters
+</ResponseField>
+
+<ResponseField name="market_summary" type="object">
+  Market overview information
+  
+  <Expandable title="market_summary">
+    <ResponseField name="market_status" type="string" required>
+      Current market status: `open`, `closed`, `pre_market`, `after_hours`
+    </ResponseField>
+    
+    <ResponseField name="major_indices" type="object">
+      Major market indices performance
+    </ResponseField>
+    
+    <ResponseField name="fx_rates" type="object">
+      Current exchange rates
+    </ResponseField>
+    
+    <ResponseField name="last_updated" type="string" required>
+      Last market data update timestamp
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Request
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://api.awo-platform.com/investments/products?category=etf&risk_level=medium&min_investment=500&currency=ZAR&esg=true&sort=recommended&page=1&limit=10" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json"
+```
+
+```javascript JavaScript
+const response = await fetch('/investments/products?' + new URLSearchParams({
+  category: 'etf',
+  risk_level: 'medium',
+  min_investment: 500,
+  currency: 'ZAR',
+  esg: true,
+  sort: 'recommended',
+  page: 1,
+  limit: 10
+}), {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer ' + accessToken,
+    'Content-Type': 'application/json'
+  }
+});
+
+const products = await response.json();
+```
+
+```python Python
+import requests
+
+headers = {
+    'Authorization': f'Bearer {access_token}',
+    'Content-Type': 'application/json'
+}
+
+params = {
+    'category': 'etf',
+    'risk_level': 'medium',
+    'min_investment': 500,
+    'currency': 'ZAR',
+    'esg': True,
+    'sort': 'recommended',
+    'page': 1,
+    'limit': 10
+}
+
+response = requests.get(
+    'https://api.awo-platform.com/investments/products',
+    headers=headers,
+    params=params
+)
+
+products = response.json()
+```
+</CodeGroup>
+
+## Example Response
+
+<CodeGroup>
+```json 200 OK
+{
+  "products": [
+    {
+      "product_id": "prd_satrix_top40",
+      "name": "Satrix Top 40 ETF",
+      "description": "Tracks the performance of the top 40 companies on the JSE by market capitalization",
+      "provider": "Satrix",
+      "category": "etf",
+      "risk_level": "medium",
+      "geography": "south_africa",
+      "currency": "ZAR",
+      "minimum_investment": 500.00,
+      "maximum_investment": null,
+      "current_price": 92.15,
+      "price_change_24h": 1.25,
+      "fees": {
+        "management_fee": 0.10,
+        "performance_fee": null,
+        "entry_fee": 0.00,
+        "exit_fee": 0.00,
+        "total_expense_ratio": 0.10
+      },
+      "performance": {
+        "ytd_return": 8.45,
+        "one_year_return": 12.30,
+        "three_year_return": 9.87,
+        "five_year_return": 7.65,
+        "inception_return": 11.23,
+        "volatility": 16.78,
+        "sharpe_ratio": 0.67,
+        "max_drawdown": -18.45
+      },
+      "fund_details": {
+        "assets_under_management": 15600000000,
+        "inception_date": "2000-11-01T00:00:00Z",
+        "distribution_frequency": "quarterly",
+        "distribution_yield": 3.45,
+        "liquidity": "daily",
+        "benchmark": "FTSE/JSE Top 40 Index"
+      },
+      "flags": {
+        "esg_compliant": true,
+        "halal_compliant": false,
+        "tax_efficient": true,
+        "new_product": false,
+        "featured": true
+      },
+      "recommendation": {
+        "score": 87,
+        "reason": "Excellent fit for your moderate risk profile and South African market exposure goals",
+        "fit_percentage": 87,
+        "suggested_allocation": 25,
+        "diva_alignment": "excellent"
+      },
+      "availability": {
+        "countries": ["ZA"],
+        "platforms": ["awo_platform", "easy_equities", "standard_bank"],
+        "trading_hours": {
+          "open": "09:00",
+          "close": "17:00",
+          "timezone": "SAST"
+        },
+        "settlement_period": "T+3"
+      },
+      "updated_at": "2025-06-02T14:30:00Z"
+    },
+    {
+      "product_id": "prd_african_equity_fund",
+      "name": "African Equity Growth Fund",
+      "description": "Diversified equity fund focusing on African growth companies outside South Africa",
+      "provider": "Coronation Fund Managers",
+      "category": "equity",
+      "risk_level": "high",
+      "geography": "africa",
+      "currency": "USD",
+      "minimum_investment": 1000.00,
+      "maximum_investment": null,
+      "current_price": 25.78,
+      "price_change_24h": -0.85,
+      "fees": {
+        "management_fee": 1.75,
+        "performance_fee": 20.00,
+        "entry_fee": 0.50,
+        "exit_fee": 0.25,
+        "total_expense_ratio": 2.15
+      },
+      "performance": {
+        "ytd_return": 15.67,
+        "one_year_return": 18.90,
+        "three_year_return": 12.45,
+        "five_year_return": null,
+        "inception_return": 14.32,
+        "volatility": 28.45,
+        "sharpe_ratio": 0.51,
+        "max_drawdown": -32.18
+      },
+      "fund_details": {
+        "assets_under_management": 250000000,
+        "inception_date": "2021-03-15T00:00:00Z",
+        "distribution_frequency": "annually",
+        "distribution_yield": 1.25,
+        "liquidity": "daily",
+        "benchmark": "MSCI Africa ex South Africa Index"
+      },
+      "flags": {
+        "esg_compliant": true,
+        "halal_compliant": true,
+        "tax_efficient": false,
+        "new_product": false,
+        "featured": false
+      },
+      "recommendation": {
+        "score": 72,
+        "reason": "Good diversification opportunity for African exposure, but higher risk than your typical profile",
+        "fit_percentage": 72,
+        "suggested_allocation": 10,
+        "diva_alignment": "good"
+      },
+      "availability": {
+        "countries": ["ZA", "KE", "NG"],
+        "platforms": ["awo_platform", "coronation_direct"],
+        "trading_hours": {
+          "open": "09:00",
+          "close": "17:00",
+          "timezone": "SAST"
+        },
+        "settlement_period": "T+2"
+      },
+      "updated_at": "2025-06-02T14:25:00Z"
+    }
+  ],
+  "pagination": {
+    "current_page": 1,
+    "total_pages": 5,
+    "total_products": 47,
+    "per_page": 10,
+    "has_next": true,
+    "has_previous": false
+  },
+  "filters_applied": {
+    "category": "etf",
+    "risk_level": "medium",
+    "min_investment": 500,
+    "esg": true,
+    "currency": "ZAR"
+  },
+  "market_summary": {
+    "market_status": "open",
+    "major_indices": {
+      "JSE_ALL_SHARE": {
+        "value": 82547.50,
+        "change": 1.25,
+        "change_percentage": 1.52
+      },
+      "JSE_TOP40": {
+        "value": 75234.80,
+        "change": 0.85,
+        "change_percentage": 1.14
+      }
+    },
+    "fx_rates": {
+      "USD_ZAR": 18.75,
+      "EUR_ZAR": 20.45,
+      "GBP_ZAR": 23.80
+    },
+    "last_updated": "2025-06-02T14:30:00Z"
+  }
+}
+```
+
+```json 400 Bad Request
+{
+  "error": {
+    "code": "INVALID_PARAMETERS",
+    "message": "Invalid query parameters provided",
+    "details": {
+      "risk_level": "Must be one of: low, medium, high",
+      "limit": "Must be between 1 and 50"
+    }
+  }
+}
+```
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Invalid or expired access token",
+    "details": "Authentication required for personalized recommendations"
+  }
+}
+```
+
+```json 429 Too Many Requests
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Too many requests",
+    "details": "Rate limit: 200 requests per minute"
+  }
+}
+```
+</CodeGroup>
+
+## Error Codes
+
+<ResponseField name="INVALID_PARAMETERS" type="400">
+  Invalid query parameters provided
+</ResponseField>
+
+<ResponseField name="UNAUTHORIZED" type="401">
+  Invalid or expired access token (required for personalized recommendations)
+</ResponseField>
+
+<ResponseField name="INVALID_CURRENCY" type="400">
+  Unsupported currency code provided
+</ResponseField>
+
+<ResponseField name="INVALID_CATEGORY" type="400">
+  Invalid investment category specified
+</ResponseField>
+
+<ResponseField name="RATE_LIMIT_EXCEEDED" type="429">
+  Too many requests - rate limit exceeded
+</ResponseField>
+
+<ResponseField name="INTERNAL_SERVER_ERROR" type="500">
+  Internal server error occurred
+</ResponseField>
+
+## Rate Limits
+
+- **200 requests per minute** per user (authenticated)
+- **50 requests per minute** per IP (unauthenticated)
+- **2,000 requests per hour** per user
+
+## Notes
+
+<Note>
+**Personalized Recommendations**: Product recommendations and DIVA alignment scores are only available for authenticated users with a calculated DIVA score.
+</Note>
+
+<Tip>
+**Performance Data**: All performance data is updated daily after market close. Real-time prices are updated every 15 minutes during market hours.
+</Tip>
+
+<Warning>
+**Investment Risk**: Past performance does not guarantee future results. All investments carry risk of loss.
+</Warning>
+
+<Info>
+**ESG & Halal Filtering**: ESG and Halal compliance flags are maintained by third-party providers and updated monthly.
+</Info>
+
+## Related Endpoints
+
+- [Get Investment Portfolio](/api-reference/investments/portfolio) - View current holdings
+- [Buy Investment](/api-reference/investments/buy) - Purchase investments
+- [Get DIVA Score](/api-reference/diva-score/get-score) - View financial health assessment
+- [Get User Profile](/api-reference/users/profile) - User risk profile and preferences
