@@ -1,37 +1,660 @@
----
-title: "Technical Decisions"
-description: "AWO Platform technical decisions documentation"
----
-
 # Technical Decisions
 
-## Overview
+This document captures the key architectural and technical decisions made for AWO Platform, providing context, rationale, and trade-offs for each decision to guide future development and maintenance.
+
+## Architecture Decision Records (ADRs)
 
 <Info>
-This section covers the technical decisions of the AWO Platform, designed for financial inclusion across the SADC region.
+AWO Platform follows the Architecture Decision Record (ADR) format to document significant technical decisions, ensuring transparency and enabling informed future decisions as the platform evolves.
 </Info>
 
-## Architecture Components
+### ADR Format
+Each decision follows a structured format:
+- **Context**: The situation or problem requiring a decision
+- **Decision**: The specific choice made
+- **Rationale**: Why this decision was made
+- **Consequences**: Expected positive and negative outcomes
+- **Alternatives**: Other options considered
+- **Status**: Current status (Proposed, Accepted, Deprecated, Superseded)
 
-Detailed architecture information will be provided here.
+## Core Technology Stack Decisions
 
-## Key Decisions
+### ADR-001: React Native with Expo for Mobile Development
+
+**Context**: Need for cross-platform mobile application to serve African markets with diverse device ecosystems and varying app store accessibility.
+
+**Decision**: Use React Native with Expo managed workflow for mobile application development.
+
+**Rationale**:
+- **Cross-platform efficiency**: Single codebase for iOS and Android reduces development time by 40-60%
+- **African market suitability**: Excellent performance on mid-range Android devices prevalent in SADC region
+- **OTA updates**: Critical for African markets where app store updates can be unreliable
+- **Offline capabilities**: Strong offline-first architecture support essential for variable connectivity
+- **Developer ecosystem**: Large talent pool familiar with React/JavaScript in African tech hubs
+
+**Consequences**:
+- ✅ Faster time-to-market and reduced development costs
+- ✅ Consistent UX across platforms
+- ✅ Strong community support and extensive libraries
+- ❌ Slightly larger app bundle size compared to native apps
+- ❌ Some platform-specific features require native modules
+
+**Alternatives Considered**:
+- **Flutter**: Rejected due to smaller talent pool in African markets
+- **Native Development**: Rejected due to higher costs and longer development time
+- **Progressive Web App**: Rejected due to limited offline capabilities and app store presence
+
+**Status**: ✅ Accepted
+
+---
+
+### ADR-002: Express.js Backend with TypeScript
+
+**Context**: Need for a robust, scalable backend that can handle financial operations while being maintainable by African development teams.
+
+**Decision**: Use Express.js with TypeScript for backend API development.
+
+**Rationale**:
+- **Simplicity**: Express.js provides flexibility without excessive framework overhead
+- **JavaScript ecosystem**: Leverages existing React Native expertise in the team
+- **TypeScript benefits**: Type safety crucial for financial applications and team collaboration
+- **African developer familiarity**: Widely known framework in African tech communities
+- **Performance**: Adequate performance for expected scale with proper optimization
+- **Microservices readiness**: Easy to decompose into microservices as needed
+
+**Consequences**:
+- ✅ Rapid development and prototyping
+- ✅ Extensive middleware ecosystem for authentication, validation, etc.
+- ✅ Easy integration with African payment providers
+- ❌ Less opinionated structure requires more architectural discipline
+- ❌ Single-threaded nature requires careful async handling
+
+**Alternatives Considered**:
+- **NestJS**: Rejected as too complex for initial team size and requirements
+- **Django/Python**: Rejected to maintain JavaScript consistency across stack
+- **Spring Boot/Java**: Rejected due to higher resource requirements and complexity
+
+**Status**: ✅ Accepted
+
+---
+
+### ADR-003: Neon PostgreSQL as Primary Database
+
+**Context**: Need for a reliable, scalable database solution that can handle complex financial data relationships while providing excellent performance for SADC region users.
+
+**Decision**: Use Neon PostgreSQL as the primary database with global edge locations.
+
+**Rationale**:
+- **Serverless scaling**: Automatic scaling handles variable African traffic patterns
+- **Global edge**: Neon's edge locations provide better latency for SADC users
+- **SQL familiarity**: Team expertise in SQL reduces learning curve
+- **ACID compliance**: Essential for financial transaction integrity
+- **JSON support**: Flexible schema evolution for rapid feature development
+- **Cost efficiency**: Pay-per-use model aligns with startup growth trajectory
+
+**Consequences**:
+- ✅ Automatic scaling without manual intervention
+- ✅ Strong consistency for financial operations
+- ✅ Excellent query performance with proper indexing
+- ✅ Built-in backup and point-in-time recovery
+- ❌ Vendor lock-in with Neon-specific features
+- ❌ Limited control over database server configuration
+
+**Alternatives Considered**:
+- **MongoDB**: Rejected due to eventual consistency challenges for financial data
+- **Self-hosted PostgreSQL**: Rejected due to operational complexity
+- **AWS RDS**: Rejected due to higher costs and limited African edge presence
+- **Firebase**: Rejected due to limited complex query capabilities
+
+**Status**: ✅ Accepted
+
+---
+
+### ADR-004: Rule-Based DIVA Scoring (No AI/ML Initially)
+
+**Context**: Need for a reliable, explainable, and maintainable financial scoring system that African users can understand and trust.
+
+**Decision**: Implement rule-based DIVA scoring system using business logic in TypeScript, with future AI/ML enhancement planned.
+
+**Rationale**:
+- **Explainability**: Users can understand how their scores are calculated
+- **Regulatory compliance**: Easier to explain to regulators and auditors
+- **Maintainability**: Business rules can be easily modified by domain experts
+- **Trust building**: Transparent scoring builds user confidence
+- **Data requirements**: Effective with limited initial user data
+- **African context**: Can incorporate region-specific financial behaviors
+
+**Consequences**:
+- ✅ Transparent and explainable scoring mechanism
+- ✅ Easier regulatory compliance and auditing
+- ✅ Faster initial implementation and iteration
+- ✅ Deterministic results for testing and validation
+- ❌ May miss complex patterns that ML could identify
+- ❌ Requires manual rule updates as market understanding evolves
+
+**Alternatives Considered**:
+- **Machine Learning from start**: Rejected due to limited initial data and explainability requirements
+- **Third-party scoring**: Rejected due to lack of African market-specific models
+- **Hybrid approach**: Deferred to Phase 2 after sufficient data collection
+
+**Status**: ✅ Accepted
+
+---
+
+## Integration Technology Decisions
+
+### ADR-005: Stitch and Mono for Open Banking
+
+**Context**: Need for reliable Open Banking integration across SADC region with varying levels of banking API maturity.
+
+**Decision**: Use Stitch as primary Open Banking provider for South Africa, with Mono as secondary provider for broader African coverage.
+
+**Rationale**:
+- **Regional focus**: Stitch specializes in African markets with SADC expertise
+- **Regulatory compliance**: Built-in compliance with local banking regulations
+- **Developer experience**: Strong API documentation and developer support
+- **Bank coverage**: Comprehensive coverage of major SADC banks
+- **Security**: Bank-grade security with proper OAuth implementation
+- **Fallback strategy**: Mono provides backup and additional market coverage
+
+**Consequences**:
+- ✅ Comprehensive bank coverage across SADC region
+- ✅ Regulatory compliance handled by specialized providers
+- ✅ Faster integration compared to direct bank APIs
+- ❌ Dependency on third-party providers for critical functionality
+- ❌ Additional costs for API usage at scale
+
+**Alternatives Considered**:
+- **Direct bank APIs**: Rejected due to complexity and inconsistent implementations
+- **Plaid**: Rejected due to limited African market coverage
+- **Single provider**: Rejected to avoid single point of failure
+
+**Status**: ✅ Accepted
+
+---
+
+### ADR-006: Flutterwave for Payment Processing
+
+**Context**: Need for reliable payment processing across multiple African countries with support for various payment methods.
+
+**Decision**: Use Flutterwave as primary payment gateway with direct mobile money integrations as backup.
+
+**Rationale**:
+- **Pan-African coverage**: Single integration covers multiple SADC countries
+- **Payment method diversity**: Supports mobile money, cards, bank transfers
+- **Local expertise**: Deep understanding of African payment landscape
+- **Regulatory compliance**: Handles complex multi-country compliance requirements
+- **Developer tools**: Excellent documentation and testing environments
+- **Established reputation**: Trusted by major African fintech companies
+
+**Consequences**:
+- ✅ Simplified integration across multiple countries and payment methods
+- ✅ Reduced compliance burden through specialized provider
+- ✅ Strong uptime and reliability track record
+- ❌ Transaction fees impact unit economics
+- ❌ Dependency on single provider for critical payment functionality
+
+**Alternatives Considered**:
+- **Paystack**: Rejected due to more limited SADC coverage
+- **Direct mobile money APIs**: Rejected due to integration complexity across providers
+- **Multiple regional providers**: Rejected due to operational complexity
+
+**Status**: ✅ Accepted
+
+---
+
+### ADR-007: Smile ID for KYC and Identity Verification
+
+**Context**: Need for compliant identity verification across SADC region with varying identity document formats and verification requirements.
+
+**Decision**: Use Smile ID as primary KYC provider for identity verification across SADC markets.
+
+**Rationale**:
+- **African specialization**: Purpose-built for African identity documents and verification needs
+- **Multi-country support**: Covers all target SADC markets
+- **Document variety**: Supports diverse ID formats across African countries
+- **Biometric verification**: Advanced facial recognition and liveness detection
+- **Compliance expertise**: Deep understanding of African KYC/AML requirements
+- **API quality**: Well-documented APIs with good developer experience
+
+**Consequences**:
+- ✅ Comprehensive identity verification across all target markets
+- ✅ Reduced compliance risk through specialized African provider
+- ✅ High verification accuracy with low false rejection rates
+- ❌ Dependency on third-party for critical onboarding process
+- ❌ Per-verification costs impact user acquisition economics
+
+**Alternatives Considered**:
+- **Onfido**: Rejected due to higher costs and less African market focus
+- **Jumio**: Rejected due to limited African document coverage
+- **Local providers per country**: Rejected due to integration complexity
+
+**Status**: ✅ Accepted
+
+---
+
+## Architecture Pattern Decisions
+
+### ADR-008: Microservices-Inspired Monolithic Architecture
+
+**Context**: Need for a maintainable, scalable architecture that can evolve to microservices while remaining manageable for a small initial team.
+
+**Decision**: Implement a modular monolithic architecture with clear service boundaries, designed for easy extraction to microservices later.
+
+**Rationale**:
+- **Team size**: Small initial team benefits from monolithic simplicity
+- **Development speed**: Faster development and deployment cycles
+- **Data consistency**: Easier to maintain transaction integrity across modules
+- **Future flexibility**: Clear module boundaries enable microservices extraction
+- **Operational simplicity**: Single deployment reduces operational complexity
+- **Cost efficiency**: Lower infrastructure costs during early stages
+
+**Consequences**:
+- ✅ Faster initial development and deployment
+- ✅ Easier debugging and testing
+- ✅ Simpler data consistency management
+- ✅ Lower initial operational overhead
+- ❌ Potential scaling bottlenecks as user base grows
+- ❌ Technology diversity limitations
+
+**Alternatives Considered**:
+- **Microservices from start**: Rejected due to operational complexity for small team
+- **Pure monolith**: Rejected due to future scalability concerns
+- **Serverless functions**: Rejected due to complexity of financial transaction management
+
+**Status**: ✅ Accepted
+
+---
+
+### ADR-009: Event-Driven Architecture for Real-Time Features
+
+**Context**: Need for real-time updates for Chama activities, DIVA score changes, and transaction notifications while maintaining system decoupling.
+
+**Decision**: Implement event-driven architecture using Redis Streams for event processing and Socket.io for real-time client communication.
+
+**Rationale**:
+- **Real-time requirements**: Essential for Chama transparency and user engagement
+- **Scalability**: Event-driven patterns scale well with user growth
+- **Decoupling**: Services can evolve independently while maintaining communication
+- **Reliability**: Event persistence ensures no data loss during system failures
+- **African connectivity**: Works well with variable internet connectivity patterns
+- **Cost efficiency**: Redis-based solution more cost-effective than managed services
+
+**Consequences**:
+- ✅ Excellent real-time user experience
+- ✅ System components remain loosely coupled
+- ✅ Natural audit trail through event logs
+- ✅ Supports eventual consistency patterns
+- ❌ Increased system complexity
+- ❌ Debugging distributed event flows can be challenging
+
+**Alternatives Considered**:
+- **Polling-based updates**: Rejected due to poor user experience and inefficiency
+- **Apache Kafka**: Rejected due to operational complexity for small team
+- **AWS EventBridge**: Rejected due to cost and vendor lock-in concerns
+
+**Status**: ✅ Accepted
+
+---
+
+## Security and Compliance Decisions
+
+### ADR-010: JWT with Refresh Token Strategy
+
+**Context**: Need for secure, scalable authentication that works well with mobile applications and provides good user experience.
+
+**Decision**: Implement JWT access tokens (15-minute expiry) with secure HTTP-only refresh tokens (30-day expiry).
+
+**Rationale**:
+- **Mobile optimization**: JWTs work well with mobile app authentication flows
+- **Scalability**: Stateless tokens reduce server-side session management
+- **Security**: Short-lived access tokens limit exposure risk
+- **User experience**: Refresh tokens enable persistent login without frequent re-authentication
+- **Offline capability**: Cached tokens enable offline functionality
+- **Microservices ready**: JWTs work well across distributed services
+
+**Consequences**:
+- ✅ Excellent mobile user experience with persistent login
+- ✅ Scalable authentication without server-side session storage
+- ✅ Strong security with limited token exposure window
+- ❌ Token revocation requires blacklist management
+- ❌ Slightly more complex implementation than basic sessions
+
+**Alternatives Considered**:
+- **Server-side sessions**: Rejected due to scalability concerns and mobile challenges
+- **Long-lived JWTs**: Rejected due to security risks
+- **OAuth2 with external providers**: Rejected due to dependency concerns
+
+**Status**: ✅ Accepted
+
+---
+
+### ADR-011: Field-Level Encryption for Sensitive Data
+
+**Context**: Need to protect sensitive user data (PII, financial information) while maintaining query performance and regulatory compliance.
+
+**Decision**: Implement field-level AES-256 encryption for sensitive data with application-level encryption/decryption.
+
+**Rationale**:
+- **Data protection**: Ensures sensitive data is encrypted at rest
+- **Compliance**: Meets POPIA and GDPR encryption requirements
+- **Performance**: Only encrypts necessary fields, maintaining query performance
+- **Key management**: Application-controlled encryption enables secure key rotation
+- **Audit trail**: Encryption/decryption events can be logged for compliance
+- **Backup security**: Encrypted backups provide additional protection
+
+**Consequences**:
+- ✅ Strong protection for sensitive user data
+- ✅ Regulatory compliance for data protection
+- ✅ Maintains database query performance for non-encrypted fields
+- ❌ Increased application complexity
+- ❌ Some analytical queries become more complex
+
+**Alternatives Considered**:
+- **Database-level encryption**: Rejected due to limited key management control
+- **Full database encryption**: Rejected due to performance impact
+- **No encryption**: Rejected due to regulatory and security requirements
+
+**Status**: ✅ Accepted
+
+---
+
+## Performance and Scaling Decisions
+
+### ADR-012: Redis for Caching and Session Management
+
+**Context**: Need for high-performance caching and session management that can scale with user growth across SADC region.
+
+**Decision**: Use Redis cluster for caching, session storage, and real-time features.
+
+**Rationale**:
+- **Performance**: In-memory storage provides excellent performance for frequent data access
+- **Scalability**: Redis cluster supports horizontal scaling
+- **Versatility**: Supports multiple use cases (cache, sessions, pub/sub, streams)
+- **African infrastructure**: Works well with variable connectivity patterns
+- **Cost efficiency**: Open-source solution reduces licensing costs
+- **Operational maturity**: Well-understood operational characteristics
+
+**Consequences**:
+- ✅ Excellent performance for cached data and sessions
+- ✅ Strong support for real-time features
+- ✅ Cost-effective scaling compared to managed alternatives
+- ❌ Additional operational complexity
+- ❌ Data volatility requires careful backup strategies
+
+**Alternatives Considered**:
+- **Memcached**: Rejected due to limited feature set
+- **Database-only caching**: Rejected due to performance limitations
+- **Managed cache services**: Rejected due to cost and vendor lock-in
+
+**Status**: ✅ Accepted
+
+---
+
+### ADR-013: CDN with African Edge Locations
+
+**Context**: Need to deliver fast, reliable content to users across SADC region with varying internet infrastructure quality.
+
+**Decision**: Use Cloudflare CDN with emphasis on African edge locations for content delivery.
+
+**Rationale**:
+- **African presence**: Cloudflare has edge locations across major African cities
+- **Performance**: Significant latency reduction for SADC users
+- **Reliability**: DDoS protection and uptime improvements
+- **Cost efficiency**: Reduces bandwidth costs for origin servers
+- **Security**: Built-in security features benefit African market needs
+- **Developer experience**: Excellent integration with modern development workflows
+
+**Consequences**:
+- ✅ Dramatically improved performance for African users
+- ✅ Reduced infrastructure costs through bandwidth savings
+- ✅ Enhanced security and DDoS protection
+- ❌ Additional complexity in deployment and cache management
+- ❌ Dependency on third-party for content delivery
+
+**Alternatives Considered**:
+- **AWS CloudFront**: Rejected due to limited African edge presence
+- **No CDN**: Rejected due to poor user experience for African users
+- **Regional CDN providers**: Rejected due to limited coverage and reliability
+
+**Status**: ✅ Accepted
+
+---
+
+## Data and Analytics Decisions
+
+### ADR-014: Event Sourcing for Audit Trail
+
+**Context**: Need for comprehensive audit trail for financial transactions and regulatory compliance while supporting real-time features.
+
+**Decision**: Implement event sourcing for critical business events (transactions, DIVA score changes, Chama activities).
+
+**Rationale**:
+- **Audit compliance**: Complete audit trail for regulatory requirements
+- **Data integrity**: Immutable event log prevents data tampering
+- **Real-time capabilities**: Events naturally support real-time updates
+- **Debugging**: Complete system state reconstruction for troubleshooting
+- **Business intelligence**: Rich event data supports analytics and insights
+- **Regulatory reporting**: Simplified compliance reporting from event logs
+
+**Consequences**:
+- ✅ Comprehensive audit trail for compliance
+- ✅ Excellent support for real-time features
+- ✅ Strong data integrity and immutability
+- ✅ Rich data for business analytics
+- ❌ Increased storage requirements
+- ❌ More complex query patterns for some use cases
+
+**Alternatives Considered**:
+- **Traditional CRUD with audit logs**: Rejected due to incomplete audit trail
+- **Database triggers for auditing**: Rejected due to performance and complexity concerns
+- **External audit logging**: Rejected due to consistency and reliability concerns
+
+**Status**: ✅ Accepted
+
+---
+
+### ADR-015: Data Localization Strategy
+
+**Context**: Need to comply with varying data residency requirements across SADC countries while maintaining operational efficiency.
+
+**Decision**: Implement primary data storage in South Africa with read replicas in other SADC countries, ensuring user data residency compliance.
+
+**Rationale**:
+- **Compliance**: Meets POPIA and other regional data protection requirements
+- **Performance**: Local replicas improve query performance
+- **Sovereignty**: User data remains within their country's jurisdiction
+- **Operational efficiency**: Single primary database simplifies operations
+- **Backup strategy**: Cross-border replicas provide disaster recovery
+- **Regulatory reporting**: Simplified reporting with regional data segmentation
+
+**Consequences**:
+- ✅ Full compliance with regional data protection laws
+- ✅ Improved performance through local data access
+- ✅ Enhanced disaster recovery capabilities
+- ❌ Increased operational complexity
+- ❌ Higher infrastructure costs
+
+**Alternatives Considered**:
+- **Single global database**: Rejected due to compliance requirements
+- **Separate databases per country**: Rejected due to operational complexity
+- **Data processing agreements**: Rejected due to regulatory uncertainty
+
+**Status**: ✅ Accepted
+
+---
+
+## Mobile and Offline Decisions
+
+### ADR-016: Offline-First Mobile Architecture
+
+**Context**: Need to provide reliable functionality despite variable internet connectivity common in African markets.
+
+**Decision**: Implement offline-first architecture with local data persistence and intelligent synchronization.
+
+**Rationale**:
+- **African connectivity**: Variable internet quality requires offline capability
+- **User experience**: Core features work regardless of connectivity status
+- **Data costs**: Reduces data usage through efficient sync strategies
+- **Rural accessibility**: Enables usage in areas with poor connectivity
+- **Battery efficiency**: Reduces battery drain from constant network requests
+- **Trust building**: Reliable operation builds user confidence
+
+**Consequences**:
+- ✅ Excellent user experience even with poor connectivity
+- ✅ Reduced data costs for users
+- ✅ Better battery life and device performance
+- ❌ Increased development complexity
+- ❌ Conflict resolution challenges for concurrent updates
+
+**Alternatives Considered**:
+- **Online-only architecture**: Rejected due to African connectivity challenges
+- **Basic caching**: Rejected as insufficient for African market needs
+- **Progressive Web App**: Rejected due to limited offline capabilities
+
+**Status**: ✅ Accepted
+
+---
+
+## Future-Proofing Decisions
+
+### ADR-017: API-First Development Approach
+
+**Context**: Need to support multiple client types (mobile, web, potential partner integrations) while maintaining consistency and enabling future expansion.
+
+**Decision**: Implement API-first development with comprehensive OpenAPI documentation and versioning strategy.
+
+**Rationale**:
+- **Multi-client support**: Single API serves multiple client types
+- **Partner integration**: Enables future B2B and white-label opportunities
+- **Development efficiency**: Frontend and backend teams can work in parallel
+- **Testing**: APIs can be thoroughly tested independently of UI
+- **Documentation**: OpenAPI specs provide comprehensive documentation
+- **Versioning**: Proper versioning enables backward compatibility
+
+**Consequences**:
+- ✅ Excellent foundation for multiple client types
+- ✅ Enables future partner integrations and B2B opportunities
+- ✅ Improved development efficiency and testing capabilities
+- ❌ Additional upfront design and documentation effort
+- ❌ Version management complexity
+
+**Alternatives Considered**:
+- **Mobile-first approach**: Rejected due to limited expansion opportunities
+- **Monolithic web application**: Rejected due to poor mobile experience
+- **GraphQL**: Rejected due to team expertise and caching complexity
+
+**Status**: ✅ Accepted
+
+---
+
+### ADR-018: Modular Frontend Architecture
+
+**Context**: Need for maintainable, testable frontend code that can evolve with changing requirements and team growth.
+
+**Decision**: Implement modular React Native architecture with feature-based organization and reusable component library.
+
+**Rationale**:
+- **Maintainability**: Clear module boundaries improve code organization
+- **Testability**: Modular architecture enables comprehensive testing
+- **Team scaling**: Multiple developers can work on different modules
+- **Reusability**: Component library ensures UI consistency
+- **Evolution**: Modules can be refactored or replaced independently
+- **Performance**: Enables code splitting and lazy loading
+
+**Consequences**:
+- ✅ Highly maintainable and testable codebase
+- ✅ Excellent foundation for team scaling
+- ✅ Consistent UI through shared component library
+- ❌ Additional architectural complexity
+- ❌ Requires discipline to maintain module boundaries
+
+**Alternatives Considered**:
+- **Monolithic frontend**: Rejected due to maintainability concerns
+- **Micro-frontends**: Rejected as too complex for initial team size
+- **Component libraries only**: Rejected as insufficient for large-scale organization
+
+**Status**: ✅ Accepted
+
+---
+
+## Decision Review and Evolution
+
+### Decision Evaluation Criteria
+
+**Technical Decisions Evaluation Framework:**
 
 <CardGroup cols={2}>
-  <Card title="Technology Stack" icon="layers">
-    React Native, Express.js, PostgreSQL
+  <Card title="Business Alignment" icon="target">
+    **Market Fit**: Does the decision serve African market needs?  
+    **Regulatory**: Does it support SADC compliance requirements?  
+    **Cost**: Is it financially sustainable for our business model?  
+    **Timeline**: Does it support aggressive go-to-market timeline?
   </Card>
-  <Card title="Design Principles" icon="compass">
-    Scalability, Security, Simplicity
+  <Card title="Technical Excellence" icon="code">
+    **Scalability**: Can it support 1M+ users by 2030?  
+    **Maintainability**: Can our team maintain and evolve it?  
+    **Security**: Does it meet financial services security standards?  
+    **Performance**: Does it deliver excellent user experience?
   </Card>
 </CardGroup>
 
-## Implementation Details
+### Decision Review Process
 
-Technical implementation details will be documented here.
+<Steps>
+  <Step title="Quarterly Review">
+    **Schedule**: Every quarter review all active ADRs  
+    **Participants**: Engineering team, product stakeholders  
+    **Focus**: Performance, costs, emerging alternatives  
+    **Outcome**: Keep, modify, or deprecate decisions
+  </Step>
+  <Step title="Major Release Review">
+    **Schedule**: Before major platform releases  
+    **Participants**: Full product and engineering teams  
+    **Focus**: Strategic architectural directions  
+    **Outcome**: New ADRs or significant updates
+  </Step>
+  <Step title="Incident-Driven Review">
+    **Trigger**: Major incidents or performance issues  
+    **Participants**: Incident response team, architecture review  
+    **Focus**: Decisions that contributed to incidents  
+    **Outcome**: Immediate fixes and long-term improvements
+  </Step>
+</Steps>
 
-## Related Documentation
+### Future Decision Areas
 
-<Card title="System Overview" href="/architecture/system-overview">
-  Explore the complete system architecture
-</Card>
+**Decisions Pending or Under Consideration:**
+
+<CardGroup cols={2}>
+  <Card title="AI/ML Integration" icon="brain">
+    **Timeline**: Phase 2 (Year 2)  
+    **Scope**: Enhanced DIVA scoring with machine learning  
+    **Considerations**: Data requirements, explainability, regulatory approval
+  </Card>
+  <Card title="Microservices Migration" icon="boxes">
+    **Timeline**: Phase 3 (Year 3-4)  
+    **Scope**: Extract high-traffic services to microservices  
+    **Considerations**: Team growth, operational maturity, performance needs
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Blockchain Integration" icon="link">
+    **Timeline**: Phase 4 (Year 4-5)  
+    **Scope**: Immutable audit trails, cross-border payments  
+    **Considerations**: Regulatory acceptance, energy consumption, complexity
+  </Card>
+  <Card title="Multi-Cloud Strategy" icon="cloud">
+    **Timeline**: Phase 3 (Year 3-4)  
+    **Scope**: Avoid vendor lock-in, improve regional presence  
+    **Considerations**: Operational complexity, cost implications, data sovereignty
+  </Card>
+</CardGroup>
+
+---
+
+*These technical decisions provide a foundation for AWO Platform's architecture while remaining flexible enough to evolve with changing market needs, regulatory requirements, and technical advancements across the SADC region.*
+
+*Last updated: June 2025*  
+*Next review: July 2025*

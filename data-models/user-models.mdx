@@ -1,49 +1,736 @@
----
-title: "User Models"
-description: "AWO Platform user models schema and relationships"
----
-
 # User Models
 
-## Overview
+AWO Platform's user models are designed to support multi-tier KYC verification, comprehensive user profiling, and secure session management while maintaining compliance with SADC regional data protection requirements.
+
+## User Data Architecture
 
 <Info>
-This section documents the user models used in the AWO Platform for financial services.
+User models implement a tiered verification system that aligns with regulatory requirements across SADC countries, supporting progressive feature unlocking based on verification levels while maintaining strong data protection.
 </Info>
 
-## Schema Definition
+### User Model Hierarchy
 
-Database schema and model definitions will be provided here.
-
-```sql
--- Schema example will be added
-CREATE TABLE example (
-  id SERIAL PRIMARY KEY,
-  created_at TIMESTAMP DEFAULT NOW()
-);
+```mermaid
+classDiagram
+    class User {
+        +UUID id
+        +String email
+        +String phoneNumber
+        +String passwordHash
+        +UserStatus status
+        +Integer kycTier
+        +DateTime createdAt
+        +DateTime lastLoginAt
+    }
+    
+    class UserProfile {
+        +UUID userId
+        +String firstName
+        +String lastName
+        +Date dateOfBirth
+        +Gender gender
+        +String nationality
+        +String nationalIdNumber
+        +Address address
+        +String preferredLanguage
+    }
+    
+    class UserSession {
+        +UUID id
+        +UUID userId
+        +String refreshTokenHash
+        +String deviceFingerprint
+        +DateTime expiresAt
+        +Boolean isActive
+    }
+    
+    class UserDevice {
+        +UUID id
+        +UUID userId
+        +String deviceToken
+        +Platform platform
+        +String deviceModel
+        +Boolean isActive
+    }
+    
+    User ||--|| UserProfile : has
+    User ||--o{ UserSession : maintains
+    User ||--o{ UserDevice : registers
 ```
 
-## Relationships
+## Core User Model
 
-Entity relationships and data flow will be documented here.
+### User Entity Structure
 
-## Usage Examples
-
-<CodeGroup>
-```typescript TypeScript
-// TypeScript interface example
-interface ExampleModel {
-  id: number;
+```typescript
+// Primary user entity
+interface User {
+  id: string; // UUID
+  email: string;
+  phoneNumber: string; // E.164 format
+  passwordHash: string; // bcrypt hash
+  status: UserStatus;
+  kycTier: 1 | 2;
+  emailVerifiedAt?: Date;
+  phoneVerifiedAt?: Date;
   createdAt: Date;
+  updatedAt: Date;
+  lastLoginAt?: Date;
+  
+  // Relationships
+  profile?: UserProfile;
+  sessions: UserSession[];
+  devices: UserDevice[];
+  preferences: UserPreferences;
+}
+
+enum UserStatus {
+  PENDING = 'pending',
+  ACTIVE = 'active', 
+  SUSPENDED = 'suspended',
+  CLOSED = 'closed'
 }
 ```
 
-```sql SQL Query
--- SQL query example
-SELECT * FROM example WHERE id = $1;
+### User Status Flow
+
+<Steps>
+  <Step title="Pending Registration">
+    **Status**: `pending`  
+    **Access**: No platform access  
+    **Requirements**: Email and phone verification needed  
+    **Duration**: 7 days before cleanup
+  </Step>
+  <Step title="Active User">
+    **Status**: `active`  
+    **Access**: Full platform access based on KYC tier  
+    **Requirements**: Verified email and phone  
+    **Features**: All tier-appropriate features available
+  </Step>
+  <Step title="Suspended Account">
+    **Status**: `suspended`  
+    **Access**: Login allowed, limited functionality  
+    **Reasons**: Compliance issues, suspicious activity  
+    **Recovery**: Support ticket resolution required
+  </Step>
+  <Step title="Closed Account">
+    **Status**: `closed`  
+    **Access**: No access, data retained per regulations  
+    **Trigger**: User request or regulatory requirement  
+    **Data**: Anonymized after retention period
+  </Step>
+</Steps>
+
+### KYC Tier System
+
+<CardGroup cols={2}>
+  <Card title="Tier 1 KYC" icon="user">
+    **Requirements**: Phone + National ID number  
+    **Verification**: SMS OTP + ID validation  
+    **Features**: Basic wallet, P2P transfers, savings  
+    **Limits**: R10,000 monthly transaction limit
+  </Card>
+  <Card title="Tier 2 KYC" icon="shield">
+    **Requirements**: Photo ID + Selfie + Bank link  
+    **Verification**: Biometric + document verification  
+    **Features**: Full platform access, investments  
+    **Limits**: No platform-imposed limits
+  </Card>
+</CardGroup>
+
+## User Profile Model
+
+### Profile Data Structure
+
+```typescript
+interface UserProfile {
+  userId: string; // Foreign key to User
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: Date;
+  gender?: Gender;
+  nationality: string; // ISO 3166 country code
+  nationalIdNumber?: string; // Encrypted
+  
+  // Address information
+  address: {
+    line1?: string; // Encrypted
+    line2?: string; // Encrypted
+    city?: string;
+    provinceState?: string;
+    postalCode?: string;
+    country: string; // ISO 3166 country code
+  };
+  
+  // Localization
+  preferredLanguage: string; // ISO 639 language code
+  timezone: string; // IANA timezone
+  
+  // Profile metadata
+  profilePictureUrl?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+enum Gender {
+  FEMALE = 'female',
+  MALE = 'male',
+  NON_BINARY = 'non_binary',
+  PREFER_NOT_TO_SAY = 'prefer_not_to_say'
+}
 ```
-</CodeGroup>
 
-## Best Practices
+### Regional Profile Considerations
 
-Data modeling best practices will be included here.
+**SADC Country-Specific Fields:**
+
+<CardGroup cols={2}>
+  <Card title="South Africa" icon="flag">
+    **ID Format**: 13-digit RSA ID number  
+    **Validation**: Luhn algorithm + date validation  
+    **Language**: English, Afrikaans, Zulu, Xhosa  
+    **Address**: Postal code validation
+  </Card>
+  <Card title="Botswana" icon="flag">
+    **ID Format**: Omang number format  
+    **Validation**: Country-specific algorithm  
+    **Language**: English, Setswana  
+    **Address**: Village/town classification
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Namibia" icon="flag">
+    **ID Format**: Namibian ID structure  
+    **Validation**: Check digit validation  
+    **Language**: English, Afrikaans, German  
+    **Address**: Regional council areas
+  </Card>
+  <Card title="Zambia" icon="flag">
+    **ID Format**: National Registration Card  
+    **Validation**: Prefix and check digit  
+    **Language**: English, Bemba, Nyanja  
+    **Address**: Province and district codes
+  </Card>
+</CardGroup>
+
+## Authentication and Session Management
+
+### Session Model
+
+```typescript
+interface UserSession {
+  id: string; // UUID
+  userId: string;
+  refreshTokenHash: string; // bcrypt hash of refresh token
+  deviceFingerprint?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  expiresAt: Date;
+  createdAt: Date;
+  revokedAt?: Date;
+  isActive: boolean; // Computed: not revoked and not expired
+  
+  // Security metadata
+  loginMethod: 'password' | 'biometric' | 'sms_otp' | 'totp';
+  riskScore?: number; // 0-100 risk assessment
+  locationInfo?: {
+    country: string;
+    city?: string;
+    suspicious: boolean;
+  };
+}
+```
+
+### Multi-Factor Authentication
+
+```typescript
+interface UserMFA {
+  userId: string;
+  methods: MFAMethod[];
+  primaryMethod: MFAMethodType;
+  backupCodes: string[]; // Encrypted recovery codes
+  isEnabled: boolean;
+  enabledAt?: Date;
+  lastUsedAt?: Date;
+}
+
+interface MFAMethod {
+  type: MFAMethodType;
+  identifier: string; // Phone number, email, or TOTP secret
+  isActive: boolean;
+  verifiedAt: Date;
+  metadata?: {
+    totpSecret?: string; // Encrypted
+    phoneNumber?: string; // Encrypted
+    emailAddress?: string;
+  };
+}
+
+enum MFAMethodType {
+  SMS_OTP = 'sms_otp',
+  EMAIL_OTP = 'email_otp',
+  TOTP = 'totp',
+  PUSH_NOTIFICATION = 'push_notification',
+  BIOMETRIC = 'biometric'
+}
+```
+
+### Device Management
+
+```typescript
+interface UserDevice {
+  id: string; // UUID
+  userId: string;
+  deviceToken: string; // Push notification token
+  platform: Platform;
+  deviceModel?: string;
+  osVersion?: string;
+  appVersion?: string;
+  isActive: boolean;
+  
+  // Security features
+  biometricEnabled: boolean;
+  lastActiveAt: Date;
+  firstRegisteredAt: Date;
+  
+  // Location tracking (with consent)
+  lastKnownLocation?: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    timestamp: Date;
+  };
+}
+
+enum Platform {
+  IOS = 'ios',
+  ANDROID = 'android',
+  WEB = 'web'
+}
+```
+
+## User Preferences and Settings
+
+### Comprehensive Preferences Model
+
+```typescript
+interface UserPreferences {
+  userId: string;
+  
+  // Communication preferences
+  notifications: {
+    push: {
+      enabled: boolean;
+      transactions: boolean;
+      chamaActivities: boolean;
+      investments: boolean;
+      educational: boolean;
+      promotional: boolean;
+      quietHours: {
+        enabled: boolean;
+        startTime: string; // HH:MM format
+        endTime: string;
+      };
+    };
+    sms: {
+      enabled: boolean;
+      transactionAlerts: boolean;
+      securityAlerts: boolean;
+      marketingOptIn: boolean;
+    };
+    email: {
+      enabled: boolean;
+      statements: boolean;
+      newsletters: boolean;
+      promotions: boolean;
+      frequency: 'daily' | 'weekly' | 'monthly';
+    };
+    whatsapp: {
+      enabled: boolean;
+      businessUpdates: boolean;
+      customerSupport: boolean;
+    };
+  };
+  
+  // Privacy settings
+  privacy: {
+    profileVisibility: 'public' | 'friends' | 'private';
+    shareAnalytics: boolean;
+    shareWithPartners: boolean;
+    dataProcessingConsent: {
+      marketing: boolean;
+      analytics: boolean;
+      improvement: boolean;
+      consentDate: Date;
+    };
+  };
+  
+  // Financial preferences
+  financial: {
+    defaultCurrency: string;
+    riskTolerance: 'very_low' | 'low' | 'moderate' | 'high' | 'very_high';
+    autoSavingsEnabled: boolean;
+    autoSavingsPercentage: number; // 0-100
+    investmentGoals: string[];
+    retirementAge?: number;
+  };
+  
+  // App experience
+  interface: {
+    theme: 'light' | 'dark' | 'system';
+    language: string;
+    currency: string;
+    dateFormat: 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
+    numberFormat: 'decimal_point' | 'decimal_comma';
+  };
+  
+  // Security preferences
+  security: {
+    biometricEnabled: boolean;
+    autoLockTimeout: number; // minutes
+    transactionConfirmation: boolean;
+    requireMFAForTransfers: boolean;
+    allowedCountries: string[]; // ISO country codes
+  };
+  
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+## KYC and Verification Models
+
+### KYC Verification Tracking
+
+```typescript
+interface KYCVerification {
+  id: string; // UUID
+  userId: string;
+  tier: 1 | 2;
+  status: KYCStatus;
+  provider: 'smile_id' | 'manual' | 'onfido';
+  
+  // Verification steps
+  steps: {
+    phoneVerification: KYCStep;
+    emailVerification: KYCStep;
+    identityDocument: KYCStep;
+    biometricVerification?: KYCStep;
+    addressVerification?: KYCStep;
+    bankAccountVerification?: KYCStep;
+  };
+  
+  // Results
+  verificationResults: {
+    identityMatch: number; // 0-100 confidence score
+    livenessCheck: number; // 0-100 confidence score
+    documentAuthenticity: number; // 0-100 confidence score
+    riskAssessment: 'low' | 'medium' | 'high';
+  };
+  
+  // Compliance
+  complianceFlags: string[];
+  reviewNotes?: string;
+  expiresAt?: Date; // For Tier 2 re-verification
+  
+  submittedAt: Date;
+  completedAt?: Date;
+  updatedAt: Date;
+}
+
+interface KYCStep {
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'expired';
+  attempts: number;
+  maxAttempts: number;
+  completedAt?: Date;
+  failureReason?: string;
+  documents?: KYCDocument[];
+}
+
+interface KYCDocument {
+  id: string;
+  type: 'national_id' | 'passport' | 'drivers_license' | 'utility_bill' | 'bank_statement';
+  frontImageUrl: string; // Encrypted storage URL
+  backImageUrl?: string; // Encrypted storage URL
+  extractedData: {
+    idNumber?: string;
+    fullName?: string;
+    dateOfBirth?: Date;
+    expiryDate?: Date;
+    issueDate?: Date;
+    nationality?: string;
+  };
+  verificationStatus: 'pending' | 'verified' | 'rejected';
+  uploadedAt: Date;
+}
+
+enum KYCStatus {
+  PENDING = 'pending',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  REJECTED = 'rejected',
+  EXPIRED = 'expired',
+  REQUIRES_REVIEW = 'requires_review'
+}
+```
+
+## User Analytics and Behavior
+
+### User Activity Tracking
+
+```typescript
+interface UserActivity {
+  userId: string;
+  sessionId: string;
+  eventType: ActivityEventType;
+  eventData: {
+    screen?: string;
+    action?: string;
+    feature?: string;
+    duration?: number; // milliseconds
+    metadata?: Record<string, any>;
+  };
+  deviceInfo: {
+    platform: Platform;
+    appVersion: string;
+    osVersion: string;
+    deviceModel: string;
+  };
+  location?: {
+    country: string;
+    city?: string;
+    coordinates?: {
+      latitude: number;
+      longitude: number;
+    };
+  };
+  timestamp: Date;
+}
+
+enum ActivityEventType {
+  LOGIN = 'login',
+  LOGOUT = 'logout',
+  SCREEN_VIEW = 'screen_view',
+  TRANSACTION = 'transaction',
+  INVESTMENT = 'investment',
+  CHAMA_ACTIVITY = 'chama_activity',
+  EDUCATION = 'education',
+  FEATURE_USE = 'feature_use',
+  ERROR = 'error'
+}
+```
+
+### User Segmentation
+
+```typescript
+interface UserSegment {
+  userId: string;
+  segments: {
+    demographic: {
+      ageGroup: '18-25' | '26-35' | '36-45' | '46-55' | '55+';
+      country: string;
+      gender?: Gender;
+      incomeLevel: 'low' | 'lower_middle' | 'upper_middle' | 'high';
+    };
+    behavioral: {
+      userType: 'saver' | 'investor' | 'borrower' | 'chama_leader' | 'passive';
+      engagementLevel: 'low' | 'medium' | 'high';
+      riskProfile: 'conservative' | 'moderate' | 'aggressive';
+      preferredFeatures: string[];
+    };
+    financial: {
+      portfolioTier: 'bronze' | 'silver' | 'gold' | 'platinum';
+      averageBalance: number;
+      transactionFrequency: 'low' | 'medium' | 'high';
+      investmentActivity: 'none' | 'beginner' | 'active' | 'advanced';
+    };
+    lifecycle: {
+      stage: 'onboarding' | 'activation' | 'engagement' | 'retention' | 'reactivation';
+      daysSinceRegistration: number;
+      lastActiveDate: Date;
+      churnRisk: 'low' | 'medium' | 'high';
+    };
+  };
+  lastUpdated: Date;
+}
+```
+
+## Data Protection and Privacy
+
+### Data Consent Management
+
+```typescript
+interface DataConsent {
+  userId: string;
+  consents: {
+    dataProcessing: {
+      necessary: boolean; // Always true, required for service
+      analytics: boolean;
+      marketing: boolean;
+      improvement: boolean;
+      consentDate: Date;
+      withdrawnDate?: Date;
+    };
+    dataSharing: {
+      partners: boolean;
+      anonymizedResearch: boolean;
+      governmentReporting: boolean; // Required by law
+      consentDate: Date;
+      withdrawnDate?: Date;
+    };
+    communications: {
+      transactional: boolean; // Always true, required
+      promotional: boolean;
+      educational: boolean;
+      surveys: boolean;
+      consentDate: Date;
+      withdrawnDate?: Date;
+    };
+  };
+  
+  // Legal basis tracking
+  legalBasis: {
+    dataProcessing: 'consent' | 'contract' | 'legal_obligation' | 'vital_interests' | 'public_task' | 'legitimate_interests';
+    dataRetention: 'consent' | 'legal_requirement' | 'business_necessity';
+  };
+  
+  // GDPR/POPIA compliance
+  rightsRequests: {
+    accessRequests: DataRequest[];
+    rectificationRequests: DataRequest[];
+    erasureRequests: DataRequest[];
+    portabilityRequests: DataRequest[];
+  };
+  
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface DataRequest {
+  id: string;
+  type: 'access' | 'rectification' | 'erasure' | 'portability';
+  status: 'pending' | 'in_progress' | 'completed' | 'rejected';
+  requestDate: Date;
+  completionDate?: Date;
+  rejectionReason?: string;
+  fulfillmentData?: string; // File path or export data
+}
+```
+
+### Data Anonymization
+
+```typescript
+interface AnonymizedUser {
+  anonymizedId: string; // Generated hash, not traceable to original
+  demographics: {
+    ageRange: string;
+    country: string;
+    gender?: string;
+  };
+  behavioral: {
+    registrationMonth: string; // YYYY-MM
+    lastActiveMonth: string;
+    totalTransactions: number;
+    averageTransactionAmount: number;
+    portfolioTier: string;
+    chamaParticipation: boolean;
+    investmentActivity: boolean;
+  };
+  anonymizedAt: Date;
+  originalDataRetainedUntil: Date;
+}
+```
+
+## User Model Validation
+
+### Data Validation Rules
+
+```typescript
+// User validation schema using Zod
+const UserValidationSchema = {
+  user: z.object({
+    email: z.string().email().max(255),
+    phoneNumber: z.string().regex(/^\+[1-9]\d{1,14}$/), // E.164 format
+    password: z.string().min(12).max(128)
+      .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+  }),
+  
+  profile: z.object({
+    firstName: z.string().min(1).max(100).regex(/^[a-zA-Z\s'-]+$/),
+    lastName: z.string().min(1).max(100).regex(/^[a-zA-Z\s'-]+$/),
+    dateOfBirth: z.date().max(new Date(Date.now() - 16 * 365 * 24 * 60 * 60 * 1000)), // Minimum 16 years
+    nationality: z.string().length(3).regex(/^[A-Z]{3}$/), // ISO 3166 alpha-3
+    country: z.string().length(3).regex(/^[A-Z]{3}$/)
+  }),
+  
+  preferences: z.object({
+    language: z.enum(['en', 'af', 'zu', 'xh', 'st', 'tn', 'pt']),
+    currency: z.enum(['ZAR', 'BWP', 'NAD', 'ZMW']),
+    timezone: z.string().refine((tz) => Intl.supportedValuesOf('timeZone').includes(tz))
+  })
+};
+```
+
+### Business Logic Validation
+
+```typescript
+class UserBusinessRules {
+  static validateKYCProgression(currentTier: number, requestedTier: number): boolean {
+    // Can only progress to next tier
+    return requestedTier === currentTier + 1;
+  }
+  
+  static validateAgeRestrictions(dateOfBirth: Date, country: string): boolean {
+    const age = new Date().getFullYear() - dateOfBirth.getFullYear();
+    
+    // Minimum age requirements per country
+    const minimumAges: Record<string, number> = {
+      'ZAF': 18, // South Africa
+      'BWA': 18, // Botswana
+      'NAM': 18, // Namibia
+      'ZMB': 18  // Zambia
+    };
+    
+    return age >= (minimumAges[country] || 18);
+  }
+  
+  static validateNationalId(idNumber: string, country: string): boolean {
+    // Country-specific ID validation logic
+    switch (country) {
+      case 'ZAF':
+        return this.validateSouthAfricanId(idNumber);
+      case 'BWA':
+        return this.validateBotswanaId(idNumber);
+      default:
+        return true; // Basic length check
+    }
+  }
+  
+  private static validateSouthAfricanId(id: string): boolean {
+    if (!/^\d{13}$/.test(id)) return false;
+    
+    // Luhn algorithm validation
+    const digits = id.split('').map(Number);
+    let sum = 0;
+    
+    for (let i = 0; i < 12; i++) {
+      if (i % 2 === 0) {
+        sum += digits[i];
+      } else {
+        const doubled = digits[i] * 2;
+        sum += doubled > 9 ? doubled - 9 : doubled;
+      }
+    }
+    
+    return (10 - (sum % 10)) % 10 === digits[12];
+  }
+}
+```
+
+---
+
+*This comprehensive user model documentation provides the foundation for secure, compliant, and scalable user management across the AWO Platform, supporting the diverse needs of African women while maintaining the highest standards of data protection and user experience.*
+
+*Last updated: June 2025*  
+*Next review: July 2025*
