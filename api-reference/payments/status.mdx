@@ -1,0 +1,528 @@
+---
+title: "Payment Status"
+description: "Track payment status and get detailed payment information for transactions on the AWO platform"
+---
+
+# Payment Status
+
+Track the status of payments made through the AWO platform, including Chama contributions, goal deposits, and peer-to-peer transfers. This endpoint provides real-time payment tracking crucial for transparency in community savings and financial goal management.
+
+<Info>
+Payment status tracking is essential for maintaining trust in Chama groups and ensuring transparent financial operations across the AWO platform.
+</Info>
+
+## Authentication
+
+This endpoint requires a valid JWT token with `VIEW_PAYMENTS` permission.
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+## Request
+
+### Endpoint
+```
+GET /payments/{paymentId}/status
+```
+
+### Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `paymentId` | string | Yes | Unique identifier for the payment |
+
+### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `include_details` | boolean | No | `false` | Include detailed transaction breakdown |
+| `include_fees` | boolean | No | `false` | Include fee breakdown information |
+
+## Response
+
+### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "pay_2NvZhKG9G3nfMTfHV8R6cC1L",
+    "status": "completed",
+    "amount": 1500.00,
+    "currency": "ZAR",
+    "description": "Chama contribution - Ubuntu Women's Group",
+    "type": "chama_contribution",
+    "method": "mobile_money",
+    "provider": "m_pesa",
+    "recipient": {
+      "type": "chama",
+      "id": "chama_9xKm2Pv8B4nHfR6qE7tY5wA3",
+      "name": "Ubuntu Women's Group"
+    },
+    "sender": {
+      "id": "user_4K8n5RmP2vQ9xE6wT7cY1sA8",
+      "name": "Naledi Mbeki",
+      "phoneNumber": "+27821234567"
+    },
+    "timestamps": {
+      "initiated": "2025-06-19T14:30:00Z",
+      "processed": "2025-06-19T14:30:45Z",
+      "completed": "2025-06-19T14:31:15Z"
+    },
+    "confirmation": {
+      "code": "MP25061914301234",
+      "reference": "AWO-CHM-001234",
+      "receipt_url": "https://receipts.awo-platform.com/pay_2NvZhKG9G3nfMTfHV8R6cC1L"
+    },
+    "fees": {
+      "platform_fee": 15.00,
+      "provider_fee": 25.00,
+      "total_fees": 40.00,
+      "fee_currency": "ZAR"
+    }
+  },
+  "meta": {
+    "timestamp": "2025-06-19T14:31:20Z",
+    "version": "1.0.0"
+  }
+}
+```
+
+### Payment Status Values
+
+| Status | Description | Next Steps |
+|--------|-------------|------------|
+| `pending` | Payment initiated, awaiting processing | Monitor for status updates |
+| `processing` | Payment being processed by provider | Wait for completion |
+| `completed` | Payment successfully processed | Transaction complete |
+| `failed` | Payment failed to process | Check failure reason, retry if needed |
+| `cancelled` | Payment cancelled by user or system | Create new payment if needed |
+| `expired` | Payment link or session expired | Initiate new payment |
+
+## DIVA Score Impact
+
+<Note>
+Successful payments, especially regular Chama contributions, positively impact your **Discipline** component of the DIVA score. Consistent payment completion can improve your overall DIVA score by 20-40 points over 3 months.
+</Note>
+
+## Cultural Context
+
+Payment transparency is fundamental to traditional Chama operations. AWO's payment tracking ensures the same level of visibility and trust that has made community savings groups successful across Africa for generations.
+
+## Error Handling
+
+### Error Response Format
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "PAYMENT_NOT_FOUND",
+    "message": "Payment with ID pay_invalid123 not found",
+    "details": {
+      "payment_id": "pay_invalid123",
+      "user_id": "user_4K8n5RmP2vQ9xE6wT7cY1sA8"
+    }
+  },
+  "meta": {
+    "timestamp": "2025-06-19T14:31:20Z",
+    "version": "1.0.0",
+    "request_id": "req_7H9mK3pL8vN2xR5qF6tE4wA1"
+  }
+}
+```
+
+### Common Error Codes
+
+| Code | Status | Description | Solution |
+|------|--------|-------------|----------|
+| `PAYMENT_NOT_FOUND` | 404 | Payment ID does not exist | Verify payment ID is correct |
+| `UNAUTHORIZED_ACCESS` | 403 | User cannot access this payment | Ensure user has permission to view payment |
+| `INVALID_PAYMENT_ID` | 400 | Payment ID format is invalid | Use valid payment ID format |
+| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests | Wait before retrying |
+
+## Code Examples
+
+<CodeGroup>
+
+```javascript JavaScript/TypeScript
+import { AWOClient } from '@awo-platform/js-sdk';
+
+const awo = new AWOClient({
+  apiKey: process.env.AWO_API_KEY,
+  environment: 'production'
+});
+
+// Get payment status
+async function checkPaymentStatus(paymentId) {
+  try {
+    const payment = await awo.payments.getStatus(paymentId, {
+      include_details: true,
+      include_fees: true
+    });
+    
+    console.log(`Payment ${paymentId}: ${payment.status}`);
+    
+    switch (payment.status) {
+      case 'completed':
+        console.log('✅ Payment successful!');
+        console.log(`Amount: ${payment.currency} ${payment.amount}`);
+        console.log(`Reference: ${payment.confirmation.reference}`);
+        break;
+        
+      case 'pending':
+      case 'processing':
+        console.log('⏳ Payment still processing...');
+        // Poll again after delay
+        setTimeout(() => checkPaymentStatus(paymentId), 5000);
+        break;
+        
+      case 'failed':
+        console.log('❌ Payment failed');
+        console.log(`Reason: ${payment.failure_reason}`);
+        break;
+        
+      default:
+        console.log(`Payment status: ${payment.status}`);
+    }
+    
+    return payment;
+  } catch (error) {
+    console.error('Error checking payment status:', error.message);
+    throw error;
+  }
+}
+
+// Example usage
+checkPaymentStatus('pay_2NvZhKG9G3nfMTfHV8R6cC1L');
+```
+
+```python Python
+import requests
+import time
+from typing import Dict, Optional
+
+class AWOPayments:
+    def __init__(self, api_key: str, base_url: str = "https://api.awo-platform.com/v1"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+    
+    def get_payment_status(self, payment_id: str, include_details: bool = False, 
+                          include_fees: bool = False) -> Dict:
+        """Get the status of a payment"""
+        params = {
+            'include_details': str(include_details).lower(),
+            'include_fees': str(include_fees).lower()
+        }
+        
+        response = requests.get(
+            f"{self.base_url}/payments/{payment_id}/status",
+            headers=self.headers,
+            params=params
+        )
+        
+        if response.status_code == 200:
+            return response.json()['data']
+        else:
+            error_data = response.json()
+            raise Exception(f"API Error: {error_data['error']['message']}")
+    
+    def wait_for_completion(self, payment_id: str, max_wait: int = 300) -> Dict:
+        """Poll payment status until completion or timeout"""
+        start_time = time.time()
+        
+        while time.time() - start_time < max_wait:
+            payment = self.get_payment_status(payment_id, include_details=True)
+            
+            if payment['status'] in ['completed', 'failed', 'cancelled']:
+                return payment
+            
+            print(f"Payment {payment_id} status: {payment['status']}")
+            time.sleep(5)  # Wait 5 seconds before next check
+        
+        raise TimeoutError(f"Payment {payment_id} did not complete within {max_wait} seconds")
+
+# Example usage
+awo_payments = AWOPayments('your-api-key')
+
+try:
+    # Check immediate status
+    payment = awo_payments.get_payment_status('pay_2NvZhKG9G3nfMTfHV8R6cC1L')
+    print(f"Payment status: {payment['status']}")
+    
+    # Wait for completion if still processing
+    if payment['status'] in ['pending', 'processing']:
+        final_payment = awo_payments.wait_for_completion('pay_2NvZhKG9G3nfMTfHV8R6cC1L')
+        print(f"Final status: {final_payment['status']}")
+        
+        if final_payment['status'] == 'completed':
+            print(f"✅ Payment completed successfully!")
+            print(f"Reference: {final_payment['confirmation']['reference']}")
+        else:
+            print(f"❌ Payment {final_payment['status']}")
+    
+except Exception as e:
+    print(f"Error: {e}")
+```
+
+```curl cURL
+# Get basic payment status
+curl -X GET "https://api.awo-platform.com/v1/payments/pay_2NvZhKG9G3nfMTfHV8R6cC1L/status" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Accept: application/json"
+
+# Get detailed payment status with fees
+curl -X GET "https://api.awo-platform.com/v1/payments/pay_2NvZhKG9G3nfMTfHV8R6cC1L/status?include_details=true&include_fees=true" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Accept: application/json"
+
+# Example response parsing with jq
+curl -X GET "https://api.awo-platform.com/v1/payments/pay_2NvZhKG9G3nfMTfHV8R6cC1L/status" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Accept: application/json" | \
+  jq -r '.data | "Status: \(.status), Amount: \(.currency) \(.amount)"'
+```
+
+```php PHP
+<?php
+
+class AWOPayments {
+    private $apiKey;
+    private $baseUrl;
+    
+    public function __construct($apiKey, $baseUrl = 'https://api.awo-platform.com/v1') {
+        $this->apiKey = $apiKey;
+        $this->baseUrl = $baseUrl;
+    }
+    
+    public function getPaymentStatus($paymentId, $includeDetails = false, $includeFees = false) {
+        $url = $this->baseUrl . '/payments/' . $paymentId . '/status';
+        
+        $params = http_build_query([
+            'include_details' => $includeDetails ? 'true' : 'false',
+            'include_fees' => $includeFees ? 'true' : 'false'
+        ]);
+        
+        $context = stream_context_create([
+            'http' => [
+                'header' => [
+                    'Authorization: Bearer ' . $this->apiKey,
+                    'Content-Type: application/json',
+                    'Accept: application/json'
+                ],
+                'method' => 'GET'
+            ]
+        ]);
+        
+        $response = file_get_contents($url . '?' . $params, false, $context);
+        
+        if ($response === false) {
+            throw new Exception('Failed to get payment status');
+        }
+        
+        $data = json_decode($response, true);
+        
+        if (!$data['success']) {
+            throw new Exception('API Error: ' . $data['error']['message']);
+        }
+        
+        return $data['data'];
+    }
+    
+    public function waitForCompletion($paymentId, $maxWait = 300) {
+        $startTime = time();
+        
+        while ((time() - $startTime) < $maxWait) {
+            $payment = $this->getPaymentStatus($paymentId, true);
+            
+            if (in_array($payment['status'], ['completed', 'failed', 'cancelled'])) {
+                return $payment;
+            }
+            
+            echo "Payment {$paymentId} status: {$payment['status']}\n";
+            sleep(5);
+        }
+        
+        throw new Exception("Payment {$paymentId} did not complete within {$maxWait} seconds");
+    }
+}
+
+// Example usage
+try {
+    $awoPayments = new AWOPayments('your-api-key');
+    
+    $payment = $awoPayments->getPaymentStatus('pay_2NvZhKG9G3nfMTfHV8R6cC1L');
+    echo "Payment status: " . $payment['status'] . "\n";
+    
+    if (in_array($payment['status'], ['pending', 'processing'])) {
+        $finalPayment = $awoPayments->waitForCompletion('pay_2NvZhKG9G3nfMTfHV8R6cC1L');
+        
+        if ($finalPayment['status'] === 'completed') {
+            echo "✅ Payment completed successfully!\n";
+            echo "Reference: " . $finalPayment['confirmation']['reference'] . "\n";
+        } else {
+            echo "❌ Payment " . $finalPayment['status'] . "\n";
+        }
+    }
+} catch (Exception $e) {
+    echo "Error: " . $e->getMessage() . "\n";
+}
+?>
+```
+
+</CodeGroup>
+
+## Real-time Updates
+
+For real-time payment status updates, consider using webhooks instead of polling:
+
+```javascript
+// Subscribe to payment status webhooks
+const webhook = await awo.webhooks.create({
+  url: 'https://your-app.com/webhooks/payment-status',
+  events: ['payment.completed', 'payment.failed', 'payment.cancelled']
+});
+```
+
+## Payment Types
+
+### Chama Contributions
+```json
+{
+  "type": "chama_contribution",
+  "recipient": {
+    "type": "chama",
+    "id": "chama_9xKm2Pv8B4nHfR6qE7tY5wA3",
+    "name": "Ubuntu Women's Group"
+  }
+}
+```
+
+### Savings Goal Deposits
+```json
+{
+  "type": "savings_deposit",
+  "recipient": {
+    "type": "savings_goal",
+    "id": "goal_3mK9Pv2B8nHfR6qE7tY5wAx",
+    "name": "Emergency Fund"
+  }
+}
+```
+
+### Peer-to-Peer Transfers
+```json
+{
+  "type": "p2p_transfer",
+  "recipient": {
+    "type": "user",
+    "id": "user_8K3n5RmP2vQ9xE6wT7cY1sB4",
+    "name": "Thandiwe Nkomo"
+  }
+}
+```
+
+## Regional Considerations
+
+<Tabs>
+  <Tab title="South Africa">
+    **Payment Methods**: M-Pesa, EFT, FNB Pay, Standard Bank  
+    **Currency**: ZAR (South African Rand)  
+    **Processing Time**: 30 seconds - 5 minutes  
+    **Regulations**: SARB compliance, POPIA data protection
+  </Tab>
+  <Tab title="Kenya">
+    **Payment Methods**: M-Pesa, Airtel Money, Equity Bank  
+    **Currency**: KES (Kenyan Shilling)  
+    **Processing Time**: 10 seconds - 2 minutes  
+    **Regulations**: CBK guidelines, Data Protection Act
+  </Tab>
+  <Tab title="Zimbabwe">
+    **Payment Methods**: EcoCash, OneMoney, ZimSwitch  
+    **Currency**: USD (United States Dollar)  
+    **Processing Time**: 1-10 minutes  
+    **Regulations**: RBZ oversight, Cyber Security Act
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+### Polling Guidelines
+- **Initial Check**: Check status immediately after initiation
+- **Polling Interval**: Wait 5-10 seconds between status checks
+- **Timeout**: Set maximum wait time (5-10 minutes for most payments)
+- **Exponential Backoff**: Increase wait time if payment is taking longer
+
+### Error Handling
+- **Retry Logic**: Implement retry for temporary failures
+- **User Communication**: Provide clear status updates to users
+- **Fallback Options**: Offer alternative payment methods if needed
+- **Support Integration**: Log failed payments for support follow-up
+
+### Security Considerations
+- **Authorization**: Only allow users to check their own payments
+- **Rate Limiting**: Implement reasonable polling frequency
+- **Logging**: Log all payment status requests for audit trails
+- **Data Sensitivity**: Protect payment information in logs and storage
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Initiate Payment" href="/api-reference/payments/initiate">
+    Start a new payment transaction
+  </Card>
+  <Card title="Payment History" href="/api-reference/payments/history">
+    Get list of user's payment history
+  </Card>
+  <Card title="Cancel Payment" href="/api-reference/payments/cancel">
+    Cancel a pending payment
+  </Card>
+  <Card title="Payment Webhooks" href="/api-reference/webhooks/events#payment-events">
+    Real-time payment status notifications
+  </Card>
+</CardGroup>
+
+## Webhooks Integration
+
+Instead of polling for status updates, consider subscribing to payment webhooks for real-time notifications:
+
+```javascript
+// Example webhook payload for payment completion
+{
+  "event": "payment.completed",
+  "data": {
+    "payment_id": "pay_2NvZhKG9G3nfMTfHV8R6cC1L",
+    "status": "completed",
+    "amount": 1500.00,
+    "currency": "ZAR",
+    "user_id": "user_4K8n5RmP2vQ9xE6wT7cY1sA8"
+  },
+  "timestamp": "2025-06-19T14:31:15Z"
+}
+```
+
+## Testing
+
+### Test Payment IDs
+
+Use these test payment IDs in sandbox environment:
+
+| Payment ID | Status | Description |
+|------------|--------|-------------|
+| `pay_test_completed_001` | completed | Successful payment |
+| `pay_test_pending_001` | pending | Payment awaiting processing |
+| `pay_test_failed_001` | failed | Failed payment with error details |
+| `pay_test_processing_001` | processing | Payment currently processing |
+
+<Warning>
+These test payment IDs only work in sandbox environment. Use real payment IDs in production.
+</Warning>
+
+---
+
+**Next Steps**: Once you have the payment status, you can [process successful transactions](/guides/payment-processing) or [handle payment failures](/guides/troubleshooting#payment-failures) according to your application's business logic.

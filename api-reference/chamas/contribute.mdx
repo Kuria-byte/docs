@@ -1,0 +1,1201 @@
+---
+title: "Make Contribution"
+description: "Make contributions to Chama groups including regular monthly payments, catch-up contributions, and emergency fund deposits"
+---
+
+# Make Contribution
+
+Make financial contributions to your Chama groups, supporting the traditional African practice of collective savings that has empowered women for generations. Regular contributions build community wealth, improve individual DIVA scores, and strengthen social bonds within the group.
+
+<Info>
+Consistent Chama contributions demonstrate financial discipline and community commitment - core values that significantly improve your DIVA score and unlock better financial opportunities.
+</Info>
+
+## Authentication
+
+This endpoint requires a valid JWT token with `MAKE_CONTRIBUTIONS` permission. Users can only contribute to Chamas they are members of.
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+## Request
+
+### Endpoint
+```
+POST /chamas/{chamaId}/contributions
+```
+
+### Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `chamaId` | string | Yes | Unique identifier for the Chama group |
+
+### Request Body
+
+```json
+{
+  "amount": 1500.00,
+  "contribution_type": "regular",
+  "payment_method": "mobile_money",
+  "payment_provider": "m_pesa",
+  "payment_details": {
+    "phone_number": "+27821234567",
+    "reference": "Ubuntu-June-2025"
+  },
+  "contribution_period": "2025-06",
+  "notes": "June contribution - Ubuntu Women's Group",
+  "auto_contribute": false,
+  "late_fee_accepted": true
+}
+```
+
+### Request Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `amount` | number | Yes | Contribution amount (positive decimal) |
+| `contribution_type` | string | Yes | Type of contribution: `regular`, `catch_up`, `emergency_fund`, `penalty`, `voluntary` |
+| `payment_method` | string | Yes | Payment method: `mobile_money`, `bank_transfer`, `card`, `crypto` |
+| `payment_provider` | string | Yes | Provider: `m_pesa`, `ecocash`, `fnb`, `standard_bank`, etc. |
+| `payment_details` | object | Yes | Provider-specific payment information |
+| `contribution_period` | string | No | Target period (YYYY-MM format) |
+| `notes` | string | No | Optional contribution notes (max 200 chars) |
+| `auto_contribute` | boolean | No | Set up automatic future contributions |
+| `late_fee_accepted` | boolean | No | Accept late fees if contribution is overdue |
+
+### Payment Method Details
+
+<Tabs>
+  <Tab title="Mobile Money (M-Pesa, EcoCash)">
+    ```json
+    {
+      "payment_method": "mobile_money",
+      "payment_provider": "m_pesa",
+      "payment_details": {
+        "phone_number": "+27821234567",
+        "reference": "Ubuntu-June-2025",
+        "pin": "encrypted_pin_hash"
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Bank Transfer">
+    ```json
+    {
+      "payment_method": "bank_transfer",
+      "payment_provider": "fnb",
+      "payment_details": {
+        "account_number": "************1234",
+        "reference": "Chama contribution June",
+        "beneficiary_reference": "Ubuntu Group"
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Card Payment">
+    ```json
+    {
+      "payment_method": "card",
+      "payment_provider": "visa",
+      "payment_details": {
+        "card_token": "card_tok_1ABcdef234567890",
+        "cvv": "123",
+        "save_card": false
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Cryptocurrency">
+    ```json
+    {
+      "payment_method": "crypto",
+      "payment_provider": "usdc_polygon",
+      "payment_details": {
+        "wallet_address": "0x742d35Cc6D6b4A4E3C5F8d2e9F1A2B3C4D5E6F7G",
+        "currency": "USDC",
+        "network": "polygon"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Response
+
+### Success Response (201 Created)
+
+```json
+{
+  "success": true,
+  "data": {
+    "contribution_id": "contrib_8K3n5RmP2vQ9xE6wT7cY1sA4",
+    "payment_id": "pay_2NvZhKG9G3nfMTfHV8R6cC1L",
+    "chama_id": "chama_9xKm2Pv8B4nHfR6qE7tY5wA3",
+    "contributor": {
+      "id": "user_4K8n5RmP2vQ9xE6wT7cY1sA8",
+      "name": "Naledi Mbeki",
+      "phone_number": "+27821234567"
+    },
+    "contribution_details": {
+      "amount": 1500.00,
+      "currency": "ZAR",
+      "contribution_type": "regular",
+      "contribution_period": "2025-06",
+      "status": "completed",
+      "processing_time_seconds": 45
+    },
+    "payment_details": {
+      "method": "mobile_money",
+      "provider": "m_pesa",
+      "transaction_id": "MP25061914301234",
+      "reference": "Ubuntu-June-2025",
+      "fees": {
+        "platform_fee": 15.00,
+        "provider_fee": 25.00,
+        "late_fee": 0.00,
+        "total_fees": 40.00
+      }
+    },
+    "chama_impact": {
+      "new_member_balance": 13500.00,
+      "total_contributions_to_date": 13500.00,
+      "position_in_current_cycle": 1,
+      "contribution_streak": 8,
+      "group_fund_balance": 97400.00,
+      "members_contributed_this_period": 9,
+      "total_members": 12
+    },
+    "diva_score_impact": {
+      "discipline_points_earned": 8,
+      "assets_points_earned": 5,
+      "consistency_bonus": 3,
+      "community_participation_bonus": 2,
+      "total_points_earned": 18,
+      "new_estimated_score": 768
+    },
+    "next_actions": {
+      "next_contribution_due": "2025-07-15T08:00:00Z",
+      "auto_contribute_enabled": false,
+      "upcoming_payout_date": "2025-07-20T08:00:00Z",
+      "your_payout_position": 1,
+      "estimated_payout_amount": 18000.00
+    },
+    "notifications": {
+      "sms_sent": true,
+      "email_sent": true,
+      "group_notification_sent": true,
+      "diva_score_update_scheduled": true
+    },
+    "blockchain_record": {
+      "transaction_hash": "0x8f9e7d6c5b4a39281f0e6d5c4b3a29180f7e6d5c",
+      "block_number": 45832976,
+      "gas_fee": 0.0023,
+      "immutable_proof": "verified"
+    }
+  },
+  "meta": {
+    "timestamp": "2025-06-19T14:31:20Z",
+    "version": "1.0.0",
+    "processing_location": "johannesburg_south_africa"
+  }
+}
+```
+
+### Contribution Types
+
+| Type | Description | Amount Rules | Impact |
+|------|-------------|--------------|--------|
+| `regular` | Monthly scheduled contribution | Fixed amount as per Chama rules | High DIVA score boost |
+| `catch_up` | Make up for missed contributions | Can be multiple periods | Restores DIVA score |
+| `emergency_fund` | Contribute to group emergency reserves | Any amount above minimum | Community trust bonus |
+| `penalty` | Late fees or disciplinary payments | As determined by group rules | Maintains good standing |
+| `voluntary` | Extra contribution beyond requirements | Any amount | Extra DIVA score boost |
+
+## DIVA Score Impact
+
+<Note>
+Chama contributions have the highest impact on your DIVA score:
+- **Regular contributions**: +5-10 points per month
+- **Consistency bonus**: +20 points for 6+ consecutive months
+- **Community participation**: +15 points for active group involvement
+- **Early payments**: +3 bonus points for contributing before deadline
+- **Voluntary contributions**: +5-15 additional points based on amount
+</Note>
+
+### DIVA Score Calculation
+
+```javascript
+// DIVA score boost calculation
+const divaBoost = {
+  discipline: {
+    base: contributionAmount / 100,           // Base points
+    consistency: consecutiveMonths * 2,       // Consistency bonus
+    early: isEarlyPayment ? 3 : 0            // Early payment bonus
+  },
+  assets: {
+    accumulation: contributionAmount / 200,   // Savings accumulation
+    growth: groupFundGrowth * 0.1            // Group wealth building
+  },
+  community: {
+    participation: isActiveParticipant ? 5 : 2,  // Group engagement
+    leadership: memberRole === 'admin' ? 3 : 0   // Leadership bonus
+  }
+};
+```
+
+## Cultural Context
+
+Chama contributions represent more than financial transactions - they embody the African principle of Ubuntu: "I am because we are." Each contribution strengthens the collective financial power of the group and demonstrates commitment to community upliftment.
+
+Traditional Chama practices that AWO preserves:
+- **Transparency**: All members see contribution records
+- **Accountability**: Group members encourage consistent participation  
+- **Celebration**: Successful contributions are acknowledged by the community
+- **Support**: Members help each other meet contribution obligations
+
+## Error Handling
+
+### Error Response Format
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INSUFFICIENT_FUNDS",
+    "message": "Insufficient balance to complete contribution",
+    "details": {
+      "required_amount": 1500.00,
+      "available_balance": 1200.00,
+      "shortfall": 300.00,
+      "currency": "ZAR",
+      "fees_included": true
+    },
+    "suggestions": [
+      "Add funds to your mobile money account",
+      "Use a different payment method",
+      "Make a partial contribution and catch up later"
+    ]
+  },
+  "meta": {
+    "timestamp": "2025-06-19T14:31:20Z",
+    "version": "1.0.0",
+    "request_id": "req_9H5mK7pL3vN8xR2qF9tE1wA6"
+  }
+}
+```
+
+### Common Error Codes
+
+| Code | Status | Description | Solution |
+|------|--------|-------------|----------|
+| `CHAMA_NOT_FOUND` | 404 | Chama does not exist | Verify Chama ID |
+| `NOT_A_MEMBER` | 403 | User is not a Chama member | Join Chama first |
+| `INSUFFICIENT_FUNDS` | 400 | Not enough balance for contribution | Add funds or use different payment method |
+| `CONTRIBUTION_ALREADY_MADE` | 409 | Contribution for this period already exists | Check contribution history |
+| `LATE_FEE_REQUIRED` | 400 | Late contribution requires fee acceptance | Accept late fees or contact admin |
+| `PAYMENT_METHOD_UNAVAILABLE` | 400 | Selected payment method not available | Use alternative payment method |
+| `AMOUNT_BELOW_MINIMUM` | 400 | Contribution below required minimum | Increase contribution amount |
+| `AMOUNT_ABOVE_MAXIMUM` | 400 | Contribution exceeds maximum allowed | Reduce amount or split contributions |
+| `CHAMA_SUSPENDED` | 403 | Chama is temporarily suspended | Contact support |
+| `MEMBER_SUSPENDED` | 403 | Member account is suspended | Resolve account issues |
+
+## Code Examples
+
+<CodeGroup>
+
+```javascript JavaScript/TypeScript
+import { AWOClient } from '@awo-platform/js-sdk';
+
+const awo = new AWOClient({
+  apiKey: process.env.AWO_API_KEY,
+  environment: 'production'
+});
+
+// Make a regular monthly contribution
+async function makeRegularContribution(chamaId, amount, paymentDetails) {
+  try {
+    const contribution = await awo.chamas.contribute(chamaId, {
+      amount: amount,
+      contribution_type: 'regular',
+      payment_method: 'mobile_money',
+      payment_provider: 'm_pesa',
+      payment_details: {
+        phone_number: paymentDetails.phoneNumber,
+        reference: `${chamaId}-${new Date().toISOString().slice(0, 7)}`,
+        pin: paymentDetails.pin
+      },
+      contribution_period: new Date().toISOString().slice(0, 7), // YYYY-MM
+      auto_contribute: false,
+      late_fee_accepted: true
+    });
+    
+    console.log('✅ Contribution successful!');
+    console.log(`💰 Amount: ${contribution.contribution_details.currency} ${contribution.contribution_details.amount}`);
+    console.log(`📈 DIVA boost: +${contribution.diva_score_impact.total_points_earned} points`);
+    console.log(`🎯 New estimated score: ${contribution.diva_score_impact.new_estimated_score}`);
+    
+    // Check if this unlocks any achievements
+    if (contribution.chama_impact.contribution_streak >= 6) {
+      console.log('🏆 Achievement unlocked: 6-month consistency streak!');
+    }
+    
+    return contribution;
+  } catch (error) {
+    console.error('❌ Contribution failed:', error.message);
+    
+    if (error.code === 'INSUFFICIENT_FUNDS') {
+      console.log(`💡 Shortfall: ${error.details.currency} ${error.details.shortfall}`);
+      console.log('Suggestions:', error.suggestions.join(', '));
+    } else if (error.code === 'LATE_FEE_REQUIRED') {
+      console.log('⏰ This contribution is late and requires a fee');
+      // Retry with late_fee_accepted: true
+      return makeRegularContribution(chamaId, amount, paymentDetails);
+    }
+    
+    throw error;
+  }
+}
+
+// Make a catch-up contribution for missed periods
+async function makeCatchUpContribution(chamaId, missedPeriods, paymentDetails) {
+  try {
+    const totalAmount = missedPeriods.length * 1500; // Assuming ZAR 1500 per month
+    
+    const contribution = await awo.chamas.contribute(chamaId, {
+      amount: totalAmount,
+      contribution_type: 'catch_up',
+      payment_method: 'bank_transfer',
+      payment_provider: 'fnb',
+      payment_details: {
+        account_number: paymentDetails.accountNumber,
+        reference: `Catch-up for ${missedPeriods.join(', ')}`
+      },
+      notes: `Catching up on missed contributions: ${missedPeriods.join(', ')}`,
+      late_fee_accepted: true
+    });
+    
+    console.log('✅ Catch-up contribution successful!');
+    console.log(`📅 Periods covered: ${missedPeriods.join(', ')}`);
+    console.log(`💰 Total amount: ${contribution.contribution_details.currency} ${contribution.contribution_details.amount}`);
+    console.log(`📈 DIVA score restored: +${contribution.diva_score_impact.total_points_earned} points`);
+    
+    return contribution;
+  } catch (error) {
+    console.error('❌ Catch-up contribution failed:', error.message);
+    throw error;
+  }
+}
+
+// Set up automatic contributions
+async function enableAutoContributions(chamaId, paymentDetails) {
+  try {
+    const contribution = await awo.chamas.contribute(chamaId, {
+      amount: 1500.00,
+      contribution_type: 'regular',
+      payment_method: 'mobile_money',
+      payment_provider: 'm_pesa',
+      payment_details: paymentDetails,
+      auto_contribute: true, // Enable automatic future contributions
+      notes: 'Setting up automatic monthly contributions'
+    });
+    
+    console.log('✅ Auto-contributions enabled!');
+    console.log(`🔄 Next auto-contribution: ${contribution.next_actions.next_contribution_due}`);
+    
+    return contribution;
+  } catch (error) {
+    console.error('❌ Failed to enable auto-contributions:', error.message);
+    throw error;
+  }
+}
+
+// Make voluntary extra contribution
+async function makeVoluntaryContribution(chamaId, extraAmount, purpose, paymentDetails) {
+  try {
+    const contribution = await awo.chamas.contribute(chamaId, {
+      amount: extraAmount,
+      contribution_type: 'voluntary',
+      payment_method: 'card',
+      payment_provider: 'visa',
+      payment_details: {
+        card_token: paymentDetails.cardToken,
+        cvv: paymentDetails.cvv
+      },
+      notes: `Voluntary contribution for: ${purpose}`,
+      auto_contribute: false
+    });
+    
+    console.log('✅ Voluntary contribution successful!');
+    console.log(`🎁 Extra amount: ${contribution.contribution_details.currency} ${contribution.contribution_details.amount}`);
+    console.log(`📈 Bonus DIVA points: +${contribution.diva_score_impact.total_points_earned}`);
+    console.log(`🤝 Community impact: Strengthened group fund`);
+    
+    return contribution;
+  } catch (error) {
+    console.error('❌ Voluntary contribution failed:', error.message);
+    throw error;
+  }
+}
+
+// Monitor contribution status across multiple Chamas
+async function getContributionSummary(userId) {
+  try {
+    const userChamas = await awo.chamas.getUserChamas(userId);
+    const summary = {
+      totalChamas: userChamas.length,
+      upToDate: 0,
+      overdue: 0,
+      totalContributed: 0,
+      estimatedDivaBoost: 0
+    };
+    
+    for (const chama of userChamas) {
+      const memberInfo = chama.members.find(m => m.id === userId);
+      if (memberInfo) {
+        summary.totalContributed += memberInfo.total_contributed;
+        summary.estimatedDivaBoost += memberInfo.diva_score_improvement || 0;
+        
+        if (memberInfo.contribution_status === 'up_to_date') {
+          summary.upToDate++;
+        } else if (memberInfo.contribution_status === 'late') {
+          summary.overdue++;
+        }
+      }
+    }
+    
+    console.log('📊 Contribution Summary:');
+    console.log(`🏆 Chamas up to date: ${summary.upToDate}/${summary.totalChamas}`);
+    console.log(`⚠️ Overdue contributions: ${summary.overdue}`);
+    console.log(`💰 Total contributed: ZAR ${summary.totalContributed.toLocaleString()}`);
+    console.log(`📈 Total DIVA boost: +${summary.estimatedDivaBoost} points`);
+    
+    return summary;
+  } catch (error) {
+    console.error('❌ Failed to get contribution summary:', error.message);
+    throw error;
+  }
+}
+
+// Example usage
+(async () => {
+  try {
+    // Regular monthly contribution
+    await makeRegularContribution('chama_9xKm2Pv8B4nHfR6qE7tY5wA3', 1500, {
+      phoneNumber: '+27821234567',
+      pin: 'encrypted_pin'
+    });
+    
+    // Check overall contribution status
+    await getContributionSummary('user_4K8n5RmP2vQ9xE6wT7cY1sA8');
+    
+  } catch (error) {
+    console.error('Error in contribution workflow:', error.message);
+  }
+})();
+```
+
+```python Python
+import requests
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+
+class AWOChamaContributions:
+    def __init__(self, api_key: str, base_url: str = "https://api.awo-platform.com/v1"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+    
+    def make_contribution(self, chama_id: str, contribution_data: Dict) -> Dict:
+        """Make a contribution to a Chama"""
+        response = requests.post(
+            f"{self.base_url}/chamas/{chama_id}/contributions",
+            headers=self.headers,
+            json=contribution_data
+        )
+        
+        if response.status_code == 201:
+            return response.json()['data']
+        else:
+            error_data = response.json()
+            raise Exception(f"Contribution failed: {error_data['error']['message']}")
+    
+    def make_regular_contribution(self, chama_id: str, amount: float, 
+                                payment_method: str, payment_details: Dict,
+                                auto_setup: bool = False) -> Dict:
+        """Make a regular monthly contribution"""
+        current_period = datetime.now().strftime('%Y-%m')
+        
+        contribution_data = {
+            'amount': amount,
+            'contribution_type': 'regular',
+            'payment_method': payment_method,
+            'payment_provider': payment_details.get('provider'),
+            'payment_details': payment_details,
+            'contribution_period': current_period,
+            'auto_contribute': auto_setup,
+            'late_fee_accepted': True,
+            'notes': f'Regular contribution for {current_period}'
+        }
+        
+        try:
+            result = self.make_contribution(chama_id, contribution_data)
+            
+            print(f"✅ Regular contribution successful!")
+            print(f"💰 Amount: {result['contribution_details']['currency']} {result['contribution_details']['amount']}")
+            print(f"📈 DIVA boost: +{result['diva_score_impact']['total_points_earned']} points")
+            print(f"🎯 New score: {result['diva_score_impact']['new_estimated_score']}")
+            
+            # Check for achievements
+            if result['chama_impact']['contribution_streak'] >= 6:
+                print("🏆 Achievement: 6-month consistency streak!")
+            
+            return result
+            
+        except Exception as e:
+            print(f"❌ Regular contribution failed: {e}")
+            raise
+    
+    def make_catch_up_contribution(self, chama_id: str, missed_periods: List[str],
+                                 amount_per_period: float, payment_details: Dict) -> Dict:
+        """Make catch-up contribution for missed periods"""
+        total_amount = len(missed_periods) * amount_per_period
+        
+        contribution_data = {
+            'amount': total_amount,
+            'contribution_type': 'catch_up',
+            'payment_method': payment_details.get('method', 'mobile_money'),
+            'payment_provider': payment_details.get('provider'),
+            'payment_details': payment_details,
+            'late_fee_accepted': True,
+            'notes': f'Catch-up for periods: {", ".join(missed_periods)}'
+        }
+        
+        try:
+            result = self.make_contribution(chama_id, contribution_data)
+            
+            print(f"✅ Catch-up contribution successful!")
+            print(f"📅 Periods covered: {', '.join(missed_periods)}")
+            print(f"💰 Total: {result['contribution_details']['currency']} {result['contribution_details']['amount']}")
+            print(f"📈 DIVA restoration: +{result['diva_score_impact']['total_points_earned']} points")
+            
+            return result
+            
+        except Exception as e:
+            print(f"❌ Catch-up contribution failed: {e}")
+            raise
+    
+    def make_voluntary_contribution(self, chama_id: str, amount: float,
+                                  purpose: str, payment_details: Dict) -> Dict:
+        """Make voluntary extra contribution"""
+        contribution_data = {
+            'amount': amount,
+            'contribution_type': 'voluntary',
+            'payment_method': payment_details.get('method'),
+            'payment_provider': payment_details.get('provider'),
+            'payment_details': payment_details,
+            'notes': f'Voluntary contribution: {purpose}',
+            'auto_contribute': False
+        }
+        
+        try:
+            result = self.make_contribution(chama_id, contribution_data)
+            
+            print(f"✅ Voluntary contribution successful!")
+            print(f"🎁 Extra amount: {result['contribution_details']['currency']} {result['contribution_details']['amount']}")
+            print(f"📈 Bonus DIVA: +{result['diva_score_impact']['total_points_earned']} points")
+            print(f"🤝 Community impact: Group fund strengthened")
+            
+            return result
+            
+        except Exception as e:
+            print(f"❌ Voluntary contribution failed: {e}")
+            raise
+    
+    def calculate_contribution_schedule(self, chama_id: str, months_ahead: int = 12) -> List[Dict]:
+        """Calculate upcoming contribution schedule"""
+        # This would typically call the chama details endpoint first
+        # For demo, using example data
+        
+        base_amount = 1500.00  # Example monthly contribution
+        current_date = datetime.now()
+        schedule = []
+        
+        for i in range(months_ahead):
+            due_date = current_date + timedelta(days=30*i + 15)  # 15th of each month
+            period = due_date.strftime('%Y-%m')
+            
+            schedule.append({
+                'period': period,
+                'due_date': due_date.isoformat(),
+                'amount': base_amount,
+                'currency': 'ZAR',
+                'is_overdue': due_date < current_date,
+                'days_until_due': (due_date - current_date).days,
+                'recommended_payment_date': (due_date - timedelta(days=3)).isoformat()
+            })
+        
+        return schedule
+    
+    def get_contribution_analytics(self, chama_id: str, user_id: str) -> Dict:
+        """Get detailed contribution analytics for a user"""
+        # This would call the API to get actual data
+        # For demo, calculating from hypothetical data
+        
+        total_months = 8  # Example: member for 8 months
+        contributions_made = 8
+        total_contributed = contributions_made * 1500.00
+        
+        analytics = {
+            'contribution_summary': {
+                'total_months_member': total_months,
+                'contributions_made': contributions_made,
+                'missed_contributions': total_months - contributions_made,
+                'contribution_rate': (contributions_made / total_months) * 100,
+                'total_contributed': total_contributed,
+                'average_monthly': total_contributed / contributions_made if contributions_made > 0 else 0
+            },
+            'diva_impact': {
+                'total_diva_boost': contributions_made * 8,  # 8 points per contribution
+                'consistency_bonus': 20 if contributions_made >= 6 else 0,
+                'early_payment_bonuses': contributions_made * 2,  # 2 points for early payment
+                'community_participation': 15
+            },
+            'chama_standing': {
+                'rank_in_group': 3,  # Example ranking
+                'total_members': 12,
+                'percentile': 75,
+                'contribution_streak': contributions_made,
+                'reliability_score': 95.5
+            },
+            'financial_growth': {
+                'starting_diva_score': 650,
+                'current_estimated_score': 723,
+                'improvement': 73,
+                'projected_score_12_months': 780
+            }
+        }
+        
+        return analytics
+
+# Example usage
+if __name__ == "__main__":
+    awo_contributions = AWOChamaContributions('your-api-key')
+    
+    try:
+        # Make regular contribution using M-Pesa
+        regular_contribution = awo_contributions.make_regular_contribution(
+            chama_id='chama_9xKm2Pv8B4nHfR6qE7tY5wA3',
+            amount=1500.00,
+            payment_method='mobile_money',
+            payment_details={
+                'provider': 'm_pesa',
+                'phone_number': '+27821234567',
+                'reference': 'Ubuntu-June-2025'
+            },
+            auto_setup=False
+        )
+        
+        # Make catch-up contribution for missed periods
+        catch_up = awo_contributions.make_catch_up_contribution(
+            chama_id='chama_9xKm2Pv8B4nHfR6qE7tY5wA3',
+            missed_periods=['2025-04', '2025-05'],
+            amount_per_period=1500.00,
+            payment_details={
+                'method': 'bank_transfer',
+                'provider': 'fnb',
+                'account_number': '************1234',
+                'reference': 'Catch-up payment'
+            }
+        )
+        
+        # Get contribution schedule
+        schedule = awo_contributions.calculate_contribution_schedule(
+            'chama_9xKm2Pv8B4nHfR6qE7tY5wA3', 
+            months_ahead=6
+        )
+        
+        print("\n📅 Upcoming Contribution Schedule:")
+        for item in schedule[:3]:  # Show next 3 contributions
+            print(f"  {item['period']}: ZAR {item['amount']} (Due: {item['due_date'][:10]})")
+        
+        # Get analytics
+        analytics = awo_contributions.get_contribution_analytics(
+            'chama_9xKm2Pv8B4nHfR6qE7tY5wA3',
+            'user_4K8n5RmP2vQ9xE6wT7cY1sA8'
+        )
+        
+        print(f"\n📊 Contribution Analytics:")
+        print(f"Contribution rate: {analytics['contribution_summary']['contribution_rate']:.1f}%")
+        print(f"Total DIVA boost: +{analytics['diva_impact']['total_diva_boost']} points")
+        print(f"Group ranking: #{analytics['chama_standing']['rank_in_group']} of {analytics['chama_standing']['total_members']}")
+        
+    except Exception as e:
+        print(f"Error: {e}")
+```
+
+```curl cURL
+# Make regular monthly contribution with M-Pesa
+curl -X POST "https://api.awo-platform.com/v1/chamas/chama_9xKm2Pv8B4nHfR6qE7tY5wA3/contributions" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 1500.00,
+    "contribution_type": "regular",
+    "payment_method": "mobile_money",
+    "payment_provider": "m_pesa",
+    "payment_details": {
+      "phone_number": "+27821234567",
+      "reference": "Ubuntu-June-2025",
+      "pin": "encrypted_pin_hash"
+    },
+    "contribution_period": "2025-06",
+    "notes": "June contribution - Ubuntu Women'\''s Group",
+    "auto_contribute": false,
+    "late_fee_accepted": true
+  }'
+
+# Make catch-up contribution for multiple missed periods
+curl -X POST "https://api.awo-platform.com/v1/chamas/chama_9xKm2Pv8B4nHfR6qE7tY5wA3/contributions" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 3000.00,
+    "contribution_type": "catch_up",
+    "payment_method": "bank_transfer",
+    "payment_provider": "fnb",
+    "payment_details": {
+      "account_number": "************1234",
+      "reference": "Catch-up for April and May 2025"
+    },
+    "notes": "Catching up on missed contributions for 2025-04 and 2025-05",
+    "late_fee_accepted": true
+  }'
+
+# Make voluntary contribution to emergency fund
+curl -X POST "https://api.awo-platform.com/v1/chamas/chama_9xKm2Pv8B4nHfR6qE7tY5wA3/contributions" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 500.00,
+    "contribution_type": "emergency_fund",
+    "payment_method": "card",
+    "payment_provider": "visa",
+    "payment_details": {
+      "card_token": "card_tok_1ABcdef234567890",
+      "cvv": "123"
+    },
+    "notes": "Extra contribution to strengthen group emergency fund"
+  }'
+
+# Set up automatic monthly contributions
+curl -X POST "https://api.awo-platform.com/v1/chamas/chama_9xKm2Pv8B4nHfR6qE7tY5wA3/contributions" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 1500.00,
+    "contribution_type": "regular",
+    "payment_method": "mobile_money",
+    "payment_provider": "m_pesa",
+    "payment_details": {
+      "phone_number": "+27821234567",
+      "reference": "Auto-contribution setup"
+    },
+    "auto_contribute": true,
+    "notes": "Setting up automatic monthly contributions"
+  }'
+
+# Extract contribution details using jq
+curl -X POST "https://api.awo-platform.com/v1/chamas/chama_9xKm2Pv8B4nHfR6qE7tY5wA3/contributions" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 1500.00, "contribution_type": "regular", "payment_method": "mobile_money", "payment_provider": "m_pesa", "payment_details": {"phone_number": "+27821234567"}}' | \
+  jq -r '.data | "Contribution: \(.contribution_details.currency) \(.contribution_details.amount), DIVA boost: +\(.diva_score_impact.total_points_earned) points, New score: \(.diva_score_impact.new_estimated_score)"'
+```
+
+```php PHP
+<?php
+
+class AWOChamaContributions {
+    private $apiKey;
+    private $baseUrl;
+    
+    public function __construct($apiKey, $baseUrl = 'https://api.awo-platform.com/v1') {
+        $this->apiKey = $apiKey;
+        $this->baseUrl = $baseUrl;
+    }
+    
+    public function makeContribution($chamaId, $contributionData) {
+        $url = $this->baseUrl . '/chamas/' . $chamaId . '/contributions';
+        
+        $context = stream_context_create([
+            'http' => [
+                'header' => [
+                    'Authorization: Bearer ' . $this->apiKey,
+                    'Content-Type: application/json',
+                    'Accept: application/json'
+                ],
+                'method' => 'POST',
+                'content' => json_encode($contributionData)
+            ]
+        ]);
+        
+        $response = file_get_contents($url, false, $context);
+        
+        if ($response === false) {
+            throw new Exception('Failed to make contribution');
+        }
+        
+        $data = json_decode($response, true);
+        
+        if (!$data['success']) {
+            throw new Exception('Contribution failed: ' . $data['error']['message']);
+        }
+        
+        return $data['data'];
+    }
+    
+    public function makeRegularContribution($chamaId, $amount, $paymentDetails, $autoSetup = false) {
+        $currentPeriod = date('Y-m');
+        
+        $contributionData = [
+            'amount' => $amount,
+            'contribution_type' => 'regular',
+            'payment_method' => $paymentDetails['method'],
+            'payment_provider' => $paymentDetails['provider'],
+            'payment_details' => $paymentDetails['details'],
+            'contribution_period' => $currentPeriod,
+            'auto_contribute' => $autoSetup,
+            'late_fee_accepted' => true,
+            'notes' => "Regular contribution for {$currentPeriod}"
+        ];
+        
+        try {
+            $result = $this->makeContribution($chamaId, $contributionData);
+            
+            echo "✅ Regular contribution successful!\n";
+            echo "💰 Amount: {$result['contribution_details']['currency']} {$result['contribution_details']['amount']}\n";
+            echo "📈 DIVA boost: +{$result['diva_score_impact']['total_points_earned']} points\n";
+            echo "🎯 New score: {$result['diva_score_impact']['new_estimated_score']}\n";
+            
+            if ($result['chama_impact']['contribution_streak'] >= 6) {
+                echo "🏆 Achievement: 6-month consistency streak!\n";
+            }
+            
+            return $result;
+            
+        } catch (Exception $e) {
+            echo "❌ Regular contribution failed: " . $e->getMessage() . "\n";
+            throw $e;
+        }
+    }
+    
+    public function makeCatchUpContribution($chamaId, $missedPeriods, $amountPerPeriod, $paymentDetails) {
+        $totalAmount = count($missedPeriods) * $amountPerPeriod;
+        
+        $contributionData = [
+            'amount' => $totalAmount,
+            'contribution_type' => 'catch_up',
+            'payment_method' => $paymentDetails['method'],
+            'payment_provider' => $paymentDetails['provider'],
+            'payment_details' => $paymentDetails['details'],
+            'late_fee_accepted' => true,
+            'notes' => 'Catch-up for periods: ' . implode(', ', $missedPeriods)
+        ];
+        
+        try {
+            $result = $this->makeContribution($chamaId, $contributionData);
+            
+            echo "✅ Catch-up contribution successful!\n";
+            echo "📅 Periods covered: " . implode(', ', $missedPeriods) . "\n";
+            echo "💰 Total: {$result['contribution_details']['currency']} {$result['contribution_details']['amount']}\n";
+            echo "📈 DIVA restoration: +{$result['diva_score_impact']['total_points_earned']} points\n";
+            
+            return $result;
+            
+        } catch (Exception $e) {
+            echo "❌ Catch-up contribution failed: " . $e->getMessage() . "\n";
+            throw $e;
+        }
+    }
+    
+    public function calculateContributionImpact($userId, $chamaId, $amount, $contributionType = 'regular') {
+        // Calculate estimated DIVA score impact
+        $basePoints = floor($amount / 100); // Base points from amount
+        $typeMultiplier = [
+            'regular' => 1.0,
+            'catch_up' => 0.8,
+            'voluntary' => 1.2,
+            'emergency_fund' => 1.1
+        ];
+        
+        $disciplinePoints = $basePoints * ($typeMultiplier[$contributionType] ?? 1.0);
+        $assetsPoints = floor($amount / 200);
+        $communityPoints = 5; // Base community participation
+        
+        // Consistency bonus (simulated)
+        $consistencyBonus = ($contributionType === 'regular') ? 3 : 0;
+        
+        return [
+            'estimated_diva_boost' => [
+                'discipline_points' => $disciplinePoints,
+                'assets_points' => $assetsPoints,
+                'community_points' => $communityPoints,
+                'consistency_bonus' => $consistencyBonus,
+                'total_points' => $disciplinePoints + $assetsPoints + $communityPoints + $consistencyBonus
+            ],
+            'financial_impact' => [
+                'contribution_amount' => $amount,
+                'estimated_fees' => $amount * 0.025, // 2.5% estimated fees
+                'net_savings_increase' => $amount * 0.975
+            ],
+            'community_impact' => [
+                'group_fund_contribution' => $amount,
+                'member_trust_boost' => $contributionType === 'voluntary' ? 'high' : 'medium',
+                'leadership_points' => $contributionType === 'emergency_fund' ? 5 : 0
+            ]
+        ];
+    }
+    
+    public function getContributionRecommendations($userId, $chamaId) {
+        // Get user's financial profile (simplified for demo)
+        $recommendations = [];
+        
+        // Recommend regular contribution
+        $recommendations[] = [
+            'type' => 'regular_contribution',
+            'priority' => 'high',
+            'title' => 'Make Your Monthly Contribution',
+            'description' => 'Keep your contribution streak alive and boost your DIVA score',
+            'estimated_diva_boost' => 15,
+            'deadline' => date('Y-m-15'), // 15th of current month
+            'amount' => 1500.00,
+            'currency' => 'ZAR'
+        ];
+        
+        // Recommend auto-setup if not enabled
+        $recommendations[] = [
+            'type' => 'auto_setup',
+            'priority' => 'medium',
+            'title' => 'Set Up Automatic Contributions',
+            'description' => 'Never miss a payment and earn consistency bonuses',
+            'estimated_diva_boost' => 20,
+            'benefit' => 'Consistency bonus and peace of mind'
+        ];
+        
+        // Recommend voluntary contribution
+        $recommendations[] = [
+            'type' => 'voluntary_contribution',
+            'priority' => 'low',
+            'title' => 'Make an Extra Contribution',
+            'description' => 'Boost your DIVA score and help strengthen the group fund',
+            'estimated_diva_boost' => 25,
+            'suggested_amount' => 500.00,
+            'impact' => 'High community trust and extra DIVA points'
+        ];
+        
+        return $recommendations;
+    }
+}
+
+// Example usage
+try {
+    $awoContributions = new AWOChamaContributions('your-api-key');
+    
+    // Make regular contribution
+    $regularContribution = $awoContributions->makeRegularContribution(
+        'chama_9xKm2Pv8B4nHfR6qE7tY5wA3',
+        1500.00,
+        [
+            'method' => 'mobile_money',
+            'provider' => 'm_pesa',
+            'details' => [
+                'phone_number' => '+27821234567',
+                'reference' => 'Ubuntu-June-2025'
+            ]
+        ]
+    );
+    
+    // Calculate impact of potential contribution
+    $impact = $awoContributions->calculateContributionImpact(
+        'user_4K8n5RmP2vQ9xE6wT7cY1sA8',
+        'chama_9xKm2Pv8B4nHfR6qE7tY5wA3',
+        1500.00,
+        'regular'
+    );
+    
+    echo "\n📊 Contribution Impact Analysis:\n";
+    echo "DIVA boost: +{$impact['estimated_diva_boost']['total_points']} points\n";
+    echo "Net savings: ZAR " . number_format($impact['financial_impact']['net_savings_increase'], 2) . "\n";
+    echo "Community impact: {$impact['community_impact']['member_trust_boost']}\n";
+    
+    // Get recommendations
+    $recommendations = $awoContributions->getContributionRecommendations(
+        'user_4K8n5RmP2vQ9xE6wT7cY1sA8',
+        'chama_9xKm2Pv8B4nHfR6qE7tY5wA3'
+    );
+    
+    echo "\n💡 Contribution Recommendations:\n";
+    foreach ($recommendations as $rec) {
+        echo "  {$rec['priority']}: {$rec['title']}\n";
+        echo "    {$rec['description']}\n";
+        echo "    Estimated DIVA boost: +{$rec['estimated_diva_boost']} points\n\n";
+    }
+    
+} catch (Exception $e) {
+    echo "Error: " . $e->getMessage() . "\n";
+}
+?>
+```
+
+</CodeGroup>
+
+## Payment Method Availability
+
+<Tabs>
+  <Tab title="South Africa">
+    **Mobile Money**: M-Pesa, MTN MoMo, Vodacom Pay  
+    **Banking**: FNB, Standard Bank, ABSA, Nedbank, Capitec  
+    **Cards**: Visa, Mastercard, American Express  
+    **Digital**: PayPal, Samsung Pay, Google Pay  
+    **Processing Time**: 30 seconds - 5 minutes  
+    **Fees**: 1.5-3.5% depending on method
+  </Tab>
+  <Tab title="Kenya">
+    **Mobile Money**: M-Pesa, Airtel Money, T-Kash  
+    **Banking**: Equity Bank, KCB, Co-operative Bank, NCBA  
+    **Cards**: Visa, Mastercard  
+    **Digital**: PesaLink, iPay  
+    **Processing Time**: 10 seconds - 2 minutes  
+    **Fees**: 1.0-2.5% depending on method
+  </Tab>
+  <Tab title="Zimbabwe">
+    **Mobile Money**: EcoCash, OneMoney, NetOne OneWallet  
+    **Banking**: CBZ, ZB Bank, First Capital Bank  
+    **Cards**: Visa, Mastercard (limited)  
+    **Digital**: ZimSwitch  
+    **Processing Time**: 1-10 minutes  
+    **Fees**: 2.0-4.0% depending on method
+  </Tab>
+</Tabs>
+
+## Contribution Scheduling & Automation
+
+### Auto-Contribution Setup
+
+```javascript
+// Enable automatic contributions
+const autoSetup = await awo.chamas.contribute(chamaId, {
+  amount: 1500.00,
+  contribution_type: 'regular',
+  payment_method: 'mobile_money',
+  payment_provider: 'm_pesa',
+  payment_details: {
+    phone_number: '+27821234567',
+    auto_debit_consent: true
+  },
+  auto_contribute: true,
+  notification_preferences: {
+    sms_reminder: true,
+    email_reminder: true,
+    days_before_due: 3
+  }
+});
+```
+
+### Smart Contribution Reminders
+
+AWO sends intelligent reminders based on:
+- **Payment history patterns**
+- **Account balance trends** 
+- **Optimal payment timing**
+- **DIVA score impact opportunities**
+
+## Regional Compliance & Regulations
+
+<AccordionGroup>
+  <Accordion title="South Africa - SARB & POPIA Compliance">
+    **Regulatory Framework**: South African Reserve Bank (SARB) regulations  
+    **Data Protection**: POPIA (Protection of Personal Information Act)  
+    **Transaction Limits**: R25,000 per day, R100,000 per month  
+    **KYC Requirements**: FICA compliance for amounts above R3,000  
+    **Tax Implications**: Contributions may be subject to tax reporting
+  </Accordion>
+  <Accordion title="Kenya - CBK Guidelines">
+    **Regulatory Framework**: Central Bank of Kenya (CBK) regulations  
+    **Data Protection**: Data Protection Act 2019  
+    **Transaction Limits**: KES 150,000 per day, KES 1,000,000 per month  
+    **KYC Requirements**: Tiered KYC based on transaction amounts  
+    **Mobile Money Integration**: Direct integration with Safaricom M-Pesa
+  </Accordion>
+  <Accordion title="Zimbabwe - RBZ Oversight">
+    **Regulatory Framework**: Reserve Bank of Zimbabwe (RBZ) oversight  
+    **Data Protection**: Cyber Security and Data Protection Act  
+    **Transaction Limits**: USD 1,000 per day, USD 5,000 per month  
+    **KYC Requirements**: Enhanced due diligence for USD transactions  
+    **Economic Considerations**: Multi-currency environment support
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+### For Regular Contributors
+- **Consistency**: Make contributions on the same date each month
+- **Early Payment**: Contribute 2-3 days before the deadline for DIVA bonuses
+- **Auto-Setup**: Enable automatic contributions for convenience and consistency
+- **Communication**: Notify the group if you'll be late with your contribution
+
+### For Developers
+- **Error Handling**: Implement comprehensive error handling for payment failures
+- **User Experience**: Provide clear feedback on contribution status and impact
+- **Security**: Encrypt sensitive payment information
+- **Monitoring**: Track contribution success rates and identify improvement opportunities
+
+### For Chama Administrators
+- **Deadline Management**: Send timely reminders to members
+- **Payment Tracking**: Monitor group contribution compliance
+- **Support**: Help members with payment issues
+- **Transparency**: Share regular financial updates with the group
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Chama Details" href="/api-reference/chamas/details">
+    View Chama information and member status
+  </Card>
+  <Card title="Payment Status" href="/api-reference/payments/status">
+    Track contribution payment progress
+  </Card>
+  <Card title="Member Management" href="/api-reference/chamas/members">
+    Manage Chama membership and roles
+  </Card>
+  <Card title="Contribution History" href="/api-reference/chamas/history">
+    View historical contribution records
+  </Card>
+</CardGroup>
+
+## Testing
+
+### Test Contribution Scenarios
+
+Use these test scenarios in sandbox environment:
+
+| Scenario | Amount | Payment Method | Expected Result |
+|----------|--------|----------------|-----------------|
+| Regular contribution | 1500.00 | m_pesa | Success with DIVA boost |
+| Late contribution | 1500.00 | bank_transfer | Success with late fee |
+| Insufficient funds | 1500.00 | m_pesa | Failure with suggestions |
+| Catch-up payment | 3000.00 | card | Success for multiple periods |
+| Auto-setup | 1500.00 | m_pesa | Success with auto-contribution enabled |
+
+<Warning>
+Test scenarios use realistic amounts and fees but don't process real money. Use sandbox environment for all testing.
+</Warning>
+
+---
+
+**Next Steps**: After making contributions, [track payment status](/api-reference/payments/status), [view updated Chama details](/api-reference/chamas/details), or [monitor your DIVA score improvements](/api-reference/diva-score/get-score).

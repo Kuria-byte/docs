@@ -1,0 +1,1386 @@
+---
+title: "Create Savings Goal"
+description: "Create personalized savings goals with smart recommendations, automatic tracking, and DIVA score integration"
+---
+
+# Create Savings Goal
+
+Create and manage personalized savings goals that align with your financial dreams and priorities. AWO's smart goal-setting system provides culturally relevant recommendations, automatic progress tracking, and DIVA score integration to accelerate your journey to financial independence.
+
+<Info>
+Structured savings goals are proven to increase achievement rates by 42%. AWO's goal-setting system combines traditional African savings wisdom with modern financial planning to maximize your success.
+</Info>
+
+## Authentication
+
+This endpoint requires a valid JWT token with `CREATE_SAVINGS_GOALS` permission.
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+## Request
+
+### Endpoint
+```
+POST /savings/goals
+```
+
+### Request Body
+
+```json
+{
+  "goal_details": {
+    "name": "Emergency Fund",
+    "description": "Building a safety net for unexpected expenses and financial security for my family",
+    "category": "emergency_fund",
+    "target_amount": 25000.00,
+    "currency": "ZAR",
+    "target_date": "2025-12-31T23:59:59Z",
+    "priority": "high"
+  },
+  "savings_strategy": {
+    "monthly_contribution": 2000.00,
+    "contribution_frequency": "monthly",
+    "contribution_day": 15,
+    "automatic_transfer": true,
+    "source_account": "acc_4K8n5RmP2vQ9xE6wT7cY1sA8",
+    "boost_contributions": {
+      "chama_dividends": true,
+      "bonus_income": true,
+      "tax_refunds": true
+    }
+  },
+  "milestone_settings": {
+    "create_milestones": true,
+    "milestone_frequency": "quarterly",
+    "celebration_preferences": {
+      "notifications": true,
+      "social_sharing": false,
+      "reward_system": true
+    }
+  },
+  "smart_features": {
+    "ai_recommendations": true,
+    "spending_analysis": true,
+    "goal_adjustment_alerts": true,
+    "investment_suggestions": false,
+    "inflation_protection": true
+  },
+  "cultural_context": {
+    "traditional_savings_method": "chama_participation",
+    "family_financial_responsibility": "primary_breadwinner",
+    "community_support_level": "high",
+    "financial_education_preference": "practical_examples"
+  },
+  "privacy_settings": {
+    "visibility": "private",
+    "share_with_chama": false,
+    "allow_encouragement": true,
+    "progress_visibility": "milestones_only"
+  }
+}
+```
+
+### Request Parameters
+
+<Tabs>
+  <Tab title="Goal Details">
+    | Parameter | Type | Required | Description |
+    |-----------|------|----------|-------------|
+    | `name` | string | Yes | Goal name (3-100 characters) |
+    | `description` | string | No | Detailed description (max 500 chars) |
+    | `category` | string | Yes | Goal category (see categories below) |
+    | `target_amount` | number | Yes | Target amount (positive decimal) |
+    | `currency` | string | Yes | Currency code (ZAR, KES, USD, etc.) |
+    | `target_date` | string | Yes | Target completion date (ISO 8601) |
+    | `priority` | string | Yes | Priority level: `low`, `medium`, `high`, `critical` |
+  </Tab>
+  <Tab title="Savings Strategy">
+    | Parameter | Type | Required | Description |
+    |-----------|------|----------|-------------|
+    | `monthly_contribution` | number | Yes | Planned monthly savings amount |
+    | `contribution_frequency` | string | No | Frequency: `weekly`, `bi_weekly`, `monthly`, `quarterly` |
+    | `contribution_day` | integer | No | Day of month for contributions (1-31) |
+    | `automatic_transfer` | boolean | No | Enable automatic transfers |
+    | `source_account` | string | No | Source account for automatic transfers |
+    | `boost_contributions` | object | No | Additional contribution sources |
+  </Tab>
+  <Tab title="Smart Features">
+    | Parameter | Type | Required | Description |
+    |-----------|------|----------|-------------|
+    | `ai_recommendations` | boolean | No | Enable AI-powered recommendations |
+    | `spending_analysis` | boolean | No | Analyze spending to find savings opportunities |
+    | `goal_adjustment_alerts` | boolean | No | Alert when goal needs adjustment |
+    | `investment_suggestions` | boolean | No | Suggest investments to accelerate goal |
+    | `inflation_protection` | boolean | No | Adjust goal for inflation |
+  </Tab>
+</Tabs>
+
+### Goal Categories
+
+| Category | Description | Typical Amount Range | Priority Level |
+|----------|-------------|---------------------|----------------|
+| `emergency_fund` | Emergency safety net | 3-6 months expenses | High |
+| `education` | School fees, training, courses | Variable | High |
+| `housing` | Down payment, rent deposit | 10%-20% of property value | High |
+| `business_startup` | Starting a business | ZAR 10,000 - 100,000 | Medium |
+| `family_support` | Supporting family members | Variable | Medium |
+| `healthcare` | Medical expenses, insurance | Variable | High |
+| `vacation_travel` | Holiday and travel expenses | ZAR 5,000 - 50,000 | Low |
+| `wedding` | Wedding expenses | ZAR 20,000 - 200,000 | Medium |
+| `vehicle` | Car purchase, down payment | ZAR 20,000 - 150,000 | Medium |
+| `retirement` | Long-term retirement savings | Monthly contributions | Critical |
+| `technology` | Computers, phones, equipment | ZAR 2,000 - 30,000 | Low |
+| `debt_repayment` | Paying off existing debts | Variable | High |
+
+## Response
+
+### Success Response (201 Created)
+
+```json
+{
+  "success": true,
+  "data": {
+    "goal_id": "goal_3mK9Pv2B8nHfR6qE7tY5wAx",
+    "user_id": "user_4K8n5RmP2vQ9xE6wT7cY1sA8",
+    "goal_details": {
+      "name": "Emergency Fund",
+      "description": "Building a safety net for unexpected expenses and financial security for my family",
+      "category": "emergency_fund",
+      "target_amount": 25000.00,
+      "currency": "ZAR",
+      "target_date": "2025-12-31T23:59:59Z",
+      "priority": "high",
+      "status": "active",
+      "created_date": "2025-06-19T17:15:30Z"
+    },
+    "savings_plan": {
+      "monthly_contribution": 2000.00,
+      "contribution_frequency": "monthly",
+      "contribution_day": 15,
+      "automatic_transfer_enabled": true,
+      "source_account_id": "acc_4K8n5RmP2vQ9xE6wT7cY1sA8",
+      "estimated_completion_date": "2025-12-15T00:00:00Z",
+      "months_to_completion": 12.5,
+      "total_contributions_needed": 25000.00,
+      "contributions_remaining": 25000.00
+    },
+    "progress_tracking": {
+      "current_amount": 0.00,
+      "percentage_complete": 0.0,
+      "contributions_made": 0,
+      "last_contribution_date": null,
+      "next_contribution_due": "2025-07-15T00:00:00Z",
+      "on_track_status": "not_started",
+      "projected_completion_date": "2025-12-15T00:00:00Z"
+    },
+    "milestones": [
+      {
+        "milestone_id": "ms_1",
+        "name": "25% Complete",
+        "target_amount": 6250.00,
+        "target_date": "2025-09-15T00:00:00Z",
+        "status": "pending",
+        "reward_type": "achievement_badge",
+        "description": "First quarter of your emergency fund completed!"
+      },
+      {
+        "milestone_id": "ms_2", 
+        "name": "50% Complete",
+        "target_amount": 12500.00,
+        "target_date": "2025-10-15T00:00:00Z",
+        "status": "pending",
+        "reward_type": "diva_bonus",
+        "description": "Halfway to your emergency fund goal!"
+      },
+      {
+        "milestone_id": "ms_3",
+        "name": "75% Complete", 
+        "target_amount": 18750.00,
+        "target_date": "2025-11-15T00:00:00Z",
+        "status": "pending",
+        "reward_type": "financial_insight",
+        "description": "Almost there! Your financial security is within reach!"
+      }
+    ],
+    "smart_recommendations": {
+      "spending_optimization": [
+        {
+          "category": "dining_out",
+          "current_monthly": 1200.00,
+          "recommended_reduction": 400.00,
+          "potential_monthly_savings": 400.00,
+          "impact": "Reduce dining out by 2 meals per week"
+        },
+        {
+          "category": "entertainment",
+          "current_monthly": 800.00,
+          "recommended_reduction": 200.00,
+          "potential_monthly_savings": 200.00,
+          "impact": "Choose free community events 1-2 times per month"
+        }
+      ],
+      "income_optimization": [
+        {
+          "suggestion": "chama_participation",
+          "description": "Join 1-2 additional Chamas for rotating payouts",
+          "potential_monthly_boost": 300.00,
+          "effort_level": "medium",
+          "diva_score_benefit": 15
+        },
+        {
+          "suggestion": "skills_monetization",
+          "description": "Offer weekend catering services in your community",
+          "potential_monthly_boost": 800.00,
+          "effort_level": "high",
+          "diva_score_benefit": 10
+        }
+      ],
+      "timeline_optimization": {
+        "original_timeline": "12.5 months",
+        "optimized_timeline": "10.5 months",
+        "acceleration_methods": [
+          "Reduce non-essential spending by ZAR 600/month",
+          "Apply Chama payout to goal when received",
+          "Contribute yearly bonus to emergency fund"
+        ]
+      }
+    },
+    "diva_score_impact": {
+      "estimated_monthly_boost": 12,
+      "completion_bonus": 50,
+      "milestone_bonuses": 15,
+      "total_potential_boost": 194,
+      "current_score_estimate": 723,
+      "projected_score_at_completion": 773,
+      "contributing_factors": [
+        "Consistent monthly savings (+8 points/month)",
+        "Emergency fund priority (+4 points/month)",
+        "Automatic contributions (+2 points/month)"
+      ]
+    },
+    "next_actions": [
+      {
+        "action": "setup_automatic_transfer",
+        "description": "Configure automatic monthly transfer of ZAR 2,000",
+        "deadline": "2025-06-25T23:59:59Z",
+        "priority": "high",
+        "estimated_time": "5 minutes"
+      },
+      {
+        "action": "review_spending_analysis",
+        "description": "Review spending recommendations to find additional savings",
+        "deadline": "2025-06-22T23:59:59Z", 
+        "priority": "medium",
+        "estimated_time": "15 minutes"
+      },
+      {
+        "action": "first_contribution",
+        "description": "Make your first contribution to start building momentum",
+        "deadline": "2025-06-20T23:59:59Z",
+        "priority": "high",
+        "estimated_time": "3 minutes"
+      }
+    ],
+    "cultural_insights": {
+      "traditional_wisdom": "In African culture, we say 'Ukuzenzela kwakho' - self-reliance through preparation. Your emergency fund embodies this wisdom.",
+      "community_connection": "Consider sharing your milestone achievements with trusted Chama members for accountability and celebration",
+      "family_impact": "As a primary breadwinner, this emergency fund will provide security for your entire family during unexpected challenges",
+      "cultural_savings_methods": [
+        "Combine this goal with rotating Chama savings for faster accumulation",
+        "Use traditional 'challenge savings' during good months to boost progress",
+        "Apply the principle of 'save first, spend later' from traditional practices"
+      ]
+    },
+    "automation_setup": {
+      "automatic_transfer_configured": false,
+      "transfer_amount": 2000.00,
+      "transfer_frequency": "monthly",
+      "transfer_day": 15,
+      "next_transfer_date": "2025-07-15T08:00:00Z",
+      "backup_payment_method": "mobile_money",
+      "setup_completion_required": true
+    }
+  },
+  "meta": {
+    "timestamp": "2025-06-19T17:15:30Z",
+    "version": "1.0.0",
+    "goal_creation_source": "user_initiated"
+  }
+}
+```
+
+## DIVA Score Impact
+
+<Note>
+Savings goals significantly boost your DIVA score:
+- **Goal Creation**: +10 points immediately for planning ahead
+- **Monthly Contributions**: +8-15 points per month based on consistency
+- **Milestone Achievement**: +5-20 points per milestone reached
+- **Goal Completion**: +30-100 points based on goal size and timeline
+- **Emergency Fund Bonus**: Extra +25 points for completing emergency fund
+- **Multiple Goal Management**: +5 points monthly for managing 2+ active goals
+</Note>
+
+### DIVA Score Calculation for Goals
+
+```javascript
+// DIVA score boost formula for savings goals
+const calculateGoalDivaBoost = (goal) => {
+  const basePoints = {
+    creation: 10,
+    monthlyContribution: Math.min(15, goal.monthlyContribution / 500),
+    priorityMultiplier: {
+      low: 0.8,
+      medium: 1.0,
+      high: 1.2,
+      critical: 1.5
+    },
+    categoryBonus: {
+      emergency_fund: 5,
+      education: 4,
+      housing: 4,
+      retirement: 6,
+      healthcare: 3,
+      business_startup: 3
+    }
+  };
+  
+  const monthlyBoost = basePoints.monthlyContribution * 
+                      basePoints.priorityMultiplier[goal.priority] +
+                      (basePoints.categoryBonus[goal.category] || 0);
+  
+  return {
+    creation: basePoints.creation,
+    monthly: monthlyBoost,
+    milestoneAverage: monthlyBoost * 0.5,
+    completionBonus: goal.targetAmount / 1000 * 2 // 2 points per 1000 currency units
+  };
+};
+```
+
+## Cultural Context
+
+Savings goals in African culture represent more than personal financial planning - they embody the principle of **"Ikusasa Lethu"** (Our Future) where individual financial stability strengthens the entire community.
+
+### Traditional African Savings Wisdom Integrated:
+
+- **"Save in Good Times for Bad Times"**: Emergency funds reflect traditional wisdom about preparing for uncertainty
+- **Community Accountability**: Sharing goals with trusted community members increases success rates
+- **Celebration of Milestones**: African cultures celebrate progress, not just completion
+- **Family-First Approach**: Goals often consider extended family needs and responsibilities
+- **Incremental Progress**: "Little by little makes a bundle" - consistent small contributions build wealth
+
+## Error Handling
+
+### Error Response Format
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_TARGET_DATE",
+    "message": "Target date must be at least 30 days in the future",
+    "details": {
+      "provided_date": "2025-06-25T23:59:59Z",
+      "minimum_date": "2025-07-19T17:15:30Z",
+      "days_difference": -24
+    },
+    "suggestions": [
+      "Set target date to at least July 19, 2025",
+      "Consider a more realistic timeline for your goal",
+      "Use our timeline recommendation tool"
+    ]
+  },
+  "meta": {
+    "timestamp": "2025-06-19T17:15:30Z",
+    "version": "1.0.0",
+    "request_id": "req_7H9mK3pL8vN2xR5qF6tE4wA1"
+  }
+}
+```
+
+### Common Error Codes
+
+| Code | Status | Description | Solution |
+|------|--------|-------------|----------|
+| `INVALID_TARGET_AMOUNT` | 400 | Target amount below minimum or above maximum | Use amount between ZAR 100 and ZAR 10,000,000 |
+| `INVALID_TARGET_DATE` | 400 | Target date in past or too far in future | Set date between 30 days and 50 years from now |
+| `INSUFFICIENT_MONTHLY_CONTRIBUTION` | 400 | Monthly contribution too low to reach goal | Increase contribution amount or extend timeline |
+| `EXCESSIVE_MONTHLY_CONTRIBUTION` | 400 | Monthly contribution exceeds 80% of income | Reduce contribution or verify income information |
+| `GOAL_LIMIT_EXCEEDED` | 400 | User has reached maximum number of active goals | Complete or archive existing goals first |
+| `INVALID_CATEGORY` | 400 | Goal category not recognized | Use valid category from supported list |
+| `DUPLICATE_GOAL_NAME` | 409 | Goal name already exists for user | Choose different name or update existing goal |
+| `ACCOUNT_NOT_FOUND` | 404 | Source account for automatic transfers not found | Link valid bank account or use different payment method |
+| `INSUFFICIENT_PERMISSIONS` | 403 | User lacks permission to create savings goals | Complete KYC verification or account setup |
+
+## Code Examples
+
+<CodeGroup>
+
+```javascript JavaScript/TypeScript
+import { AWOClient } from '@awo-platform/js-sdk';
+
+const awo = new AWOClient({
+  apiKey: process.env.AWO_API_KEY,
+  environment: 'production'
+});
+
+// Create emergency fund goal
+async function createEmergencyFund(targetAmount, monthlyContribution, targetDate) {
+  try {
+    const goal = await awo.savings.createGoal({
+      goal_details: {
+        name: "Emergency Fund",
+        description: "Building financial security for my family - preparing for unexpected expenses and ensuring peace of mind",
+        category: "emergency_fund",
+        target_amount: targetAmount,
+        currency: "ZAR",
+        target_date: targetDate,
+        priority: "high"
+      },
+      savings_strategy: {
+        monthly_contribution: monthlyContribution,
+        contribution_frequency: "monthly",
+        contribution_day: 15,
+        automatic_transfer: true,
+        boost_contributions: {
+          chama_dividends: true,
+          bonus_income: true,
+          tax_refunds: true
+        }
+      },
+      milestone_settings: {
+        create_milestones: true,
+        milestone_frequency: "quarterly",
+        celebration_preferences: {
+          notifications: true,
+          social_sharing: false,
+          reward_system: true
+        }
+      },
+      smart_features: {
+        ai_recommendations: true,
+        spending_analysis: true,
+        goal_adjustment_alerts: true,
+        inflation_protection: true
+      },
+      cultural_context: {
+        traditional_savings_method: "chama_participation",
+        family_financial_responsibility: "primary_breadwinner",
+        community_support_level: "high"
+      }
+    });
+    
+    console.log('✅ Emergency fund goal created successfully!');
+    console.log(`🎯 Goal ID: ${goal.goal_id}`);
+    console.log(`💰 Target: ${goal.goal_details.currency} ${goal.goal_details.target_amount.toLocaleString()}`);
+    console.log(`📅 Timeline: ${goal.savings_plan.months_to_completion} months`);
+    console.log(`📈 Estimated DIVA boost: +${goal.diva_score_impact.total_potential_boost} points`);
+    
+    // Display smart recommendations
+    if (goal.smart_recommendations.spending_optimization.length > 0) {
+      console.log('\n💡 Spending Optimization Suggestions:');
+      goal.smart_recommendations.spending_optimization.forEach((rec, index) => {
+        console.log(`${index + 1}. ${rec.category}: Save ZAR ${rec.potential_monthly_savings}/month`);
+        console.log(`   ${rec.impact}`);
+      });
+    }
+    
+    // Show next actions
+    console.log('\n📋 Next Steps:');
+    goal.next_actions.forEach((action, index) => {
+      console.log(`${index + 1}. ${action.action}: ${action.description}`);
+      console.log(`   Deadline: ${new Date(action.deadline).toLocaleDateString()}`);
+    });
+    
+    return goal;
+  } catch (error) {
+    console.error('❌ Failed to create emergency fund:', error.message);
+    
+    if (error.code === 'INSUFFICIENT_MONTHLY_CONTRIBUTION') {
+      console.log('💡 Consider reducing the target amount or extending the timeline');
+    } else if (error.code === 'GOAL_LIMIT_EXCEEDED') {
+      console.log('💡 Complete or archive some existing goals to make room for new ones');
+    }
+    
+    throw error;
+  }
+}
+
+// Create education goal with flexible timeline
+async function createEducationGoal(courseName, targetAmount, preferredTimeline) {
+  try {
+    const targetDate = new Date();
+    targetDate.setMonth(targetDate.getMonth() + preferredTimeline);
+    
+    const monthlyContribution = Math.ceil(targetAmount / preferredTimeline);
+    
+    const goal = await awo.savings.createGoal({
+      goal_details: {
+        name: `Education: ${courseName}`,
+        description: `Investing in my education and skills development through ${courseName}. This investment will improve my earning potential and career prospects.`,
+        category: "education",
+        target_amount: targetAmount,
+        currency: "ZAR",
+        target_date: targetDate.toISOString(),
+        priority: "high"
+      },
+      savings_strategy: {
+        monthly_contribution: monthlyContribution,
+        contribution_frequency: "monthly",
+        contribution_day: 5, // Early in month for education planning
+        automatic_transfer: true,
+        boost_contributions: {
+          chama_dividends: false, // Keep Chama funds separate for education
+          bonus_income: true,
+          tax_refunds: true
+        }
+      },
+      milestone_settings: {
+        create_milestones: true,
+        milestone_frequency: "monthly", // More frequent milestones for education
+        celebration_preferences: {
+          notifications: true,
+          social_sharing: true, // Share education achievements
+          reward_system: true
+        }
+      },
+      smart_features: {
+        ai_recommendations: true,
+        spending_analysis: true,
+        goal_adjustment_alerts: true,
+        investment_suggestions: false // Focus on saving, not investing for education
+      },
+      cultural_context: {
+        traditional_savings_method: "education_fund",
+        family_financial_responsibility: "investing_in_future",
+        community_support_level: "medium"
+      }
+    });
+    
+    console.log('📚 Education goal created successfully!');
+    console.log(`🎓 Course: ${courseName}`);
+    console.log(`💰 Total cost: ${goal.goal_details.currency} ${goal.goal_details.target_amount.toLocaleString()}`);
+    console.log(`📅 Timeline: ${preferredTimeline} months`);
+    console.log(`💳 Monthly savings: ${goal.goal_details.currency} ${monthlyContribution.toLocaleString()}`);
+    
+    return goal;
+  } catch (error) {
+    console.error('❌ Failed to create education goal:', error.message);
+    throw error;
+  }
+}
+
+// Create business startup goal with community focus
+async function createBusinessGoal(businessIdea, targetAmount, includeChama = true) {
+  try {
+    const targetDate = new Date();
+    targetDate.setMonth(targetDate.getMonth() + 18); // 18 months for business preparation
+    
+    const goal = await awo.savings.createGoal({
+      goal_details: {
+        name: `Business: ${businessIdea}`,
+        description: `Starting my own business in ${businessIdea}. This goal represents my journey toward financial independence and community empowerment.`,
+        category: "business_startup",
+        target_amount: targetAmount,
+        currency: "ZAR",
+        target_date: targetDate.toISOString(),
+        priority: "medium"
+      },
+      savings_strategy: {
+        monthly_contribution: Math.ceil(targetAmount / 18),
+        contribution_frequency: "monthly",
+        contribution_day: 20,
+        automatic_transfer: true,
+        boost_contributions: {
+          chama_dividends: includeChama,
+          bonus_income: true,
+          tax_refunds: true
+        }
+      },
+      milestone_settings: {
+        create_milestones: true,
+        milestone_frequency: "quarterly",
+        celebration_preferences: {
+          notifications: true,
+          social_sharing: true, // Share business milestones for community support
+          reward_system: true
+        }
+      },
+      smart_features: {
+        ai_recommendations: true,
+        spending_analysis: true,
+        goal_adjustment_alerts: true,
+        investment_suggestions: true // Consider investments for business goals
+      },
+      cultural_context: {
+        traditional_savings_method: "business_chama",
+        family_financial_responsibility: "entrepreneur",
+        community_support_level: "high"
+      },
+      privacy_settings: {
+        visibility: "community", // Share with trusted community for accountability
+        share_with_chama: includeChama,
+        allow_encouragement: true,
+        progress_visibility: "milestones_only"
+      }
+    });
+    
+    console.log('🚀 Business goal created successfully!');
+    console.log(`💼 Business: ${businessIdea}`);
+    console.log(`💰 Startup capital: ${goal.goal_details.currency} ${goal.goal_details.target_amount.toLocaleString()}`);
+    console.log(`📅 Launch timeline: 18 months`);
+    console.log(`🤝 Community support: ${includeChama ? 'Enabled' : 'Personal only'}`);
+    
+    return goal;
+  } catch (error) {
+    console.error('❌ Failed to create business goal:', error.message);
+    throw error;
+  }
+}
+
+// Smart goal recommendation based on user profile
+async function getSmartGoalRecommendations(userId) {
+  try {
+    // This would typically call a separate recommendations endpoint
+    // For demo, we'll create example recommendations
+    
+    const userProfile = await awo.users.getProfile(userId);
+    const divaScore = await awo.divaScore.get(userId);
+    const chamas = await awo.chamas.getUserChamas(userId);
+    
+    const recommendations = [];
+    
+    // Emergency fund recommendation (priority for everyone)
+    if (!userProfile.hasEmergencyFund) {
+      const monthlyIncome = userProfile.estimatedMonthlyIncome || 15000;
+      const emergencyFundTarget = monthlyIncome * 3; // 3 months of expenses
+      
+      recommendations.push({
+        category: 'emergency_fund',
+        name: 'Emergency Fund',
+        description: 'Build a financial safety net for unexpected expenses',
+        target_amount: emergencyFundTarget,
+        monthly_contribution: emergencyFundTarget / 12,
+        priority: 'critical',
+        reasoning: 'Emergency funds provide financial security and peace of mind',
+        diva_impact: 85,
+        cultural_relevance: 'Aligns with African wisdom of preparing for difficult times'
+      });
+    }
+    
+    // Education recommendation based on DIVA score
+    if (divaScore.overallScore < 700) {
+      recommendations.push({
+        category: 'education',
+        name: 'Skills Development Course',
+        description: 'Invest in education to improve earning potential',
+        target_amount: 8000,
+        monthly_contribution: 800,
+        priority: 'high',
+        reasoning: 'Education investments typically provide 15-25% returns through increased income',
+        diva_impact: 45,
+        cultural_relevance: 'Education empowers individuals and uplifts entire communities'
+      });
+    }
+    
+    // Business goal if user is active in multiple Chamas
+    if (chamas.length >= 2) {
+      recommendations.push({
+        category: 'business_startup',
+        name: 'Small Business Venture',
+        description: 'Start a community-focused business',
+        target_amount: 25000,
+        monthly_contribution: 1500,
+        priority: 'medium',
+        reasoning: 'Your Chama experience shows community trust - perfect for business',
+        diva_impact: 60,
+        cultural_relevance: 'African entrepreneurship strengthens local economies'
+      });
+    }
+    
+    console.log('🎯 Smart Goal Recommendations:');
+    recommendations.forEach((rec, index) => {
+      console.log(`\n${index + 1}. ${rec.name} (${rec.priority} priority)`);
+      console.log(`   Target: ZAR ${rec.target_amount.toLocaleString()}`);
+      console.log(`   Monthly: ZAR ${rec.monthly_contribution.toLocaleString()}`);
+      console.log(`   DIVA Impact: +${rec.diva_impact} points`);
+      console.log(`   Why: ${rec.reasoning}`);
+      console.log(`   Cultural Note: ${rec.cultural_relevance}`);
+    });
+    
+    return recommendations;
+  } catch (error) {
+    console.error('❌ Failed to get goal recommendations:', error.message);
+    throw error;
+  }
+}
+
+// Example usage
+(async () => {
+  try {
+    // Create emergency fund
+    const emergencyFund = await createEmergencyFund(25000, 2000, '2025-12-31T23:59:59Z');
+    
+    // Create education goal
+    const educationGoal = await createEducationGoal('Digital Marketing Certificate', 12000, 8);
+    
+    // Get smart recommendations
+    const recommendations = await getSmartGoalRecommendations('user_4K8n5RmP2vQ9xE6wT7cY1sA8');
+    
+    console.log('\n🎉 Goals created successfully! Start building your financial future today!');
+  } catch (error) {
+    console.error('Goal creation failed:', error.message);
+  }
+})();
+```
+
+```python Python
+import requests
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+
+class AWOSavingsGoals:
+    def __init__(self, api_key: str, base_url: str = "https://api.awo-platform.com/v1"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+    
+    def create_goal(self, goal_data: Dict) -> Dict:
+        """Create a new savings goal"""
+        response = requests.post(
+            f"{self.base_url}/savings/goals",
+            headers=self.headers,
+            json=goal_data
+        )
+        
+        if response.status_code == 201:
+            return response.json()['data']
+        else:
+            error_data = response.json()
+            raise Exception(f"Failed to create goal: {error_data['error']['message']}")
+    
+    def create_emergency_fund(self, target_amount: float, monthly_contribution: float,
+                            months_to_complete: int = 12) -> Dict:
+        """Create emergency fund goal with smart defaults"""
+        target_date = datetime.now() + timedelta(days=months_to_complete * 30)
+        
+        goal_data = {
+            'goal_details': {
+                'name': 'Emergency Fund',
+                'description': 'Building financial security for unexpected expenses and peace of mind for my family',
+                'category': 'emergency_fund',
+                'target_amount': target_amount,
+                'currency': 'ZAR',
+                'target_date': target_date.isoformat(),
+                'priority': 'high'
+            },
+            'savings_strategy': {
+                'monthly_contribution': monthly_contribution,
+                'contribution_frequency': 'monthly',
+                'contribution_day': 15,
+                'automatic_transfer': True,
+                'boost_contributions': {
+                    'chama_dividends': True,
+                    'bonus_income': True,
+                    'tax_refunds': True
+                }
+            },
+            'milestone_settings': {
+                'create_milestones': True,
+                'milestone_frequency': 'quarterly',
+                'celebration_preferences': {
+                    'notifications': True,
+                    'social_sharing': False,
+                    'reward_system': True
+                }
+            },
+            'smart_features': {
+                'ai_recommendations': True,
+                'spending_analysis': True,
+                'goal_adjustment_alerts': True,
+                'inflation_protection': True
+            },
+            'cultural_context': {
+                'traditional_savings_method': 'chama_participation',
+                'family_financial_responsibility': 'primary_breadwinner',
+                'community_support_level': 'high'
+            }
+        }
+        
+        try:
+            goal = self.create_goal(goal_data)
+            
+            print("✅ Emergency fund goal created successfully!")
+            print(f"🎯 Target: {goal['goal_details']['currency']} {goal['goal_details']['target_amount']:,.2f}")
+            print(f"📅 Timeline: {goal['savings_plan']['months_to_completion']} months")
+            print(f"💳 Monthly: {goal['goal_details']['currency']} {goal['savings_plan']['monthly_contribution']:,.2f}")
+            print(f"📈 DIVA boost: +{goal['diva_score_impact']['total_potential_boost']} points")
+            
+            return goal
+            
+        except Exception as e:
+            print(f"❌ Failed to create emergency fund: {e}")
+            raise
+    
+    def create_education_goal(self, course_name: str, target_amount: float,
+                            timeline_months: int = 10) -> Dict:
+        """Create education savings goal"""
+        target_date = datetime.now() + timedelta(days=timeline_months * 30)
+        monthly_contribution = target_amount / timeline_months
+        
+        goal_data = {
+            'goal_details': {
+                'name': f'Education: {course_name}',
+                'description': f'Investing in my education through {course_name} to improve my skills and earning potential',
+                'category': 'education',
+                'target_amount': target_amount,
+                'currency': 'ZAR',
+                'target_date': target_date.isoformat(),
+                'priority': 'high'
+            },
+            'savings_strategy': {
+                'monthly_contribution': monthly_contribution,
+                'contribution_frequency': 'monthly',
+                'contribution_day': 5,
+                'automatic_transfer': True,
+                'boost_contributions': {
+                    'chama_dividends': False,  # Keep separate for education
+                    'bonus_income': True,
+                    'tax_refunds': True
+                }
+            },
+            'milestone_settings': {
+                'create_milestones': True,
+                'milestone_frequency': 'monthly',
+                'celebration_preferences': {
+                    'notifications': True,
+                    'social_sharing': True,  # Share education achievements
+                    'reward_system': True
+                }
+            },
+            'smart_features': {
+                'ai_recommendations': True,
+                'spending_analysis': True,
+                'goal_adjustment_alerts': True,
+                'investment_suggestions': False  # Focus on saving for education
+            },
+            'cultural_context': {
+                'traditional_savings_method': 'education_fund',
+                'family_financial_responsibility': 'investing_in_future',
+                'community_support_level': 'medium'
+            }
+        }
+        
+        try:
+            goal = self.create_goal(goal_data)
+            
+            print("📚 Education goal created successfully!")
+            print(f"🎓 Course: {course_name}")
+            print(f"💰 Total cost: {goal['goal_details']['currency']} {goal['goal_details']['target_amount']:,.2f}")
+            print(f"📅 Timeline: {timeline_months} months")
+            print(f"💳 Monthly: {goal['goal_details']['currency']} {monthly_contribution:,.2f}")
+            
+            return goal
+            
+        except Exception as e:
+            print(f"❌ Failed to create education goal: {e}")
+            raise
+    
+    def create_business_goal(self, business_name: str, target_amount: float,
+                           timeline_months: int = 18, include_chama: bool = True) -> Dict:
+        """Create business startup savings goal"""
+        target_date = datetime.now() + timedelta(days=timeline_months * 30)
+        monthly_contribution = target_amount / timeline_months
+        
+        goal_data = {
+            'goal_details': {
+                'name': f'Business: {business_name}',
+                'description': f'Building startup capital for {business_name} - my path to financial independence and community empowerment',
+                'category': 'business_startup',
+                'target_amount': target_amount,
+                'currency': 'ZAR',
+                'target_date': target_date.isoformat(),
+                'priority': 'medium'
+            },
+            'savings_strategy': {
+                'monthly_contribution': monthly_contribution,
+                'contribution_frequency': 'monthly',
+                'contribution_day': 20,
+                'automatic_transfer': True,
+                'boost_contributions': {
+                    'chama_dividends': include_chama,
+                    'bonus_income': True,
+                    'tax_refunds': True
+                }
+            },
+            'milestone_settings': {
+                'create_milestones': True,
+                'milestone_frequency': 'quarterly',
+                'celebration_preferences': {
+                    'notifications': True,
+                    'social_sharing': True,
+                    'reward_system': True
+                }
+            },
+            'smart_features': {
+                'ai_recommendations': True,
+                'spending_analysis': True,
+                'goal_adjustment_alerts': True,
+                'investment_suggestions': True
+            },
+            'cultural_context': {
+                'traditional_savings_method': 'business_chama',
+                'family_financial_responsibility': 'entrepreneur',
+                'community_support_level': 'high'
+            },
+            'privacy_settings': {
+                'visibility': 'community',
+                'share_with_chama': include_chama,
+                'allow_encouragement': True,
+                'progress_visibility': 'milestones_only'
+            }
+        }
+        
+        try:
+            goal = self.create_goal(goal_data)
+            
+            print("🚀 Business goal created successfully!")
+            print(f"💼 Business: {business_name}")
+            print(f"💰 Startup capital: {goal['goal_details']['currency']} {goal['goal_details']['target_amount']:,.2f}")
+            print(f"📅 Timeline: {timeline_months} months")
+            print(f"🤝 Chama integration: {'Enabled' if include_chama else 'Disabled'}")
+            
+            return goal
+            
+        except Exception as e:
+            print(f"❌ Failed to create business goal: {e}")
+            raise
+    
+    def calculate_optimal_timeline(self, target_amount: float, 
+                                 available_monthly: float, max_months: int = 60) -> Dict:
+        """Calculate optimal timeline for a savings goal"""
+        if available_monthly <= 0:
+            raise ValueError("Monthly contribution must be positive")
+        
+        basic_months = target_amount / available_monthly
+        
+        # Add buffer for realistic planning
+        realistic_months = min(basic_months * 1.1, max_months)
+        
+        # Calculate with different contribution scenarios
+        scenarios = {
+            'conservative': {
+                'monthly': available_monthly * 0.8,
+                'months': target_amount / (available_monthly * 0.8)
+            },
+            'moderate': {
+                'monthly': available_monthly,
+                'months': basic_months
+            },
+            'aggressive': {
+                'monthly': available_monthly * 1.2,
+                'months': target_amount / (available_monthly * 1.2)
+            }
+        }
+        
+        return {
+            'target_amount': target_amount,
+            'scenarios': scenarios,
+            'recommended_scenario': 'moderate',
+            'recommended_months': int(realistic_months),
+            'recommended_monthly': target_amount / realistic_months,
+            'tips': [
+                f"Start with the moderate scenario: ZAR {available_monthly:,.2f}/month",
+                f"Complete in {int(realistic_months)} months",
+                "Consider boosting contributions during good months",
+                "Use Chama payouts to accelerate progress"
+            ]
+        }
+    
+    def generate_goal_recommendations(self, monthly_income: float, 
+                                    existing_goals: int = 0, 
+                                    has_emergency_fund: bool = False) -> List[Dict]:
+        """Generate personalized goal recommendations"""
+        recommendations = []
+        
+        # Emergency fund (highest priority)
+        if not has_emergency_fund:
+            emergency_target = monthly_income * 3  # 3 months of income
+            recommendations.append({
+                'category': 'emergency_fund',
+                'name': 'Emergency Fund',
+                'target_amount': emergency_target,
+                'monthly_contribution': emergency_target / 12,
+                'priority': 'critical',
+                'reasoning': 'Essential for financial security - should be your first goal',
+                'diva_impact': 85,
+                'timeline_months': 12,
+                'cultural_note': 'Embodies African wisdom of preparing for uncertainty'
+            })
+        
+        # Education goal
+        if monthly_income < 20000:  # Focus on skills development for lower income
+            recommendations.append({
+                'category': 'education',
+                'name': 'Skills Development',
+                'target_amount': 8000,
+                'monthly_contribution': 800,
+                'priority': 'high',
+                'reasoning': 'Education typically provides 15-25% return through increased income',
+                'diva_impact': 45,
+                'timeline_months': 10,
+                'cultural_note': 'Investment in education uplifts entire community'
+            })
+        
+        # Housing goal
+        if monthly_income > 15000:
+            house_deposit = 150000  # Typical house deposit
+            recommendations.append({
+                'category': 'housing',
+                'name': 'House Deposit',
+                'target_amount': house_deposit,
+                'monthly_contribution': min(monthly_income * 0.3, house_deposit / 36),
+                'priority': 'medium',
+                'reasoning': 'Homeownership builds long-term wealth and family stability',
+                'diva_impact': 65,
+                'timeline_months': 36,
+                'cultural_note': 'Owning land provides security for future generations'
+            })
+        
+        # Business goal for entrepreneurs
+        if existing_goals < 2:  # Don't overwhelm with too many goals
+            recommendations.append({
+                'category': 'business_startup',
+                'name': 'Small Business',
+                'target_amount': 25000,
+                'monthly_contribution': min(monthly_income * 0.15, 1500),
+                'priority': 'low',
+                'reasoning': 'Entrepreneurship provides income diversification and community value',
+                'diva_impact': 55,
+                'timeline_months': 18,
+                'cultural_note': 'African entrepreneurship strengthens local economies'
+            })
+        
+        return sorted(recommendations, key=lambda x: {
+            'critical': 4, 'high': 3, 'medium': 2, 'low': 1
+        }[x['priority']], reverse=True)
+
+# Example usage
+if __name__ == "__main__":
+    awo_goals = AWOSavingsGoals('your-api-key')
+    
+    try:
+        # Create emergency fund
+        emergency_fund = awo_goals.create_emergency_fund(
+            target_amount=25000,
+            monthly_contribution=2000,
+            months_to_complete=13
+        )
+        
+        # Create education goal
+        education_goal = awo_goals.create_education_goal(
+            course_name='Digital Marketing Certificate',
+            target_amount=12000,
+            timeline_months=8
+        )
+        
+        # Calculate optimal timeline for a house deposit
+        house_timeline = awo_goals.calculate_optimal_timeline(
+            target_amount=150000,
+            available_monthly=3000,
+            max_months=60
+        )
+        
+        print(f"\n🏠 House Deposit Timeline:")
+        print(f"Recommended: {house_timeline['recommended_months']} months")
+        print(f"Monthly: ZAR {house_timeline['recommended_monthly']:,.2f}")
+        
+        # Get recommendations
+        recommendations = awo_goals.generate_goal_recommendations(
+            monthly_income=18000,
+            existing_goals=2,
+            has_emergency_fund=True
+        )
+        
+        print(f"\n💡 Additional Goal Recommendations:")
+        for i, rec in enumerate(recommendations[:3], 1):
+            print(f"{i}. {rec['name']} ({rec['priority']} priority)")
+            print(f"   Target: ZAR {rec['target_amount']:,.2f} over {rec['timeline_months']} months")
+            print(f"   DIVA Impact: +{rec['diva_impact']} points")
+            print(f"   {rec['reasoning']}")
+            print()
+        
+    except Exception as e:
+        print(f"Error: {e}")
+```
+
+```curl cURL
+# Create emergency fund goal
+curl -X POST "https://api.awo-platform.com/v1/savings/goals" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "goal_details": {
+      "name": "Emergency Fund",
+      "description": "Building financial security for unexpected expenses",
+      "category": "emergency_fund",
+      "target_amount": 25000.00,
+      "currency": "ZAR",
+      "target_date": "2025-12-31T23:59:59Z",
+      "priority": "high"
+    },
+    "savings_strategy": {
+      "monthly_contribution": 2000.00,
+      "contribution_frequency": "monthly",
+      "contribution_day": 15,
+      "automatic_transfer": true,
+      "boost_contributions": {
+        "chama_dividends": true,
+        "bonus_income": true,
+        "tax_refunds": true
+      }
+    },
+    "milestone_settings": {
+      "create_milestones": true,
+      "milestone_frequency": "quarterly"
+    },
+    "smart_features": {
+      "ai_recommendations": true,
+      "spending_analysis": true,
+      "goal_adjustment_alerts": true,
+      "inflation_protection": true
+    }
+  }'
+
+# Create education goal
+curl -X POST "https://api.awo-platform.com/v1/savings/goals" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "goal_details": {
+      "name": "Digital Marketing Course",
+      "description": "Investing in my education to improve career prospects",
+      "category": "education",
+      "target_amount": 12000.00,
+      "currency": "ZAR", 
+      "target_date": "2025-12-01T23:59:59Z",
+      "priority": "high"
+    },
+    "savings_strategy": {
+      "monthly_contribution": 1500.00,
+      "contribution_frequency": "monthly",
+      "automatic_transfer": true
+    },
+    "cultural_context": {
+      "traditional_savings_method": "education_fund",
+      "family_financial_responsibility": "investing_in_future"
+    }
+  }'
+
+# Create business startup goal
+curl -X POST "https://api.awo-platform.com/v1/savings/goals" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "goal_details": {
+      "name": "Catering Business Startup",
+      "description": "Building capital to start my community catering business",
+      "category": "business_startup",
+      "target_amount": 35000.00,
+      "currency": "ZAR",
+      "target_date": "2026-06-01T23:59:59Z",
+      "priority": "medium"
+    },
+    "savings_strategy": {
+      "monthly_contribution": 1800.00,
+      "contribution_frequency": "monthly",
+      "boost_contributions": {
+        "chama_dividends": true,
+        "bonus_income": true
+      }
+    },
+    "privacy_settings": {
+      "visibility": "community",
+      "share_with_chama": true,
+      "allow_encouragement": true
+    }
+  }'
+
+# Extract goal summary using jq
+curl -X POST "https://api.awo-platform.com/v1/savings/goals" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"goal_details": {"name": "Emergency Fund", "category": "emergency_fund", "target_amount": 25000.00, "currency": "ZAR", "target_date": "2025-12-31T23:59:59Z", "priority": "high"}, "savings_strategy": {"monthly_contribution": 2000.00}}' | \
+  jq -r '.data | "Goal: \(.goal_details.name), Target: \(.goal_details.currency) \(.goal_details.target_amount), Timeline: \(.savings_plan.months_to_completion) months, DIVA boost: +\(.diva_score_impact.total_potential_boost) points"'
+```
+
+</CodeGroup>
+
+## Goal Categories & Templates
+
+### Popular Goal Templates
+
+<Tabs>
+  <Tab title="Emergency Fund">
+    **Recommended Amount**: 3-6 months of expenses  
+    **Timeline**: 12-18 months  
+    **Priority**: Critical  
+    **DIVA Impact**: +85 points total  
+    **Cultural Note**: Embodies "Ukuzenzela kwakho" (self-reliance)
+    
+    ```json
+    {
+      "category": "emergency_fund",
+      "target_multiplier": 3.5,
+      "base_unit": "monthly_expenses",
+      "recommended_timeline_months": 12,
+      "priority": "critical"
+    }
+    ```
+  </Tab>
+  <Tab title="Education Investment">
+    **Recommended Amount**: Based on course/program cost  
+    **Timeline**: 6-24 months  
+    **Priority**: High  
+    **DIVA Impact**: +45-60 points total  
+    **Cultural Note**: Education uplifts entire community
+    
+    ```json
+    {
+      "category": "education",
+      "typical_range": [5000, 50000],
+      "roi_expectation": "15-25% income increase",
+      "recommended_timeline_months": 10
+    }
+    ```
+  </Tab>
+  <Tab title="Housing Goals">
+    **Recommended Amount**: 10-20% of property value  
+    **Timeline**: 24-60 months  
+    **Priority**: Medium-High  
+    **DIVA Impact**: +65-80 points total  
+    **Cultural Note**: Land ownership provides generational security
+    
+    ```json
+    {
+      "category": "housing",
+      "deposit_percentage": 0.15,
+      "typical_property_range": [500000, 2000000],
+      "recommended_timeline_months": 36
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Smart Features & AI Integration
+
+### Spending Analysis
+AWO analyzes your spending patterns to identify savings opportunities:
+- **Category Analysis**: Find areas where you can reduce expenses
+- **Timing Optimization**: Identify best days for contributions
+- **Seasonal Adjustments**: Account for seasonal income variations
+- **Chama Integration**: Coordinate with Chama schedules for maximum benefit
+
+### Goal Adjustment Alerts
+Intelligent monitoring that suggests adjustments:
+- **Timeline Warnings**: Alert when goals may not be met on time
+- **Opportunity Alerts**: Suggest accelerating when extra income is available
+- **Inflation Adjustments**: Recommend updates for changing costs
+- **Life Event Adaptations**: Suggest changes for major life changes
+
+## Regional Considerations
+
+<Tabs>
+  <Tab title="South Africa">
+    **Currency**: ZAR (South African Rand)  
+    **Typical Emergency Fund**: ZAR 15,000 - 45,000  
+    **Housing Deposits**: 10-15% of property value  
+    **Education Costs**: ZAR 5,000 - 30,000 per year  
+    **Business Startup**: ZAR 10,000 - 100,000  
+    **Tax Considerations**: Tax-free savings accounts available
+  </Tab>
+  <Tab title="Kenya">
+    **Currency**: KES (Kenyan Shilling)  
+    **Typical Emergency Fund**: KES 50,000 - 150,000  
+    **Housing Deposits**: 15-20% of property value  
+    **Education Costs**: KES 20,000 - 100,000 per year  
+    **Business Startup**: KES 50,000 - 500,000  
+    **Mobile Integration**: M-Shwari and KCB M-Pesa savings integration
+  </Tab>
+  <Tab title="Zimbabwe">
+    **Currency**: USD (United States Dollar)  
+    **Typical Emergency Fund**: USD 300 - 1,200  
+    **Housing Deposits**: 20-30% of property value  
+    **Education Costs**: USD 200 - 2,000 per year  
+    **Business Startup**: USD 500 - 5,000  
+    **Economic Considerations**: Inflation protection especially important
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+### For Goal Setting
+- **Start Small**: Begin with achievable goals to build momentum
+- **Be Specific**: Clear, measurable goals are more likely to be achieved
+- **Set Deadlines**: Time-bound goals create urgency and focus
+- **Regular Review**: Monitor progress monthly and adjust as needed
+- **Celebrate Milestones**: Acknowledge progress to maintain motivation
+
+### For Savings Strategy
+- **Automate Everything**: Set up automatic transfers to remove friction
+- **Pay Yourself First**: Save before spending on non-essentials
+- **Use Multiple Sources**: Combine salary, Chama payouts, and bonuses
+- **Emergency Buffer**: Keep small buffer in checking for unexpected expenses
+- **Seasonal Planning**: Account for times of higher/lower income
+
+### For Cultural Integration
+- **Community Support**: Share appropriate goals with trusted community members
+- **Traditional Wisdom**: Apply proven African savings principles
+- **Family Consideration**: Factor in extended family responsibilities
+- **Chama Coordination**: Align personal goals with Chama participation
+- **Celebration Culture**: Use African celebration traditions for milestones
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Update Goal" href="/api-reference/savings/update-goal">
+    Modify existing savings goal details
+  </Card>
+  <Card title="Goal Progress" href="/api-reference/savings/progress">
+    Track progress and make contributions
+  </Card>
+  <Card title="Investment Options" href="/api-reference/investments/products">
+    Explore investments to accelerate goals
+  </Card>
+  <Card title="DIVA Score Impact" href="/api-reference/diva-score/get-score">
+    See how goals improve your DIVA score
+  </Card>
+</CardGroup>
+
+## Testing
+
+### Test Goal Creation
+
+Use these test scenarios in sandbox environment:
+
+| Goal Type | Target Amount | Timeline | Expected Result |
+|-----------|---------------|----------|-----------------|
+| Emergency Fund | ZAR 25,000 | 12 months | Success with milestones |
+| Education | ZAR 12,000 | 8 months | Success with high DIVA impact |
+| Invalid Amount | ZAR 50 | 6 months | Error: below minimum |
+| Past Date | ZAR 10,000 | Yesterday | Error: invalid target date |
+| Excessive Goal | ZAR 50,000,000 | 12 months | Error: above maximum |
+
+<Warning>
+Test goals use realistic calculations but don't affect real bank accounts or create actual automatic transfers in sandbox environment.
+</Warning>
+
+---
+
+**Next Steps**: After creating your savings goal, [set up automatic contributions](/api-reference/savings/progress), [track your progress](/api-reference/savings/update-goal), or [explore investment options](/api-reference/investments/products) to accelerate your financial growth.

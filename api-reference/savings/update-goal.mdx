@@ -1,0 +1,1306 @@
+---
+title: "Update Goal"
+description: "Update Goal endpoint documentation"
+---
+
+# Update Goal
+
+## Overview---
+title: "Update Savings Goal"
+description: "Modify existing savings goals including target amounts, timelines, contributions, and smart settings to adapt to changing circumstances"
+---
+
+# Update Savings Goal
+
+Modify and optimize your existing savings goals as your life circumstances, income, or priorities change. AWO's flexible goal management helps you stay on track toward financial success while adapting to real-life changes.
+
+<Info>
+Life changes, and your financial goals should adapt too. Regular goal updates increase achievement rates by 35% and maintain motivation through changing circumstances.
+</Info>
+
+## Authentication
+
+This endpoint requires a valid JWT token with `UPDATE_SAVINGS_GOALS` permission. Users can only update their own goals.
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+## Request
+
+### Endpoint
+```
+PUT /savings/goals/{goalId}
+```
+
+### Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `goalId` | string | Yes | Unique identifier for the savings goal |
+
+### Request Body
+
+```json
+{
+  "goal_updates": {
+    "name": "Enhanced Emergency Fund",
+    "description": "Expanded emergency fund to cover 6 months of expenses after recent family growth",
+    "target_amount": 35000.00,
+    "target_date": "2026-06-30T23:59:59Z",
+    "priority": "critical",
+    "category": "emergency_fund"
+  },
+  "savings_strategy_updates": {
+    "monthly_contribution": 2500.00,
+    "contribution_frequency": "monthly",
+    "contribution_day": 10,
+    "automatic_transfer": true,
+    "source_account": "acc_4K8n5RmP2vQ9xE6wT7cY1sA8",
+    "boost_contributions": {
+      "chama_dividends": true,
+      "bonus_income": true,
+      "tax_refunds": true,
+      "overtime_pay": true
+    }
+  },
+  "milestone_adjustments": {
+    "recalculate_milestones": true,
+    "milestone_frequency": "monthly",
+    "celebration_preferences": {
+      "notifications": true,
+      "social_sharing": true,
+      "reward_system": true
+    },
+    "custom_milestones": [
+      {
+        "name": "First Quarter Complete",
+        "target_amount": 8750.00,
+        "target_date": "2025-09-30T23:59:59Z",
+        "reward_type": "family_celebration"
+      }
+    ]
+  },
+  "smart_feature_updates": {
+    "ai_recommendations": true,
+    "spending_analysis": true,
+    "goal_adjustment_alerts": true,
+    "investment_suggestions": true,
+    "inflation_protection": true,
+    "seasonal_adjustments": true
+  },
+  "life_event_context": {
+    "trigger_event": "family_expansion",
+    "impact_description": "New baby requires increased emergency fund coverage",
+    "income_change": {
+      "change_type": "increase",
+      "new_monthly_income": 22000.00,
+      "effective_date": "2025-07-01T00:00:00Z"
+    },
+    "expense_change": {
+      "change_type": "increase",
+      "monthly_expense_increase": 3000.00,
+      "category": "family_expenses"
+    }
+  },
+  "update_reason": "family_growth",
+  "preserve_progress": true,
+  "notification_preferences": {
+    "notify_on_timeline_change": true,
+    "notify_on_amount_change": true,
+    "share_update_with_chama": false,
+    "celebration_level": "moderate"
+  }
+}
+```
+
+### Update Categories
+
+<Tabs>
+  <Tab title="Goal Details">
+    | Parameter | Type | Required | Description |
+    |-----------|------|----------|-------------|
+    | `name` | string | No | Updated goal name (3-100 characters) |
+    | `description` | string | No | Updated description (max 500 chars) |
+    | `target_amount` | number | No | New target amount |
+    | `target_date` | string | No | New target completion date |
+    | `priority` | string | No | Updated priority: `low`, `medium`, `high`, `critical` |
+    | `category` | string | No | Goal category (limited changes allowed) |
+  </Tab>
+  <Tab title="Savings Strategy">
+    | Parameter | Type | Required | Description |
+    |-----------|------|----------|-------------|
+    | `monthly_contribution` | number | No | New monthly contribution amount |
+    | `contribution_frequency` | string | No | Updated frequency |
+    | `contribution_day` | integer | No | New contribution day (1-31) |
+    | `automatic_transfer` | boolean | No | Enable/disable automatic transfers |
+    | `source_account` | string | No | New source account |
+    | `boost_contributions` | object | No | Additional contribution sources |
+  </Tab>
+  <Tab title="Life Event Context">
+    | Parameter | Type | Required | Description |
+    |-----------|------|----------|-------------|
+    | `trigger_event` | string | No | Reason for update: `income_change`, `family_growth`, `emergency`, `opportunity` |
+    | `impact_description` | string | No | How the event affects the goal |
+    | `income_change` | object | No | New income information |
+    | `expense_change` | object | No | Changed expense patterns |
+  </Tab>
+</Tabs>
+
+### Update Reasons
+
+| Reason | Description | Common Changes |
+|--------|-------------|----------------|
+| `income_change` | Salary increase/decrease, new job | Monthly contribution, timeline |
+| `family_growth` | New baby, marriage, dependents | Target amount, priority |
+| `emergency` | Unexpected expenses, setbacks | Timeline extension, amount reduction |
+| `opportunity` | Bonus, inheritance, windfall | Accelerated timeline, increased target |
+| `life_stage` | Career change, retirement planning | Category change, strategy overhaul |
+| `market_conditions` | Inflation, economic changes | Amount adjustment, timeline modification |
+| `goal_refinement` | Better understanding of needs | All aspects potential update |
+
+## Response
+
+### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "goal_id": "goal_3mK9Pv2B8nHfR6qE7tY5wAx",
+    "update_summary": {
+      "updated_at": "2025-06-19T18:45:20Z",
+      "update_reason": "family_growth",
+      "fields_changed": [
+        "target_amount",
+        "monthly_contribution", 
+        "target_date",
+        "priority",
+        "description"
+      ],
+      "impact_analysis": {
+        "timeline_change": "+6 months",
+        "monthly_increase": 500.00,
+        "total_increase": 10000.00,
+        "completion_probability": "95%"
+      }
+    },
+    "updated_goal_details": {
+      "name": "Enhanced Emergency Fund",
+      "description": "Expanded emergency fund to cover 6 months of expenses after recent family growth",
+      "category": "emergency_fund",
+      "target_amount": 35000.00,
+      "current_amount": 8400.00,
+      "currency": "ZAR",
+      "target_date": "2026-06-30T23:59:59Z",
+      "priority": "critical",
+      "status": "active",
+      "progress_percentage": 24.0
+    },
+    "updated_savings_plan": {
+      "monthly_contribution": 2500.00,
+      "contribution_frequency": "monthly",
+      "contribution_day": 10,
+      "automatic_transfer_enabled": true,
+      "estimated_completion_date": "2026-06-10T00:00:00Z",
+      "months_to_completion": 10.7,
+      "total_contributions_needed": 26600.00,
+      "contributions_remaining": 26600.00,
+      "original_timeline": "2025-12-31T23:59:59Z",
+      "timeline_adjustment": "+6 months"
+    },
+    "progress_impact": {
+      "previous_progress": 33.6,
+      "new_progress": 24.0,
+      "progress_adjustment_reason": "Increased target amount",
+      "momentum_preserved": true,
+      "contributions_to_date": 8400.00,
+      "contributions_count": 4,
+      "average_monthly_actual": 2100.00
+    },
+    "updated_milestones": [
+      {
+        "milestone_id": "ms_1_updated",
+        "name": "First Quarter Complete", 
+        "target_amount": 8750.00,
+        "current_amount": 8400.00,
+        "target_date": "2025-09-30T23:59:59Z",
+        "status": "near_completion",
+        "progress_percentage": 95.9,
+        "reward_type": "family_celebration",
+        "days_remaining": 103
+      },
+      {
+        "milestone_id": "ms_2_new",
+        "name": "50% Complete",
+        "target_amount": 17500.00,
+        "target_date": "2026-01-10T00:00:00Z",
+        "status": "pending",
+        "reward_type": "achievement_badge",
+        "estimated_reach_date": "2026-01-10T00:00:00Z"
+      },
+      {
+        "milestone_id": "ms_3_new",
+        "name": "75% Complete",
+        "target_amount": 26250.00,
+        "target_date": "2026-04-10T00:00:00Z",
+        "status": "pending",
+        "reward_type": "financial_insight",
+        "estimated_reach_date": "2026-04-10T00:00:00Z"
+      }
+    ],
+    "diva_score_impact": {
+      "update_bonus": 5,
+      "new_monthly_boost": 15,
+      "increased_commitment_bonus": 8,
+      "family_responsibility_bonus": 5,
+      "total_additional_points": 18,
+      "previous_estimated_total": 194,
+      "new_estimated_total": 254,
+      "current_score_estimate": 728,
+      "projected_score_at_completion": 788,
+      "impact_explanation": "Increased target and commitment show greater financial discipline"
+    },
+    "smart_recommendations": {
+      "timeline_optimization": {
+        "current_timeline": "10.7 months",
+        "aggressive_timeline": "9.2 months", 
+        "conservative_timeline": "12.8 months",
+        "recommended_approach": "current",
+        "reasoning": "Current timeline balances ambition with family responsibilities"
+      },
+      "contribution_optimization": [
+        {
+          "suggestion": "chama_coordination",
+          "description": "Coordinate Chama payout with goal contribution",
+          "potential_acceleration": "2 months faster",
+          "next_opportunity": "2025-08-20T00:00:00Z"
+        },
+        {
+          "suggestion": "seasonal_boost", 
+          "description": "Increase contributions during December bonus season",
+          "potential_boost": 5000.00,
+          "impact": "Complete goal 1.5 months earlier"
+        }
+      ],
+      "risk_mitigation": [
+        {
+          "risk": "family_expense_increase",
+          "probability": "medium",
+          "mitigation": "Create flexible contribution schedule",
+          "backup_plan": "Reduce to ZAR 2,000/month if needed"
+        }
+      ]
+    },
+    "automation_updates": {
+      "automatic_transfer_updated": true,
+      "new_transfer_amount": 2500.00,
+      "transfer_day_changed": true,
+      "old_transfer_day": 15,
+      "new_transfer_day": 10,
+      "next_transfer_date": "2025-07-10T08:00:00Z",
+      "setup_completion_required": false
+    },
+    "family_impact_analysis": {
+      "emergency_coverage": {
+        "previous_months_covered": 3.3,
+        "new_months_covered": 6.0,
+        "family_size_adjustment": "Accounts for new family member",
+        "security_improvement": "Significantly enhanced family financial security"
+      },
+      "goal_alignment": {
+        "family_priorities": "Aligned with growing family needs",
+        "partner_buy_in": "Recommended to discuss with partner",
+        "children_education_impact": "Provides stability for future education savings"
+      }
+    },
+    "notification_status": {
+      "goal_update_sent": true,
+      "milestone_recalculation_sent": true,
+      "automatic_transfer_update_sent": true,
+      "family_members_notified": false,
+      "chama_notification_sent": false
+    }
+  },
+  "meta": {
+    "timestamp": "2025-06-19T18:45:20Z",
+    "version": "1.0.0",
+    "update_initiated_by": "user",
+    "processing_time_ms": 1247
+  }
+}
+```
+
+## Update Types & Scenarios
+
+### Major Life Events
+
+<Tabs>
+  <Tab title="Income Changes">
+    ```json
+    {
+      "life_event_context": {
+        "trigger_event": "income_change",
+        "income_change": {
+          "change_type": "increase",
+          "old_monthly_income": 18000.00,
+          "new_monthly_income": 25000.00,
+          "effective_date": "2025-07-01T00:00:00Z",
+          "change_reason": "promotion"
+        }
+      },
+      "savings_strategy_updates": {
+        "monthly_contribution": 3500.00, // Increased from 2000
+        "boost_contributions": {
+          "overtime_pay": true // New income source
+        }
+      }
+    }
+    ```
+    **Typical Adjustments**: Increase monthly contributions, accelerate timeline, add new goals
+  </Tab>
+  <Tab title="Family Growth">
+    ```json
+    {
+      "life_event_context": {
+        "trigger_event": "family_expansion",
+        "impact_description": "New baby requires increased emergency fund",
+        "expense_change": {
+          "change_type": "increase",
+          "monthly_expense_increase": 3000.00,
+          "category": "family_expenses"
+        }
+      },
+      "goal_updates": {
+        "target_amount": 35000.00, // Increased from 25000
+        "priority": "critical", // Upgraded from high
+        "target_date": "2026-06-30T23:59:59Z" // Extended timeline
+      }
+    }
+    ```
+    **Typical Adjustments**: Increase emergency fund, extend timelines, shift priorities
+  </Tab>
+  <Tab title="Economic Changes">
+    ```json
+    {
+      "life_event_context": {
+        "trigger_event": "market_conditions",
+        "impact_description": "Inflation affecting cost of living and goal targets"
+      },
+      "goal_updates": {
+        "target_amount": 28000.00, // Inflation adjustment
+        "description": "Adjusted for 12% inflation in essential expenses"
+      },
+      "smart_feature_updates": {
+        "inflation_protection": true,
+        "seasonal_adjustments": true
+      }
+    }
+    ```
+    **Typical Adjustments**: Adjust targets for inflation, enable protection features
+  </Tab>
+</Tabs>
+
+## DIVA Score Impact
+
+<Note>
+Goal updates show financial adaptability and responsibility:
+- **Proactive Updates**: +5-10 points for updating before problems arise
+- **Increased Commitment**: +8-15 points for raising targets or contributions
+- **Life Event Adaptation**: +5-12 points for smart adjustments to life changes
+- **Timeline Management**: +3-8 points for realistic timeline adjustments
+- **Family Responsibility**: +5-10 points for family-focused goal updates
+</Note>
+
+### Update Impact Formula
+
+```javascript
+// DIVA score calculation for goal updates
+const calculateUpdateImpact = (update) => {
+  const basePoints = {
+    proactiveUpdate: 5,
+    increasedCommitment: update.targetIncrease > 0 ? Math.min(15, update.targetIncrease / 2000) : 0,
+    timelineRealism: update.timelineAdjustment === 'realistic' ? 8 : 0,
+    familyFocus: update.familyImpact ? 10 : 0,
+    smartFeatureAdoption: update.newSmartFeatures * 2
+  };
+  
+  const multipliers = {
+    frequency: update.isFirstUpdate ? 1.0 : 0.8,
+    priority: {
+      critical: 1.2,
+      high: 1.0,
+      medium: 0.8,
+      low: 0.6
+    }
+  };
+  
+  return Object.values(basePoints).reduce((sum, points) => sum + points, 0) * 
+         multipliers.frequency * 
+         (multipliers.priority[update.priority] || 1.0);
+};
+```
+
+## Cultural Context
+
+Goal updates in African culture reflect the principle of **"Ukuphila Ngokwenene"** (living authentically) - adapting plans to life's realities while maintaining commitment to family and community welfare.
+
+### Traditional Wisdom in Goal Updates:
+- **"Bend but don't break"**: Adjust goals rather than abandon them
+- **Family first**: Always consider impact on extended family
+- **Community accountability**: Seek wisdom from trusted community members
+- **Seasonal thinking**: Align updates with natural cycles and seasons
+- **Ubuntu approach**: Consider how personal changes affect the whole community
+
+## Error Handling
+
+### Common Error Codes
+
+| Code | Status | Description | Solution |
+|------|--------|-------------|----------|
+| `GOAL_NOT_FOUND` | 404 | Goal does not exist | Verify goal ID |
+| `GOAL_ALREADY_COMPLETED` | 409 | Cannot update completed goal | Archive or create new goal |
+| `INVALID_TARGET_REDUCTION` | 400 | Cannot reduce target below current amount | Adjust target or create new goal |
+| `EXCESSIVE_TIMELINE_EXTENSION` | 400 | Timeline extension too large | Use reasonable timeline extension |
+| `INSUFFICIENT_CONTRIBUTION` | 400 | New contribution too low for timeline | Increase contribution or extend timeline |
+| `CONFLICTING_UPDATES` | 400 | Update parameters conflict with each other | Review and resolve conflicting parameters |
+| `UPDATE_FREQUENCY_EXCEEDED` | 429 | Too many updates in short period | Wait before making additional updates |
+| `ACCOUNT_CHANGE_RESTRICTED` | 403 | Cannot change source account | Verify account ownership |
+
+## Code Examples
+
+<CodeGroup>
+
+```javascript JavaScript/TypeScript
+import { AWOClient } from '@awo-platform/js-sdk';
+
+const awo = new AWOClient({
+  apiKey: process.env.AWO_API_KEY,
+  environment: 'production'
+});
+
+// Update goal for income increase
+async function updateGoalForIncomeIncrease(goalId, newMonthlyIncome, oldMonthlyIncome) {
+  try {
+    const incomeIncrease = newMonthlyIncome - oldMonthlyIncome;
+    const contributionIncrease = Math.min(incomeIncrease * 0.3, 1000); // Max 30% of increase
+    
+    const currentGoal = await awo.savings.getGoal(goalId);
+    const newContribution = currentGoal.savings_plan.monthly_contribution + contributionIncrease;
+    
+    const update = await awo.savings.updateGoal(goalId, {
+      life_event_context: {
+        trigger_event: "income_change",
+        impact_description: `Salary increase allows for higher monthly contributions`,
+        income_change: {
+          change_type: "increase",
+          old_monthly_income: oldMonthlyIncome,
+          new_monthly_income: newMonthlyIncome,
+          effective_date: new Date().toISOString(),
+          change_reason: "promotion"
+        }
+      },
+      savings_strategy_updates: {
+        monthly_contribution: newContribution,
+        boost_contributions: {
+          chama_dividends: true,
+          bonus_income: true,
+          tax_refunds: true,
+          overtime_pay: true // New income source
+        }
+      },
+      smart_feature_updates: {
+        ai_recommendations: true,
+        goal_adjustment_alerts: true,
+        investment_suggestions: true // Consider investments with higher income
+      },
+      update_reason: "income_change",
+      notification_preferences: {
+        notify_on_timeline_change: true,
+        celebration_level: "high" // Celebrate the promotion!
+      }
+    });
+    
+    console.log('✅ Goal updated for income increase!');
+    console.log(`💰 Monthly contribution: ${currentGoal.goal_details.currency} ${currentGoal.savings_plan.monthly_contribution} → ${update.updated_savings_plan.monthly_contribution}`);
+    console.log(`📅 New completion date: ${new Date(update.updated_savings_plan.estimated_completion_date).toLocaleDateString()}`);
+    console.log(`📈 Additional DIVA points: +${update.diva_score_impact.total_additional_points}`);
+    console.log(`⚡ Timeline acceleration: ${update.smart_recommendations.timeline_optimization.current_timeline}`);
+    
+    return update;
+  } catch (error) {
+    console.error('❌ Failed to update goal for income increase:', error.message);
+    throw error;
+  }
+}
+
+// Update goal for family expansion
+async function updateGoalForFamilyGrowth(goalId, newFamilySize, additionalMonthlyExpenses) {
+  try {
+    const currentGoal = await awo.savings.getGoal(goalId);
+    
+    // Calculate new emergency fund target (6 months of new expenses)
+    const monthlyExpenseIncrease = additionalMonthlyExpenses;
+    const newTargetAmount = currentGoal.goal_details.target_amount + (monthlyExpenseIncrease * 6);
+    
+    // Extend timeline if needed to keep contributions manageable
+    const timelineExtension = Math.ceil((newTargetAmount - currentGoal.goal_details.target_amount) / 
+                                      currentGoal.savings_plan.monthly_contribution);
+    
+    const newTargetDate = new Date(currentGoal.goal_details.target_date);
+    newTargetDate.setMonth(newTargetDate.getMonth() + timelineExtension);
+    
+    const update = await awo.savings.updateGoal(goalId, {
+      goal_updates: {
+        name: `Enhanced ${currentGoal.goal_details.name}`,
+        description: `Expanded to cover ${newFamilySize} family members with increased security buffer`,
+        target_amount: newTargetAmount,
+        target_date: newTargetDate.toISOString(),
+        priority: "critical" // Upgrade priority for family security
+      },
+      life_event_context: {
+        trigger_event: "family_expansion",
+        impact_description: `New family member requires increased emergency fund coverage`,
+        expense_change: {
+          change_type: "increase",
+          monthly_expense_increase: monthlyExpenseIncrease,
+          category: "family_expenses"
+        }
+      },
+      milestone_adjustments: {
+        recalculate_milestones: true,
+        celebration_preferences: {
+          notifications: true,
+          social_sharing: true, // Share family milestone achievements
+          reward_system: true
+        }
+      },
+      update_reason: "family_growth",
+      preserve_progress: true,
+      notification_preferences: {
+        notify_on_amount_change: true,
+        celebration_level: "family_focused"
+      }
+    });
+    
+    console.log('👨‍👩‍👧‍👦 Goal updated for family growth!');
+    console.log(`🎯 New target: ${update.updated_goal_details.currency} ${update.updated_goal_details.target_amount.toLocaleString()}`);
+    console.log(`👶 Family coverage: Expanded for ${newFamilySize} members`);
+    console.log(`📅 Timeline: Extended by ${timelineExtension} months`);
+    console.log(`🏆 Progress preserved: ${update.progress_impact.contributions_to_date} already saved`);
+    
+    return update;
+  } catch (error) {
+    console.error('❌ Failed to update goal for family growth:', error.message);
+    throw error;
+  }
+}
+
+// Smart goal optimization based on progress analysis
+async function optimizeGoalBasedOnProgress(goalId) {
+  try {
+    const currentGoal = await awo.savings.getGoal(goalId);
+    const progressAnalysis = await awo.savings.analyzeProgress(goalId);
+    
+    let optimizations = {};
+    
+    // If consistently saving more than planned, accelerate timeline
+    if (progressAnalysis.averageMonthlyActual > currentGoal.savings_plan.monthly_contribution * 1.2) {
+      const acceleratedContribution = Math.round(progressAnalysis.averageMonthlyActual);
+      optimizations.savings_strategy_updates = {
+        monthly_contribution: acceleratedContribution
+      };
+      
+      console.log(`💪 Detected higher actual contributions: ${acceleratedContribution} vs planned ${currentGoal.savings_plan.monthly_contribution}`);
+    }
+    
+    // If behind schedule, suggest realistic adjustments
+    if (progressAnalysis.completionProbability < 70) {
+      const currentDate = new Date();
+      const targetDate = new Date(currentGoal.goal_details.target_date);
+      const monthsRemaining = (targetDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
+      const amountRemaining = currentGoal.goal_details.target_amount - currentGoal.progress_tracking.current_amount;
+      const requiredMonthly = amountRemaining / monthsRemaining;
+      
+      if (requiredMonthly > currentGoal.savings_plan.monthly_contribution * 1.5) {
+        // Extend timeline rather than drastically increase contributions
+        const realisticMonthly = currentGoal.savings_plan.monthly_contribution * 1.2;
+        const newTimelineMonths = Math.ceil(amountRemaining / realisticMonthly);
+        const newTargetDate = new Date();
+        newTargetDate.setMonth(newTargetDate.getMonth() + newTimelineMonths);
+        
+        optimizations.goal_updates = {
+          target_date: newTargetDate.toISOString()
+        };
+        optimizations.savings_strategy_updates = {
+          monthly_contribution: realisticMonthly
+        };
+        
+        console.log(`⏰ Adjusting timeline to be more realistic: ${newTimelineMonths} months`);
+      }
+    }
+    
+    // Apply optimizations if any were identified
+    if (Object.keys(optimizations).length > 0) {
+      optimizations.update_reason = "goal_optimization";
+      optimizations.life_event_context = {
+        trigger_event: "goal_refinement",
+        impact_description: "Optimizing goal based on actual progress patterns"
+      };
+      
+      const update = await awo.savings.updateGoal(goalId, optimizations);
+      
+      console.log('🎯 Goal optimized based on progress analysis!');
+      console.log(`📊 Completion probability improved: ${progressAnalysis.completionProbability}% → ${update.impact_analysis.completion_probability}`);
+      
+      return update;
+    } else {
+      console.log('✅ Goal is well-optimized, no changes needed');
+      return { message: "Goal is already well-optimized" };
+    }
+    
+  } catch (error) {
+    console.error('❌ Failed to optimize goal:', error.message);
+    throw error;
+  }
+}
+
+// Seasonal goal adjustment
+async function adjustGoalForSeason(goalId, season, expectedIncomeChange) {
+  try {
+    const seasonalAdjustments = {
+      summer: {
+        description: "Summer season adjustment with potential overtime opportunities",
+        contribution_multiplier: 1.1,
+        boost_opportunities: ["overtime_pay", "seasonal_work"]
+      },
+      winter: {
+        description: "Winter season adjustment with higher expenses",
+        contribution_multiplier: 0.9,
+        expense_increase: 500
+      },
+      holiday: {
+        description: "Holiday season with bonus income and higher expenses",
+        contribution_multiplier: 1.3,
+        boost_opportunities: ["bonus_income", "tax_refunds"]
+      },
+      back_to_school: {
+        description: "Back-to-school season adjustment",
+        contribution_multiplier: 0.8,
+        expense_increase: 1000
+      }
+    };
+    
+    const adjustment = seasonalAdjustments[season];
+    if (!adjustment) {
+      throw new Error(`Unknown season: ${season}`);
+    }
+    
+    const currentGoal = await awo.savings.getGoal(goalId);
+    const newContribution = Math.round(currentGoal.savings_plan.monthly_contribution * adjustment.contribution_multiplier);
+    
+    const update = await awo.savings.updateGoal(goalId, {
+      savings_strategy_updates: {
+        monthly_contribution: newContribution,
+        boost_contributions: {
+          ...currentGoal.savings_plan.boost_contributions,
+          ...(adjustment.boost_opportunities?.reduce((acc, opportunity) => {
+            acc[opportunity] = true;
+            return acc;
+          }, {}) || {})
+        }
+      },
+      life_event_context: {
+        trigger_event: "seasonal_adjustment",
+        impact_description: adjustment.description,
+        income_change: expectedIncomeChange ? {
+          change_type: expectedIncomeChange > 0 ? "increase" : "decrease",
+          temporary: true,
+          seasonal: true
+        } : undefined
+      },
+      smart_feature_updates: {
+        seasonal_adjustments: true
+      },
+      update_reason: "seasonal_optimization"
+    });
+    
+    console.log(`🌟 Goal adjusted for ${season} season!`);
+    console.log(`💰 Contribution: ${currentGoal.goal_details.currency} ${currentGoal.savings_plan.monthly_contribution} → ${newContribution}`);
+    console.log(`📈 Multiplier: ${adjustment.contribution_multiplier}x`);
+    
+    return update;
+  } catch (error) {
+    console.error('❌ Failed to adjust goal for season:', error.message);
+    throw error;
+  }
+}
+
+// Example usage
+(async () => {
+  try {
+    const goalId = 'goal_3mK9Pv2B8nHfR6qE7tY5wAx';
+    
+    // Update for promotion/income increase
+    await updateGoalForIncomeIncrease(goalId, 25000, 18000);
+    
+    // Update for new baby
+    await updateGoalForFamilyGrowth(goalId, 4, 3000);
+    
+    // Optimize based on actual progress
+    await optimizeGoalBasedOnProgress(goalId);
+    
+    console.log('\n🎉 All goal updates completed successfully!');
+  } catch (error) {
+    console.error('Goal update operations failed:', error.message);
+  }
+})();
+```
+
+```python Python
+import requests
+from datetime import datetime, timedelta
+from typing import Dict, Optional, List
+
+class AWOGoalUpdates:
+    def __init__(self, api_key: str, base_url: str = "https://api.awo-platform.com/v1"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+    
+    def update_goal(self, goal_id: str, updates: Dict) -> Dict:
+        """Update an existing savings goal"""
+        response = requests.put(
+            f"{self.base_url}/savings/goals/{goal_id}",
+            headers=self.headers,
+            json=updates
+        )
+        
+        if response.status_code == 200:
+            return response.json()['data']
+        else:
+            error_data = response.json()
+            raise Exception(f"Failed to update goal: {error_data['error']['message']}")
+    
+    def get_goal(self, goal_id: str) -> Dict:
+        """Get current goal details"""
+        response = requests.get(
+            f"{self.base_url}/savings/goals/{goal_id}",
+            headers=self.headers
+        )
+        
+        if response.status_code == 200:
+            return response.json()['data']
+        else:
+            error_data = response.json()
+            raise Exception(f"Failed to get goal: {error_data['error']['message']}")
+    
+    def update_for_income_change(self, goal_id: str, old_income: float, 
+                               new_income: float, change_reason: str = "promotion") -> Dict:
+        """Update goal when income changes"""
+        income_increase = new_income - old_income
+        
+        # Conservative approach: use 30% of increase for additional savings
+        additional_contribution = min(income_increase * 0.3, 1000)
+        
+        current_goal = self.get_goal(goal_id)
+        new_contribution = current_goal['savings_plan']['monthly_contribution'] + additional_contribution
+        
+        updates = {
+            'life_event_context': {
+                'trigger_event': 'income_change',
+                'impact_description': f'Income change from {old_income:,.2f} to {new_income:,.2f}',
+                'income_change': {
+                    'change_type': 'increase' if income_increase > 0 else 'decrease',
+                    'old_monthly_income': old_income,
+                    'new_monthly_income': new_income,
+                    'effective_date': datetime.now().isoformat(),
+                    'change_reason': change_reason
+                }
+            },
+            'savings_strategy_updates': {
+                'monthly_contribution': new_contribution,
+                'boost_contributions': {
+                    'chama_dividends': True,
+                    'bonus_income': True,
+                    'tax_refunds': True,
+                    'overtime_pay': True
+                }
+            },
+            'smart_feature_updates': {
+                'ai_recommendations': True,
+                'investment_suggestions': new_income > 20000  # Consider investments for higher income
+            },
+            'update_reason': 'income_change',
+            'notification_preferences': {
+                'celebration_level': 'high' if income_increase > 0 else 'moderate'
+            }
+        }
+        
+        try:
+            result = self.update_goal(goal_id, updates)
+            
+            print("✅ Goal updated for income change!")
+            print(f"💰 Monthly contribution: {current_goal['goal_details']['currency']} {current_goal['savings_plan']['monthly_contribution']:,.2f} → {new_contribution:,.2f}")
+            print(f"📅 New completion: {result['updated_savings_plan']['estimated_completion_date'][:10]}")
+            print(f"📈 DIVA boost: +{result['diva_score_impact']['total_additional_points']} points")
+            
+            return result
+            
+        except Exception as e:
+            print(f"❌ Failed to update for income change: {e}")
+            raise
+    
+    def update_for_family_growth(self, goal_id: str, new_family_size: int, 
+                               additional_expenses: float) -> Dict:
+        """Update emergency fund for family expansion"""
+        current_goal = self.get_goal(goal_id)
+        
+        # Increase emergency fund target for new family member
+        # Rule of thumb: 6 months of additional expenses
+        target_increase = additional_expenses * 6
+        new_target = current_goal['goal_details']['target_amount'] + target_increase
+        
+        # Extend timeline to keep contributions manageable
+        current_contribution = current_goal['savings_plan']['monthly_contribution']
+        timeline_extension_months = max(1, int(target_increase / current_contribution))
+        
+        current_target_date = datetime.fromisoformat(
+            current_goal['goal_details']['target_date'].replace('Z', '+00:00')
+        )
+        new_target_date = current_target_date + timedelta(days=timeline_extension_months * 30)
+        
+        updates = {
+            'goal_updates': {
+                'name': f"Enhanced {current_goal['goal_details']['name']}",
+                'description': f"Expanded to secure {new_family_size} family members",
+                'target_amount': new_target,
+                'target_date': new_target_date.isoformat(),
+                'priority': 'critical'
+            },
+            'life_event_context': {
+                'trigger_event': 'family_expansion',
+                'impact_description': f'New family member requires increased emergency coverage',
+                'expense_change': {
+                    'change_type': 'increase',
+                    'monthly_expense_increase': additional_expenses,
+                    'category': 'family_expenses'
+                }
+            },
+            'milestone_adjustments': {
+                'recalculate_milestones': True,
+                'celebration_preferences': {
+                    'notifications': True,
+                    'social_sharing': True,
+                    'reward_system': True
+                }
+            },
+            'update_reason': 'family_growth',
+            'preserve_progress': True
+        }
+        
+        try:
+            result = self.update_goal(goal_id, updates)
+            
+            print("👨‍👩‍👧‍👦 Goal updated for family growth!")
+            print(f"🎯 Target: {current_goal['goal_details']['currency']} {current_goal['goal_details']['target_amount']:,.2f} → {new_target:,.2f}")
+            print(f"👶 Coverage: Expanded for {new_family_size} family members")
+            print(f"📅 Extended: +{timeline_extension_months} months")
+            print(f"💪 Progress preserved: {result['progress_impact']['contributions_to_date']:,.2f}")
+            
+            return result
+            
+        except Exception as e:
+            print(f"❌ Failed to update for family growth: {e}")
+            raise
+    
+    def update_for_inflation(self, goal_id: str, inflation_rate: float) -> Dict:
+        """Adjust goal target for inflation"""
+        current_goal = self.get_goal(goal_id)
+        
+        # Calculate inflation adjustment
+        current_target = current_goal['goal_details']['target_amount']
+        inflation_adjustment = current_target * (inflation_rate / 100)
+        new_target = current_target + inflation_adjustment
+        
+        updates = {
+            'goal_updates': {
+                'target_amount': new_target,
+                'description': f"{current_goal['goal_details']['description']} (Adjusted for {inflation_rate}% inflation)"
+            },
+            'life_event_context': {
+                'trigger_event': 'market_conditions',
+                'impact_description': f'Inflation adjustment of {inflation_rate}% applied to maintain purchasing power'
+            },
+            'smart_feature_updates': {
+                'inflation_protection': True,
+                'goal_adjustment_alerts': True
+            },
+            'update_reason': 'inflation_adjustment'
+        }
+        
+        try:
+            result = self.update_goal(goal_id, updates)
+            
+            print("📈 Goal updated for inflation!")
+            print(f"💰 Target: {current_goal['goal_details']['currency']} {current_target:,.2f} → {new_target:,.2f}")
+            print(f"📊 Inflation rate: {inflation_rate}%")
+            print(f"🛡️ Purchasing power protected")
+            
+            return result
+            
+        except Exception as e:
+            print(f"❌ Failed to update for inflation: {e}")
+            raise
+    
+    def optimize_based_on_performance(self, goal_id: str) -> Dict:
+        """Optimize goal based on actual savings performance"""
+        current_goal = self.get_goal(goal_id)
+        
+        # Analyze performance (simplified - would typically call analytics endpoint)
+        current_amount = current_goal['progress_tracking']['current_amount']
+        target_amount = current_goal['goal_details']['target_amount']
+        contributions_made = current_goal['progress_tracking']['contributions_made']
+        
+        if contributions_made == 0:
+            return {'message': 'No contributions made yet, cannot optimize'}
+        
+        actual_average = current_amount / contributions_made
+        planned_monthly = current_goal['savings_plan']['monthly_contribution']
+        
+        optimizations = {}
+        
+        # If consistently saving more than planned
+        if actual_average > planned_monthly * 1.2:
+            new_contribution = round(actual_average)
+            optimizations['savings_strategy_updates'] = {
+                'monthly_contribution': new_contribution
+            }
+            
+            print(f"💪 Detected higher actual contributions: {new_contribution:,.2f} vs planned {planned_monthly:,.2f}")
+        
+        # If significantly behind, suggest realistic timeline extension
+        progress_rate = current_amount / target_amount
+        months_elapsed = contributions_made  # Simplified
+        expected_progress_rate = months_elapsed / 12  # Assuming 12-month goal
+        
+        if progress_rate < expected_progress_rate * 0.7:  # 30% behind
+            # Extend timeline by 20%
+            current_target_date = datetime.fromisoformat(
+                current_goal['goal_details']['target_date'].replace('Z', '+00:00')
+            )
+            extension_months = max(2, int(months_elapsed * 0.2))
+            new_target_date = current_target_date + timedelta(days=extension_months * 30)
+            
+            optimizations['goal_updates'] = {
+                'target_date': new_target_date.isoformat()
+            }
+            
+            print(f"⏰ Extending timeline by {extension_months} months for realistic completion")
+        
+        if optimizations:
+            optimizations.update({
+                'update_reason': 'performance_optimization',
+                'life_event_context': {
+                    'trigger_event': 'goal_refinement',
+                    'impact_description': 'Optimizing based on actual savings patterns'
+                }
+            })
+            
+            try:
+                result = self.update_goal(goal_id, optimizations)
+                
+                print("🎯 Goal optimized based on performance!")
+                print(f"📊 Improvements applied based on actual savings behavior")
+                
+                return result
+                
+            except Exception as e:
+                print(f"❌ Failed to optimize goal: {e}")
+                raise
+        else:
+            print("✅ Goal is already well-optimized")
+            return {'message': 'Goal is already optimized for current performance'}
+    
+    def seasonal_adjustment(self, goal_id: str, season: str, income_change_percentage: float = 0) -> Dict:
+        """Adjust goal for seasonal income/expense changes"""
+        seasonal_multipliers = {
+            'holiday': 1.3,    # Holiday bonuses and gifts
+            'summer': 1.1,     # Overtime opportunities
+            'winter': 0.9,     # Higher heating costs
+            'back_to_school': 0.8  # School expenses
+        }
+        
+        multiplier = seasonal_multipliers.get(season, 1.0)
+        
+        current_goal = self.get_goal(goal_id)
+        current_contribution = current_goal['savings_plan']['monthly_contribution']
+        
+        # Apply seasonal adjustment
+        base_adjustment = current_contribution * (multiplier - 1.0)
+        income_adjustment = current_contribution * (income_change_percentage / 100)
+        new_contribution = round(current_contribution + base_adjustment + income_adjustment)
+        
+        updates = {
+            'savings_strategy_updates': {
+                'monthly_contribution': new_contribution
+            },
+            'life_event_context': {
+                'trigger_event': 'seasonal_adjustment',
+                'impact_description': f'{season.title()} season adjustment with {multiplier}x factor'
+            },
+            'smart_feature_updates': {
+                'seasonal_adjustments': True
+            },
+            'update_reason': 'seasonal_optimization'
+        }
+        
+        try:
+            result = self.update_goal(goal_id, updates)
+            
+            print(f"🌟 Goal adjusted for {season} season!")
+            print(f"💰 Contribution: {current_goal['goal_details']['currency']} {current_contribution:,.2f} → {new_contribution:,.2f}")
+            print(f"📈 Seasonal multiplier: {multiplier}x")
+            
+            return result
+            
+        except Exception as e:
+            print(f"❌ Failed to adjust for season: {e}")
+            raise
+    
+    def bulk_update_goals(self, updates_list: List[Dict]) -> List[Dict]:
+        """Update multiple goals efficiently"""
+        results = []
+        
+        for update_request in updates_list:
+            goal_id = update_request.pop('goal_id')
+            try:
+                result = self.update_goal(goal_id, update_request)
+                results.append({
+                    'goal_id': goal_id,
+                    'status': 'success',
+                    'result': result
+                })
+                print(f"✅ Updated goal {goal_id}")
+            except Exception as e:
+                results.append({
+                    'goal_id': goal_id,
+                    'status': 'error',
+                    'error': str(e)
+                })
+                print(f"❌ Failed to update goal {goal_id}: {e}")
+        
+        return results
+
+# Example usage
+if __name__ == "__main__":
+    goal_updater = AWOGoalUpdates('your-api-key')
+    
+    try:
+        goal_id = 'goal_3mK9Pv2B8nHfR6qE7tY5wAx'
+        
+        # Update for income increase
+        income_update = goal_updater.update_for_income_change(
+            goal_id=goal_id,
+            old_income=18000,
+            new_income=25000,
+            change_reason='promotion'
+        )
+        
+        # Update for family growth
+        family_update = goal_updater.update_for_family_growth(
+            goal_id=goal_id,
+            new_family_size=4,
+            additional_expenses=3000
+        )
+        
+        # Optimize based on performance
+        optimization = goal_updater.optimize_based_on_performance(goal_id)
+        
+        # Seasonal adjustment
+        seasonal = goal_updater.seasonal_adjustment(
+            goal_id=goal_id,
+            season='holiday',
+            income_change_percentage=20
+        )
+        
+        print("\n🎉 All goal updates completed successfully!")
+        
+    except Exception as e:
+        print(f"Error in goal updates: {e}")
+```
+
+```curl cURL
+# Update goal for income increase
+curl -X PUT "https://api.awo-platform.com/v1/savings/goals/goal_3mK9Pv2B8nHfR6qE7tY5wAx" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "life_event_context": {
+      "trigger_event": "income_change",
+      "impact_description": "Salary increase allows for higher monthly contributions",
+      "income_change": {
+        "change_type": "increase",
+        "old_monthly_income": 18000.00,
+        "new_monthly_income": 25000.00,
+        "effective_date": "2025-07-01T00:00:00Z",
+        "change_reason": "promotion"
+      }
+    },
+    "savings_strategy_updates": {
+      "monthly_contribution": 3000.00,
+      "boost_contributions": {
+        "chama_dividends": true,
+        "bonus_income": true,
+        "overtime_pay": true
+      }
+    },
+    "update_reason": "income_change"
+  }'
+
+# Update goal for family expansion
+curl -X PUT "https://api.awo-platform.com/v1/savings/goals/goal_3mK9Pv2B8nHfR6qE7tY5wAx" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "goal_updates": {
+      "name": "Enhanced Emergency Fund",
+      "description": "Expanded emergency fund for growing family",
+      "target_amount": 35000.00,
+      "target_date": "2026-06-30T23:59:59Z",
+      "priority": "critical"
+    },
+    "life_event_context": {
+      "trigger_event": "family_expansion",
+      "impact_description": "New baby requires increased emergency fund"
+    },
+    "milestone_adjustments": {
+      "recalculate_milestones": true
+    },
+    "update_reason": "family_growth"
+  }'
+
+# Inflation adjustment
+curl -X PUT "https://api.awo-platform.com/v1/savings/goals/goal_3mK9Pv2B8nHfR6qE7tY5wAx" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "goal_updates": {
+      "target_amount": 28000.00,
+      "description": "Adjusted for 12% inflation in living costs"
+    },
+    "life_event_context": {
+      "trigger_event": "market_conditions",
+      "impact_description": "Inflation adjustment to maintain purchasing power"
+    },
+    "smart_feature_updates": {
+      "inflation_protection": true
+    },
+    "update_reason": "inflation_adjustment"
+  }'
+
+# Extract update summary using jq
+curl -X PUT "https://api.awo-platform.com/v1/savings/goals/goal_3mK9Pv2B8nHfR6qE7tY5wAx" \
+  -H "Authorization: Bearer $AWO_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"savings_strategy_updates": {"monthly_contribution": 2500.00}, "update_reason": "optimization"}' | \
+  jq -r '.data.update_summary | "Updated: \(.fields_changed | join(", ")), Timeline change: \(.impact_analysis.timeline_change), New completion: \(.impact_analysis.completion_probability)"'
+```
+
+</CodeGroup>
+
+## Best Practices
+
+### When to Update Goals
+- **Major Life Events**: Marriage, new job, family changes
+- **Income Changes**: Promotions, job loss, side income
+- **Quarterly Reviews**: Regular assessment and optimization
+- **Progress Milestones**: When reaching 25%, 50%, 75% completion
+- **Economic Changes**: Inflation, market conditions
+- **Performance Analysis**: When consistently over/under target
+
+### Update Strategies
+- **Conservative Approach**: Small, gradual adjustments
+- **Aggressive Optimization**: Maximize opportunities when they arise
+- **Family-First**: Always consider impact on dependents
+- **Community Coordination**: Align with Chama schedules and goals
+- **Seasonal Planning**: Account for predictable income/expense cycles
+
+### Cultural Considerations
+- **Ubuntu Principle**: Consider community impact of personal changes
+- **Extended Family**: Factor in responsibilities to broader family
+- **Traditional Wisdom**: Apply proven African financial principles
+- **Community Accountability**: Share appropriate updates with trusted advisors
+- **Celebration Culture**: Acknowledge progress and positive changes
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Create Goal" href="/api-reference/savings/create-goal">
+    Create new savings goals
+  </Card>
+  <Card title="Goal Progress" href="/api-reference/savings/progress">
+    Track progress and make contributions
+  </Card>
+  <Card title="Goal Analytics" href="/api-reference/analytics/goals">
+    Detailed goal performance analysis
+  </Card>
+  <Card title="DIVA Score Updates" href="/api-reference/diva-score/get-score">
+    See how goal updates affect DIVA score
+  </Card>
+</CardGroup>
+
+## Testing
+
+### Test Update Scenarios
+
+Use these scenarios in sandbox environment:
+
+| Update Type | Changes | Expected Result |
+|-------------|---------|-----------------|
+| Income increase | +30% monthly contribution | Timeline acceleration |
+| Family growth | +40% target amount | Extended timeline |
+| Inflation adjustment | +12% target amount | Maintained timeline |
+| Performance optimization | Adjust to actual patterns | Improved completion probability |
+| Seasonal adjustment | ±20% monthly contribution | Temporary timeline change |
+
+<Warning>
+Test updates use realistic calculations but don't affect real goals or trigger actual financial transactions in sandbox environment.
+</Warning>
+
+---
+
+**Next Steps**: After updating your goal, [track your progress](/api-reference/savings/progress), [make contributions](/api-reference/savings/progress), or [analyze goal performance](/api-reference/analytics/goals) to ensure you stay on track toward financial success.
+
+This endpoint documentation is coming soon.
+
+<Info>
+This page is under development. Please check back later for complete documentation.
+</Info>
+
+## Authentication
+
+This endpoint requires authentication.
+
+```bash
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+## Request
+
+```bash
+curl -X GET "https://api.awo-platform.com/v1/endpoint" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+## Response
+
+```json
+{
+  "success": true,
+  "data": {}
+}
+```
