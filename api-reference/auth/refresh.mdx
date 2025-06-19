@@ -1,919 +1,728 @@
 ---
-title: 'Token Refresh'
-api: 'POST https://api.awo-platform.com/v1/auth/refresh'
-description: 'Refresh expired access tokens using a valid refresh token'
+title: "Token Refresh"
+description: "Refresh expired access tokens using refresh tokens with automatic rotation and enhanced security for mobile applications"
 ---
+
+# Token Refresh
+
+Refresh expired access tokens using refresh tokens to maintain seamless user sessions. This endpoint implements token rotation and is optimized for African mobile networks with automatic retry mechanisms and offline token caching.
 
 ## Overview
 
-The token refresh endpoint allows you to obtain new access tokens when they expire, without requiring the user to log in again. This ensures a seamless user experience while maintaining security.
-
-AWO uses JWT (JSON Web Tokens) with the following characteristics:
-- **Access Token**: Short-lived (15 minutes), used for API authentication
-- **Refresh Token**: Long-lived (30 days), used to obtain new access tokens
-- **Automatic Token Rotation**: New refresh token issued with each refresh
-
-<Info>
-Implement automatic token refresh in your applications to handle expired tokens gracefully without user intervention.
-</Info>
-
-## Request
-
-### Headers
-
-<ParamField header="X-API-Key" type="string" required>
-  Your AWO API key from the developer dashboard
-</ParamField>
-
-<ParamField header="Content-Type" type="string" required>
-  Must be `application/json`
-</ParamField>
-
-<ParamField header="X-Request-ID" type="string">
-  Optional unique identifier for request tracking and debugging
-</ParamField>
-
-### Body Parameters
-
-<ParamField body="refreshToken" type="string" required>
-  Valid refresh token obtained from login or previous refresh
-  
-  **Format**: JWT string (e.g., `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`)
-</ParamField>
-
-<ParamField body="deviceInfo" type="object">
-  Optional device information for security tracking
-  
-  <Expandable title="deviceInfo object">
-    <ParamField body="deviceId" type="string">
-      Unique device identifier
-    </ParamField>
-    <ParamField body="platform" type="string">
-      Platform type: `ios`, `android`, `web`
-    </ParamField>
-    <ParamField body="appVersion" type="string">
-      Application version
-    </ParamField>
-  </Expandable>
-</ParamField>
-
-## Response
-
-<ResponseField name="success" type="boolean">
-  Indicates if token refresh was successful
-</ResponseField>
-
-<ResponseField name="message" type="string">
-  Human-readable response message
-</ResponseField>
-
-<ResponseField name="data" type="object">
-  <Expandable title="data object">
-    <ResponseField name="accessToken" type="string">
-      New access token for API authentication
-    </ResponseField>
-    <ResponseField name="refreshToken" type="string">
-      New refresh token (replaces the old one)
-    </ResponseField>
-    <ResponseField name="tokenType" type="string">
-      Token type, always "Bearer"
-    </ResponseField>
-    <ResponseField name="expiresIn" type="number">
-      Access token lifetime in seconds (default: 900)
-    </ResponseField>
-    <ResponseField name="expiresAt" type="string">
-      ISO 8601 timestamp when access token expires
-    </ResponseField>
-    <ResponseField name="refreshExpiresIn" type="number">
-      Refresh token lifetime in seconds (default: 2592000)
-    </ResponseField>
-    <ResponseField name="user" type="object">
-      <Expandable title="user object">
-        <ResponseField name="id" type="string">
-          User unique identifier
-        </ResponseField>
-        <ResponseField name="phoneNumber" type="string">
-          User's phone number (masked)
-        </ResponseField>
-        <ResponseField name="firstName" type="string">
-          User's first name
-        </ResponseField>
-        <ResponseField name="lastName" type="string">
-          User's last name
-        </ResponseField>
-      </Expandable>
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
-<ResponseField name="requestId" type="string">
-  Unique request identifier for support and debugging
-</ResponseField>
-
-## Code Examples
-
-<CodeGroup>
-
-```javascript JavaScript
-const refreshAccessToken = async () => {
-  const refreshToken = localStorage.getItem('awo_refresh_token');
-  
-  if (!refreshToken) {
-    throw new Error('No refresh token available');
-  }
-  
-  const response = await fetch('https://api.awo-platform.com/v1/auth/refresh', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': process.env.AWO_API_KEY,
-      'X-Request-ID': crypto.randomUUID()
-    },
-    body: JSON.stringify({
-      refreshToken,
-      deviceInfo: {
-        deviceId: localStorage.getItem('deviceId'),
-        platform: 'web',
-        appVersion: '1.0.0'
-      }
-    })
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    // Handle refresh token expiry
-    if (response.status === 401) {
-      localStorage.removeItem('awo_access_token');
-      localStorage.removeItem('awo_refresh_token');
-      // Redirect to login
-      window.location.href = '/login';
-    }
-    throw new Error(data.message || 'Token refresh failed');
-  }
-  
-  // Store new tokens
-  localStorage.setItem('awo_access_token', data.data.accessToken);
-  localStorage.setItem('awo_refresh_token', data.data.refreshToken);
-  
-  return data;
-};
-
-// Automatic token refresh interceptor
-const apiCallWithAuth = async (url, options = {}) => {
-  let token = localStorage.getItem('awo_access_token');
-  
-  const makeRequest = async (accessToken) => {
-    return fetch(url, {
-      ...options,
-      headers: {
-        ...options.headers,
-        'Authorization': `Bearer ${accessToken}`,
-        'X-API-Key': process.env.AWO_API_KEY
-      }
-    });
-  };
-  
-  let response = await makeRequest(token);
-  
-  // If token expired, refresh and retry
-  if (response.status === 401) {
-    try {
-      await refreshAccessToken();
-      token = localStorage.getItem('awo_access_token');
-      response = await makeRequest(token);
-    } catch (error) {
-      // Refresh failed, redirect to login
-      window.location.href = '/login';
-      throw error;
-    }
-  }
-  
-  return response;
-};
-
-// Usage
-try {
-  const newTokens = await refreshAccessToken();
-  console.log('Tokens refreshed successfully');
-  console.log(`New access token expires at: ${newTokens.data.expiresAt}`);
-} catch (error) {
-  console.error('Refresh error:', error.message);
-}
-```
-
-```python Python
-import requests
-import json
-import os
-from datetime import datetime, timedelta
-
-class TokenManager:
-    def __init__(self, api_key):
-        self.api_key = api_key
-        self.access_token = None
-        self.refresh_token = None
-        self.expires_at = None
+<CardGroup cols={1}>
+  <Card>
+    **POST** `/v1/auth/refresh`
     
-    def refresh_access_token(self):
-        if not self.refresh_token:
-            raise Exception('No refresh token available')
-        
-        response = requests.post(
-            'https://api.awo-platform.com/v1/auth/refresh',
-            headers={
-                'Content-Type': 'application/json',
-                'X-API-Key': self.api_key
-            },
-            json={
-                'refreshToken': self.refresh_token,
-                'deviceInfo': {
-                    'platform': 'python-sdk',
-                    'appVersion': '1.0.0'
-                }
-            }
-        )
-        
-        data = response.json()
-        
-        if not response.ok:
-            if response.status_code == 401:
-                # Refresh token expired
-                self.access_token = None
-                self.refresh_token = None
-                self.expires_at = None
-                raise Exception('Refresh token expired, please login again')
-            raise Exception(data.get('message', 'Token refresh failed'))
-        
-        # Update tokens
-        self.access_token = data['data']['accessToken']
-        self.refresh_token = data['data']['refreshToken']
-        self.expires_at = datetime.fromisoformat(
-            data['data']['expiresAt'].replace('Z', '+00:00')
-        )
-        
-        return data
-    
-    def get_valid_token(self):
-        # Check if token is expired or will expire in next 5 minutes
-        if (not self.access_token or 
-            not self.expires_at or 
-            self.expires_at <= datetime.now() + timedelta(minutes=5)):
-            self.refresh_access_token()
-        
-        return self.access_token
-    
-    def api_call(self, url, method='GET', **kwargs):
-        token = self.get_valid_token()
-        
-        headers = kwargs.get('headers', {})
-        headers.update({
-            'Authorization': f'Bearer {token}',
-            'X-API-Key': self.api_key
-        })
-        kwargs['headers'] = headers
-        
-        return requests.request(method, url, **kwargs)
-
-# Usage
-token_manager = TokenManager(os.getenv('AWO_API_KEY'))
-token_manager.refresh_token = 'your_refresh_token_here'
-
-try:
-    new_tokens = token_manager.refresh_access_token()
-    print('Tokens refreshed successfully')
-    print(f"Access token expires at: {new_tokens['data']['expiresAt']}")
-except Exception as error:
-    print(f"Refresh error: {error}")
-```
-
-```php PHP
-<?php
-class AWOTokenManager {
-    private $apiKey;
-    private $accessToken;
-    private $refreshToken;
-    private $expiresAt;
-    
-    public function __construct($apiKey) {
-        $this->apiKey = $apiKey;
-    }
-    
-    public function setRefreshToken($refreshToken) {
-        $this->refreshToken = $refreshToken;
-    }
-    
-    public function refreshAccessToken() {
-        if (!$this->refreshToken) {
-            throw new Exception('No refresh token available');
-        }
-        
-        $data = [
-            'refreshToken' => $this->refreshToken,
-            'deviceInfo' => [
-                'platform' => 'php-sdk',
-                'appVersion' => '1.0.0'
-            ]
-        ];
-        
-        $options = [
-            'http' => [
-                'header' => [
-                    'Content-Type: application/json',
-                    'X-API-Key: ' . $this->apiKey
-                ],
-                'method' => 'POST',
-                'content' => json_encode($data)
-            ]
-        ];
-        
-        $context = stream_context_create($options);
-        $response = file_get_contents(
-            'https://api.awo-platform.com/v1/auth/refresh',
-            false,
-            $context
-        );
-        
-        if ($response === false) {
-            throw new Exception('Failed to refresh token');
-        }
-        
-        $data = json_decode($response, true);
-        
-        if (!isset($data['success']) || !$data['success']) {
-            if (isset($data['error']['code']) && $data['error']['code'] === 'TOKEN_EXPIRED') {
-                $this->accessToken = null;
-                $this->refreshToken = null;
-                $this->expiresAt = null;
-                throw new Exception('Refresh token expired, please login again');
-            }
-            throw new Exception($data['message'] ?? 'Token refresh failed');
-        }
-        
-        $this->accessToken = $data['data']['accessToken'];
-        $this->refreshToken = $data['data']['refreshToken'];
-        $this->expiresAt = new DateTime($data['data']['expiresAt']);
-        
-        return $data;
-    }
-    
-    public function getValidToken() {
-        $now = new DateTime();
-        $bufferTime = new DateTime('+5 minutes');
-        
-        if (!$this->accessToken || 
-            !$this->expiresAt || 
-            $this->expiresAt <= $bufferTime) {
-            $this->refreshAccessToken();
-        }
-        
-        return $this->accessToken;
-    }
-}
-
-// Usage
-$tokenManager = new AWOTokenManager(getenv('AWO_API_KEY'));
-$tokenManager->setRefreshToken('your_refresh_token_here');
-
-try {
-    $newTokens = $tokenManager->refreshAccessToken();
-    echo "Tokens refreshed successfully\n";
-    echo "Access token expires at: " . $newTokens['data']['expiresAt'] . "\n";
-} catch (Exception $e) {
-    echo "Refresh error: " . $e->getMessage() . "\n";
-}
-?>
-```
-
-```curl cURL
-curl -X POST https://api.awo-platform.com/v1/auth/refresh \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your_api_key_here" \
-  -H "X-Request-ID: $(uuidgen)" \
-  -d '{
-    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "deviceInfo": {
-      "platform": "curl",
-      "appVersion": "1.0.0"
-    }
-  }'
-```
-
-</CodeGroup>
-
-## Response Examples
-
-<CodeGroup>
-
-```json Success Response
-{
-  "success": true,
-  "message": "Token refreshed successfully",
-  "data": {
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfMDFIOFg5WTJaM0E0QjVDNkQ3RThGOUcwSDEiLCJpYXQiOjE2ODc5NjQ4MDAsImV4cCI6MTY4Nzk2NTcwMH0...",
-    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfMDFIOFg5WTJaM0E0QjVDNkQ3RThGOUcwSDEiLCJpYXQiOjE2ODc5NjQ4MDAsImV4cCI6MTY5MDU1NjgwMH0...",
-    "tokenType": "Bearer",
-    "expiresIn": 900,
-    "expiresAt": "2023-06-28T15:30:00Z",
-    "refreshExpiresIn": 2592000,
-    "user": {
-      "id": "usr_01H8X9Y2Z3A4B5C6D7E8F9G0H1",
-      "phoneNumber": "+27***456789",
-      "firstName": "Thandi",
-      "lastName": "Mthembu"
-    }
-  },
-  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H1"
-}
-```
-
-```json Error Response - Invalid Refresh Token
-{
-  "success": false,
-  "message": "Invalid refresh token",
-  "error": {
-    "code": "INVALID_REFRESH_TOKEN",
-    "details": "The provided refresh token is invalid or malformed"
-  },
-  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H2"
-}
-```
-
-```json Error Response - Expired Refresh Token
-{
-  "success": false,
-  "message": "Refresh token has expired",
-  "error": {
-    "code": "TOKEN_EXPIRED",
-    "details": "Please log in again to obtain new tokens",
-    "expiredAt": "2023-06-15T10:30:00Z"
-  },
-  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H3"
-}
-```
-
-```json Error Response - Token Revoked
-{
-  "success": false,
-  "message": "Refresh token has been revoked",
-  "error": {
-    "code": "TOKEN_REVOKED",
-    "details": "This token was revoked due to security reasons. Please log in again.",
-    "revokedAt": "2023-06-20T14:22:30Z",
-    "reason": "suspicious_activity"
-  },
-  "requestId": "req_01H8X9Y2Z3A4B5C6D7E8F9G0H4"
-}
-```
-
-</CodeGroup>
-
-## Error Handling
-
-### HTTP Status Codes
-
-<ResponseField name="HTTP Status Codes" type="object">
-  <Expandable title="Status Codes">
-    <ResponseField name="200" type="Success">
-      Token refreshed successfully
-    </ResponseField>
-    <ResponseField name="400" type="Bad Request">
-      Invalid request format or missing refresh token
-    </ResponseField>
-    <ResponseField name="401" type="Unauthorized">
-      Invalid, expired, or revoked refresh token
-    </ResponseField>
-    <ResponseField name="429" type="Too Many Requests">
-      Rate limit exceeded
-    </ResponseField>
-    <ResponseField name="500" type="Internal Server Error">
-      Server error occurred
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
-### Common Error Codes
-
-| Code | Description | Resolution |
-|------|-------------|------------|
-| `INVALID_REFRESH_TOKEN` | Refresh token is malformed | Check token format |
-| `TOKEN_EXPIRED` | Refresh token has expired | Redirect user to login |
-| `TOKEN_REVOKED` | Token was revoked for security | Redirect user to login |
-| `TOKEN_NOT_FOUND` | Token doesn't exist in system | Redirect user to login |
-| `USER_SUSPENDED` | User account is suspended | Contact support |
-| `DEVICE_MISMATCH` | Token used from different device | Security verification required |
-| `RATE_LIMITED` | Too many refresh attempts | Wait before retrying |
-
-## Token Security
-
-### Security Features
-
-<Accordion title="Token Rotation">
-Each refresh operation issues new access and refresh tokens, invalidating the old ones. This limits the window of vulnerability if tokens are compromised.
-</Accordion>
-
-<Accordion title="Device Binding">
-Refresh tokens are optionally bound to specific devices. Using a token from a different device may trigger security alerts or require additional verification.
-</Accordion>
-
-<Accordion title="Automatic Revocation">
-Tokens are automatically revoked when:
-- Suspicious activity is detected
-- User changes password
-- User logs out from all devices
-- Account is suspended
-</Accordion>
-
-<Accordion title="Rate Limiting">
-Refresh requests are rate-limited per user to prevent abuse:
-- 10 requests per minute per user
-- 100 requests per hour per user
-</Accordion>
-
-## Implementation Best Practices
-
-### Automatic Token Refresh
-
-<CodeGroup>
-
-```javascript React Hook
-import { useEffect, useCallback } from 'react';
-
-const useAutoTokenRefresh = () => {
-  const refreshToken = useCallback(async () => {
-    try {
-      await refreshAccessToken();
-    } catch (error) {
-      // Handle refresh failure
-      console.error('Token refresh failed:', error);
-      // Redirect to login
-      window.location.href = '/login';
-    }
-  }, []);
-
-  useEffect(() => {
-    const token = localStorage.getItem('awo_access_token');
-    if (!token) return;
-
-    // Parse token to get expiry
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const expiryTime = payload.exp * 1000;
-    const currentTime = Date.now();
-    const timeUntilExpiry = expiryTime - currentTime;
-    
-    // Refresh 5 minutes before expiry
-    const refreshTime = Math.max(timeUntilExpiry - 5 * 60 * 1000, 0);
-
-    const timeoutId = setTimeout(refreshToken, refreshTime);
-    
-    return () => clearTimeout(timeoutId);
-  }, [refreshToken]);
-};
-```
-
-```javascript Axios Interceptor
-import axios from 'axios';
-
-// Request interceptor to add token
-axios.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('awo_access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-      config.headers['X-API-Key'] = process.env.AWO_API_KEY;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor to handle token refresh
-axios.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
-      try {
-        await refreshAccessToken();
-        const newToken = localStorage.getItem('awo_access_token');
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        return axios(originalRequest);
-      } catch (refreshError) {
-        // Refresh failed, redirect to login
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      }
-    }
-    
-    return Promise.reject(error);
-  }
-);
-```
-
-</CodeGroup>
-
-### Token Storage
-
-<Warning>
-**Secure Storage**: Store tokens securely to prevent XSS and CSRF attacks. Consider using HttpOnly cookies for web applications or secure storage for mobile apps.
-</Warning>
-
-<CodeGroup>
-
-```javascript Secure Storage (Web)
-class SecureTokenStorage {
-  constructor() {
-    this.storageKey = 'awo_tokens';
-  }
-  
-  // Use encrypted storage or secure cookies
-  setTokens(accessToken, refreshToken) {
-    const tokens = {
-      accessToken,
-      refreshToken,
-      timestamp: Date.now()
-    };
-    
-    // In production, encrypt before storing
-    const encrypted = this.encrypt(JSON.stringify(tokens));
-    localStorage.setItem(this.storageKey, encrypted);
-  }
-  
-  getTokens() {
-    const encrypted = localStorage.getItem(this.storageKey);
-    if (!encrypted) return null;
-    
-    try {
-      const decrypted = this.decrypt(encrypted);
-      return JSON.parse(decrypted);
-    } catch (error) {
-      console.error('Failed to decrypt tokens:', error);
-      this.clearTokens();
-      return null;
-    }
-  }
-  
-  clearTokens() {
-    localStorage.removeItem(this.storageKey);
-  }
-  
-  encrypt(data) {
-    // Implement encryption (e.g., using Web Crypto API)
-    return btoa(data); // Simple base64 for demo
-  }
-  
-  decrypt(data) {
-    // Implement decryption
-    return atob(data); // Simple base64 for demo
-  }
-}
-```
-
-```swift iOS Keychain
-import Security
-
-class AWOTokenManager {
-    private let keychainService = "com.awo-platform.app"
-    private let accessTokenKey = "access_token"
-    private let refreshTokenKey = "refresh_token"
-    
-    func saveTokens(accessToken: String, refreshToken: String) {
-        saveToKeychain(key: accessTokenKey, value: accessToken)
-        saveToKeychain(key: refreshTokenKey, value: refreshToken)
-    }
-    
-    func getAccessToken() -> String? {
-        return getFromKeychain(key: accessTokenKey)
-    }
-    
-    func getRefreshToken() -> String? {
-        return getFromKeychain(key: refreshTokenKey)
-    }
-    
-    func clearTokens() {
-        deleteFromKeychain(key: accessTokenKey)
-        deleteFromKeychain(key: refreshTokenKey)
-    }
-    
-    private func saveToKeychain(key: String, value: String) {
-        let data = value.data(using: .utf8)!
-        
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: key,
-            kSecValueData as String: data
-        ]
-        
-        SecItemDelete(query as CFDictionary)
-        SecItemAdd(query as CFDictionary, nil)
-    }
-    
-    private func getFromKeychain(key: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true
-        ]
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        guard status == errSecSuccess,
-              let data = result as? Data else {
-            return nil
-        }
-        
-        return String(data: data, encoding: .utf8)
-    }
-}
-```
-
-</CodeGroup>
-
-## Testing
-
-### Unit Tests
-
-<CodeGroup>
-
-```javascript Jest Tests
-describe('Token Refresh', () => {
-  beforeEach(() => {
-    localStorage.clear();
-    fetch.resetMocks();
-  });
-
-  test('should refresh token successfully', async () => {
-    const mockResponse = {
-      success: true,
-      data: {
-        accessToken: 'new_access_token',
-        refreshToken: 'new_refresh_token',
-        expiresIn: 900,
-        expiresAt: '2023-06-28T15:30:00Z'
-      }
-    };
-    
-    fetch.mockResponseOnce(JSON.stringify(mockResponse));
-    localStorage.setItem('awo_refresh_token', 'old_refresh_token');
-    
-    const result = await refreshAccessToken();
-    
-    expect(result.success).toBe(true);
-    expect(localStorage.getItem('awo_access_token')).toBe('new_access_token');
-    expect(localStorage.getItem('awo_refresh_token')).toBe('new_refresh_token');
-  });
-
-  test('should clear tokens on expired refresh token', async () => {
-    const mockResponse = {
-      success: false,
-      error: { code: 'TOKEN_EXPIRED' }
-    };
-    
-    fetch.mockResponseOnce(JSON.stringify(mockResponse), { status: 401 });
-    localStorage.setItem('awo_refresh_token', 'expired_token');
-    
-    await expect(refreshAccessToken()).rejects.toThrow();
-    
-    expect(localStorage.getItem('awo_access_token')).toBeNull();
-    expect(localStorage.getItem('awo_refresh_token')).toBeNull();
-  });
-});
-```
-
-```python Pytest Tests
-import pytest
-from unittest.mock import patch, Mock
-
-def test_successful_token_refresh():
-    mock_response = Mock()
-    mock_response.ok = True
-    mock_response.json.return_value = {
-        'success': True,
-        'data': {
-            'accessToken': 'new_access_token',
-            'refreshToken': 'new_refresh_token',
-            'expiresAt': '2023-06-28T15:30:00Z'
-        }
-    }
-    
-    with patch('requests.post', return_value=mock_response):
-        token_manager = TokenManager('test_api_key')
-        token_manager.refresh_token = 'old_refresh_token'
-        
-        result = token_manager.refresh_access_token()
-        
-        assert result['success'] == True
-        assert token_manager.access_token == 'new_access_token'
-        assert token_manager.refresh_token == 'new_refresh_token'
-
-def test_expired_refresh_token():
-    mock_response = Mock()
-    mock_response.ok = False
-    mock_response.status_code = 401
-    mock_response.json.return_value = {
-        'success': False,
-        'error': {'code': 'TOKEN_EXPIRED'}
-    }
-    
-    with patch('requests.post', return_value=mock_response):
-        token_manager = TokenManager('test_api_key')
-        token_manager.refresh_token = 'expired_token'
-        
-        with pytest.raises(Exception) as exc_info:
-            token_manager.refresh_access_token()
-        
-        assert 'expired' in str(exc_info.value).lower()
-        assert token_manager.access_token is None
-        assert token_manager.refresh_token is None
-```
-
-</CodeGroup>
-
-## Monitoring & Analytics
-
-Track token refresh patterns for security and optimization:
-
-<CodeGroup>
-
-```javascript Analytics
-const trackTokenRefresh = (success, error = null) => {
-  // Send to your analytics service
-  analytics.track('token_refresh', {
-    success,
-    error_code: error?.code,
-    timestamp: new Date().toISOString(),
-    user_agent: navigator.userAgent,
-    platform: 'web'
-  });
-};
-
-// In your refresh function
-try {
-  const result = await refreshAccessToken();
-  trackTokenRefresh(true);
-  return result;
-} catch (error) {
-  trackTokenRefresh(false, error);
-  throw error;
-}
-```
-
-```python Monitoring
-import logging
-from datetime import datetime
-
-logger = logging.getLogger(__name__)
-
-def track_token_refresh(success, error_code=None, user_id=None):
-    log_data = {
-        'event': 'token_refresh',
-        'success': success,
-        'timestamp': datetime.utcnow().isoformat(),
-        'user_id': user_id,
-        'error_code': error_code
-    }
-    
-    if success:
-        logger.info('Token refreshed successfully', extra=log_data)
-    else:
-        logger.warning('Token refresh failed', extra=log_data)
-
-# Usage in token manager
-def refresh_access_token(self):
-    try:
-        # ... refresh logic
-        track_token_refresh(True, user_id=self.user_id)
-        return data
-    except Exception as error:
-        track_token_refresh(False, error_code=getattr(error, 'code', 'unknown'))
-        raise
-```
-
-</CodeGroup>
-
-## Next Steps
-
-<CardGroup cols={2}>
-  <Card title="User Profile" icon="user" href="/api-reference/users/profile">
-    Fetch and manage user profile information
-  </Card>
-  <Card title="Logout" icon="sign-out" href="/api-reference/auth/logout">
-    Properly terminate user sessions
-  </Card>
-  <Card title="Bank Connection" icon="bank" href="/api-reference/accounts/connect">
-    Connect bank accounts after authentication
-  </Card>
-  <Card title="Security Best Practices" icon="shield" href="/guides/security">
-    Implement additional security measures
+    **Authentication**: Refresh token required  
+    **Rate Limit**: 20 requests per minute per user  
+    **Response Time**: ~100ms average
   </Card>
 </CardGroup>
 
-<Note>
-Always implement automatic token refresh to provide a seamless user experience. Monitor refresh patterns to detect potential security issues or user experience problems.
-</Note>
+## Token Lifecycle Overview
+
+```mermaid
+sequenceDiagram
+    participant App as Mobile App
+    participant API as AWO API
+    participant Cache as Token Cache
+    
+    Note over App: Access token expires
+    
+    App->>Cache: Check cached refresh token
+    Cache->>App: Return refresh token
+    
+    App->>API: POST /auth/refresh
+    API->>API: Validate refresh token
+    API->>API: Generate new tokens
+    API->>App: New access & refresh tokens
+    
+    App->>Cache: Store new tokens
+    
+    Note over App: Continue with new access token
+    
+    App->>API: Authenticated request
+    API->>App: Success response
+```
+
+## Token Strategy for African Markets
+
+### Offline-First Token Management
+
+AWO Platform's token strategy is designed for African mobile network conditions:
+
+<CardGroup cols={2}>
+  <Card title="Extended Validity" icon="clock">
+    Access tokens: 24 hours, Refresh tokens: 30 days for reduced network dependency
+  </Card>
+  <Card title="Automatic Rotation" icon="arrow-up">
+    New refresh token with each refresh to prevent token hijacking
+  </Card>
+  <Card title="Grace Periods" icon="shield">
+    15-minute overlap during token transitions for network delays
+  </Card>
+  <Card title="Offline Caching" icon="mobile">
+    Secure local storage for seamless offline/online transitions
+  </Card>
+</CardGroup>
+
+## Request Format
+
+### Headers
+
+```http
+Content-Type: application/json
+Authorization: Bearer refresh_token_here
+X-Device-ID: device_unique_identifier (recommended)
+X-App-Version: 1.2.0 (optional)
+```
+
+### Request Body
+
+```json
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfYWJjMTIzIiwidHlwZSI6InJlZnJlc2giLCJpYXQiOjE2NDIyNDg2MDAsImV4cCI6MTY0NDg0MDYwMH0.signature",
+  "deviceInfo": {
+    "deviceId": "device_abc123",
+    "platform": "ios",
+    "appVersion": "1.2.0",
+    "lastSyncAt": "2024-01-15T10:25:00Z"
+  },
+  "options": {
+    "extendExpiry": false,
+    "invalidateOtherTokens": false
+  }
+}
+```
+
+### Parameter Details
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `refreshToken` | string | ✅ | Valid refresh token from previous authentication |
+| `deviceInfo.deviceId` | string | ❌ | Device identifier for security validation |
+| `deviceInfo.platform` | string | ❌ | Platform: `ios`, `android`, `web` |
+| `deviceInfo.appVersion` | string | ❌ | Current app version |
+| `deviceInfo.lastSyncAt` | string | ❌ | Last successful data sync timestamp |
+| `options.extendExpiry` | boolean | ❌ | Request extended token validity (premium feature) |
+| `options.invalidateOtherTokens` | boolean | ❌ | Invalidate all other user sessions |
+
+## Response Format
+
+### Successful Token Refresh
+
+```json
+{
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfYWJjMTIzIiwiaWF0IjoxNjQyMjQ4NjAwLCJleHAiOjE2NDIzMzUwMDB9.new_signature",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfYWJjMTIzIiwidHlwZSI6InJlZnJlc2giLCJpYXQiOjE2NDIyNDg2MDAsImV4cCI6MTY0NDg0MDYwMH0.new_signature",
+    "tokenType": "Bearer",
+    "expiresIn": 86400,
+    "tokenInfo": {
+      "issuedAt": "2024-01-15T10:30:00Z",
+      "expiresAt": "2024-01-16T10:30:00Z",
+      "refreshExpiresAt": "2024-02-14T10:30:00Z",
+      "tokenId": "tok_xyz789",
+      "deviceTrusted": true
+    },
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "status": "active",
+      "permissions": [
+        "wallet:read",
+        "wallet:write",
+        "chama:read",
+        "chama:write"
+      ],
+      "lastActiveAt": "2024-01-15T10:25:00Z"
+    },
+    "session": {
+      "sessionId": "sess_new_xyz789",
+      "deviceId": "device_abc123",
+      "ipAddress": "196.XX.XXX.XXX",
+      "location": {
+        "country": "ZA",
+        "city": "Johannesburg"
+      },
+      "security": {
+        "riskScore": "low",
+        "newDevice": false,
+        "locationChanged": false
+      }
+    }
+  },
+  "meta": {
+    "requestId": "req_refresh_abc123",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "processingTime": "0.089s",
+    "deprecatedToken": {
+      "graceExpiresAt": "2024-01-15T10:45:00Z",
+      "message": "Previous tokens remain valid for 15 minutes"
+    }
+  }
+}
+```
+
+### Invalid or Expired Refresh Token
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_REFRESH_TOKEN",
+    "message": "Refresh token is invalid or has expired",
+    "details": {
+      "reason": "token_expired",
+      "expiredAt": "2024-01-10T10:30:00Z",
+      "requiresReauth": true
+    }
+  },
+  "actions": {
+    "reAuthenticate": {
+      "endpoint": "/auth/login",
+      "method": "POST",
+      "message": "Please log in again to continue"
+    }
+  }
+}
+```
+
+## Implementation Examples
+
+### React Native with Automatic Token Management
+
+```typescript
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+
+interface TokenManager {
+  accessToken: string | null;
+  refreshToken: string | null;
+  isAuthenticated: boolean;
+  refreshTokens: () => Promise<boolean>;
+  logout: () => Promise<void>;
+}
+
+const AuthContext = createContext<TokenManager | null>(null);
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [refreshPromise, setRefreshPromise] = useState<Promise<boolean> | null>(null);
+
+  useEffect(() => {
+    loadStoredTokens();
+    setupTokenRefreshTimer();
+  }, []);
+
+  const loadStoredTokens = async () => {
+    try {
+      const storedAccessToken = await SecureStore.getItemAsync('accessToken');
+      const storedRefreshToken = await SecureStore.getItemAsync('refreshToken');
+      
+      if (storedAccessToken && storedRefreshToken) {
+        // Validate token expiry
+        const tokenPayload = JSON.parse(atob(storedAccessToken.split('.')[1]));
+        const currentTime = Math.floor(Date.now() / 1000);
+        
+        if (tokenPayload.exp > currentTime) {
+          setAccessToken(storedAccessToken);
+          setRefreshToken(storedRefreshToken);
+        } else {
+          // Token expired, try to refresh
+          await refreshTokens();
+        }
+      }
+    } catch (error) {
+      console.error('Error loading stored tokens:', error);
+      await logout();
+    }
+  };
+
+  const refreshTokens = async (): Promise<boolean> => {
+    // Prevent multiple simultaneous refresh attempts
+    if (refreshPromise) {
+      return refreshPromise;
+    }
+
+    const promise = performTokenRefresh();
+    setRefreshPromise(promise);
+    
+    try {
+      const result = await promise;
+      return result;
+    } finally {
+      setRefreshPromise(null);
+    }
+  };
+
+  const performTokenRefresh = async (): Promise<boolean> => {
+    try {
+      const currentRefreshToken = await SecureStore.getItemAsync('refreshToken');
+      
+      if (!currentRefreshToken) {
+        await logout();
+        return false;
+      }
+
+      // Get device information
+      const deviceInfo = {
+        deviceId: await getDeviceId(),
+        platform: Platform.OS,
+        appVersion: getAppVersion(),
+        lastSyncAt: await getLastSyncTime()
+      };
+
+      const response = await fetch('https://api.awo-platform.com/v1/auth/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Device-ID': deviceInfo.deviceId
+        },
+        body: JSON.stringify({
+          refreshToken: currentRefreshToken,
+          deviceInfo,
+          options: {
+            extendExpiry: false,
+            invalidateOtherTokens: false
+          }
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = result.data;
+        
+        // Store new tokens
+        await SecureStore.setItemAsync('accessToken', newAccessToken);
+        await SecureStore.setItemAsync('refreshToken', newRefreshToken);
+        
+        // Update state
+        setAccessToken(newAccessToken);
+        setRefreshToken(newRefreshToken);
+        
+        // Set up next refresh
+        setupTokenRefreshTimer();
+        
+        return true;
+      } else {
+        console.error('Token refresh failed:', result.error);
+        await logout();
+        return false;
+      }
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      
+      // Check if it's a network error - if so, keep current tokens
+      if (error.message.includes('Network') || error.message.includes('timeout')) {
+        console.log('Network error during token refresh, keeping current tokens');
+        return false;
+      }
+      
+      // For other errors, logout
+      await logout();
+      return false;
+    }
+  };
+
+  const setupTokenRefreshTimer = () => {
+    if (!accessToken) return;
+
+    try {
+      // Decode token to get expiry
+      const tokenPayload = JSON.parse(atob(accessToken.split('.')[1]));
+      const expiryTime = tokenPayload.exp * 1000; // Convert to milliseconds
+      const currentTime = Date.now();
+      
+      // Refresh token 5 minutes before expiry
+      const refreshTime = expiryTime - currentTime - (5 * 60 * 1000);
+      
+      if (refreshTime > 0) {
+        setTimeout(() => {
+          refreshTokens();
+        }, refreshTime);
+      }
+    } catch (error) {
+      console.error('Error setting up token refresh timer:', error);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      // Call logout API if we have tokens
+      if (refreshToken) {
+        await fetch('https://api.awo-platform.com/v1/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${refreshToken}`
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error during logout API call:', error);
+    } finally {
+      // Clear tokens regardless of API call success
+      await SecureStore.deleteItemAsync('accessToken');
+      await SecureStore.deleteItemAsync('refreshToken');
+      await SecureStore.deleteItemAsync('userId');
+      
+      setAccessToken(null);
+      setRefreshToken(null);
+    }
+  };
+
+  const contextValue: TokenManager = {
+    accessToken,
+    refreshToken,
+    isAuthenticated: !!accessToken,
+    refreshTokens,
+    logout
+  };
+
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = (): TokenManager => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+// Helper functions
+const getDeviceId = async (): Promise<string> => {
+  // Implementation depends on your device ID strategy
+  return Device.deviceId || await AsyncStorage.getItem('deviceId') || 'unknown';
+};
+
+const getAppVersion = (): string => {
+  return Application.nativeApplicationVersion || '1.0.0';
+};
+
+const getLastSyncTime = async (): Promise<string> => {
+  const lastSync = await AsyncStorage.getItem('lastSyncTime');
+  return lastSync || new Date().toISOString();
+};
+```
+
+### Axios Interceptor for Automatic Token Refresh
+
+```typescript
+import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
+
+class APIClient {
+  private axiosInstance;
+  private refreshPromise: Promise<string> | null = null;
+
+  constructor(baseURL: string) {
+    this.axiosInstance = axios.create({
+      baseURL,
+      timeout: 30000, // 30 second timeout for African networks
+    });
+
+    this.setupInterceptors();
+  }
+
+  private setupInterceptors() {
+    // Request interceptor to add auth token
+    this.axiosInstance.interceptors.request.use(
+      async (config: AxiosRequestConfig) => {
+        const token = await this.getAccessToken();
+        if (token) {
+          config.headers = {
+            ...config.headers,
+            Authorization: `Bearer ${token}`
+          };
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    // Response interceptor to handle token refresh
+    this.axiosInstance.interceptors.response.use(
+      (response: AxiosResponse) => response,
+      async (error: AxiosError) => {
+        const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+
+        // Check if error is due to expired token
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          originalRequest._retry = true;
+
+          try {
+            // Refresh token
+            const newToken = await this.refreshAccessToken();
+            
+            if (newToken) {
+              // Update authorization header and retry request
+              originalRequest.headers = {
+                ...originalRequest.headers,
+                Authorization: `Bearer ${newToken}`
+              };
+              
+              return this.axiosInstance(originalRequest);
+            }
+          } catch (refreshError) {
+            // Refresh failed, redirect to login
+            await this.handleAuthenticationFailure();
+            return Promise.reject(refreshError);
+          }
+        }
+
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  private async getAccessToken(): Promise<string | null> {
+    try {
+      if (Platform.OS !== 'web') {
+        return await SecureStore.getItemAsync('accessToken');
+      } else {
+        // For web, get from httpOnly cookie or secure storage
+        return localStorage.getItem('accessToken');
+      }
+    } catch (error) {
+      console.error('Error getting access token:', error);
+      return null;
+    }
+  }
+
+  private async refreshAccessToken(): Promise<string | null> {
+    // Prevent multiple simultaneous refresh attempts
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = this.performTokenRefresh();
+    
+    try {
+      const result = await this.refreshPromise;
+      return result;
+    } finally {
+      this.refreshPromise = null;
+    }
+  }
+
+  private async performTokenRefresh(): Promise<string | null> {
+    try {
+      const refreshToken = await this.getRefreshToken();
+      
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
+
+      const deviceInfo = await this.getDeviceInfo();
+
+      const response = await axios.post('/auth/refresh', {
+        refreshToken,
+        deviceInfo,
+        options: {
+          extendExpiry: false,
+          invalidateOtherTokens: false
+        }
+      });
+
+      if (response.data.success) {
+        const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+        
+        // Store new tokens
+        await this.storeTokens(accessToken, newRefreshToken);
+        
+        return accessToken;
+      } else {
+        throw new Error('Token refresh failed');
+      }
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      throw error;
+    }
+  }
+
+  private async getRefreshToken(): Promise<string | null> {
+    try {
+      if (Platform.OS !== 'web') {
+        return await SecureStore.getItemAsync('refreshToken');
+      } else {
+        return localStorage.getItem('refreshToken');
+      }
+    } catch (error) {
+      console.error('Error getting refresh token:', error);
+      return null;
+    }
+  }
+
+  private async storeTokens(accessToken: string, refreshToken: string): Promise<void> {
+    try {
+      if (Platform.OS !== 'web') {
+        await SecureStore.setItemAsync('accessToken', accessToken);
+        await SecureStore.setItemAsync('refreshToken', refreshToken);
+      } else {
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+      }
+    } catch (error) {
+      console.error('Error storing tokens:', error);
+    }
+  }
+
+  private async getDeviceInfo() {
+    return {
+      deviceId: await this.getDeviceId(),
+      platform: Platform.OS,
+      appVersion: await this.getAppVersion(),
+      lastSyncAt: new Date().toISOString()
+    };
+  }
+
+  private async handleAuthenticationFailure(): Promise<void> {
+    // Clear stored tokens
+    try {
+      if (Platform.OS !== 'web') {
+        await SecureStore.deleteItemAsync('accessToken');
+        await SecureStore.deleteItemAsync('refreshToken');
+      } else {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+      }
+    } catch (error) {
+      console.error('Error clearing tokens:', error);
+    }
+
+    // Redirect to login or emit event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('auth:logout'));
+    }
+  }
+
+  // Public methods for making API calls
+  async get(url: string, config?: AxiosRequestConfig) {
+    return this.axiosInstance.get(url, config);
+  }
+
+  async post(url: string, data?: any, config?: AxiosRequestConfig) {
+    return this.axiosInstance.post(url, data, config);
+  }
+
+  async put(url: string, data?: any, config?: AxiosRequestConfig) {
+    return this.axiosInstance.put(url, data, config);
+  }
+
+  async delete(url: string, config?: AxiosRequestConfig) {
+    return this.axiosInstance.delete(url, config);
+  }
+}
+
+// Usage
+const apiClient = new APIClient('https://api.awo-platform.com/v1');
+
+// All requests will automatically include auth tokens and handle refresh
+const userProfile = await apiClient.get('/users/profile');
+const divaScore = await apiClient.get('/diva/score');
+```
+
+## Security Considerations
+
+### Token Security Features
+
+<Accordion title="Advanced Security Measures">
+**Token Rotation**:
+- New refresh token issued with each refresh request
+- Previous refresh token immediately invalidated
+- 15-minute grace period for network delays
+
+**Device Validation**:
+- Device ID verification on each refresh
+- Suspicious device activity detection
+- Automatic token revocation for compromised devices
+
+**Geographic Security**:
+- Location-based validation for token refresh
+- Alerts for requests from new countries
+- Risk scoring based on travel patterns
+
+**Network Resilience**:
+- Extended timeouts for African mobile networks
+- Automatic retry with exponential backoff
+- Graceful degradation for connectivity issues
+</Accordion>
+
+### Best Practices
+
+<Steps>
+  <Step title="Secure Storage">
+    Always use secure storage mechanisms (Keychain/Keystore on mobile, httpOnly cookies on web)
+  </Step>
+  <Step title="Token Validation">
+    Validate token expiry before making requests to avoid unnecessary API calls
+  </Step>
+  <Step title="Error Handling">
+    Implement proper error handling for refresh failures and network issues
+  </Step>
+  <Step title="Logout Cleanup">
+    Always clear all stored tokens on logout or authentication failure
+  </Step>
+</Steps>
+
+## Error Responses
+
+### Common Error Scenarios
+
+| Error Code | Description | Resolution |
+|------------|-------------|------------|
+| `INVALID_REFRESH_TOKEN` | Refresh token is invalid, expired, or revoked | Re-authenticate user |
+| `TOKEN_ROTATION_FAILED` | Error generating new tokens | Retry or re-authenticate |
+| `DEVICE_NOT_TRUSTED` | Device not recognized or flagged | Complete device verification |
+| `SUSPICIOUS_ACTIVITY` | Request flagged as suspicious | Contact support or verify identity |
+| `RATE_LIMIT_EXCEEDED` | Too many refresh attempts | Wait and retry with backoff |
+
+### Network Error Handling
+
+```typescript
+// Example network-aware error handling
+const handleRefreshError = (error: any) => {
+  if (error.code === 'NETWORK_ERROR' || error.message.includes('timeout')) {
+    // Network issue - keep current tokens and retry later
+    console.log('Network error during refresh, will retry');
+    scheduleRetry();
+  } else if (error.response?.status === 401) {
+    // Authentication failure - clear tokens and redirect to login
+    clearTokens();
+    redirectToLogin();
+  } else {
+    // Other error - log and continue with current tokens
+    console.error('Refresh error:', error);
+  }
+};
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="User Login" href="/api-reference/auth/login">
+    Initial authentication to obtain tokens
+  </Card>
+  <Card title="User Logout" href="/api-reference/auth/logout">
+    Invalidate tokens and end user session
+  </Card>
+  <Card title="Token Validation" href="/api-reference/auth/validate">
+    Validate token status and permissions
+  </Card>
+  <Card title="Session Management" href="/api-reference/users/sessions">
+    Manage active user sessions and devices
+  </Card>
+</CardGroup>
+
+---
+
+**Next Step**: Implement automatic token refresh in your application or explore [Multi-Factor Authentication](/api-reference/auth/mfa) for enhanced security.

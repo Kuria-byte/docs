@@ -6,13 +6,11 @@
     "dark": "/logo/awo.svg",
     "light": "/logo/awo.svg"
   },
-  
   "favicon": "/favicon.svg",
   "colors": {
-   "primary": "#bc9b25",
+    "primary": "#bc9b25",
     "light": "#bc9b25",
     "dark": "#010101"
-    
   },
   "topbarLinks": [
     {
@@ -22,6 +20,10 @@
     {
       "name": "Status",
       "url": "https://status.awo-platform.com"
+    },
+    {
+      "name": "Business Hub",
+      "url": "https://awo-platform.com/business"
     }
   ],
   "topbarCtaButton": {
@@ -56,22 +58,101 @@
         "group": "Getting Started",
         "pages": [
           "introduction",
-          "quickstart",
-          "development"
+          "platform-overview",
+          "target-users",
+          "key-features",
+          "market-context",
+          "quickstart"
         ]
       },
       {
-        "group": "Essentials",
+        "group": "Quick Setup",
         "pages": [
-          "essentials/architecture",
-          "essentials/design-system",
-          "essentials/code",
-          "essentials/navigation",
-          "essentials/markdown",
-          "essentials/settings",
-          "essentials/images",
-          "essentials/reusable-snippets",
-          "essentials/faq"
+          "quick-setup/development-environment",
+          "quick-setup/api-setup",
+          "quick-setup/mobile-app-setup",
+          "quick-setup/database-configuration",
+          "quick-setup/first-integration"
+        ]
+      },
+      {
+        "group": "Architecture",
+        "pages": [
+          "architecture/system-overview",
+          "architecture/technology-stack",
+          "architecture/component-architecture",
+          "architecture/data-flow",
+          "architecture/security-architecture",
+          "architecture/scalability-design",
+          "architecture/technical-decisions"
+        ]
+      },
+      {
+        "group": "Data Models",
+        "pages": [
+          "data-models/database-schema",
+          "data-models/user-models",
+          "data-models/financial-models",
+          "data-models/chama-models",
+          "data-models/investment-models",
+          "data-models/compliance-models",
+          "data-models/relationships"
+        ]
+      },
+      {
+        "group": "Core Features",
+        "pages": [
+          "core-features/authentication",
+          "core-features/user-management",
+          "core-features/awo-wallet",
+          "core-features/diva-scoring",
+          "core-features/rtsm-assessment",
+          "core-features/basic-chama",
+          "core-features/mobile-money",
+          "core-features/transaction-history"
+        ]
+      },
+      {
+        "group": "Advanced Features",
+        "pages": [
+          "advanced-features/investment-platform",
+          "advanced-features/sme-marketplace",
+          "advanced-features/portfolio-management",
+          "advanced-features/advanced-chama",
+          "advanced-features/wealth-coaching",
+          "advanced-features/youth-accounts",
+          "advanced-features/cross-border-payments",
+          "advanced-features/ussd-banking",
+          "advanced-features/whatsapp-banking",
+          "advanced-features/agent-networks"
+        ]
+      },
+      {
+        "group": "Development",
+        "pages": [
+          "development",
+          "development/environment-setup",
+          "development/project-structure",
+          "development/development-workflow",
+          "development/code-style",
+          "development/component-patterns",
+          "development/state-management",
+          "development/real-time-features",
+          "development/performance-optimization",
+          "development/debugging"
+        ]
+      },
+      {
+        "group": "Testing",
+        "pages": [
+          "testing/testing-strategy",
+          "testing/unit-testing",
+          "testing/integration-testing",
+          "testing/e2e-testing",
+          "testing/financial-testing",
+          "testing/performance-testing",
+          "testing/mobile-testing",
+          "testing/compliance-testing"
         ]
       },
       {
@@ -83,23 +164,31 @@
             "pages": [
               "api-reference/auth/login",
               "api-reference/auth/register",
-              "api-reference/auth/refresh"
+              "api-reference/auth/refresh",
+              "api-reference/auth/mfa",
+              "api-reference/auth/logout"
             ]
           },
           {
-            "group": "Accounts",
-            "pages": [
-              "api-reference/accounts/connect"
-              
-            
-            ]
-          },
-          {
-            "group": "Users",
+            "group": "User Management",
             "pages": [
               "api-reference/users/profile",
               "api-reference/users/update",
-              "api-reference/users/kyc"
+              "api-reference/users/kyc",
+              "api-reference/users/preferences",
+              "api-reference/users/contacts",
+              "api-reference/users/devices"
+            ]
+          },
+          {
+            "group": "Financial Services",
+            "pages": [
+              "api-reference/accounts/list",
+              "api-reference/accounts/connect",
+              "api-reference/transactions/list",
+              "api-reference/transactions/categorize",
+              "api-reference/financial/balance-inquiries",
+              "api-reference/financial/transaction-sync"
             ]
           },
           {
@@ -108,26 +197,20 @@
               "api-reference/diva-score/get-score",
               "api-reference/diva-score/history",
               "api-reference/diva-score/insights",
-              "api-reference/diva-score/refresh"
+              "api-reference/diva-score/refresh",
+              "api-reference/diva-score/rtsm-assessment"
             ]
           },
           {
-            "group": "Financial Data",
-            "pages": [
-              "api-reference/accounts/list",
-              "api-reference/accounts/connect",
-              "api-reference/transactions/list",
-              "api-reference/transactions/categorize"
-            ]
-          },
-          {
-            "group": "Chamas",
+            "group": "Chama Management",
             "pages": [
               "api-reference/chamas/list",
               "api-reference/chamas/create",
               "api-reference/chamas/details",
               "api-reference/chamas/contribute",
-              "api-reference/chamas/members"
+              "api-reference/chamas/members",
+              "api-reference/chamas/governance",
+              "api-reference/chamas/reporting"
             ]
           },
           {
@@ -136,24 +219,47 @@
               "api-reference/savings/goals",
               "api-reference/savings/create-goal",
               "api-reference/savings/update-goal",
-              "api-reference/savings/progress"
+              "api-reference/savings/progress",
+              "api-reference/savings/auto-savings"
             ]
           },
           {
-            "group": "Investments",
+            "group": "Investment Platform",
             "pages": [
               "api-reference/investments/portfolio",
               "api-reference/investments/products",
               "api-reference/investments/buy",
-              "api-reference/investments/sell"
+              "api-reference/investments/sell",
+              "api-reference/investments/sme-marketplace",
+              "api-reference/investments/performance"
             ]
           },
           {
-            "group": "Payments",
+            "group": "Payment Processing",
             "pages": [
               "api-reference/payments/initiate",
               "api-reference/payments/status",
-              "api-reference/payments/history"
+              "api-reference/payments/history",
+              "api-reference/payments/mobile-money",
+              "api-reference/payments/cross-border"
+            ]
+          },
+          {
+            "group": "Wealth Coaching",
+            "pages": [
+              "api-reference/coaching/coach-discovery",
+              "api-reference/coaching/session-management",
+              "api-reference/coaching/content-library",
+              "api-reference/coaching/progress-tracking"
+            ]
+          },
+          {
+            "group": "Notifications",
+            "pages": [
+              "api-reference/notifications/push-notifications",
+              "api-reference/notifications/sms-email",
+              "api-reference/notifications/real-time-updates",
+              "api-reference/notifications/preferences"
             ]
           },
           {
@@ -161,9 +267,69 @@
             "pages": [
               "api-reference/webhooks/overview",
               "api-reference/webhooks/events",
-              "api-reference/webhooks/verification"
+              "api-reference/webhooks/verification",
+              "api-reference/webhooks/payment-events",
+              "api-reference/webhooks/score-events"
             ]
           }
+        ]
+      },
+      {
+        "group": "Integration Guides",
+        "pages": [
+          "integration/open-banking",
+          "integration/stitch-integration",
+          "integration/mono-integration",
+          "integration/flutterwave-setup",
+          "integration/mobile-money",
+          "integration/kyc-integration",
+          "integration/sms-email-setup",
+          "integration/push-notifications",
+          "integration/whatsapp-banking"
+        ]
+      },
+      {
+        "group": "Security",
+        "pages": [
+          "security/overview",
+          "security/authentication-security",
+          "security/data-security",
+          "security/api-security",
+          "security/financial-security",
+          "security/threat-model",
+          "security/incident-response"
+        ]
+      },
+      {
+        "group": "Security Best Practices",
+        "pages": [
+          "security-practices/development-guidelines",
+          "security-practices/infrastructure-security",
+          "security-practices/operational-security",
+          "security-practices/code-review",
+          "security-practices/compliance-practices"
+        ]
+      },
+      {
+        "group": "Deployment",
+        "pages": [
+          "deployment/overview",
+          "deployment/environment-setup",
+          "deployment/backend-deployment",
+          "deployment/mobile-deployment",
+          "deployment/database-deployment",
+          "deployment/monitoring-setup"
+        ]
+      },
+      {
+        "group": "Infrastructure",
+        "pages": [
+          "infrastructure/overview",
+          "infrastructure/database-infrastructure",
+          "infrastructure/application-infrastructure",
+          "infrastructure/devops-cicd",
+          "infrastructure/security-infrastructure",
+          "infrastructure/monitoring-logging"
         ]
       },
       {
@@ -176,11 +342,15 @@
           "guides/payment-processing",
           "guides/mobile-app-setup",
           "guides/web-app-setup",
+          "guides/portfolio-setup",
+          "guides/wealth-coaching-setup",
+          "guides/youth-accounts",
           "guides/testing-strategies",
           "guides/deployment",
           "guides/monitoring",
           "guides/troubleshooting",
-          "guides/best-practices"
+          "guides/best-practices",
+          "guides/migration-guides"
         ]
       },
       {
@@ -214,14 +384,58 @@
         ]
       },
       {
+        "group": "Business",
+        "pages": [
+          "business/market-analysis",
+          "business/product-strategy",
+          "business/business-model",
+          "business/success-metrics",
+          "business/risk-assessment",
+          "business/partnership-opportunities",
+          "business/roi-analysis"
+        ]
+      },
+      {
+        "group": "Compliance",
+        "pages": [
+          "compliance/regulatory-framework",
+          "compliance/data-protection",
+          "compliance/financial-compliance",
+          "compliance/operational-compliance",
+          "compliance/sadc-requirements",
+          "compliance/audit-procedures"
+        ]
+      },
+      {
+        "group": "Essentials",
+        "pages": [
+          "essentials/architecture",
+          "essentials/design-system",
+          "essentials/code",
+          "essentials/navigation",
+          "essentials/markdown",
+          "essentials/settings",
+          "essentials/images",
+          "essentials/reusable-snippets",
+          "essentials/faq"
+        ]
+      },
+      {
         "group": "Resources",
         "pages": [
           "resources/examples",
+          "resources/code-samples",
+          "resources/sdks-libraries",
+          "resources/tools-utilities",
           "resources/postman-collection",
           "resources/openapi-spec",
+          "resources/database-schema",
+          "resources/configuration-templates",
           "resources/status-codes",
           "resources/rate-limits",
+          "resources/error-codes",
           "resources/webhooks-reference",
+          "resources/external-resources",
           "resources/glossary",
           "resources/changelog"
         ]
@@ -241,7 +455,8 @@
   },
   "feedback": {
     "suggestEdit": true,
-    "raiseIssue": true
+    "raiseIssue": true,
+    "thumbsRating": true
   },
   "search": {
     "prompt": "Search AWO documentation..."

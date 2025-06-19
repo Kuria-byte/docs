@@ -1,0 +1,49 @@
+---
+title: "Database Schema"
+description: "AWO Platform database schema schema and relationships"
+---
+
+# Database Schema
+
+## Overview
+
+<Info>
+This section documents the database schema used in the AWO Platform for financial services.
+</Info>
+
+## Schema Definition
+
+Database schema and model definitions will be provided here.
+
+```sql
+-- Schema example will be added
+CREATE TABLE example (
+  id SERIAL PRIMARY KEY,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+## Relationships
+
+Entity relationships and data flow will be documented here.
+
+## Usage Examples
+
+<CodeGroup>
+```typescript TypeScript
+// TypeScript interface example
+interface ExampleModel {
+  id: number;
+  createdAt: Date;
+}
+```
+
+```sql SQL Query
+-- SQL query example
+SELECT * FROM example WHERE id = $1;
+```
+</CodeGroup>
+
+## Best Practices
+
+Data modeling best practices will be included here.

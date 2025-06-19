@@ -1,0 +1,727 @@
+---
+title: "Development Environment Setup"
+description: "Complete guide to setting up your AWO Platform development environment with all necessary tools and dependencies"
+---
+
+# Development Environment Setup
+
+This guide will walk you through setting up a complete AWO Platform development environment. By the end, you'll have everything needed to build, test, and deploy AWO applications including mobile apps, backend services, and integrations.
+
+<Info>
+**Time Required**: 30-45 minutes for complete setup  
+**Prerequisites**: Basic familiarity with command line and development tools
+</Info>
+
+## Prerequisites Checklist
+
+Before starting, ensure your system meets these requirements:
+
+<Steps>
+  <Step title="Operating System">
+    **Supported**: macOS 10.15+, Windows 10+, Ubuntu 18.04+  
+    **Recommended**: macOS or Ubuntu for optimal development experience
+  </Step>
+  <Step title="Hardware Requirements">
+    **Minimum**: 8GB RAM, 50GB free disk space  
+    **Recommended**: 16GB RAM, 100GB free disk space, SSD storage
+  </Step>
+  <Step title="Network Access">
+    Stable internet connection for package downloads and API testing
+  </Step>
+</Steps>
+
+## Core Development Tools
+
+### 1. Node.js and Package Management
+
+<Accordion title="Node.js Installation & Setup">
+**Install Node.js 18+ (LTS recommended)**
+
+```bash
+# Using Node Version Manager (recommended)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+source ~/.bashrc
+
+# Install and use Node.js 18 LTS
+nvm install 18
+nvm use 18
+nvm alias default 18
+
+# Verify installation
+node --version  # Should show v18.x.x
+npm --version   # Should show 9.x.x or higher
+```
+
+**Alternative: Direct Installation**
+- Download from [nodejs.org](https://nodejs.org/)
+- Choose the LTS version (18.x.x)
+- Follow platform-specific installation instructions
+
+**Configure npm for African Networks**
+```bash
+# Set registry and increase timeout for slower connections
+npm config set registry https://registry.npmjs.org/
+npm config set timeout 300000
+npm config set network-timeout 300000
+
+# Configure proxy if needed (replace with your proxy settings)
+# npm config set proxy http://proxy.company.com:8080
+# npm config set https-proxy https://proxy.company.com:8080
+```
+</Accordion>
+
+### 2. Git Version Control
+
+```bash
+# Install Git (if not already installed)
+# Ubuntu/Debian
+sudo apt update && sudo apt install git
+
+# macOS (using Homebrew)
+brew install git
+
+# Windows: Download from https://git-scm.com/
+
+# Configure Git
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+git config --global init.defaultBranch main
+
+# Generate SSH key for GitHub (recommended)
+ssh-keygen -t ed25519 -C "your.email@example.com"
+```
+
+### 3. Code Editor Setup
+
+<Accordion title="VS Code Configuration for AWO Development">
+**Install Visual Studio Code**
+- Download from [code.visualstudio.com](https://code.visualstudio.com/)
+- Follow platform-specific installation instructions
+
+**Essential Extensions**
+```bash
+# Install via command line
+code --install-extension ms-vscode.vscode-typescript-next
+code --install-extension bradlc.vscode-tailwindcss
+code --install-extension ms-vscode.vscode-json
+code --install-extension formulahendry.auto-rename-tag
+code --install-extension esbenp.prettier-vscode
+code --install-extension ms-vscode.vscode-eslint
+code --install-extension ms-vscode-remote.remote-containers
+code --install-extension github.copilot
+```
+
+**VS Code Settings for AWO Development**
+```json
+{
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "emmet.includeLanguages": {
+    "typescript": "typescriptreact"
+  },
+  "files.associations": {
+    "*.mdx": "markdown"
+  }
+}
+```
+</Accordion>
+
+## Mobile Development Setup
+
+### 1. React Native Environment
+
+<Accordion title="React Native Development Environment">
+**Install Expo CLI**
+```bash
+# Install Expo CLI globally
+npm install -g @expo/cli
+
+# Verify installation
+expo --version
+
+# Login to Expo (create account at expo.dev if needed)
+expo login
+```
+
+**Android Development (Optional but Recommended)**
+```bash
+# Install Android Studio
+# Download from https://developer.android.com/studio
+
+# Set up Android SDK (after Android Studio installation)
+export ANDROID_HOME=$HOME/Android/Sdk
+export PATH=$PATH:$ANDROID_HOME/emulator
+export PATH=$PATH:$ANDROID_HOME/tools
+export PATH=$PATH:$ANDROID_HOME/tools/bin
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+
+# Add to ~/.bashrc or ~/.zshrc for persistence
+echo 'export ANDROID_HOME=$HOME/Android/Sdk' >> ~/.bashrc
+echo 'export PATH=$PATH:$ANDROID_HOME/emulator' >> ~/.bashrc
+echo 'export PATH=$PATH:$ANDROID_HOME/tools' >> ~/.bashrc
+echo 'export PATH=$PATH:$ANDROID_HOME/platform-tools' >> ~/.bashrc
+```
+
+**iOS Development (macOS only)**
+```bash
+# Install Xcode from Mac App Store
+# Install Xcode Command Line Tools
+xcode-select --install
+
+# Install iOS Simulator
+# Open Xcode > Preferences > Components > Install iOS Simulator
+```
+
+**Install Device Simulators**
+```bash
+# Create Android Virtual Device (after Android Studio setup)
+# Open Android Studio > AVD Manager > Create Virtual Device
+# Choose Pixel 4 or similar mid-range device for testing
+
+# For iOS (macOS only)
+# Simulators are installed with Xcode
+# iPhone 12 or iPhone SE recommended for testing
+```
+</Accordion>
+
+### 2. Testing on Physical Devices
+
+<Accordion title="Physical Device Testing Setup">
+**Install Expo Go App**
+- **Android**: [Google Play Store](https://play.google.com/store/apps/details?id=host.exp.exponent)
+- **iOS**: [App Store](https://apps.apple.com/app/expo-go/id982107779)
+
+**Enable Developer Mode**
+
+**Android**:
+```bash
+# Enable Developer Options
+# Settings > About Phone > Tap "Build Number" 7 times
+# Settings > Developer Options > Enable "USB Debugging"
+
+# Verify device connection
+adb devices
+```
+
+**iOS**:
+- Connect device to Mac via USB
+- Open Xcode > Window > Devices and Simulators
+- Trust the computer when prompted on device
+- Device should appear in Xcode devices list
+
+**Network Configuration for African Development**
+- Ensure device and development machine are on same WiFi network
+- For mobile networks, consider using ngrok for external access:
+```bash
+# Install ngrok for external access
+npm install -g ngrok
+
+# Expose local development server
+ngrok http 3000
+```
+</Accordion>
+
+## Backend Development Setup
+
+### 1. Database Setup
+
+<Accordion title="Neon PostgreSQL Configuration">
+**Create Neon Account**
+1. Sign up at [neon.tech](https://neon.tech/)
+2. Create new project named "awo-dev"
+3. Note your connection string
+
+**Local PostgreSQL (Alternative)**
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+
+# macOS
+brew install postgresql
+brew services start postgresql
+
+# Windows: Download from https://www.postgresql.org/download/windows/
+
+# Create development database
+sudo -u postgres createdb awo_development
+sudo -u postgres createuser --interactive awo_user
+```
+
+**Database Tools**
+```bash
+# Install database management tools
+npm install -g @neon/cli
+
+# Or use GUI tools
+# - TablePlus (macOS/Windows)
+# - pgAdmin (Cross-platform)
+# - DBeaver (Cross-platform, free)
+```
+</Accordion>
+
+### 2. Redis Setup
+
+<Accordion title="Redis Installation for Caching">
+**Install Redis**
+```bash
+# Ubuntu/Debian
+sudo apt install redis-server
+
+# macOS
+brew install redis
+brew services start redis
+
+# Windows: Use Redis for Windows or Docker
+# Docker approach (recommended for Windows)
+docker run --name awo-redis -p 6379:6379 -d redis:7-alpine
+```
+
+**Verify Redis Installation**
+```bash
+# Test Redis connection
+redis-cli ping
+# Should respond with "PONG"
+
+# Test basic operations
+redis-cli set test "hello"
+redis-cli get test
+# Should return "hello"
+```
+
+**Redis Configuration for Development**
+```bash
+# Edit Redis config (optional)
+sudo nano /etc/redis/redis.conf
+
+# Key settings for development:
+# maxmemory 256mb
+# maxmemory-policy allkeys-lru
+# save 900 1
+```
+</Accordion>
+
+## AWO Platform Setup
+
+### 1. Clone Repository
+
+```bash
+# Clone main AWO repository
+git clone https://github.com/awo-platform/awo-core.git
+cd awo-core
+
+# Install dependencies
+npm install
+
+# Set up workspace (if using npm workspaces)
+npm run setup:workspace
+```
+
+### 2. Environment Configuration
+
+<Accordion title="Environment Variables Setup">
+**Create Environment Files**
+```bash
+# Create environment file from template
+cp .env.example .env
+
+# Edit environment variables
+nano .env
+```
+
+**Essential Environment Variables**
+```env
+# Database Configuration
+DATABASE_URL="postgresql://username:password@localhost:5432/awo_development"
+REDIS_URL="redis://localhost:6379"
+
+# API Configuration
+NODE_ENV="development"
+PORT=3000
+JWT_SECRET="your-super-secret-jwt-key-for-development"
+API_VERSION="v1"
+
+# External Service Keys (get from respective dashboards)
+STITCH_API_KEY="your-stitch-api-key"
+STITCH_SECRET="your-stitch-secret"
+MONO_API_KEY="your-mono-api-key"
+FLUTTERWAVE_PUBLIC_KEY="your-flutterwave-public-key"
+FLUTTERWAVE_SECRET_KEY="your-flutterwave-secret-key"
+SMILE_ID_API_KEY="your-smile-id-api-key"
+
+# Communication Services
+TWILIO_ACCOUNT_SID="your-twilio-account-sid"
+TWILIO_AUTH_TOKEN="your-twilio-auth-token"
+SENDGRID_API_KEY="your-sendgrid-api-key"
+
+# Development Settings
+ENABLE_CORS=true
+ENABLE_LOGGING=true
+ENABLE_RATE_LIMITING=false
+```
+
+**Secure Environment Management**
+```bash
+# Install and configure direnv for automatic environment loading
+# Ubuntu/Debian
+sudo apt install direnv
+
+# macOS
+brew install direnv
+
+# Add to shell configuration
+echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
+# or for zsh
+echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc
+
+# Allow directory
+direnv allow
+```
+</Accordion>
+
+### 3. Database Initialization
+
+```bash
+# Run database migrations
+npm run db:migrate
+
+# Seed development data
+npm run db:seed
+
+# Verify database setup
+npm run db:verify
+
+# Optional: Create test data for DIVA scoring
+npm run db:seed:test-users
+```
+
+### 4. Service Dependencies
+
+<Accordion title="External Service Account Setup">
+**Required for Development**:
+
+**Stitch (Open Banking - South Africa)**
+1. Sign up at [stitch.money](https://stitch.money/)
+2. Create sandbox application
+3. Get API keys and client credentials
+4. Configure webhook endpoints
+
+**Mono (Open Banking - Nigeria/Kenya/Ghana)**
+1. Sign up at [mono.co](https://mono.co/)
+2. Create test application
+3. Get API keys and configure sandbox
+4. Set up webhook URLs
+
+**Flutterwave (Payments)**
+1. Sign up at [flutterwave.com](https://flutterwave.com/)
+2. Create test application
+3. Get sandbox API keys
+4. Configure webhook endpoints
+
+**Smile ID (KYC/Identity)**
+1. Sign up at [smileidentity.com](https://smileidentity.com/)
+2. Get sandbox API credentials
+3. Configure partner settings
+4. Test with sample documents
+
+**Communication Services (Optional for basic development)**
+- **Twilio**: SMS and voice services
+- **SendGrid**: Email delivery
+- **Expo**: Push notifications (included with Expo account)
+</Accordion>
+
+## Development Workflow Setup
+
+### 1. Git Hooks and Quality Gates
+
+```bash
+# Install development dependencies
+npm install --save-dev husky lint-staged prettier eslint
+
+# Set up Git hooks
+npx husky install
+npx husky add .husky/pre-commit "lint-staged"
+npx husky add .husky/commit-msg "commitlint --edit $1"
+
+# Configure lint-staged
+cat > .lintstagedrc.json << EOF
+{
+  "*.{ts,tsx,js,jsx}": [
+    "eslint --fix",
+    "prettier --write"
+  ],
+  "*.{json,md,mdx}": [
+    "prettier --write"
+  ]
+}
+EOF
+```
+
+### 2. Testing Setup
+
+<Accordion title="Testing Environment Configuration">
+**Install Testing Dependencies**
+```bash
+# Core testing frameworks
+npm install --save-dev jest @types/jest ts-jest
+npm install --save-dev supertest @types/supertest
+npm install --save-dev @testing-library/react-native
+npm install --save-dev detox @detox/cli
+
+# Financial calculation testing
+npm install --save-dev @awo/test-utils
+
+# Mock services for development
+npm install --save-dev msw
+```
+
+**Jest Configuration**
+```json
+// jest.config.js
+module.exports = {
+  preset: 'react-native',
+  testEnvironment: 'node',
+  setupFilesAfterEnv: ['<rootDir>/src/test-setup.ts'],
+  testMatch: [
+    '**/__tests__/**/*.(ts|tsx|js)',
+    '**/*.(test|spec).(ts|tsx|js)'
+  ],
+  collectCoverageFrom: [
+    'src/**/*.(ts|tsx)',
+    '!src/**/*.d.ts',
+    '!src/test-utils/**/*'
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 70,
+      lines: 70,
+      statements: 70
+    }
+  }
+};
+```
+
+**Run Test Suite**
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run specific test suites
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+```
+</Accordion>
+
+## Verification & Testing
+
+### 1. Verify Development Environment
+
+<Accordion title="Environment Verification Checklist">
+**Run Complete Verification**
+```bash
+# Run environment verification script
+npm run verify:environment
+
+# Manual verification steps
+echo "✅ Node.js version:" && node --version
+echo "✅ npm version:" && npm --version
+echo "✅ Git version:" && git --version
+echo "✅ Expo CLI:" && expo --version
+
+# Database connectivity
+npm run db:test-connection
+
+# Redis connectivity
+redis-cli ping
+
+# External API connectivity (with test keys)
+npm run test:external-apis
+```
+
+**Expected Output**
+```
+✅ Node.js version: v18.17.0
+✅ npm version: 9.6.7
+✅ Git version: 2.34.1
+✅ Expo CLI: 6.3.2
+✅ Database connection: Connected to PostgreSQL
+✅ Redis connection: PONG
+✅ External APIs: All test endpoints responding
+🎉 Development environment ready!
+```
+</Accordion>
+
+### 2. Start Development Servers
+
+```bash
+# Terminal 1: Start backend API server
+npm run dev:backend
+
+# Terminal 2: Start React Native development server
+npm run dev:mobile
+
+# Terminal 3: Start additional services (optional)
+npm run dev:workers  # Background job processors
+npm run dev:redis    # Redis server if not running
+```
+
+### 3. Test Basic Functionality
+
+<Accordion title="Basic Functionality Tests">
+**API Testing**
+```bash
+# Test API health endpoint
+curl http://localhost:3000/api/v1/health
+
+# Test authentication
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}'
+```
+
+**Mobile App Testing**
+```bash
+# Start Expo development server
+npm run dev:mobile
+
+# Open on device/simulator
+# Scan QR code with Expo Go app (physical device)
+# Press 'i' for iOS simulator or 'a' for Android emulator
+```
+
+**Database Testing**
+```bash
+# Test DIVA score calculation
+npm run test:diva-calculation
+
+# Test Chama creation
+npm run test:chama-creation
+
+# Test payment processing (with test data)
+npm run test:payment-flow
+```
+</Accordion>
+
+## Troubleshooting
+
+### Common Issues
+
+<Accordion title="Node.js and npm Issues">
+**Issue**: `npm install` fails with permission errors
+
+**Solution**:
+```bash
+# Fix npm permissions (avoid using sudo)
+mkdir ~/.npm-global
+npm config set prefix '~/.npm-global'
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Issue**: `node-gyp` compilation errors
+
+**Solution**:
+```bash
+# Ubuntu/Debian
+sudo apt install build-essential python3
+
+# macOS
+xcode-select --install
+
+# Windows
+npm install --global windows-build-tools
+```
+</Accordion>
+
+<Accordion title="Database Connection Issues">
+**Issue**: PostgreSQL connection refused
+
+**Solution**:
+```bash
+# Check PostgreSQL status
+sudo systemctl status postgresql
+
+# Start PostgreSQL if stopped
+sudo systemctl start postgresql
+
+# Check connection with correct credentials
+psql -h localhost -U your_username -d awo_development
+```
+
+**Issue**: Neon database connection timeout
+
+**Solution**:
+- Check internet connectivity
+- Verify connection string format
+- Ensure IP address is whitelisted in Neon dashboard
+- Test with longer timeout settings
+</Accordion>
+
+<Accordion title="Mobile Development Issues">
+**Issue**: Expo QR code not scanning
+
+**Solution**:
+- Ensure phone and computer are on same WiFi network
+- Try using tunnel mode: `expo start --tunnel`
+- Check firewall settings
+- Use device IP directly in Expo Go
+
+**Issue**: Android emulator not starting
+
+**Solution**:
+```bash
+# Check ANDROID_HOME environment variable
+echo $ANDROID_HOME
+
+# Start emulator manually
+emulator -list-avds
+emulator -avd Pixel_4_API_30
+```
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Integration" icon="code" href="/guides/integration-walkthrough">
+    Start building with AWO APIs using our comprehensive integration guide
+  </Card>
+  <Card title="Mobile App Development" icon="mobile" href="/quick-setup/mobile-app-setup">
+    Set up React Native development with AWO components and navigation
+  </Card>
+  <Card title="Banking Integration" icon="bank" href="/integration/open-banking">
+    Connect real bank accounts using Stitch and Mono APIs
+  </Card>
+  <Card title="Testing Strategies" icon="flask" href="/testing/testing-strategy">
+    Learn testing approaches for financial applications and DIVA calculations
+  </Card>
+</CardGroup>
+
+## Development Resources
+
+<CardGroup cols={3}>
+  <Card title="API Documentation" icon="book">
+    Complete API reference with examples and testing tools
+  </Card>
+  <Card title="Component Library" icon="puzzle-piece">
+    Reusable UI components optimized for African mobile networks
+  </Card>
+  <Card title="Developer Discord" icon="discord">
+    Join our community for real-time help and collaboration
+  </Card>
+</CardGroup>
+
+---
+
+**Congratulations!** Your AWO Platform development environment is ready. You're now set up to build financial solutions that empower African women. 🚀

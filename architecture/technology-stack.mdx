@@ -1,0 +1,545 @@
+---
+title: "Technology Stack"
+description: "Detailed breakdown of AWO Platform's technology choices optimized for African financial services and scalability"
+---
+
+# Technology Stack
+
+AWO Platform's technology stack is carefully chosen to optimize for African market conditions while maintaining scalability, security, and developer productivity. Every technology decision prioritizes reliability, cost-effectiveness, and ease of maintenance over complexity.
+
+## Stack Overview
+
+<CardGroup cols={2}>
+  <Card title="Frontend Technologies" icon="mobile">
+    React Native (Expo), TypeScript, Zustand + React Query, AsyncStorage for offline support
+  </Card>
+  <Card title="Backend Technologies" icon="server">
+    Express.js, TypeScript, Socket.io, Node.js with background job processing
+  </Card>
+  <Card title="Database & Storage" icon="database">
+    Neon PostgreSQL (serverless), Redis caching, S3-compatible object storage
+  </Card>
+  <Card title="Infrastructure" icon="cloud">
+    Railway/Render hosting, Cloudflare CDN, automated CI/CD, monitoring and analytics
+  </Card>
+</CardGroup>
+
+## Frontend Architecture
+
+### React Native with Expo
+
+<Accordion title="Why React Native + Expo for African Markets?">
+**Cross-Platform Efficiency**
+- Single JavaScript codebase for iOS and Android reduces development time by 60%
+- Consistent user experience across all device types and price ranges
+- Shared business logic and API integration code
+- Lower maintenance overhead with unified testing and deployment
+
+**Expo Platform Advantages**
+- **Over-the-air (OTA) updates**: Critical for African markets where app store updates can be slow or expensive
+- **Simplified development**: Built-in features for camera, location, push notifications without native code
+- **Device compatibility**: Excellent support for mid-range Android devices common in African markets
+- **Debugging tools**: Superior debugging experience with Flipper integration and remote debugging
+
+**African Market Optimizations**
+- **Offline-first design**: Works seamlessly with intermittent connectivity
+- **Data efficiency**: Optimized for expensive mobile data with smart caching
+- **Battery optimization**: Efficient background processing and minimal battery drain
+- **Device performance**: Optimized for lower-spec devices with 2-4GB RAM
+</Accordion>
+
+**Key Libraries & Tools**:
+
+| Library | Purpose | African-Specific Benefits |
+|---------|---------|--------------------------|
+| **Expo Router** | Navigation | File-based routing, automatic deep linking for payment flows |
+| **Expo SecureStore** | Credentials | Hardware-backed secure storage for banking credentials |
+| **Expo Notifications** | Push notifications | Reliable delivery even with background restrictions |
+| **AsyncStorage** | Offline data | Local persistence during connectivity issues |
+| **React Query** | Server state | Intelligent caching and background sync |
+| **Zustand** | Local state | Lightweight state management with persistence |
+
+### State Management Strategy
+
+```typescript
+// Zustand store for global app state
+interface AppStore {
+  user: User | null;
+  divaScore: DivaScore | null;
+  chamas: Chama[];
+  connectionStatus: 'online' | 'offline';
+  
+  // Actions
+  setUser: (user: User) => void;
+  updateDivaScore: (score: DivaScore) => void;
+  syncOfflineData: () => Promise<void>;
+}
+
+// React Query for server state management
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+      retry: (failureCount, error) => {
+        // African-specific retry logic for connectivity issues
+        if (error.message.includes('Network Error')) {
+          return failureCount < 3;
+        }
+        return false;
+      }
+    }
+  }
+});
+```
+
+### Offline-First Architecture
+
+<Accordion title="Offline Capabilities Implementation">
+**Data Synchronization Strategy**
+- **Critical data**: User profile, DIVA scores, chama balances stored locally
+- **Optimistic updates**: UI updates immediately, syncs to server when online
+- **Conflict resolution**: Last-write-wins for most data, manual resolution for financial conflicts
+- **Background sync**: Automatic synchronization when connectivity restored
+
+**Storage Hierarchy**
+```typescript
+// Local storage priority system
+interface OfflineStorage {
+  // Level 1: Critical data (always cached)
+  userProfile: User;
+  divaScore: DivaScore;
+  chamaBalances: ChamaBalance[];
+  
+  // Level 2: Frequently accessed (cached with TTL)
+  transactionHistory: Transaction[];
+  investmentPortfolio: Portfolio;
+  
+  // Level 3: Nice-to-have (cached if space available)
+  educationalContent: EducationModule[];
+  coachingResources: CoachingResource[];
+}
+```
+
+**Progressive Sync Implementation**
+1. **Immediate**: Critical financial data (balances, scores)
+2. **Background**: Transaction history and activity logs  
+3. **On-demand**: Educational content and non-critical features
+4. **Scheduled**: Daily sync of analytics and performance data
+</Accordion>
+
+## Backend Architecture
+
+### Express.js + TypeScript
+
+<Accordion title="Why Express.js over Alternatives?">
+**Simplicity and Productivity**
+- **Fast development cycle**: Rapid iteration compared to heavier frameworks like NestJS
+- **Minimal learning curve**: Easy onboarding for African developers
+- **Extensive ecosystem**: Vast npm ecosystem with African-specific integrations
+- **Debugging simplicity**: Straightforward debugging and error tracking
+
+**TypeScript Integration Benefits**
+- **Financial safety**: Type safety crucial for financial calculations and data handling
+- **API contracts**: Strong typing for requests/responses reduces integration errors
+- **Developer experience**: Excellent IDE support and autocomplete
+- **Runtime safety**: Catch errors at compile-time rather than in production
+
+**African Infrastructure Advantages**
+- **Lightweight footprint**: Lower hosting costs on African cloud providers
+- **Fast startup times**: Critical for auto-scaling in variable traffic patterns
+- **Simple deployment**: Easy deployment to multiple African regions
+- **Resource efficiency**: Lower memory and CPU usage compared to alternatives
+</Accordion>
+
+**Backend Service Architecture**:
+
+```typescript
+// Modular service architecture
+interface ServiceLayer {
+  auth: AuthService;
+  users: UserService;
+  diva: DivaScoreService;
+  chamas: ChamaService;
+  payments: PaymentService;
+  investments: InvestmentService;
+  notifications: NotificationService;
+}
+
+// Example service implementation
+class DivaScoreService {
+  constructor(
+    private db: DatabaseService,
+    private cache: CacheService,
+    private realtime: RealtimeService
+  ) {}
+  
+  async calculateScore(userId: string): Promise<DivaScore> {
+    // Check cache first
+    const cached = await this.cache.get(`diva:${userId}`);
+    if (cached && !this.isStale(cached)) return cached;
+    
+    // Calculate fresh score
+    const score = await this.performCalculation(userId);
+    
+    // Cache and broadcast
+    await this.cache.set(`diva:${userId}`, score, '1h');
+    this.realtime.broadcast(`user:${userId}`, 'diva:updated', score);
+    
+    return score;
+  }
+}
+```
+
+### Real-time Layer: Socket.io
+
+<Accordion title="Socket.io for African Connectivity">
+**Connection Resilience**
+- **Automatic fallback**: WebSocket → HTTP polling → XHR polling
+- **Reconnection logic**: Exponential backoff optimized for African network patterns
+- **Heartbeat monitoring**: Detect connection drops quickly in unstable networks
+- **Bandwidth optimization**: Efficient binary protocol with message compression
+
+**Chama-Specific Real-time Features**
+- **Group notifications**: Instant updates when members contribute or vote
+- **Live voting**: Real-time governance with vote counting and consensus tracking
+- **Activity feeds**: Live stream of group activities and member interactions
+- **Payment confirmations**: Instant payment status updates across all group members
+
+**Scalability Architecture**
+```typescript
+// Socket.io with Redis adapter for horizontal scaling
+const io = new Server(server, {
+  adapter: createRedisAdapter(redisClient),
+  transports: ['websocket', 'polling'],
+  pingInterval: 25000, // Optimized for African mobile networks
+  pingTimeout: 20000,
+});
+
+// Room-based messaging for efficient group management
+io.on('connection', (socket) => {
+  socket.on('join-chama', (chamaId) => {
+    socket.join(`chama:${chamaId}`);
+  });
+  
+  socket.on('contribution-made', (data) => {
+    // Broadcast to all chama members
+    io.to(`chama:${data.chamaId}`).emit('contribution-update', data);
+  });
+});
+```
+</Accordion>
+
+## Database Architecture
+
+### Neon PostgreSQL (Serverless)
+
+<Accordion title="Why Single Database Architecture?">
+**Operational Simplicity**
+- **Single source of truth**: All financial data in one place eliminates sync complexity
+- **Simplified backup**: Single backup strategy for all critical data
+- **Cost optimization**: No need for multiple database licenses or management overhead
+- **Developer productivity**: Single connection, single query language, unified monitoring
+
+**Neon Serverless Benefits**
+- **Auto-scaling**: Scales from zero to handle African traffic patterns (high variability)
+- **Database branching**: Instant database copies for safe development and testing
+- **Global edge**: Edge locations optimized for SADC region latency
+- **Cost efficiency**: Pay-per-use model perfect for growing African startups
+
+**ACID Compliance for Financial Services**
+- **Transaction integrity**: Critical for financial operations and group savings
+- **Consistency**: Ensures accurate balance calculations and score updates
+- **Isolation**: Prevents race conditions in concurrent chama contributions
+- **Durability**: Guarantees financial data persistence even in system failures
+</Accordion>
+
+**Database Schema Design**:
+
+```sql
+-- Core user and financial data schema
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email VARCHAR(255) UNIQUE NOT NULL,
+  phone_number VARCHAR(20) UNIQUE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE diva_scores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id),
+  overall_score INTEGER CHECK (overall_score >= 0 AND overall_score <= 1000),
+  discipline_score INTEGER,
+  income_score INTEGER,  
+  velocity_score INTEGER,
+  assets_score INTEGER,
+  calculated_at TIMESTAMP DEFAULT NOW(),
+  next_update_due TIMESTAMP,
+  
+  -- Indexing for fast lookups
+  INDEX idx_diva_user_date (user_id, calculated_at DESC),
+  INDEX idx_diva_score_tier (overall_score)
+);
+
+CREATE TABLE chamas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  treasurer_id UUID REFERENCES users(id),
+  contribution_amount DECIMAL(10,2),
+  member_count INTEGER DEFAULT 1,
+  total_contributions DECIMAL(15,2) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**Performance Optimizations**:
+
+| Optimization | Implementation | Benefit |
+|-------------|----------------|---------|
+| **Materialized Views** | Pre-computed DIVA aggregations | 90% faster score calculations |
+| **Partial Indexes** | Indexes on active users only | Reduced index size and faster queries |
+| **JSONB Support** | Flexible transaction metadata | Efficient storage of varying data structures |
+| **Window Functions** | Complex financial analytics | Server-side calculation of trends and patterns |
+
+### Redis Caching Layer
+
+<Accordion title="Caching Strategy for African Networks">
+**Multi-Level Caching**
+- **Level 1**: Application-level caching for frequently accessed data
+- **Level 2**: Redis caching for computed scores and expensive queries
+- **Level 3**: CDN caching for static assets and educational content
+- **Level 4**: Browser/mobile app caching for offline capabilities
+
+**Cache Invalidation Strategy**
+```typescript
+// Event-driven cache invalidation
+class CacheInvalidationService {
+  async onUserTransactionAdded(userId: string) {
+    // Invalidate DIVA score cache
+    await this.cache.delete(`diva:${userId}`);
+    
+    // Invalidate related chama caches
+    const chamas = await this.getUserChamas(userId);
+    for (const chama of chamas) {
+      await this.cache.delete(`chama:${chama.id}:stats`);
+    }
+  }
+  
+  async onChamaContribution(chamaId: string) {
+    // Invalidate chama-specific caches
+    await this.cache.deletePattern(`chama:${chamaId}:*`);
+    
+    // Invalidate member DIVA scores
+    const members = await this.getChamaMembers(chamaId);
+    for (const member of members) {
+      await this.cache.delete(`diva:${member.id}`);
+    }
+  }
+}
+```
+
+**Cache Warming for Performance**
+- **Predictive loading**: Pre-compute scores for active users
+- **Background refresh**: Update caches before expiration
+- **Regional caching**: Cache popular content closer to African users
+- **Intelligent prefetching**: Load likely-needed data based on user behavior
+</Accordion>
+
+## Integration Layer
+
+### Open Banking & Payment APIs
+
+<Accordion title="Multi-Provider Payment Architecture">
+**Primary Integration Partners**
+
+| Provider | Coverage | Use Case | Integration Method |
+|----------|----------|----------|-------------------|
+| **Stitch** | SA, Nigeria | Open Banking | REST API + OAuth |
+| **Mono** | Nigeria, Kenya, Ghana | Account linking | REST API + webhooks |
+| **Flutterwave** | Pan-African | Payment gateway | REST API + webhooks |
+| **M-Pesa** | Kenya | Mobile money | Direct API integration |
+| **MTN MoMo** | Multiple markets | Mobile money | Direct API integration |
+
+**Unified Payment Interface**
+```typescript
+interface PaymentProvider {
+  name: string;
+  supportedCountries: string[];
+  supportedCurrencies: string[];
+  
+  initializePayment(request: PaymentRequest): Promise<PaymentResponse>;
+  checkStatus(paymentId: string): Promise<PaymentStatus>;
+  processWebhook(payload: any): Promise<WebhookResult>;
+}
+
+class PaymentOrchestrator {
+  async processPayment(request: PaymentRequest): Promise<PaymentResult> {
+    // Select optimal provider based on amount, destination, user preferences
+    const provider = this.selectProvider(request);
+    
+    // Process with automatic fallback
+    try {
+      return await provider.initializePayment(request);
+    } catch (error) {
+      const fallbackProvider = this.getFallbackProvider(request);
+      return await fallbackProvider.initializePayment(request);
+    }
+  }
+}
+```
+</Accordion>
+
+### Identity & Compliance Services
+
+**KYC Integration (Smile ID)**:
+- **Document verification**: ID cards, passports, utility bills across SADC
+- **Biometric verification**: Facial recognition and liveness detection
+- **Database checks**: Credit bureau and government database verification
+- **Risk scoring**: Automated risk assessment and scoring
+
+**Compliance Automation**:
+- **AML monitoring**: Real-time transaction monitoring and suspicious activity detection
+- **Regulatory reporting**: Automated report generation for different SADC jurisdictions
+- **Data residency**: Ensuring data storage compliance with local regulations
+- **Audit trails**: Comprehensive logging for regulatory audits
+
+## Infrastructure & DevOps
+
+### Hosting Strategy
+
+<Accordion title="Multi-Region Deployment for SADC">
+**Primary Hosting: Railway/Render**
+- **Simplicity**: Easy deployment and management for growing team
+- **Auto-scaling**: Handles variable African traffic patterns efficiently
+- **Cost optimization**: Pay-for-what-you-use pricing model
+- **Global deployment**: Easy deployment to multiple regions
+
+**Database: Neon PostgreSQL**
+- **Serverless scaling**: Auto-scales based on demand
+- **Global read replicas**: Reduce latency across SADC region
+- **Automated backups**: Point-in-time recovery and automated backup management
+- **Database branching**: Safe development and testing environments
+
+**CDN: Cloudflare**
+- **African edge locations**: Reduce latency for mobile app assets
+- **DDoS protection**: Critical security for financial services
+- **SSL/TLS termination**: Automated certificate management
+- **Caching optimization**: Smart caching for African network conditions
+</Accordion>
+
+### CI/CD Pipeline
+
+```yaml
+# GitHub Actions workflow optimized for African development teams
+name: AWO Platform CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      # Run comprehensive test suite
+      - run: npm ci
+      - run: npm run test:unit
+      - run: npm run test:integration
+      - run: npm run test:security
+      
+      # Financial calculation validation
+      - run: npm run test:diva-calculations
+      - run: npm run test:payment-flows
+      
+  deploy-staging:
+    needs: test
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Railway Staging
+        run: railway deploy --environment staging
+        
+  deploy-production:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Railway Production
+        run: railway deploy --environment production
+      
+      # Mobile app deployment
+      - name: Build and Submit to App Stores
+        run: eas build --platform all --auto-submit
+```
+
+### Monitoring & Observability
+
+**Application Monitoring**:
+- **Performance**: Response times, error rates, throughput metrics
+- **User experience**: Mobile app performance, crash reporting, user flow analytics
+- **Business metrics**: DIVA score calculations, chama activity, payment success rates
+- **Financial metrics**: Transaction volumes, revenue tracking, cost analysis
+
+**Infrastructure Monitoring**:
+- **System health**: Server performance, database metrics, network connectivity
+- **Security monitoring**: Intrusion detection, access logging, threat analysis
+- **Cost optimization**: Resource utilization tracking and automated alerts
+- **Compliance monitoring**: Automated compliance checking and reporting
+
+## Development Tools & Workflow
+
+### Code Quality & Standards
+
+```typescript
+// ESLint configuration for financial services
+{
+  "extends": [
+    "@typescript-eslint/recommended",
+    "prettier"
+  ],
+  "rules": {
+    // Financial calculation safety
+    "no-floating-decimal": "error",
+    "prefer-numeric-literals": "error",
+    
+    // Security requirements
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    
+    // African-specific naming conventions
+    "@typescript-eslint/naming-convention": [
+      "error",
+      {
+        "selector": "variable",
+        "format": ["camelCase", "UPPER_CASE"]
+      }
+    ]
+  }
+}
+```
+
+**Testing Strategy**:
+- **Unit tests**: Jest for business logic and utility functions
+- **Integration tests**: Supertest for API endpoints and database interactions
+- **E2E tests**: Detox for React Native app user journey testing
+- **Financial tests**: Specialized tests for DIVA calculations and payment flows
+- **Security tests**: Automated security scanning and penetration testing
+
+**Documentation Tools**:
+- **API documentation**: OpenAPI/Swagger with automated generation
+- **Code documentation**: TypeScript doc comments with automated extraction
+- **Architecture diagrams**: Mermaid diagrams embedded in documentation
+- **Deployment guides**: Step-by-step guides for different African environments
+
+---
+
+This technology stack provides the foundation for AWO Platform's mission to empower African women through technology. Ready to dive into implementation? Continue to [Quick Setup](/quick-setup/development-environment) for hands-on development guidance.

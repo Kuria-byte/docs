@@ -1,0 +1,139 @@
+---
+title: "Welcome to AWO Platform"
+description: "Comprehensive financial platform empowering African women through AI-driven scoring, digital savings groups, and investment opportunities"
+---
+
+# Welcome to AWO Platform
+
+AWO Platform is Africa's first comprehensive financial empowerment platform specifically designed for women across the SADC region. We combine cutting-edge technology with deep understanding of African financial behaviors to bridge the **$12.6 billion gender investment gap** in Southern and Eastern Africa.
+
+<Info>
+AWO stands for "African Women Ownership" - representing our mission to give African women ownership over their financial futures through technology, education, and community.
+</Info>
+
+## What AWO Offers
+
+<CardGroup cols={2}>
+  <Card title="DIVA Scoring System" icon="chart-line">
+    AI-powered financial health assessment using Discipline, Income, Velocity, and Assets metrics with personalized portfolio recommendations.
+  </Card>
+  <Card title="Digital Chama Management" icon="users">
+    Modernized traditional savings groups with digital infrastructure, transparent governance, and automated contribution tracking.
+  </Card>
+  <Card title="Investment Marketplace" icon="gem">
+    Tiered investment platform with Bronze/Silver/Gold/Platinum portfolios and SME debt opportunities for women-led businesses.
+  </Card>
+  <Card title="Financial Education" icon="graduation-cap">
+    Comprehensive financial literacy hub with gamified learning, wealth coaching, and community-driven knowledge sharing.
+  </Card>
+</CardGroup>
+
+## Platform Highlights
+
+### 🎯 Target Impact
+- **50,000 downloads** in first 6 months
+- **20,000 monthly active users** by year-end
+- **100 women-led SMEs funded** through debt marketplace
+- **R300 average monthly savings** per active user
+
+### 🌍 Regional Focus
+Primary markets across the SADC region including South Africa, Kenya, Nigeria, Ghana, and expanding to additional African markets.
+
+### 💡 Innovation Areas
+- **Rule-based DIVA scoring** for financial health assessment
+- **Democratic Chama governance** with blockchain-backed transparency  
+- **Risk-matched portfolios** with automatic Bronze/Silver/Gold/Platinum assignment
+- **Alternative access channels** including USSD and WhatsApp banking
+
+## Documentation Structure
+
+This documentation is organized for multiple audiences:
+
+<CardGroup cols={3}>
+  <Card title="Developers" icon="code">
+    Technical guides, API references, and implementation examples for building integrations and extending the platform.
+  </Card>
+  <Card title="Business Stakeholders" icon="briefcase">
+    Market analysis, product strategy, success metrics, and partnership opportunities for decision makers.
+  </Card>
+  <Card title="Integration Partners" icon="handshake">
+    Banking APIs, payment gateways, and third-party service integration guides for seamless connectivity.
+  </Card>
+</CardGroup>
+
+## Quick Navigation
+
+<Steps>
+  <Step title="New to AWO?">
+    Start with [Platform Overview](/platform-overview) to understand our comprehensive financial ecosystem and market positioning.
+  </Step>
+  <Step title="Ready to Build?">
+    Jump to [Quick Setup](/quick-setup/development-environment) for step-by-step development environment configuration.
+  </Step>
+  <Step title="Need APIs?">
+    Explore our [API Reference](/api-reference/introduction) for complete endpoint documentation with examples.
+  </Step>
+  <Step title="Business Questions?">
+    Review [Business Documentation](/business/market-analysis) for market insights and strategic analysis.
+  </Step>
+</Steps>
+
+## Platform Architecture Overview
+
+AWO is built on a modern, scalable technology stack optimized for the African market:
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Frontend** | React Native (Expo) | Cross-platform mobile application |
+| **Backend** | Express.js + TypeScript | RESTful API and business logic |
+| **Database** | Neon PostgreSQL | All data storage and calculations |
+| **Real-time** | Socket.io | Live updates and notifications |
+| **Payments** | Flutterwave + Direct APIs | Mobile money and banking integration |
+| **Identity** | Smile ID | KYC verification across Africa |
+
+## Core Business Logic
+
+### DIVA Scoring Algorithm
+```typescript
+// Simplified DIVA calculation structure
+interface DivaScore {
+  discipline: number;  // 30% - Payment consistency, overdraft avoidance
+  income: number;      // 25% - Stability, growth, diversification  
+  velocity: number;    // 25% - Cash flow timing, efficiency
+  assets: number;      // 20% - Savings rate, investment balance
+  overallScore: number; // Weighted combination (0-1000 scale)
+}
+```
+
+### Portfolio Assignment Logic
+- **Bronze Portfolio**: DIVA Score &lt;400 - Basic savings, T-Bills
+- **Silver Portfolio**: DIVA Score 400-600 - Index funds, T-Bonds  
+- **Gold Portfolio**: DIVA Score 600-800 - Diversified ETFs, limited SME access
+- **Platinum Portfolio**: DIVA Score &gt;800 - Full investment access, premium SME debt
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="Developer Support" icon="headset">
+    Email: developers@awo-platform.com
+    Discord: [AWO Community](https://discord.gg/awo-platform)
+  </Card>
+  <Card title="Business Inquiries" icon="building">
+    Email: partnerships@awo-platform.com
+    Phone: +27 11 xxx xxxx
+  </Card>
+</CardGroup>
+
+## What's Next?
+
+Ready to dive deeper? Here are the recommended next steps based on your role:
+
+**For Developers**: Start with [Platform Overview](/platform-overview) then move to [Quick Setup](/quick-setup/development-environment)
+
+**For Product Teams**: Review [Key Features](/key-features) and [Business Strategy](/business/product-strategy)
+
+**For Integration Partners**: Check [Integration Guides](/integration/open-banking) and [API Reference](/api-reference/introduction)
+
+---
+
+*AWO Platform is committed to financial inclusion and empowerment across Africa. Join us in closing the gender investment gap through technology and community.*

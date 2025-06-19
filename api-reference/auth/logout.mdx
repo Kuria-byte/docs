@@ -1,0 +1,67 @@
+---
+title: "Logout"
+description: "AWO Platform Logout API endpoint"
+---
+
+# Logout
+
+## Overview
+
+<Info>
+This endpoint provides logout functionality for the AWO Platform.
+</Info>
+
+## Authentication
+
+All API requests require authentication:
+
+```bash
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+## Request
+
+```bash
+curl -X POST "https://api.awo-platform.com/v1/logout" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "example": "data"
+  }'
+```
+
+## Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "example",
+    "status": "completed"
+  },
+  "timestamp": "2025-01-20T10:00:00Z"
+}
+```
+
+## Error Handling
+
+<Accordion title="Common Error Responses">
+Error codes and responses will be documented here.
+</Accordion>
+
+## Rate Limits
+
+This endpoint has the following rate limits:
+- 100 requests per minute per user
+- 1000 requests per hour per user
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Authentication" href="/api-reference/auth/login">
+    User authentication endpoints
+  </Card>
+  <Card title="User Management" href="/api-reference/users/profile">
+    User profile management
+  </Card>
+</CardGroup>
