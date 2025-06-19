@@ -1,27 +1,442 @@
----
-title: "Key Features"
-description: "Key Features for AWO Platform"
----
-
 # Key Features
 
-## Overview
+AWO Platform delivers a comprehensive suite of financial services designed specifically for African women, combining traditional savings groups with modern investment opportunities and personalized financial coaching.
+
+## Core Platform Features
+
+### 1. DIVA Scoring System + RTSM Assessment
 
 <Info>
-This section provides essential information about the AWO Platform for financial inclusion in the SADC region.
+AWO's proprietary dual-engine scoring system that combines financial health assessment (DIVA) with risk tolerance evaluation (RTSM) for intelligent portfolio matching.
 </Info>
 
-## Key Points
+**DIVA Score Components:**
+- **Discipline (30%)**: Payment consistency, overdraft avoidance, savings regularity
+- **Income (25%)**: Stability, growth potential, diversification
+- **Velocity (25%)**: Cash flow timing and efficiency
+- **Assets (20%)**: Savings rate, investment balance, net worth growth
 
-Content for key features will be added here.
+**RTSM Integration:**
+- Questionnaire-based risk assessment
+- Behavioral pattern analysis
+- Investment timeline evaluation
+- Portfolio preference matching
 
-## Next Steps
-
+**Key Benefits:**
 <CardGroup cols={2}>
-  <Card title="Quick Setup" icon="rocket" href="/quick-setup/development-environment">
-    Get started with AWO development environment
+  <Card title="Intelligent Matching" icon="brain">
+    Automatic assignment to Bronze/Silver/Gold/Platinum portfolios based on financial capacity and risk tolerance
   </Card>
-  <Card title="API Reference" icon="code" href="/api-reference/introduction">
-    Explore AWO API documentation
+  <Card title="Quarterly Updates" icon="calendar">
+    Mandatory quarterly score refresh ensures portfolio alignment with changing financial circumstances
   </Card>
 </CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Real-time Insights" icon="chart-line">
+    Live score updates based on transaction patterns and savings behavior
+  </Card>
+  <Card title="Improvement Guidance" icon="lightbulb">
+    Personalized recommendations to improve DIVA components and unlock better investment tiers
+  </Card>
+</CardGroup>
+
+### 2. AWO Digital Wallet
+
+**Core Wallet Features:**
+- Multi-currency support (ZAR, BWP, NAD, ZMW)
+- Real-time balance tracking
+- Transaction history and categorization
+- Instant P2P transfers within AWO ecosystem
+
+**Funding Methods:**
+<CardGroup cols={3}>
+  <Card title="Bank Transfers" icon="building">
+    Direct bank account linking via Open Banking APIs (Stitch, Mono)
+  </Card>
+  <Card title="Mobile Money" icon="mobile">
+    M-Pesa, MTN MoMo, and other regional mobile money platforms
+  </Card>
+  <Card title="Cash Deposits" icon="coins">
+    Agent network locations for cash-in/cash-out services
+  </Card>
+</CardGroup>
+
+**Advanced Features:**
+- Auto-savings rules and scheduling
+- Goal-based savings buckets
+- Spending categorization and budgeting
+- Emergency fund management
+
+### 3. Digital Chama/Stokvel Management
+
+<Info>
+Modernizing traditional African savings groups with digital infrastructure, transparency, and democratic governance.
+</Info>
+
+**Group Formation & Management:**
+- Easy Chama creation with customizable rules
+- Member invitation and approval workflows
+- Role-based permissions (treasurer, member, observer)
+- Minimum 3 members, maximum configurable per group
+
+**Contribution System:**
+<CardGroup cols={2}>
+  <Card title="Automated Contributions" icon="calendar">
+    Scheduled monthly/weekly contributions with auto-debit from AWO Wallet
+  </Card>
+  <Card title="Flexible Payments" icon="credit-card">
+    Manual contributions via multiple payment methods
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Transparent Tracking" icon="eye">
+    Real-time contribution tracking visible to all members
+  </Card>
+  <Card title="Payout Management" icon="arrow-down">
+    Democratic payout approval and scheduling system
+  </Card>
+</CardGroup>
+
+**Advanced Governance:**
+- Democratic voting for group investments
+- Dual approval required for withdrawals
+- Immutable transaction ledger
+- Monthly SMS statements to all members
+
+### 4. Tiered Investment Marketplace
+
+**Portfolio Categories:**
+
+<CardGroup cols={2}>
+  <Card title="Bronze Portfolio" icon="award" style="border-color: #cd7f32;">
+    **Target**: DIVA Score 0-399  
+    **Products**: Savings accounts, T-Bills, money market funds  
+    **Max Investment**: R10,000  
+    **Risk Level**: Very Low
+  </Card>
+  <Card title="Silver Portfolio" icon="award" style="border-color: #c0c0c0;">
+    **Target**: DIVA Score 400-649  
+    **Products**: Index funds, T-Bonds, selected ETFs  
+    **Max Investment**: R50,000  
+    **Risk Level**: Low to Moderate
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Gold Portfolio" icon="award" style="border-color: #ffd700;">
+    **Target**: DIVA Score 650-849  
+    **Products**: Diversified ETFs, higher-yield instruments, limited SME access  
+    **Max Investment**: R200,000  
+    **Risk Level**: Moderate to High
+  </Card>
+  <Card title="Platinum Portfolio" icon="award" style="border-color: #e5e4e2;">
+    **Target**: DIVA Score 850-1000  
+    **Products**: Full investment access, premium SME debt notes  
+    **Max Investment**: No platform limits  
+    **Risk Level**: All risk levels
+  </Card>
+</CardGroup>
+
+**SME Debt Investment Platform:**
+- Curated women-led business debt investment opportunities
+- Maximum 3 concurrent SME investments per user
+- Democratic voting for group SME investments
+- Gold/Platinum tier exclusive access to high-yield notes
+
+### 5. Financial Education Hub
+
+**Educational Structure:**
+<Steps>
+  <Step title="Foundation Courses">
+    Basic financial literacy, budgeting, and saving fundamentals
+  </Step>
+  <Step title="Investment Education">
+    Understanding risk, diversification, and investment products
+  </Step>
+  <Step title="Advanced Strategies">
+    Portfolio management, tax optimization, and wealth building
+  </Step>
+  <Step title="Entrepreneurship">
+    Business planning, funding options, and SME growth strategies
+  </Step>
+</Steps>
+
+**Interactive Features:**
+- Progress tracking and achievements
+- Gamified learning with points and badges
+- Community discussions and peer learning
+- Expert-led webinars and Q&A sessions
+
+### 6. Wealth Coaching & Advisory Services
+
+**Coach Matching System:**
+- Algorithm-based coach assignment
+- Expertise matching (retirement, entrepreneurship, investing)
+- Language and cultural preference matching
+- User rating and feedback system
+
+**Service Types:**
+<CardGroup cols={2}>
+  <Card title="One-on-One Coaching" icon="user">
+    Personal financial coaching sessions via video call or in-person meetings
+  </Card>
+  <Card title="Group Masterclasses" icon="users">
+    Expert-led group sessions on specific financial topics
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Live Q&A Sessions" icon="message">
+    Regular expert sessions for community questions and discussions
+  </Card>
+  <Card title="Progress Tracking" icon="arrow-up">
+    Goal setting, milestone tracking, and accountability support
+  </Card>
+</CardGroup>
+
+### 7. Alternative Access Channels
+
+**USSD Banking (*120*AWO#):**
+- Basic account balance inquiries
+- Mini statements and transaction history
+- P2P transfers within AWO network
+- Savings goal progress updates
+
+**WhatsApp Banking:**
+- Account balance and transaction alerts
+- Quick balance inquiries
+- Customer support via WhatsApp Business API
+- Educational content delivery
+
+**Agent Network:**
+- Physical cash-in/cash-out locations
+- Assisted onboarding for new users
+- Document verification support
+- Community education and outreach
+
+## Advanced Features
+
+### 8. Cross-Border Payments & Remittances
+
+**Supported Corridors:**
+- Intra-SADC transfers (SA ↔ Botswana ↔ Namibia ↔ Zambia)
+- International remittances (SA ↔ diaspora communities)
+- Multi-currency wallet management
+- Real-time exchange rate optimization
+
+**Features:**
+- Competitive exchange rates with transparent fees
+- Real-time transfer tracking
+- Recipient notifications via SMS/WhatsApp
+- Compliance with cross-border regulations
+
+### 9. Youth Accounts & Parental Controls
+
+**Age-Based Features:**
+- **16-17 years**: Restricted accounts with parental oversight
+- **18+ years**: Full platform access
+- Enhanced KYC with parental consent for minors
+- Educational content adapted for younger users
+
+**Parental Dashboard:**
+- Real-time account monitoring
+- Spending limit configuration
+- Approval workflows for transactions above limits
+- Educational progress tracking
+
+### 10. Gamification & Rewards System
+
+**Achievement Engine:**
+<CardGroup cols={2}>
+  <Card title="Savings Milestones" icon="award">
+    Badges for reaching savings goals and maintaining consistent contributions
+  </Card>
+  <Card title="Learning Achievements" icon="graduation-cap">
+    Rewards for completing educational modules and improving financial knowledge
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Community Leadership" icon="crown">
+    Recognition for Chama leadership and positive community contributions
+  </Card>
+  <Card title="Investment Progress" icon="chart-bar">
+    Tier advancement celebrations and portfolio milestone rewards
+  </Card>
+</CardGroup>
+
+**Reward Mechanisms:**
+- Points system redeemable for platform benefits
+- Cash bonuses for major milestones
+- Investment credits for educational completion
+- Exclusive access to premium features
+
+## Technology Integration Features
+
+### 11. Open Banking Integration
+
+**Supported Providers:**
+- **Stitch**: Primary for South Africa and Nigeria
+- **Mono**: Primary for West Africa expansion
+- **Direct Bank APIs**: Where available for enhanced connectivity
+
+**Capabilities:**
+- Secure account linking with OAuth 2.0
+- Real-time transaction synchronization
+- Account balance verification
+- Payment initiation services
+- Transaction categorization and analysis
+
+### 12. Real-Time Notifications & Updates
+
+**Notification Types:**
+<CardGroup cols={3}>
+  <Card title="Financial Updates" icon="bell">
+    Transaction confirmations, balance alerts, DIVA score changes
+  </Card>
+  <Card title="Community Alerts" icon="users">
+    Chama contributions, voting reminders, group announcements
+  </Card>
+  <Card title="Educational Nudges" icon="lightbulb">
+    Learning reminders, achievement unlocks, financial tips
+  </Card>
+</CardGroup>
+
+**Delivery Channels:**
+- Push notifications via Expo
+- SMS notifications via Twilio
+- Email alerts via SendGrid
+- WhatsApp messages via Business API
+
+### 13. Comprehensive Analytics & Reporting
+
+**User Analytics:**
+- Spending pattern analysis
+- Savings behavior tracking
+- Investment performance monitoring
+- DIVA score trend analysis
+
+**Portfolio Reporting:**
+- Monthly investment statements
+- Performance comparison against benchmarks
+- Tax reporting and documentation
+- Goal progress tracking
+
+**Chama Analytics:**
+- Group contribution patterns
+- Member engagement metrics
+- Investment performance tracking
+- Governance activity reporting
+
+## Security & Compliance Features
+
+### 14. Advanced Security Framework
+
+**Data Protection:**
+- AES-256 encryption for data at rest
+- TLS 1.3 for data in transit
+- Multi-factor authentication (MFA)
+- Biometric authentication support
+
+**Financial Security:**
+- Real-time fraud detection
+- Transaction limits and controls
+- Suspicious activity monitoring
+- Secure payment processing
+
+### 15. Regulatory Compliance
+
+**KYC/AML Compliance:**
+- Tier-based verification system
+- Smile ID integration for document verification
+- Ongoing transaction monitoring
+- Regulatory reporting automation
+
+**Data Privacy:**
+- GDPR and POPIA compliance
+- User consent management
+- Data portability and deletion rights
+- Transparent privacy policies
+
+## Performance & Reliability
+
+### 16. Platform Performance
+
+**Technical Specifications:**
+- API response time: &lt;300ms for 95th percentile
+- Mobile app startup: &lt;3 seconds on mid-range devices
+- System uptime: &gt;99.9% availability
+- Real-time updates: &lt;1 second for notifications
+
+**Scalability Features:**
+- Auto-scaling database infrastructure
+- Global CDN for content delivery
+- Load balancing for high availability
+- Horizontal scaling capabilities
+
+### 17. Offline Capabilities
+
+**Offline Support:**
+- Local data storage via AsyncStorage
+- Offline transaction queuing
+- Sync when connectivity restored
+- Core features accessible without internet
+
+**Progressive Web App:**
+- Installable web application
+- Offline functionality for basic features
+- Push notification support
+- Cross-platform compatibility
+
+## Integration & API Features
+
+### 18. Developer-Friendly APIs
+
+**API Capabilities:**
+- RESTful API design
+- Comprehensive SDK support
+- Webhook event system
+- Rate limiting and throttling
+
+**Third-Party Integrations:**
+- Payment gateway integrations
+- Banking API connections
+- KYC service providers
+- Communication service APIs
+
+### 19. White-Label Solutions
+
+**Partner Integration:**
+- White-label platform for financial institutions
+- Custom branding and configuration
+- API-first architecture for seamless integration
+- Compliance support for partner organizations
+
+## Success Metrics & KPIs
+
+### User Engagement Metrics
+- Monthly Active Users (MAU): Target 20,000 within 6 months
+- DIVA Profile Completion: 70% of users complete full assessment
+- Chama Participation: 40% of users join or create a Chama
+- Investment Adoption: 40% of Gold/Platinum users invest in SME debt
+
+### Financial Performance Metrics
+- Average Monthly Savings: R300 per active user
+- Total Assets Under Management: Progressive growth trajectory
+- SMEs Funded: 100 women-led SMEs in Year 1
+- Transaction Volume: Monthly growth tracking
+
+### Platform Impact Metrics
+- Financial Inclusion: Percentage of previously unbanked users
+- Gender Gap Contribution: Progress toward closing $12.6B SADC investment gap
+- Educational Impact: Financial literacy improvement scores
+- Community Building: Chama formation and activity rates
+
+---
+
+*These features represent AWO's comprehensive approach to addressing the financial inclusion needs of African women across the SADC region, combining traditional community-based savings with modern investment opportunities and personalized financial guidance.*
+
+*Last updated: June 2025*  
+*Next review: July 2025*

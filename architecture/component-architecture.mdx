@@ -1,37 +1,610 @@
----
-title: "Component Architecture"
-description: "AWO Platform component architecture documentation"
----
-
 # Component Architecture
 
-## Overview
+AWO Platform follows a modern, microservices-inspired architecture with clear separation of concerns, enabling scalability, maintainability, and rapid feature development across the SADC region.
+
+## Architecture Overview
 
 <Info>
-This section covers the component architecture of the AWO Platform, designed for financial inclusion across the SADC region.
+AWO uses a three-tier architecture with React Native frontend, Express.js backend services, and Neon PostgreSQL database, optimized for African markets with emphasis on offline capability and mobile-first design.
 </Info>
 
-## Architecture Components
+### High-Level Component Structure
 
-Detailed architecture information will be provided here.
+```
+┌─────────────────────────────────────────────────────────┐
+│                    CLIENT TIER                          │
+│  React Native (Expo) + Web Progressive App             │
+├─────────────────────────────────────────────────────────┤
+│                   SERVICE TIER                          │
+│  Express.js API Services + Socket.io Real-time         │
+├─────────────────────────────────────────────────────────┤
+│                    DATA TIER                            │
+│  Neon PostgreSQL + Redis Cache + File Storage          │
+└─────────────────────────────────────────────────────────┘
+```
 
-## Key Decisions
+## Client Tier Architecture
+
+### React Native Mobile Application
+
+**Core Application Structure:**
+```
+src/
+├── components/          # Reusable UI components
+├── screens/            # Application screens
+├── navigation/         # Navigation configuration
+├── services/           # API and business logic
+├── store/              # State management (Zustand)
+├── utils/              # Utility functions
+└── assets/             # Images, fonts, and static files
+```
+
+**Key Components:**
 
 <CardGroup cols={2}>
-  <Card title="Technology Stack" icon="layers">
-    React Native, Express.js, PostgreSQL
+  <Card title="Authentication Module" icon="shield">
+    **Components**: Login, Register, KYC, MFA  
+    **State**: User session, authentication tokens  
+    **Services**: Auth API, biometric integration  
+    **Storage**: Secure token storage (Keychain/Keystore)
   </Card>
-  <Card title="Design Principles" icon="compass">
-    Scalability, Security, Simplicity
+  <Card title="DIVA Score Module" icon="chart-line">
+    **Components**: Score display, insights, recommendations  
+    **State**: Score history, component breakdown  
+    **Services**: DIVA calculation API, analytics  
+    **Real-time**: Score update notifications
   </Card>
 </CardGroup>
 
-## Implementation Details
+<CardGroup cols={2}>
+  <Card title="Wallet Module" icon="wallet">
+    **Components**: Balance display, transaction history, transfers  
+    **State**: Account balances, transaction cache  
+    **Services**: Payment APIs, bank integrations  
+    **Offline**: Transaction queuing and sync
+  </Card>
+  <Card title="Chama Module" icon="users">
+    **Components**: Group dashboard, member management, voting  
+    **State**: Group data, member lists, contribution tracking  
+    **Services**: Chama APIs, notification service  
+    **Real-time**: Live updates via Socket.io
+  </Card>
+</CardGroup>
 
-Technical implementation details will be documented here.
+### State Management Architecture
 
-## Related Documentation
+**Zustand Store Structure:**
+```typescript
+// Global state architecture
+interface AppState {
+  auth: AuthState;
+  user: UserState;
+  wallet: WalletState;
+  diva: DivaState;
+  chamas: ChamaState;
+  investments: InvestmentState;
+  notifications: NotificationState;
+}
 
-<Card title="System Overview" href="/architecture/system-overview">
-  Explore the complete system architecture
-</Card>
+// Service layer integration
+interface ServiceLayer {
+  api: APIService;
+  cache: CacheService;
+  offline: OfflineService;
+  realtime: SocketService;
+}
+```
+
+**React Query Integration:**
+- Server state management and caching
+- Automatic background refetching
+- Optimistic updates for better UX
+- Error boundary and retry logic
+
+### Progressive Web Application
+
+**PWA Components:**
+<CardGroup cols={3}>
+  <Card title="Service Worker" icon="gear">
+    Offline functionality, background sync, push notifications
+  </Card>
+  <Card title="App Shell" icon="mobile">
+    Core UI framework that loads instantly
+  </Card>
+  <Card title="Manifest" icon="download">
+    Installation prompts and native app-like experience
+  </Card>
+</CardGroup>
+
+## Service Tier Architecture
+
+### Express.js Backend Services
+
+**Service-Oriented Architecture:**
+```
+backend/
+├── auth/              # Authentication & user management
+├── diva/              # DIVA scoring engine
+├── wallet/            # Digital wallet services
+├── chama/             # Group savings management
+├── investment/        # Portfolio & investment services
+├── payment/           # Payment processing
+├── notification/      # Multi-channel notifications
+├── coaching/          # Wealth coaching platform
+├── education/         # Financial education content
+└── compliance/        # KYC, AML, regulatory
+```
+
+### Core Service Components
+
+#### Authentication Service
+```typescript
+class AuthService {
+  // Multi-tier KYC system
+  async registerUser(userData: UserRegistration): Promise<User>;
+  async verifyTier1KYC(documents: KYCDocuments): Promise<VerificationResult>;
+  async verifyTier2KYC(documents: KYCDocuments): Promise<VerificationResult>;
+  
+  // Session management
+  async login(credentials: LoginCredentials): Promise<AuthResult>;
+  async refreshToken(refreshToken: string): Promise<TokenPair>;
+  async logout(userId: string): Promise<void>;
+  
+  // Security features
+  async enableMFA(userId: string, method: MFAMethod): Promise<MFASetup>;
+  async verifyMFA(userId: string, token: string): Promise<boolean>;
+}
+```
+
+#### DIVA Scoring Service
+```typescript
+class DivaService {
+  // Core scoring engine
+  async calculateDivaScore(userId: string): Promise<DivaScore>;
+  async updateScoreComponents(userId: string, transactions: Transaction[]): Promise<void>;
+  async getScoreHistory(userId: string, period: DateRange): Promise<ScoreHistory[]>;
+  
+  // RTSM integration
+  async assessRiskTolerance(responses: RTSMResponses): Promise<RiskProfile>;
+  async assignPortfolioTier(divaScore: number, riskProfile: RiskProfile): Promise<PortfolioTier>;
+  
+  // Real-time updates
+  async subscribeToScoreUpdates(userId: string, callback: ScoreUpdateCallback): Promise<void>;
+}
+```
+
+#### Chama Management Service
+```typescript
+class ChamaService {
+  // Group operations
+  async createChama(chamaData: ChamaCreation): Promise<Chama>;
+  async joinChama(userId: string, chamaId: string): Promise<Membership>;
+  async manageMembers(chamaId: string, action: MemberAction): Promise<MembershipResult>;
+  
+  // Financial operations
+  async processContribution(contribution: ChamaContribution): Promise<ContributionResult>;
+  async initiatePayout(payout: ChamaPayout): Promise<PayoutResult>;
+  async voteOnProposal(vote: ChamaVote): Promise<VoteResult>;
+  
+  // Governance
+  async createProposal(proposal: ChamaProposal): Promise<Proposal>;
+  async processVoting(proposalId: string): Promise<VotingResult>;
+  async generateReports(chamaId: string, period: DateRange): Promise<ChamaReport>;
+}
+```
+
+### Middleware Architecture
+
+**Request Processing Pipeline:**
+<Steps>
+  <Step title="Rate Limiting">
+    Prevent API abuse and ensure fair usage across all users
+  </Step>
+  <Step title="Authentication">
+    Verify JWT tokens and user session validity
+  </Step>
+  <Step title="Authorization">
+    Check user permissions and access rights
+  </Step>
+  <Step title="Validation">
+    Validate request data using Zod schemas
+  </Step>
+  <Step title="Business Logic">
+    Execute core service functionality
+  </Step>
+  <Step title="Response Formatting">
+    Standardize API responses and error handling
+  </Step>
+</Steps>
+
+**Middleware Components:**
+```typescript
+// Request processing pipeline
+app.use(helmet());                    // Security headers
+app.use(rateLimiter);                // Rate limiting
+app.use(authenticateToken);          // JWT verification
+app.use(authorizeUser);              // Permission checks
+app.use(validateRequest);            // Input validation
+app.use(auditLogger);               // Audit trail
+app.use(errorHandler);              // Error management
+```
+
+### Real-Time Communication Layer
+
+**Socket.io Architecture:**
+```typescript
+// Real-time event system
+class RealtimeService {
+  // Chama updates
+  onChamaContribution(chamaId: string, contribution: Contribution): void;
+  onChamaVoting(chamaId: string, vote: Vote): void;
+  onChamaPayout(chamaId: string, payout: Payout): void;
+  
+  // DIVA score updates
+  onScoreUpdate(userId: string, newScore: DivaScore): void;
+  onTierChange(userId: string, newTier: PortfolioTier): void;
+  
+  // Payment notifications
+  onPaymentProcessed(userId: string, payment: Payment): void;
+  onPaymentFailed(userId: string, error: PaymentError): void;
+  
+  // Educational achievements
+  onCourseCompleted(userId: string, course: Course): void;
+  onBadgeEarned(userId: string, badge: Badge): void;
+}
+```
+
+**Event Broadcasting:**
+- User-specific notifications
+- Group-level updates (Chama activities)
+- System-wide announcements
+- Real-time transaction confirmations
+
+## Data Tier Architecture
+
+### Neon PostgreSQL Database
+
+**Database Schema Organization:**
+```sql
+-- Core user management
+SCHEMA users;
+  - users
+  - user_profiles
+  - user_sessions
+  - kyc_verifications
+
+-- Financial services
+SCHEMA financial;
+  - accounts
+  - transactions
+  - balances
+  - diva_scores
+  - investment_portfolios
+
+-- Community features
+SCHEMA community;
+  - chamas
+  - chama_members
+  - contributions
+  - payouts
+  - proposals
+  - votes
+
+-- Business services
+SCHEMA business;
+  - sme_businesses
+  - investment_opportunities
+  - funding_rounds
+  - investor_relations
+
+-- Educational content
+SCHEMA education;
+  - courses
+  - modules
+  - user_progress
+  - achievements
+  - coaching_sessions
+```
+
+### Data Access Layer
+
+**Repository Pattern Implementation:**
+```typescript
+// Base repository interface
+interface BaseRepository<T> {
+  create(entity: Partial<T>): Promise<T>;
+  findById(id: string): Promise<T | null>;
+  update(id: string, updates: Partial<T>): Promise<T>;
+  delete(id: string): Promise<boolean>;
+  findMany(criteria: QueryCriteria): Promise<T[]>;
+}
+
+// Specialized repositories
+class UserRepository extends BaseRepository<User> {
+  async findByEmail(email: string): Promise<User | null>;
+  async updateKYCStatus(userId: string, status: KYCStatus): Promise<void>;
+}
+
+class DivaRepository extends BaseRepository<DivaScore> {
+  async getLatestScore(userId: string): Promise<DivaScore | null>;
+  async getScoreHistory(userId: string, period: DateRange): Promise<DivaScore[]>;
+  async updateScoreComponents(userId: string, components: DivaComponents): Promise<void>;
+}
+```
+
+### Caching Strategy
+
+**Redis Cache Architecture:**
+<CardGroup cols={2}>
+  <Card title="Session Storage" icon="clock">
+    **Purpose**: JWT tokens, user sessions  
+    **TTL**: 24 hours (access), 30 days (refresh)  
+    **Pattern**: `session:${userId}:${tokenId}`
+  </Card>
+  <Card title="DIVA Score Cache" icon="chart-bar">
+    **Purpose**: Computed scores, component breakdown  
+    **TTL**: 1 hour (real-time), 24 hours (historical)  
+    **Pattern**: `diva:${userId}:score`
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="API Response Cache" icon="bolt">
+    **Purpose**: Frequently accessed data  
+    **TTL**: 5-60 minutes depending on data type  
+    **Pattern**: `api:${endpoint}:${hash}`
+  </Card>
+  <Card title="Rate Limiting" icon="shield">
+    **Purpose**: API usage tracking  
+    **TTL**: Rolling windows (1 minute, 1 hour, 1 day)  
+    **Pattern**: `rate:${userId}:${endpoint}`
+  </Card>
+</CardGroup>
+
+## Integration Layer Architecture
+
+### External Service Integrations
+
+**Banking & Payment Integration:**
+```typescript
+// Unified payment interface
+interface PaymentProvider {
+  processPayment(request: PaymentRequest): Promise<PaymentResult>;
+  getTransactionStatus(transactionId: string): Promise<TransactionStatus>;
+  webhookHandler(payload: WebhookPayload): Promise<void>;
+}
+
+// Provider implementations
+class StitchBankingProvider implements PaymentProvider {
+  // Open Banking integration for SA
+}
+
+class FlutterwaveProvider implements PaymentProvider {
+  // Pan-African mobile money integration
+}
+
+class MobileMoney implements PaymentProvider {
+  // Direct mobile money APIs (M-Pesa, MTN MoMo)
+}
+```
+
+**KYC & Compliance Integration:**
+```typescript
+class ComplianceService {
+  // Identity verification
+  async verifyIdentity(documents: IdentityDocuments): Promise<VerificationResult>;
+  
+  // AML screening
+  async screenTransaction(transaction: Transaction): Promise<AMLResult>;
+  
+  // Regulatory reporting
+  async generateComplianceReport(period: DateRange): Promise<ComplianceReport>;
+}
+```
+
+### Communication Service Architecture
+
+**Multi-Channel Notification System:**
+```typescript
+class NotificationService {
+  // Channel handlers
+  private pushNotification: PushNotificationHandler;
+  private smsHandler: SMSHandler;
+  private emailHandler: EmailHandler;
+  private whatsappHandler: WhatsAppHandler;
+  
+  // Unified notification interface
+  async sendNotification(
+    userId: string,
+    message: NotificationMessage,
+    channels: NotificationChannel[]
+  ): Promise<NotificationResult>;
+  
+  // User preference management
+  async updateNotificationPreferences(
+    userId: string,
+    preferences: NotificationPreferences
+  ): Promise<void>;
+}
+```
+
+## Security Architecture Components
+
+### Authentication & Authorization
+
+**Multi-Factor Authentication:**
+```typescript
+class SecurityService {
+  // JWT token management
+  async generateTokenPair(user: User): Promise<TokenPair>;
+  async verifyAccessToken(token: string): Promise<TokenPayload>;
+  async refreshAccessToken(refreshToken: string): Promise<TokenPair>;
+  
+  // MFA implementation
+  async generateTOTPSecret(userId: string): Promise<TOTPSecret>;
+  async verifyTOTP(userId: string, token: string): Promise<boolean>;
+  async sendSMSOTP(userId: string): Promise<void>;
+  async verifySMSOTP(userId: string, code: string): Promise<boolean>;
+}
+```
+
+### Data Encryption
+
+**Encryption Service:**
+```typescript
+class EncryptionService {
+  // Field-level encryption
+  async encryptPII(data: PersonalData): Promise<EncryptedData>;
+  async decryptPII(encryptedData: EncryptedData): Promise<PersonalData>;
+  
+  // Financial data protection
+  async encryptFinancialData(data: FinancialData): Promise<EncryptedData>;
+  async decryptFinancialData(encryptedData: EncryptedData): Promise<FinancialData>;
+  
+  // Key management
+  async rotateEncryptionKeys(): Promise<void>;
+  async backupKeys(destination: string): Promise<void>;
+}
+```
+
+## Monitoring & Observability
+
+### Application Performance Monitoring
+
+**Monitoring Stack:**
+<CardGroup cols={3}>
+  <Card title="Error Tracking" icon="shield">
+    **Tool**: Sentry  
+    **Purpose**: Real-time error monitoring and alerting  
+    **Integration**: Automatic error capture and user context
+  </Card>
+  <Card title="Performance Monitoring" icon="bolt">
+    **Tool**: New Relic / DataDog  
+    **Purpose**: Application performance and infrastructure monitoring  
+    **Metrics**: Response times, throughput, resource usage
+  </Card>
+  <Card title="Business Analytics" icon="chart-line">
+    **Tool**: Custom analytics  
+    **Purpose**: User behavior and business metrics  
+    **Storage**: PostgreSQL with analytical queries
+  </Card>
+</CardGroup>
+
+### Logging Architecture
+
+**Structured Logging:**
+```typescript
+class LoggingService {
+  // Audit logging
+  async logUserAction(userId: string, action: UserAction): Promise<void>;
+  async logFinancialTransaction(transaction: Transaction): Promise<void>;
+  async logSecurityEvent(event: SecurityEvent): Promise<void>;
+  
+  // Performance logging
+  async logAPIPerformance(endpoint: string, duration: number): Promise<void>;
+  async logDatabaseQuery(query: string, duration: number): Promise<void>;
+  
+  // Error logging
+  async logError(error: Error, context: ErrorContext): Promise<void>;
+}
+```
+
+## Deployment Architecture
+
+### Container Architecture
+
+**Docker Configuration:**
+```dockerfile
+# Multi-stage build for optimization
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+
+FROM node:18-alpine AS runtime
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY . .
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+**Service Orchestration:**
+```yaml
+# Docker Compose for local development
+services:
+  api:
+    build: ./backend
+    ports: ["3000:3000"]
+    depends_on: [db, redis]
+    
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: awo_development
+      
+  redis:
+    image: redis:7-alpine
+    
+  worker:
+    build: ./backend
+    command: npm run worker
+    depends_on: [db, redis]
+```
+
+### CI/CD Pipeline Integration
+
+**Build and Deployment Flow:**
+<Steps>
+  <Step title="Code Commit">
+    Developer commits code to GitHub repository
+  </Step>
+  <Step title="Automated Testing">
+    Unit tests, integration tests, and security scans
+  </Step>
+  <Step title="Build Process">
+    Docker image creation and artifact generation
+  </Step>
+  <Step title="Staging Deployment">
+    Automatic deployment to staging environment
+  </Step>
+  <Step title="Production Deployment">
+    Manual approval and production deployment
+  </Step>
+</Steps>
+
+## Performance Optimization
+
+### API Performance
+
+**Optimization Strategies:**
+- Database query optimization with proper indexing
+- API response caching with Redis
+- Connection pooling for database connections
+- Compression middleware for API responses
+- CDN integration for static assets
+
+### Mobile Application Performance
+
+**React Native Optimizations:**
+- Code splitting and lazy loading
+- Image optimization and caching
+- Efficient state management
+- Background task optimization
+- Bundle size optimization
+
+### Database Performance
+
+**PostgreSQL Optimizations:**
+- Strategic indexing for common queries
+- Materialized views for complex aggregations
+- Connection pooling and query optimization
+- Regular VACUUM and ANALYZE operations
+- Read replicas for analytical queries
+
+---
+
+*This component architecture provides a robust, scalable foundation for AWO Platform, ensuring reliable service delivery across the SADC region while maintaining security, performance, and maintainability standards.*
+
+*Last updated: June 2025*  
+*Next review: July 2025*
