@@ -379,7 +379,7 @@ This guide covers the markdown conventions, writing style, and documentation sta
 ## Financial Data Examples
 
 <FrameBox>
-  <div style="padding: 20px; background: #f8f9fa; border-radius: 8px;">
+  <div style={{padding: '20px', background: '#f8f9fa', borderRadius: '8px'}}>
     <h3>DIVA Score Breakdown</h3>
     <ul>
       <li><strong>Discipline:</strong> 800/1000</li>
@@ -533,7 +533,7 @@ This guide covers the markdown conventions, writing style, and documentation sta
 
 ### API Documentation
 
-```markdown
+````markdown
 # DIVA Score API
 
 Calculate and retrieve DIVA scores for authenticated users.
@@ -590,11 +590,11 @@ Retrieves the current DIVA score for the authenticated user.
 curl -X GET https://api.awo-platform.com/v1/diva-score \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
-```
+````
 
 ### Tutorial Documentation
 
-```markdown
+````markdown
 # Creating Your First Chama
 
 Learn how to create and manage a digital Chama (savings group) 
@@ -671,11 +671,11 @@ Now that your Chama is set up:
     - The Chama is in "Active" status
   </Accordion>
 </AccordionGroup>
-```
+````
 
 ### Reference Documentation
 
-```markdown
+````markdown
 # Error Codes Reference
 
 Complete list of error codes returned by the AWO API.
@@ -736,7 +736,7 @@ All errors follow this standard format:
   }
 }
 ```
-```
+````
 
 ## Quality Checklist
 

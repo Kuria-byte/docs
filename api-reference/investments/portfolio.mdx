@@ -1,16 +1,16 @@
 ---
-title: "Buy Investment"
-api: "POST /investments/buy"
-description: "Purchase investment products with integrated payment processing and automatic portfolio allocation"
+title: "Investment Portfolio"
+api: "GET /investments/portfolio"
+description: "Retrieve detailed investment portfolio with holdings, performance, allocation, and DIVA score impact"
 ---
 
-# Buy Investment
+# Investment Portfolio
 
-Execute investment purchases with real-time pricing, payment processing, and automatic portfolio allocation. This endpoint handles the complete investment flow from order placement to settlement.
+Get comprehensive portfolio information including current holdings, performance metrics, asset allocation, and impact on DIVA score calculations.
 
 ## Endpoint
 
-<api-endpoint method="POST" url="/investments/buy" />
+<api-endpoint method="GET" url="/investments/portfolio" />
 
 ## Authentication
 
@@ -21,126 +21,71 @@ Execute investment purchases with real-time pricing, payment processing, and aut
   ```
 </ParamField>
 
-## Request Body
+## Query Parameters
 
-<ParamField body="product_id" type="string" required>
-  Unique identifier for the investment product to purchase
+<ParamField query="include_history" type="boolean" default="false">
+  Include historical performance data (last 12 months)
 </ParamField>
 
-<ParamField body="investment_type" type="string" required>
-  Type of investment order
-  - `amount` - Invest a specific monetary amount
-  - `units` - Purchase a specific number of units/shares
-</ParamField>
-
-<ParamField body="amount" type="number" required>
-  Investment amount (required if investment_type is 'amount')
-</ParamField>
-
-<ParamField body="units" type="number" required>
-  Number of units to purchase (required if investment_type is 'units')
-</ParamField>
-
-<ParamField body="currency" type="string" default="ZAR">
-  Currency for the investment
+<ParamField query="currency" type="string" default="ZAR">
+  Currency for portfolio valuation
   - `ZAR` - South African Rand
-  - `KES` - Kenyan Shilling
+  - `KES` - Kenyan Shilling  
   - `USD` - US Dollar
 </ParamField>
 
-<ParamField body="payment_method" type="object" required>
-  Payment method details
-  
-  <Expandable title="payment_method" defaultOpen>
-    <ParamField body="type" type="string" required>
-      Payment method type
-      - `bank_transfer` - Bank transfer/EFT
-      - `debit_order` - Recurring debit order
-      - `card` - Credit/debit card
-      - `mobile_money` - Mobile money (M-Pesa, etc.)
-      - `wallet` - AWO wallet balance
-    </ParamField>
-    
-    <ParamField body="account_id" type="string">
-      Bank account ID (for bank_transfer or debit_order)
-    </ParamField>
-    
-    <ParamField body="card_token" type="string">
-      Tokenized card ID (for card payments)
-    </ParamField>
-    
-    <ParamField body="mobile_number" type="string">
-      Mobile number (for mobile_money)
-    </ParamField>
-  </Expandable>
+<ParamField query="as_of_date" type="string">
+  Portfolio snapshot as of specific date (ISO 8601 format)
 </ParamField>
 
-<ParamField body="order_type" type="string" default="market">
-  Order execution type
-  - `market` - Execute at current market price
-  - `limit` - Execute only at specified price or better
-</ParamField>
-
-<ParamField body="limit_price" type="number">
-  Limit price (required if order_type is 'limit')
-</ParamField>
-
-<ParamField body="auto_invest" type="object">
-  Automatic investment settings (optional)
-  
-  <Expandable title="auto_invest">
-    <ParamField body="enabled" type="boolean" default="false">
-      Enable recurring investment
-    </ParamField>
-    
-    <ParamField body="frequency" type="string">
-      Investment frequency: `weekly`, `monthly`, `quarterly`
-    </ParamField>
-    
-    <ParamField body="day_of_period" type="number">
-      Day of the period to invest (1-31 for monthly, 1-7 for weekly)
-    </ParamField>
-    
-    <ParamField body="end_date" type="string">
-      End date for auto-investment (ISO 8601)
-    </ParamField>
-  </Expandable>
-</ParamField>
-
-<ParamField body="goal_id" type="string">
-  Associate purchase with a specific savings goal
-</ParamField>
-
-<ParamField body="notes" type="string">
-  Optional notes for the investment
-</ParamField>
-
-<ParamField body="accept_risks" type="boolean" required>
-  Confirmation that user accepts investment risks
-</ParamField>
-
-<ParamField body="terms_accepted" type="boolean" required>
-  Confirmation that user accepts terms and conditions
+<ParamField query="include_closed" type="boolean" default="false">
+  Include closed/sold positions in the response
 </ParamField>
 
 ## Response
 
-<ResponseField name="transaction_id" type="string" required>
-  Unique identifier for the investment transaction
-</ResponseField>
-
-<ResponseField name="order_id" type="string" required>
-  Investment order identifier
-</ResponseField>
-
-<ResponseField name="status" type="string" required>
-  Transaction status: `pending`, `processing`, `completed`, `failed`, `cancelled`
-</ResponseField>
-
-<ResponseField name="investment_details" type="object" required>
-  Details of the investment purchase
+<ResponseField name="portfolio_summary" type="object" required>
+  Overall portfolio summary and metrics
   
-  <Expandable title="investment_details" defaultOpen>
+  <Expandable title="portfolio_summary" defaultOpen>
+    <ResponseField name="total_value" type="number" required>
+      Total portfolio value in requested currency
+    </ResponseField>
+    
+    <ResponseField name="total_cost_basis" type="number" required>
+      Total amount invested (cost basis)
+    </ResponseField>
+    
+    <ResponseField name="unrealized_gain_loss" type="number" required>
+      Unrealized gains/losses
+    </ResponseField>
+    
+    <ResponseField name="realized_gain_loss" type="number" required>
+      Realized gains/losses (year to date)
+    </ResponseField>
+    
+    <ResponseField name="total_return" type="number" required>
+      Total return percentage
+    </ResponseField>
+    
+    <ResponseField name="currency" type="string" required>
+      Portfolio currency
+    </ResponseField>
+    
+    <ResponseField name="last_updated" type="string" required>
+      Last portfolio update timestamp (ISO 8601)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="holdings" type="array" required>
+  Array of current investment holdings
+  
+  <Expandable title="holdings[]">
+    <ResponseField name="investment_id" type="string" required>
+      Unique investment identifier
+    </ResponseField>
+    
     <ResponseField name="product_id" type="string" required>
       Investment product identifier
     </ResponseField>
@@ -149,210 +94,317 @@ Execute investment purchases with real-time pricing, payment processing, and aut
       Investment product name
     </ResponseField>
     
-    <ResponseField name="units_purchased" type="number" required>
-      Number of units/shares purchased
+    <ResponseField name="symbol" type="string">
+      Trading symbol (if applicable)
     </ResponseField>
     
-    <ResponseField name="unit_price" type="number" required>
-      Price per unit at execution
+    <ResponseField name="units_held" type="number" required>
+      Number of units/shares held
     </ResponseField>
     
-    <ResponseField name="total_amount" type="number" required>
-      Total investment amount
+    <ResponseField name="current_price" type="number" required>
+      Current price per unit
     </ResponseField>
     
-    <ResponseField name="currency" type="string" required>
-      Investment currency
+    <ResponseField name="market_value" type="number" required>
+      Current market value
     </ResponseField>
     
-    <ResponseField name="execution_time" type="string" required>
-      ISO 8601 timestamp of order execution
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
-<ResponseField name="fees" type="object" required>
-  Breakdown of fees and charges
-  
-  <Expandable title="fees">
-    <ResponseField name="transaction_fee" type="number" required>
-      Platform transaction fee
+    <ResponseField name="cost_basis" type="number" required>
+      Total cost basis
     </ResponseField>
     
-    <ResponseField name="payment_processing_fee" type="number" required>
-      Payment processing fee
+    <ResponseField name="unrealized_gain_loss" type="number" required>
+      Unrealized gain/loss
     </ResponseField>
     
-    <ResponseField name="fund_management_fee" type="number" required>
-      Ongoing fund management fee (annual)
+    <ResponseField name="unrealized_gain_loss_percentage" type="number" required>
+      Unrealized gain/loss percentage
     </ResponseField>
     
-    <ResponseField name="total_fees" type="number" required>
-      Total fees for this transaction
+    <ResponseField name="weight" type="number" required>
+      Portfolio weight percentage
     </ResponseField>
     
-    <ResponseField name="fee_currency" type="string" required>
-      Currency for fee amounts
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
-<ResponseField name="payment" type="object" required>
-  Payment processing information
-  
-  <Expandable title="payment">
-    <ResponseField name="payment_id" type="string" required>
-      Unique payment identifier
+    <ResponseField name="purchase_date" type="string" required>
+      First purchase date (ISO 8601)
     </ResponseField>
     
-    <ResponseField name="payment_method" type="string" required>
-      Payment method used
-    </ResponseField>
-    
-    <ResponseField name="payment_status" type="string" required>
-      Payment status: `pending`, `processing`, `completed`, `failed`
-    </ResponseField>
-    
-    <ResponseField name="payment_reference" type="string">
-      Payment reference number
-    </ResponseField>
-    
-    <ResponseField name="estimated_settlement" type="string">
-      Estimated settlement date (ISO 8601)
-    </ResponseField>
-    
-    <ResponseField name="payment_instructions" type="object">
-      Instructions for completing payment (if applicable)
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
-<ResponseField name="portfolio_impact" type="object" required>
-  Impact on user's portfolio
-  
-  <Expandable title="portfolio_impact">
-    <ResponseField name="new_allocation" type="object" required>
-      Updated portfolio allocation percentages
-    </ResponseField>
-    
-    <ResponseField name="total_portfolio_value" type="number" required>
-      Updated total portfolio value
-    </ResponseField>
-    
-    <ResponseField name="diversification_score" type="number" required>
-      Portfolio diversification score (0-100)
+    <ResponseField name="asset_class" type="string" required>
+      Asset class: `equity`, `bond`, `money_market`, `commodity`, `real_estate`
     </ResponseField>
     
     <ResponseField name="risk_level" type="string" required>
-      Updated portfolio risk level: `low`, `medium`, `high`
+      Risk level: `low`, `medium`, `high`
     </ResponseField>
   </Expandable>
 </ResponseField>
 
-<ResponseField name="diva_impact" type="object">
-  Impact on DIVA score (if applicable)
+<ResponseField name="allocation" type="object" required>
+  Portfolio allocation breakdown
+  
+  <Expandable title="allocation">
+    <ResponseField name="by_asset_class" type="object" required>
+      Allocation by asset class
+      ```json
+      {
+        "equity": 45.2,
+        "bond": 30.5,
+        "money_market": 20.3,
+        "commodity": 4.0
+      }
+      ```
+    </ResponseField>
+    
+    <ResponseField name="by_geography" type="object" required>
+      Allocation by geographic region
+    </ResponseField>
+    
+    <ResponseField name="by_sector" type="object" required>
+      Allocation by sector (for equity holdings)
+    </ResponseField>
+    
+    <ResponseField name="by_currency" type="object" required>
+      Allocation by currency exposure
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="performance" type="object" required>
+  Portfolio performance metrics
+  
+  <Expandable title="performance">
+    <ResponseField name="day_change" type="object" required>
+      24-hour performance
+      
+      <Expandable title="day_change">
+        <ResponseField name="amount" type="number" required>
+          Change in portfolio value
+        </ResponseField>
+        
+        <ResponseField name="percentage" type="number" required>
+          Percentage change
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="week_change" type="object" required>
+      7-day performance
+    </ResponseField>
+    
+    <ResponseField name="month_change" type="object" required>
+      30-day performance
+    </ResponseField>
+    
+    <ResponseField name="year_change" type="object" required>
+      Year-to-date performance
+    </ResponseField>
+    
+    <ResponseField name="inception_return" type="number" required>
+      Total return since inception
+    </ResponseField>
+    
+    <ResponseField name="annualized_return" type="number">
+      Annualized return (if portfolio > 1 year old)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="diva_impact" type="object" required>
+  Portfolio impact on DIVA score
   
   <Expandable title="diva_impact">
-    <ResponseField name="assets_score_change" type="number">
-      Change in Assets component of DIVA score
+    <ResponseField name="assets_score_contribution" type="number" required>
+      Contribution to Assets component (0-1000)
     </ResponseField>
     
-    <ResponseField name="discipline_score_change" type="number">
-      Change in Discipline component (for auto-invest)
+    <ResponseField name="diversification_bonus" type="number" required>
+      Bonus points for diversification
     </ResponseField>
     
-    <ResponseField name="projected_score_change" type="number">
-      Projected overall DIVA score change
+    <ResponseField name="risk_adjustment" type="number" required>
+      Risk-adjusted score modifier
     </ResponseField>
     
-    <ResponseField name="score_update_date" type="string">
-      When DIVA score will be updated (ISO 8601)
+    <ResponseField name="total_contribution" type="number" required>
+      Total contribution to overall DIVA score
     </ResponseField>
   </Expandable>
-</ResponseField>
-
-<ResponseField name="auto_invest" type="object">
-  Auto-investment setup confirmation (if enabled)
-  
-  <Expandable title="auto_invest">
-    <ResponseField name="auto_invest_id" type="string" required>
-      Unique auto-investment plan identifier
-    </ResponseField>
-    
-    <ResponseField name="frequency" type="string" required>
-      Investment frequency
-    </ResponseField>
-    
-    <ResponseField name="next_investment_date" type="string" required>
-      Next scheduled investment date (ISO 8601)
-    </ResponseField>
-    
-    <ResponseField name="monthly_amount" type="number" required>
-      Amount to be invested each period
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
-<ResponseField name="confirmations" type="object" required>
-  Confirmation and receipt information
-  
-  <Expandable title="confirmations">
-    <ResponseField name="email_sent" type="boolean" required>
-      Whether confirmation email was sent
-    </ResponseField>
-    
-    <ResponseField name="sms_sent" type="boolean" required>
-      Whether confirmation SMS was sent
-    </ResponseField>
-    
-    <ResponseField name="receipt_url" type="string">
-      URL to download transaction receipt
-    </ResponseField>
-    
-    <ResponseField name="tax_certificate_url" type="string">
-      URL to download tax certificate (if applicable)
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
-<ResponseField name="created_at" type="string" required>
-  Transaction creation timestamp (ISO 8601)
-</ResponseField>
-
-<ResponseField name="updated_at" type="string" required>
-  Last update timestamp (ISO 8601)
 </ResponseField>
 
 ## Example Request
 
 <CodeGroup>
 ```bash cURL
-curl -X POST "https://api.awo-platform.com/investments/buy" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "product_id": "prd_satrix_top40",
-    "investment_type": "amount",
-    "amount": 2500.00,
-    "currency": "ZAR",
-    "payment_method": {
-      "type": "bank_transfer",
-      "account_id": "acc_user_checking_001"
-    },
-    "order_type": "market",
-    "auto_invest": {
-      "enabled": true,
-      "frequency": "monthly",
-      "day_of_period": 1
-    },
-    "goal_id": "goal_emergency_fund",
-    "notes": "Monthly investment for retirement savings",
-    "accept_risks": true,
-    "terms_accepted": true
-  }'
+curl -X GET "https://api.awo-platform.com/investments/portfolio?include_history=true" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 ```javascript JavaScript
-const response = await fetch('/investments/buy', {
-  method: 'POST',
-  headers:
+const response = await fetch('/investments/portfolio?include_history=true', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer ' + accessToken,
+    'Content-Type': 'application/json'
+  }
+});
+
+const portfolio = await response.json();
+```
+
+```python Python
+import requests
+
+headers = {
+    'Authorization': f'Bearer {access_token}',
+    'Content-Type': 'application/json'
+}
+
+response = requests.get(
+    'https://api.awo-platform.com/investments/portfolio',
+    headers=headers,
+    params={'include_history': True}
+)
+
+portfolio = response.json()
+```
+</CodeGroup>
+
+## Example Response
+
+<CodeGroup>
+```json 200 OK
+{
+  "portfolio_summary": {
+    "total_value": 25450.75,
+    "total_cost_basis": 22000.00,
+    "unrealized_gain_loss": 3450.75,
+    "realized_gain_loss": 125.50,
+    "total_return": 15.69,
+    "currency": "ZAR",
+    "last_updated": "2025-06-02T16:30:00Z"
+  },
+  "holdings": [
+    {
+      "investment_id": "inv_1a2b3c4d5e6f7g8h",
+      "product_id": "prd_satrix_top40",
+      "product_name": "Satrix Top 40 ETF",
+      "symbol": "STX40",
+      "units_held": 100.50,
+      "current_price": 95.80,
+      "market_value": 9627.90,
+      "cost_basis": 8500.00,
+      "unrealized_gain_loss": 1127.90,
+      "unrealized_gain_loss_percentage": 13.27,
+      "weight": 37.8,
+      "purchase_date": "2024-08-15T09:00:00Z",
+      "asset_class": "equity",
+      "risk_level": "medium"
+    },
+    {
+      "investment_id": "inv_9z8y7x6w5v4u3t2s",
+      "product_id": "prd_allan_gray_bond",
+      "product_name": "Allan Gray Stable Fund",
+      "symbol": "AGSTB",
+      "units_held": 125.75,
+      "current_price": 78.45,
+      "market_value": 9865.44,
+      "cost_basis": 9500.00,
+      "unrealized_gain_loss": 365.44,
+      "unrealized_gain_loss_percentage": 3.85,
+      "weight": 38.8,
+      "purchase_date": "2024-07-10T09:00:00Z",
+      "asset_class": "bond",
+      "risk_level": "low"
+    }
+  ],
+  "allocation": {
+    "by_asset_class": {
+      "equity": 45.2,
+      "bond": 35.5,
+      "money_market": 15.3,
+      "commodity": 4.0
+    },
+    "by_geography": {
+      "south_africa": 78.5,
+      "developed_markets": 15.2,
+      "emerging_markets": 6.3
+    },
+    "by_sector": {
+      "financials": 25.8,
+      "materials": 18.2,
+      "industrials": 15.5,
+      "consumer_discretionary": 12.1,
+      "technology": 10.4,
+      "other": 18.0
+    },
+    "by_currency": {
+      "ZAR": 78.5,
+      "USD": 15.2,
+      "EUR": 4.1,
+      "GBP": 2.2
+    }
+  },
+  "performance": {
+    "day_change": {
+      "amount": 45.25,
+      "percentage": 0.18
+    },
+    "week_change": {
+      "amount": 156.80,
+      "percentage": 0.62
+    },
+    "month_change": {
+      "amount": 890.45,
+      "percentage": 3.62
+    },
+    "year_change": {
+      "amount": 3450.75,
+      "percentage": 15.69
+    },
+    "inception_return": 15.69,
+    "annualized_return": 18.25
+  },
+  "diva_impact": {
+    "assets_score_contribution": 180,
+    "diversification_bonus": 25,
+    "risk_adjustment": -5,
+    "total_contribution": 200
+  }
+}
+```
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Invalid or expired access token"
+  }
+}
+```
+</CodeGroup>
+
+## Error Codes
+
+<ResponseField name="UNAUTHORIZED" type="401">
+  Invalid or expired access token
+</ResponseField>
+
+<ResponseField name="PORTFOLIO_NOT_FOUND" type="404">
+  User has no investment portfolio
+</ResponseField>
+
+<ResponseField name="INVALID_CURRENCY" type="400">
+  Unsupported currency requested
+</ResponseField>
+
+<ResponseField name="RATE_LIMIT_EXCEEDED" type="429">
+  Too many requests - rate limit exceeded
+</ResponseField>
+
+## Related Endpoints
+
+- [Buy Investment](/api-reference/investments/buy) - Purchase new investments
+- [Sell Investment](/api-reference/investments/sell) - Sell current holdings
+- [Investment Products](/api-reference/investments/products) - Browse available investments
+- [DIVA Score](/api-reference/diva-score/get-score) - View DIVA score breakdown
