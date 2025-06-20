@@ -1,41 +1,832 @@
----
-title: "Investment Platform"
-description: "AWO Platform investment platform advanced functionality"
----
-
 # Investment Platform
+
+AWO's Investment Platform provides tiered access to diversified investment opportunities, combining traditional African investment preferences with modern portfolio theory to help users build wealth according to their financial capacity (DIVA Score) and risk tolerance (RTSM Assessment).
 
 ## Overview
 
 <Info>
-Investment Platform is an advanced feature of the AWO Platform, providing sophisticated financial services for experienced users.
+The Investment Platform democratizes access to sophisticated investment strategies across the SADC region, offering portfolio tiers from conservative savings products to advanced alternative investments, all tailored to users' financial profiles and regional market opportunities.
 </Info>
 
-## Advanced Capabilities
+**Platform Principles:**
+- **Risk-Aligned Access**: Investment opportunities matched to user's financial capacity and risk tolerance
+- **African Focus**: Investment products relevant to SADC markets and opportunities
+- **Educational Integration**: Learning resources embedded throughout investment journey
+- **Community Investment**: Group investment opportunities through Chama integration
+- **Performance Transparency**: Clear reporting on all investment performance and fees
 
-Advanced functionality will be documented here.
+## Tiered Portfolio System
 
-## Configuration
+### Portfolio Tier Assignment
 
-<Accordion title="Advanced Configuration Options">
-Configuration details for investment platform will be provided here.
-</Accordion>
-
-## Implementation Guide
-
-Detailed implementation steps will be included here.
-
-## Performance Considerations
-
-Performance optimization tips will be documented here.
-
-## Enterprise Features
+Portfolio tiers are automatically assigned based on the combination of DIVA Score (financial capacity) and RTSM Assessment (risk tolerance):
 
 <CardGroup cols={2}>
-  <Card title="SME Marketplace" href="/advanced-features/sme-marketplace">
-    Business investment opportunities
+  <Card title="Bronze Tier (0-399 DIVA)" icon="award" style="border-color: #cd7f32;">
+    **Target Users**: New investors, building financial foundation  
+    **Max Investment**: R25,000 per product, R100,000 total portfolio  
+    **Risk Profile**: Very conservative, capital preservation focus  
+    **Investment Horizon**: Short to medium-term (1-5 years)
   </Card>
-  <Card title="Wealth Coaching" href="/advanced-features/wealth-coaching">
-    Professional financial advisory
+  <Card title="Silver Tier (400-649 DIVA)" icon="award" style="border-color: #c0c0c0;">
+    **Target Users**: Established savers, moderate investment experience  
+    **Max Investment**: R100,000 per product, R500,000 total portfolio  
+    **Risk Profile**: Conservative to moderate, steady growth focus  
+    **Investment Horizon**: Medium-term (3-10 years)
   </Card>
 </CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Gold Tier (650-849 DIVA)" icon="award" style="border-color: #ffd700;">
+    **Target Users**: Experienced investors, strong financial foundation  
+    **Max Investment**: R500,000 per product, R2,500,000 total portfolio  
+    **Risk Profile**: Moderate to aggressive, growth-oriented  
+    **Investment Horizon**: Long-term (5-20 years)
+  </Card>
+  <Card title="Platinum Tier (850-1000 DIVA)" icon="award" style="border-color: #e5e4e2;">
+    **Target Users**: Sophisticated investors, optimal financial health  
+    **Max Investment**: No platform limits (subject to regulatory limits)  
+    **Risk Profile**: All risk levels, maximum diversification  
+    **Investment Horizon**: All timeframes, including legacy planning
+  </Card>
+</CardGroup>
+
+### Investment Product Catalog by Tier
+
+**Bronze Tier Products:**
+<CardGroup cols={3}>
+  <Card title="Money Market Funds" icon="piggy-bank">
+    **Risk Level**: Very Low  
+    **Expected Return**: 6-8% annually  
+    **Liquidity**: Daily  
+    **Minimum**: R500
+  </Card>
+  <Card title="Government Bonds" icon="landmark">
+    **Risk Level**: Very Low  
+    **Expected Return**: 7-10% annually  
+    **Liquidity**: Secondary market  
+    **Minimum**: R1,000
+  </Card>
+  <Card title="Fixed Deposits" icon="lock">
+    **Risk Level**: Very Low  
+    **Expected Return**: 8-9% annually  
+    **Liquidity**: Maturity only  
+    **Minimum**: R5,000
+  </Card>
+</CardGroup>
+
+**Silver Tier Products (includes Bronze + additional):**
+<CardGroup cols={3}>
+  <Card title="Index Funds" icon="chart-line">
+    **Risk Level**: Low to Moderate  
+    **Expected Return**: 10-12% annually  
+    **Liquidity**: Daily  
+    **Minimum**: R1,000
+  </Card>
+  <Card title="Corporate Bonds" icon="building">
+    **Risk Level**: Low to Moderate  
+    **Expected Return**: 9-12% annually  
+    **Liquidity**: Secondary market  
+    **Minimum**: R5,000
+  </Card>
+  <Card title="Balanced Funds" icon="chart-bar">
+    **Risk Level**: Moderate  
+    **Expected Return**: 11-14% annually  
+    **Liquidity**: Daily  
+    **Minimum**: R2,500
+  </Card>
+</CardGroup>
+
+**Gold Tier Products (includes Silver + additional):**
+<CardGroup cols={3}>
+  <Card title="Equity ETFs" icon="trophy">
+    **Risk Level**: Moderate to High  
+    **Expected Return**: 12-16% annually  
+    **Liquidity**: Daily  
+    **Minimum**: R2,500
+  </Card>
+  <Card title="Property REITs" icon="building">
+    **Risk Level**: Moderate  
+    **Expected Return**: 10-14% annually  
+    **Liquidity**: Daily  
+    **Minimum**: R5,000
+  </Card>
+  <Card title="SME Debt Notes" icon="handshake">
+    **Risk Level**: Moderate to High  
+    **Expected Return**: 14-18% annually  
+    **Liquidity**: Limited  
+    **Minimum**: R10,000
+  </Card>
+</CardGroup>
+
+**Platinum Tier Products (includes Gold + additional):**
+<CardGroup cols={3}>
+  <Card title="Individual Stocks" icon="chart-bar">
+    **Risk Level**: High  
+    **Expected Return**: Variable  
+    **Liquidity**: Daily  
+    **Minimum**: R5,000
+  </Card>
+  <Card title="Alternative Investments" icon="diamond">
+    **Risk Level**: High  
+    **Expected Return**: 15-25% annually  
+    **Liquidity**: Limited  
+    **Minimum**: R25,000
+  </Card>
+  <Card title="Private Equity" icon="users">
+    **Risk Level**: Very High  
+    **Expected Return**: 18-30% annually  
+    **Liquidity**: Very Limited  
+    **Minimum**: R100,000
+  </Card>
+</CardGroup>
+
+## Investment Product Architecture
+
+### Product Data Model
+
+```typescript
+interface InvestmentProduct {
+  productId: string;
+  name: string;
+  category: ProductCategory;
+  subCategory: string;
+  provider: InvestmentProvider;
+  
+  // Access and eligibility
+  requiredTier: PortfolioTier;
+  minimumInvestment: number;
+  maximumInvestment?: number;
+  eligibilityCriteria: EligibilityCriteria;
+  
+  // Financial characteristics
+  riskLevel: RiskLevel;
+  expectedReturn: ReturnExpectation;
+  historicalPerformance: PerformanceHistory;
+  fees: FeeStructure;
+  liquidity: LiquidityProfile;
+  
+  // Investment terms
+  investmentHorizon: InvestmentHorizon;
+  currency: string;
+  dividendPolicy?: DividendPolicy;
+  rebalancingFrequency?: string;
+  
+  // Documentation and compliance
+  factSheet: string; // URL to product fact sheet
+  prospectus?: string; // URL to prospectus
+  riskDisclosure: RiskDisclosure;
+  regulatoryInformation: RegulatoryInfo;
+  
+  // Platform metadata
+  isActive: boolean;
+  launchDate: Date;
+  lastUpdated: Date;
+  popularityScore: number;
+  userRatings: UserRating[];
+}
+
+interface InvestmentProvider {
+  providerId: string;
+  name: string;
+  type: 'asset_manager' | 'bank' | 'insurance' | 'fintech' | 'platform';
+  licenses: License[];
+  amoRating: string; // Asset Manager rating
+  trackRecord: ProviderTrackRecord;
+  contactInfo: ContactInformation;
+}
+
+enum ProductCategory {
+  MONEY_MARKET = 'money_market',
+  GOVERNMENT_BONDS = 'government_bonds',
+  CORPORATE_BONDS = 'corporate_bonds',
+  INDEX_FUNDS = 'index_funds',
+  EQUITY_ETFS = 'equity_etfs',
+  BALANCED_FUNDS = 'balanced_funds',
+  PROPERTY_REITS = 'property_reits',
+  INDIVIDUAL_STOCKS = 'individual_stocks',
+  SME_DEBT = 'sme_debt',
+  ALTERNATIVE_INVESTMENTS = 'alternative_investments',
+  PRIVATE_EQUITY = 'private_equity'
+}
+```
+
+### Product Discovery and Recommendation Engine
+
+```typescript
+class InvestmentRecommendationEngine {
+  async generateRecommendations(userId: string): Promise<InvestmentRecommendations> {
+    // Get user profile and constraints
+    const userProfile = await this.getUserInvestmentProfile(userId);
+    const divaScore = await this.getDivaScore(userId);
+    const rtsmAssessment = await this.getRTSMAssessment(userId);
+    
+    // Determine available products based on tier
+    const portfolioTier = this.determinePortfolioTier(divaScore.overallScore);
+    const availableProducts = await this.getProductsForTier(portfolioTier);
+    
+    // Apply RTSM risk filtering
+    const riskAppropriateProducts = this.filterByRiskTolerance(
+      availableProducts, 
+      rtsmAssessment.riskProfile
+    );
+    
+    // Generate personalized recommendations
+    const recommendations = await this.scoreProducts(
+      riskAppropriateProducts,
+      userProfile,
+      rtsmAssessment
+    );
+    
+    // Create diversified portfolio suggestions
+    const portfolioSuggestions = this.generatePortfolioSuggestions(
+      recommendations,
+      userProfile.investmentGoals,
+      userProfile.investmentHorizon
+    );
+    
+    return {
+      recommendedProducts: recommendations.slice(0, 10),
+      portfolioSuggestions,
+      reasoning: this.generateRecommendationReasoning(recommendations),
+      riskWarnings: this.generateRiskWarnings(recommendations, rtsmAssessment),
+      educationalContent: await this.getRelevantEducationalContent(recommendations)
+    };
+  }
+
+  private async scoreProducts(
+    products: InvestmentProduct[],
+    userProfile: UserInvestmentProfile,
+    rtsmAssessment: RTSMAssessment
+  ): Promise<ScoredInvestmentProduct[]> {
+    
+    return products.map(product => {
+      let score = 0;
+      const factors: ScoringFactor[] = [];
+      
+      // Risk alignment (40% weight)
+      const riskAlignment = this.calculateRiskAlignment(product, rtsmAssessment);
+      score += riskAlignment * 0.4;
+      factors.push({ name: 'Risk Alignment', score: riskAlignment, weight: 0.4 });
+      
+      // Goal alignment (25% weight)
+      const goalAlignment = this.calculateGoalAlignment(product, userProfile.investmentGoals);
+      score += goalAlignment * 0.25;
+      factors.push({ name: 'Goal Alignment', score: goalAlignment, weight: 0.25 });
+      
+      // Performance history (20% weight)
+      const performanceScore = this.calculatePerformanceScore(product);
+      score += performanceScore * 0.2;
+      factors.push({ name: 'Performance History', score: performanceScore, weight: 0.2 });
+      
+      // Cost efficiency (15% weight)
+      const costScore = this.calculateCostScore(product);
+      score += costScore * 0.15;
+      factors.push({ name: 'Cost Efficiency', score: costScore, weight: 0.15 });
+      
+      return {
+        product,
+        score: Math.round(score * 100),
+        scoringFactors: factors,
+        recommendationReason: this.generateProductRecommendationReason(product, factors),
+        suitabilityWarnings: this.generateSuitabilityWarnings(product, rtsmAssessment)
+      };
+    }).sort((a, b) => b.score - a.score);
+  }
+}
+```
+
+## Investment Execution and Order Management
+
+### Order Types and Execution
+
+**Available Order Types:**
+<CardGroup cols={2}>
+  <Card title="Market Orders" icon="globe">
+    **Execution**: Immediate execution at current market price  
+    **Use Case**: ETFs, individual stocks, REITs  
+    **Processing Time**: Real-time during market hours  
+    **Fee Structure**: Standard brokerage fees apply
+  </Card>
+  <Card title="Unit Trust Orders" icon="calendar">
+    **Execution**: Forward pricing at next NAV calculation  
+    **Use Case**: Mutual funds, index funds, balanced funds  
+    **Processing Time**: Next business day  
+    **Fee Structure**: Annual management fees, no transaction fees
+  </Card>
+</CardGroup>
+
+### Investment Order Workflow
+
+<Steps>
+  <Step title="Product Selection and Research">
+    **Product Discovery**: Browse recommended products or search catalog  
+    **Due Diligence**: Review fact sheets, performance history, and risk disclosures  
+    **Suitability Check**: Automatic suitability assessment based on DIVA + RTSM  
+    **Amount Determination**: Specify investment amount within tier limits
+  </Step>
+  <Step title="Order Validation and Confirmation">
+    **Eligibility Verification**: Confirm user meets all product requirements  
+    **Limit Checking**: Validate against tier limits and concentration rules  
+    **Funding Verification**: Ensure sufficient AWO Wallet balance or linked accounts  
+    **Risk Acknowledgment**: User confirms understanding of risks and terms
+  </Step>
+  <Step title="Order Execution">
+    **Funds Reservation**: Reserve investment amount in AWO Wallet  
+    **Provider Submission**: Submit order to investment provider via API  
+    **Order Tracking**: Real-time status updates and execution confirmation  
+    **Settlement**: Complete transaction and update portfolio holdings
+  </Step>
+  <Step title="Confirmation and Documentation">
+    **Execution Confirmation**: Detailed confirmation with units acquired and price  
+    **Portfolio Update**: Update user's portfolio holdings and allocations  
+    **Documentation**: Generate contract notes and investment certificates  
+    **Performance Tracking**: Begin tracking investment performance and benchmarks
+  </Step>
+</Steps>
+
+### Order Management Implementation
+
+```typescript
+interface InvestmentOrder {
+  orderId: string;
+  userId: string;
+  productId: string;
+  orderType: 'buy' | 'sell' | 'switch';
+  amount: number;
+  units?: number;
+  priceType: 'market' | 'limit' | 'nav';
+  limitPrice?: number;
+  
+  status: OrderStatus;
+  submittedAt: Date;
+  executedAt?: Date;
+  settledAt?: Date;
+  
+  executionDetails?: OrderExecution;
+  fees: OrderFees;
+  fundingSource: FundingSource;
+  
+  suitabilityAssessment: SuitabilityAssessment;
+  riskAcknowledgment: RiskAcknowledgment;
+  
+  providerId: string;
+  providerOrderId?: string;
+  
+  auditTrail: OrderAuditEntry[];
+}
+
+class InvestmentOrderService {
+  async submitInvestmentOrder(request: InvestmentOrderRequest): Promise<InvestmentOrder> {
+    // Comprehensive validation
+    await this.validateOrderRequest(request);
+    
+    // Suitability assessment
+    const suitabilityResult = await this.assessSuitability(request);
+    if (!suitabilityResult.suitable) {
+      throw new SuitabilityError(suitabilityResult.reasons);
+    }
+    
+    // Fund reservation
+    const fundReservation = await this.reserveFunds(request);
+    
+    try {
+      // Create order record
+      const order = await this.createOrderRecord(request, suitabilityResult);
+      
+      // Submit to investment provider
+      const providerResult = await this.submitToProvider(order);
+      
+      // Update order with provider details
+      await this.updateOrderWithProviderResult(order.orderId, providerResult);
+      
+      // Start execution monitoring
+      await this.startExecutionMonitoring(order.orderId);
+      
+      return order;
+      
+    } catch (error) {
+      // Release reserved funds on failure
+      await this.releaseFundReservation(fundReservation);
+      throw error;
+    }
+  }
+
+  private async assessSuitability(request: InvestmentOrderRequest): Promise<SuitabilityAssessment> {
+    const user = await this.getUserProfile(request.userId);
+    const product = await this.getInvestmentProduct(request.productId);
+    const divaScore = await this.getDivaScore(request.userId);
+    const rtsmAssessment = await this.getRTSMAssessment(request.userId);
+    
+    const assessmentChecks = [
+      this.checkTierEligibility(product, divaScore),
+      this.checkRiskAlignment(product, rtsmAssessment),
+      this.checkInvestmentLimits(request, user.portfolio),
+      this.checkConcentrationLimits(request, user.portfolio),
+      this.checkLiquidityNeeds(product, rtsmAssessment),
+      this.checkInvestmentHorizon(product, rtsmAssessment)
+    ];
+
+    const results = await Promise.all(assessmentChecks);
+    const overallSuitability = results.every(result => result.suitable);
+    
+    return {
+      suitable: overallSuitability,
+      confidence: this.calculateSuitabilityConfidence(results),
+      checkResults: results,
+      warnings: results.filter(r => r.warnings).flatMap(r => r.warnings),
+      recommendations: this.generateSuitabilityRecommendations(results)
+    };
+  }
+}
+```
+
+## Portfolio Monitoring and Performance Tracking
+
+### Real-Time Portfolio Dashboard
+
+**Portfolio Overview Components:**
+<CardGroup cols={2}>
+  <Card title="Holdings Summary" icon="chart-bar">
+    **Total Value**: Current market value of all holdings  
+    **Asset Allocation**: Breakdown by asset class and geography  
+    **Top Holdings**: Largest positions and their performance  
+    **Recent Activity**: Latest transactions and changes
+  </Card>
+  <Card title="Performance Metrics" icon="arrow-up">
+    **Total Return**: Absolute and percentage returns  
+    **Time-Weighted Returns**: Standardized performance measurement  
+    **Benchmark Comparison**: Performance vs. relevant benchmarks  
+    **Risk Metrics**: Volatility, maximum drawdown, Sharpe ratio
+  </Card>
+</CardGroup>
+
+### Performance Calculation Engine
+
+```typescript
+class PortfolioPerformanceCalculator {
+  async calculatePortfolioPerformance(
+    userId: string, 
+    period: PerformancePeriod
+  ): Promise<PortfolioPerformance> {
+    
+    const holdings = await this.getCurrentHoldings(userId);
+    const transactions = await this.getTransactions(userId, period);
+    const benchmarks = await this.getRelevantBenchmarks(holdings);
+    
+    // Calculate time-weighted returns (industry standard)
+    const timeWeightedReturns = this.calculateTimeWeightedReturns(
+      holdings, 
+      transactions, 
+      period
+    );
+    
+    // Calculate money-weighted returns (user experience)
+    const moneyWeightedReturns = this.calculateMoneyWeightedReturns(
+      holdings, 
+      transactions, 
+      period
+    );
+    
+    // Risk metrics calculation
+    const riskMetrics = await this.calculateRiskMetrics(holdings, period);
+    
+    // Benchmark comparison
+    const benchmarkComparison = await this.compareToBenchmarks(
+      timeWeightedReturns, 
+      benchmarks, 
+      period
+    );
+    
+    return {
+      period,
+      totalValue: holdings.reduce((sum, holding) => sum + holding.marketValue, 0),
+      totalReturn: {
+        absolute: timeWeightedReturns.absoluteReturn,
+        percentage: timeWeightedReturns.percentageReturn,
+        annualized: timeWeightedReturns.annualizedReturn
+      },
+      riskMetrics,
+      benchmarkComparison,
+      attribution: await this.calculatePerformanceAttribution(holdings, period),
+      cashFlows: this.summarizeCashFlows(transactions),
+      lastUpdated: new Date()
+    };
+  }
+
+  private calculateTimeWeightedReturns(
+    holdings: PortfolioHolding[],
+    transactions: InvestmentTransaction[],
+    period: PerformancePeriod
+  ): TimeWeightedReturn {
+    
+    // Build timeline of cash flows and market values
+    const timeline = this.buildValueTimeline(holdings, transactions, period);
+    
+    // Calculate sub-period returns
+    const subPeriodReturns: number[] = [];
+    
+    for (let i = 1; i < timeline.length; i++) {
+      const startValue = timeline[i-1].portfolioValue;
+      const endValue = timeline[i].portfolioValue;
+      const cashFlow = timeline[i].cashFlow || 0;
+      
+      // Time-weighted return calculation excludes impact of cash flows
+      const periodReturn = (endValue - startValue - cashFlow) / startValue;
+      subPeriodReturns.push(periodReturn);
+    }
+    
+    // Chain-link sub-period returns
+    const cumulativeReturn = subPeriodReturns.reduce(
+      (cumulative, periodReturn) => cumulative * (1 + periodReturn), 
+      1
+    ) - 1;
+    
+    // Annualize return
+    const yearsInPeriod = this.calculateYearsInPeriod(period);
+    const annualizedReturn = Math.pow(1 + cumulativeReturn, 1 / yearsInPeriod) - 1;
+    
+    return {
+      percentageReturn: cumulativeReturn * 100,
+      absoluteReturn: timeline[timeline.length - 1].portfolioValue - timeline[0].portfolioValue,
+      annualizedReturn: annualizedReturn * 100,
+      periods: subPeriodReturns.length
+    };
+  }
+}
+```
+
+### Investment Analytics and Insights
+
+**Advanced Analytics Features:**
+<CardGroup cols={3}>
+  <Card title="Risk Analysis" icon="shield">
+    **Value at Risk (VaR)**: Potential losses under normal market conditions  
+    **Stress Testing**: Portfolio behavior in crisis scenarios  
+    **Correlation Analysis**: How holdings move relative to each other  
+    **Sector Concentration**: Risk concentration by sector/geography
+  </Card>
+  <Card title="Performance Attribution" icon="chart-line">
+    **Asset Allocation**: Return contribution from allocation decisions  
+    **Security Selection**: Return from individual investment choices  
+    **Timing Effects**: Impact of investment timing decisions  
+    **Currency Effects**: Impact of foreign exchange movements
+  </Card>
+  <Card title="Goal Tracking" icon="eye">
+    **Goal Progress**: Progress toward specific financial goals  
+    **Projection Analysis**: Likelihood of achieving goals  
+    **Required Returns**: Returns needed to meet objectives  
+    **Scenario Planning**: Different outcome scenarios
+  </Card>
+</CardGroup>
+
+## Investment Education Integration
+
+### Contextual Learning System
+
+**Education Delivery Methods:**
+<CardGroup cols={2}>
+  <Card title="Just-in-Time Learning" icon="lightbulb">
+    **Context**: Educational content delivered at point of investment decision  
+    **Format**: Short videos, infographics, interactive tutorials  
+    **Topics**: Product-specific education, risk explanations, market concepts  
+    **Personalization**: Tailored to user's knowledge level and interests
+  </Card>
+  <Card title="Progressive Curriculum" icon="graduation-cap">
+    **Structure**: Structured learning path from basics to advanced concepts  
+    **Certification**: Completion certificates and knowledge assessments  
+    **Unlocks**: Advanced investment access based on education completion  
+    **Community**: Discussion forums and peer learning opportunities
+  </Card>
+</CardGroup>
+
+### Educational Content Framework
+
+```typescript
+interface InvestmentEducationModule {
+  moduleId: string;
+  title: string;
+  level: 'beginner' | 'intermediate' | 'advanced';
+  category: EducationCategory;
+  
+  prerequisites: string[]; // Required prior modules
+  learningObjectives: string[];
+  estimatedDuration: number; // minutes
+  
+  content: EducationContent[];
+  assessments: Assessment[];
+  
+  relatedInvestments: string[]; // Product IDs this education relates to
+  unlocks: string[]; // Investment products unlocked upon completion
+  
+  completionCriteria: CompletionCriteria;
+  certification?: CertificationInfo;
+}
+
+class InvestmentEducationService {
+  async getPersonalizedEducationPlan(userId: string): Promise<EducationPlan> {
+    const userProfile = await this.getUserEducationProfile(userId);
+    const investmentGoals = await this.getUserInvestmentGoals(userId);
+    const currentTier = await this.getUserTier(userId);
+    
+    // Identify knowledge gaps
+    const knowledgeGaps = await this.assessKnowledgeGaps(userProfile, investmentGoals);
+    
+    // Generate recommended learning path
+    const recommendedModules = await this.recommendLearningModules(
+      knowledgeGaps,
+      currentTier,
+      investmentGoals
+    );
+    
+    // Prioritize based on immediate investment needs
+    const prioritizedModules = this.prioritizeByInvestmentGoals(
+      recommendedModules,
+      investmentGoals
+    );
+    
+    return {
+      userId,
+      recommendedModules: prioritizedModules,
+      estimatedCompletion: this.calculateEstimatedCompletion(prioritizedModules),
+      unlockedInvestments: this.calculatePotentialUnlocks(prioritizedModules),
+      nextSteps: this.generateNextSteps(prioritizedModules.slice(0, 3))
+    };
+  }
+
+  async trackEducationProgress(userId: string, moduleId: string, progress: LearningProgress): Promise<void> {
+    await this.updateModuleProgress(userId, moduleId, progress);
+    
+    // Check for completion
+    if (progress.completed) {
+      await this.handleModuleCompletion(userId, moduleId);
+      
+      // Check if new investments should be unlocked
+      const newUnlocks = await this.checkForInvestmentUnlocks(userId);
+      if (newUnlocks.length > 0) {
+        await this.notifyInvestmentUnlocks(userId, newUnlocks);
+      }
+    }
+    
+    // Update overall education profile
+    await this.updateEducationProfile(userId);
+  }
+}
+```
+
+## Regulatory Compliance and Risk Management
+
+### Investment Suitability Framework
+
+**Regulatory Compliance:**
+<CardGroup cols={2}>
+  <Card title="FAIS Compliance (South Africa)" icon="gavel">
+    **Know Your Customer**: Comprehensive KYC for investment advice  
+    **Suitability Assessment**: Mandatory suitability before investment  
+    **Record Keeping**: Complete audit trail of advice and decisions  
+    **Ongoing Review**: Regular review of investment suitability
+  </Card>
+  <Card title="Regional Regulations" icon="globe">
+    **Multi-jurisdictional**: Compliance across SADC markets  
+    **Local Requirements**: Country-specific investment regulations  
+    **Cross-border**: International investment compliance  
+    **Reporting**: Regulatory reporting and disclosure requirements
+  </Card>
+</CardGroup>
+
+### Risk Management Controls
+
+```typescript
+class InvestmentRiskManager {
+  async assessInvestmentRisk(order: InvestmentOrderRequest): Promise<RiskAssessment> {
+    const user = await this.getUserProfile(order.userId);
+    const product = await this.getInvestmentProduct(order.productId);
+    const currentPortfolio = await this.getCurrentPortfolio(order.userId);
+    
+    const riskChecks = [
+      this.checkConcentrationRisk(order, currentPortfolio),
+      this.checkLiquidityRisk(order, user.liquidityNeeds),
+      this.checkCurrencyRisk(order, user.baseCurrency),
+      this.checkMarketRisk(order, product.riskMetrics),
+      this.checkCreditRisk(order, product.creditRating),
+      this.checkOperationalRisk(order, product.provider)
+    ];
+
+    const riskResults = await Promise.all(riskChecks);
+    const overallRiskScore = this.calculateOverallRiskScore(riskResults);
+    
+    return {
+      overallRiskScore,
+      riskLevel: this.categorizeRiskLevel(overallRiskScore),
+      riskFactors: riskResults.filter(r => r.riskLevel > 0.5),
+      mitigation: this.generateRiskMitigation(riskResults),
+      approval: this.determineApprovalRequired(overallRiskScore, user.riskProfile)
+    };
+  }
+
+  private async checkConcentrationRisk(
+    order: InvestmentOrderRequest, 
+    portfolio: Portfolio
+  ): Promise<RiskCheckResult> {
+    const product = await this.getInvestmentProduct(order.productId);
+    
+    // Calculate post-investment concentration
+    const currentAllocation = this.calculateProductAllocation(portfolio, order.productId);
+    const portfolioValue = portfolio.totalValue + order.amount;
+    const newAllocation = (currentAllocation * portfolio.totalValue + order.amount) / portfolioValue;
+    
+    // Risk thresholds by asset class
+    const maxConcentration = this.getMaxConcentration(product.category);
+    
+    if (newAllocation > maxConcentration) {
+      return {
+        riskLevel: Math.min(1, newAllocation / maxConcentration),
+        description: `Position would exceed ${maxConcentration * 100}% concentration limit`,
+        recommendation: `Consider reducing investment amount or diversifying`,
+        severity: 'high'
+      };
+    }
+    
+    return { riskLevel: 0, description: 'Concentration within acceptable limits' };
+  }
+}
+```
+
+## API Integration Examples
+
+### Investment Platform APIs
+
+```typescript
+// Get investment recommendations
+const recommendations = await awoClient.investments.getRecommendations(userId, {
+  riskProfile: 'moderate',
+  investmentHorizon: 'long_term',
+  goals: ['retirement', 'wealth_building']
+});
+
+// Submit investment order
+const order = await awoClient.investments.submitOrder({
+  userId: 'user123',
+  productId: 'equity_etf_top40',
+  amount: 5000,
+  orderType: 'buy',
+  fundingSource: 'awo_wallet'
+});
+
+// Get portfolio performance
+const performance = await awoClient.investments.getPerformance(userId, {
+  period: 'last_12_months',
+  includeAttribution: true,
+  includeBenchmarks: true
+});
+
+// Track order status
+const orderStatus = await awoClient.investments.getOrderStatus(orderId);
+```
+
+### Portfolio Management APIs
+
+```typescript
+// Get current portfolio holdings
+const portfolio = await awoClient.investments.getPortfolio(userId);
+
+// Rebalance portfolio
+const rebalancing = await awoClient.investments.rebalancePortfolio(userId, {
+  targetAllocation: {
+    'equity': 60,
+    'bonds': 30,
+    'alternatives': 10
+  },
+  rebalanceThreshold: 5 // percent
+});
+
+// Get investment analytics
+const analytics = await awoClient.investments.getAnalytics(userId, {
+  includeRiskMetrics: true,
+  includeAttribution: true,
+  includeProjections: true
+});
+```
+
+## Performance Monitoring and Optimization
+
+### Portfolio Health Monitoring
+
+**Continuous Monitoring:**
+- **Performance Tracking**: Daily NAV updates and performance calculation
+- **Risk Monitoring**: Ongoing risk assessment and alerts
+- **Rebalancing Alerts**: Notifications when portfolio drift exceeds thresholds
+- **Market Commentary**: Regular market updates and portfolio impact analysis
+
+**Automated Optimization:**
+- **Rebalancing Suggestions**: Algorithm-driven rebalancing recommendations
+- **Tax Optimization**: Tax-loss harvesting and optimization strategies
+- **Cost Monitoring**: Fee analysis and cost reduction recommendations
+- **Goal Alignment**: Regular assessment of goal achievement probability
+
+---
+
+*AWO's Investment Platform provides sophisticated, tiered access to investment opportunities while maintaining appropriate risk controls and educational support, enabling users across the SADC region to build wealth according to their financial capacity and objectives.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

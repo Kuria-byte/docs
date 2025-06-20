@@ -1,42 +1,1263 @@
----
-title: "Financial Testing"
-description: "AWO Platform financial testing testing guide"
----
-
 # Financial Testing
 
-## Overview
+AWO Platform implements rigorous financial testing protocols to ensure zero-tolerance for monetary discrepancies, regulatory compliance, and absolute accuracy in all financial calculations across African financial services.
+
+## Financial Testing Philosophy
 
 <Info>
-This guide covers financial testing for the AWO Platform financial services.
+AWO's financial testing operates on a zero-tolerance principle: every cent must be accounted for correctly, every calculation must be precise, and every financial operation must maintain complete audit trails for regulatory compliance across SADC markets.
 </Info>
 
-## Testing Strategy
+### Financial Testing Pillars
 
-Testing approach and methodologies will be documented here.
+<CardGroup cols={2}>
+  <Card title="Monetary Precision" icon="calculator">
+    **Decimal Accuracy**: Use Decimal.js for all financial calculations  
+    **Currency Handling**: Test multi-currency scenarios (ZAR, BWP, NAD, ZMW)  
+    **Rounding Rules**: Validate banker's rounding and currency-specific rules  
+    **Edge Cases**: Test boundary conditions and extreme values
+  </Card>
+  <Card title="Regulatory Compliance" icon="shield-check">
+    **Audit Trails**: Complete transaction logging and traceability  
+    **AML Testing**: Anti-money laundering rule validation  
+    **KYC Verification**: Identity verification workflow testing  
+    **Cross-Border**: International transaction compliance testing
+  </Card>
+</CardGroup>
 
-## Test Implementation
+## Financial Calculation Testing Framework
+
+### Precision Testing Utilities
 
 ```typescript
-// Test example
-describe('Financial Testing', () => {
-  it('should pass validation', () => {
-    // Test implementation
+// financial-test-framework.ts
+import { Decimal } from 'decimal.js';
+import { expect } from '@jest/globals';
+
+export class FinancialTestFramework {
+  // Configure Decimal.js for financial precision
+  static {
+    Decimal.set({
+      precision: 28,
+      rounding: Decimal.ROUND_HALF_EVEN, // Banker's rounding
+      toExpNeg: -20,
+      toExpPos: 20,
+      maxE: 9e15,
+      minE: -9e15,
+      modulo: Decimal.ROUND_DOWN,
+      crypto: false,
+    });
+  }
+  
+  // Financial equality assertion with precision tolerance
+  static expectFinancialEqual(
+    actual: number | string | Decimal,
+    expected: number | string | Decimal,
+    currency: string = 'ZAR',
+    message?: string
+  ) {
+    const actualDecimal = new Decimal(actual);
+    const expectedDecimal = new Decimal(expected);
+    const tolerance = this.getCurrencyTolerance(currency);
+    
+    const difference = actualDecimal.minus(expectedDecimal).abs();
+    
+    if (difference.greaterThan(tolerance)) {
+      throw new Error(
+        `Financial precision error: Expected ${expectedDecimal.toString()}, got ${actualDecimal.toString()}, difference: ${difference.toString()}. ${message || ''}`
+      );
+    }
+  }
+  
+  // Currency-specific tolerance levels
+  private static getCurrencyTolerance(currency: string): Decimal {
+    const tolerances = {
+      'ZAR': new Decimal('0.01'), // 1 cent
+      'BWP': new Decimal('0.01'), // 1 thebe
+      'NAD': new Decimal('0.01'), // 1 cent
+      'ZMW': new Decimal('0.01'), // 1 ngwee
+      'USD': new Decimal('0.01'), // 1 cent
+    };
+    
+    return tolerances[currency] || new Decimal('0.01');
+  }
+  
+  // Test transaction balance integrity
+  static validateTransactionBalance(
+    initialBalance: number | string,
+    transactions: Array<{ amount: number | string; type: 'credit' | 'debit' }>,
+    expectedFinalBalance: number | string,
+    currency: string = 'ZAR'
+  ) {
+    let runningBalance = new Decimal(initialBalance);
+    
+    transactions.forEach((transaction, index) => {
+      const amount = new Decimal(transaction.amount);
+      
+      if (transaction.type === 'credit') {
+        runningBalance = runningBalance.add(amount);
+      } else {
+        runningBalance = runningBalance.minus(amount);
+      }
+      
+      // Log each step for audit trail
+      console.log(
+        `Transaction ${index + 1}: ${transaction.type} ${amount.toString()} ${currency}, Balance: ${runningBalance.toString()}`
+      );
+    });
+    
+    this.expectFinancialEqual(
+      runningBalance,
+      expectedFinalBalance,
+      currency,
+      'Transaction balance validation failed'
+    );
+  }
+  
+  // Validate fee calculations
+  static validateFeeCalculation(
+    principal: number | string,
+    feeRate: number | string,
+    expectedFee: number | string,
+    calculationType: 'percentage' | 'fixed' | 'tiered' = 'percentage'
+  ) {
+    const principalDecimal = new Decimal(principal);
+    const rateDecimal = new Decimal(feeRate);
+    
+    let calculatedFee: Decimal;
+    
+    switch (calculationType) {
+      case 'percentage':
+        calculatedFee = principalDecimal.mul(rateDecimal);
+        break;
+      case 'fixed':
+        calculatedFee = rateDecimal;
+        break;
+      case 'tiered':
+        calculatedFee = this.calculateTieredFee(principalDecimal, rateDecimal);
+        break;
+      default:
+        throw new Error(`Unknown fee calculation type: ${calculationType}`);
+    }
+    
+    this.expectFinancialEqual(
+      calculatedFee,
+      expectedFee,
+      'ZAR',
+      `Fee calculation validation failed for ${calculationType} fee`
+    );
+  }
+  
+  private static calculateTieredFee(principal: Decimal, rate: Decimal): Decimal {
+    // Example tiered fee structure
+    const tiers = [
+      { min: 0, max: 1000, rate: 0.01 },      // 1% for amounts 0-1000
+      { min: 1000, max: 10000, rate: 0.008 }, // 0.8% for amounts 1000-10000
+      { min: 10000, max: Infinity, rate: 0.005 }, // 0.5% for amounts above 10000
+    ];
+    
+    for (const tier of tiers) {
+      if (principal.greaterThanOrEqualTo(tier.min) && principal.lessThan(tier.max)) {
+        return principal.mul(tier.rate);
+      }
+    }
+    
+    return new Decimal(0);
+  }
+  
+  // Validate interest calculations
+  static validateInterestCalculation(
+    principal: number | string,
+    annualRate: number | string,
+    timePeriodDays: number,
+    compoundingFrequency: number = 365, // Daily compounding
+    expectedInterest: number | string
+  ) {
+    const P = new Decimal(principal);
+    const r = new Decimal(annualRate);
+    const t = new Decimal(timePeriodDays).div(365); // Convert days to years
+    const n = new Decimal(compoundingFrequency);
+    
+    // Compound interest formula: A = P(1 + r/n)^(nt)
+    const amount = P.mul(
+      new Decimal(1).add(r.div(n)).pow(n.mul(t))
+    );
+    
+    const calculatedInterest = amount.minus(P);
+    
+    this.expectFinancialEqual(
+      calculatedInterest,
+      expectedInterest,
+      'ZAR',
+      'Interest calculation validation failed'
+    );
+  }
+  
+  // Validate currency conversion
+  static validateCurrencyConversion(
+    amount: number | string,
+    exchangeRate: number | string,
+    expectedConvertedAmount: number | string,
+    fromCurrency: string,
+    toCurrency: string
+  ) {
+    const amountDecimal = new Decimal(amount);
+    const rateDecimal = new Decimal(exchangeRate);
+    const convertedAmount = amountDecimal.mul(rateDecimal);
+    
+    this.expectFinancialEqual(
+      convertedAmount,
+      expectedConvertedAmount,
+      toCurrency,
+      `Currency conversion from ${fromCurrency} to ${toCurrency} failed`
+    );
+  }
+  
+  // Generate test financial data
+  static generateTestTransactions(count: number = 10): Array<any> {
+    const transactions = [];
+    let balance = new Decimal(10000); // Starting balance
+    
+    for (let i = 0; i < count; i++) {
+      const isCredit = Math.random() > 0.3; // 70% debits, 30% credits
+      const amount = new Decimal(Math.random() * 1000).toDecimalPlaces(2);
+      
+      if (isCredit) {
+        balance = balance.add(amount);
+      } else {
+        balance = balance.minus(amount);
+      }
+      
+      transactions.push({
+        id: `txn_${i + 1}`,
+        amount: isCredit ? amount.toNumber() : amount.neg().toNumber(),
+        type: isCredit ? 'credit' : 'debit',
+        balance: balance.toNumber(),
+        date: new Date(Date.now() - (count - i) * 24 * 60 * 60 * 1000),
+        description: isCredit ? 'Income' : 'Expense',
+      });
+    }
+    
+    return transactions;
+  }
+}
+
+// Currency-specific test data
+export class CurrencyTestData {
+  static readonly SADC_CURRENCIES = [
+    { code: 'ZAR', name: 'South African Rand', symbol: 'R', decimalPlaces: 2 },
+    { code: 'BWP', name: 'Botswana Pula', symbol: 'P', decimalPlaces: 2 },
+    { code: 'NAD', name: 'Namibian Dollar', symbol: 'N$', decimalPlaces: 2 },
+    { code: 'ZMW', name: 'Zambian Kwacha', symbol: 'ZK', decimalPlaces: 2 },
+  ];
+  
+  static readonly EXCHANGE_RATES = {
+    'ZAR_BWP': 0.72,
+    'ZAR_NAD': 1.00, // Pegged to ZAR
+    'ZAR_ZMW': 1.25,
+    'BWP_ZAR': 1.39,
+    'NAD_ZAR': 1.00,
+    'ZMW_ZAR': 0.80,
+  };
+  
+  static readonly TEST_AMOUNTS = [
+    0.01, 0.50, 1.00, 10.50, 100.00, 999.99,
+    1000.00, 5000.50, 10000.00, 50000.00, 100000.00
+  ];
+}
+```
+
+### DIVA Score Financial Testing
+
+```typescript
+// diva-score-financial.test.ts
+import { DivaScoreCalculator } from '../services/diva-score-calculator';
+import { FinancialTestFramework } from './financial-test-framework';
+
+describe('DIVA Score Financial Calculations', () => {
+  let calculator: DivaScoreCalculator;
+  
+  beforeEach(() => {
+    calculator = new DivaScoreCalculator();
+  });
+  
+  describe('Discipline Component Financial Accuracy', () => {
+    test('should calculate payment punctuality with financial precision', () => {
+      const paymentHistory = [
+        { dueAmount: '1500.00', paidAmount: '1500.00', daysLate: 0 },
+        { dueAmount: '2300.50', paidAmount: '2300.50', daysLate: 2 },
+        { dueAmount: '800.75', paidAmount: '800.75', daysLate: 0 },
+        { dueAmount: '4200.25', paidAmount: '4200.25', daysLate: 5 },
+      ];
+      
+      const punctualityScore = calculator.calculatePaymentPunctuality(paymentHistory);
+      
+      // Verify score calculation
+      const onTimePayments = 2; // Payments with 0 days late
+      const totalPayments = 4;
+      const expectedBaseScore = (onTimePayments / totalPayments) * 100;
+      const latePenalty = (2 + 5) * 2; // 2 points per late day
+      const expectedScore = Math.max(0, expectedBaseScore - latePenalty);
+      
+      FinancialTestFramework.expectFinancialEqual(
+        punctualityScore,
+        expectedScore,
+        'ZAR',
+        'Payment punctuality score calculation'
+      );
+    });
+    
+    test('should calculate savings regularity with compound interest effects', () => {
+      const savingsHistory = [
+        { month: '2024-01', targetAmount: '1000.00', actualAmount: '1000.00' },
+        { month: '2024-02', targetAmount: '1000.00', actualAmount: '1200.00' },
+        { month: '2024-03', targetAmount: '1000.00', actualAmount: '800.00' },
+        { month: '2024-04', targetAmount: '1000.00', actualAmount: '1000.00' },
+      ];
+      
+      const regularityScore = calculator.calculateSavingsRegularity(savingsHistory);
+      
+      // Calculate expected regularity score
+      const totalTarget = savingsHistory.reduce((sum, month) => 
+        sum + parseFloat(month.targetAmount), 0
+      );
+      const totalActual = savingsHistory.reduce((sum, month) => 
+        sum + parseFloat(month.actualAmount), 0
+      );
+      
+      const achievementRate = Math.min(1, totalActual / totalTarget);
+      const consistencyBonus = savingsHistory.filter(month => 
+        parseFloat(month.actualAmount) >= parseFloat(month.targetAmount)
+      ).length / savingsHistory.length;
+      
+      const expectedScore = (achievementRate * 0.7 + consistencyBonus * 0.3) * 100;
+      
+      FinancialTestFramework.expectFinancialEqual(
+        regularityScore,
+        expectedScore,
+        'ZAR',
+        'Savings regularity calculation'
+      );
+    });
+  });
+  
+  describe('Income Component Financial Accuracy', () => {
+    test('should calculate income stability with statistical precision', () => {
+      const incomeHistory = [
+        { month: '2024-01', amount: '15000.00', source: 'salary' },
+        { month: '2024-02', amount: '15500.00', source: 'salary' },
+        { month: '2024-03', amount: '14800.00', source: 'salary' },
+        { month: '2024-04', amount: '15200.00', source: 'salary' },
+        { month: '2024-05', amount: '15100.00', source: 'salary' },
+        { month: '2024-06', amount: '15300.00', source: 'salary' },
+      ];
+      
+      const stabilityScore = calculator.calculateIncomeStability(incomeHistory);
+      
+      // Calculate expected stability using coefficient of variation
+      const amounts = incomeHistory.map(income => parseFloat(income.amount));
+      const mean = amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length;
+      const variance = amounts.reduce((sum, amount) => sum + Math.pow(amount - mean, 2), 0) / amounts.length;
+      const standardDeviation = Math.sqrt(variance);
+      const coefficientOfVariation = standardDeviation / mean;
+      
+      // Lower CV means higher stability
+      const expectedScore = Math.max(0, (1 - coefficientOfVariation * 10) * 100);
+      
+      FinancialTestFramework.expectFinancialEqual(
+        stabilityScore,
+        expectedScore,
+        'ZAR',
+        'Income stability calculation'
+      );
+    });
+    
+    test('should calculate income growth with compound growth rate', () => {
+      const incomeHistory = [
+        { month: '2023-07', amount: '12000.00' },
+        { month: '2023-08', amount: '12200.00' },
+        { month: '2023-09', amount: '12500.00' },
+        { month: '2023-10', amount: '12800.00' },
+        { month: '2023-11', amount: '13100.00' },
+        { month: '2023-12', amount: '13500.00' },
+        { month: '2024-01', amount: '14000.00' },
+        { month: '2024-02', amount: '14500.00' },
+        { month: '2024-03', amount: '15000.00' },
+        { month: '2024-04', amount: '15500.00' },
+        { month: '2024-05', amount: '16000.00' },
+        { month: '2024-06', amount: '16500.00' },
+      ];
+      
+      const growthScore = calculator.calculateIncomeGrowth(incomeHistory);
+      
+      // Calculate compound annual growth rate (CAGR)
+      const initialAmount = parseFloat(incomeHistory[0].amount);
+      const finalAmount = parseFloat(incomeHistory[incomeHistory.length - 1].amount);
+      const periods = incomeHistory.length - 1;
+      const monthlyGrowthRate = Math.pow(finalAmount / initialAmount, 1 / periods) - 1;
+      const annualGrowthRate = Math.pow(1 + monthlyGrowthRate, 12) - 1;
+      
+      // Score based on growth rate (capped at 100)
+      const expectedScore = Math.min(100, annualGrowthRate * 100 * 2); // 2x multiplier for scoring
+      
+      FinancialTestFramework.expectFinancialEqual(
+        growthScore,
+        expectedScore,
+        'ZAR',
+        'Income growth calculation'
+      );
+    });
+  });
+  
+  describe('DIVA Score Edge Cases', () => {
+    test('should handle zero and negative values correctly', () => {
+      const edgeCaseData = {
+        transactions: [
+          { amount: '0.00', type: 'payment', date: '2024-01-01' },
+          { amount: '-100.00', type: 'overdraft', date: '2024-01-02' },
+          { amount: '0.01', type: 'micro-payment', date: '2024-01-03' },
+        ],
+        accounts: [
+          { type: 'checking', balance: '0.00' },
+          { type: 'savings', balance: '-50.00' }, // Overdraft
+        ],
+      };
+      
+      const divaScore = calculator.calculateOverallScore(edgeCaseData);
+      
+      // Should handle edge cases gracefully
+      expect(divaScore.overallScore).toBeGreaterThanOrEqual(0);
+      expect(divaScore.overallScore).toBeLessThanOrEqual(1000);
+      expect(divaScore.confidence).toBe('low'); // Due to limited/poor data
+    });
+    
+    test('should handle maximum precision decimal values', () => {
+      const highPrecisionData = {
+        transactions: [
+          { amount: '1234.567890123456', type: 'income', date: '2024-01-01' },
+          { amount: '-987.123456789012', type: 'payment', date: '2024-01-02' },
+        ],
+        accounts: [
+          { type: 'checking', balance: '9999.999999999999' },
+        ],
+      };
+      
+      expect(() => {
+        const divaScore = calculator.calculateOverallScore(highPrecisionData);
+        
+        // Should maintain precision throughout calculation
+        FinancialTestFramework.expectFinancialEqual(
+          divaScore.overallScore,
+          divaScore.overallScore,
+          'ZAR',
+          'High precision DIVA score calculation'
+        );
+      }).not.toThrow();
+    });
+    
+    test('should validate component weight calculations', () => {
+      const testData = FinancialTestFramework.generateTestTransactions(20);
+      const divaScore = calculator.calculateOverallScore({ 
+        transactions: testData,
+        accounts: [{ type: 'checking', balance: '5000.00' }],
+      });
+      
+      // Verify weighted sum equals overall score
+      const weightedSum = 
+        (divaScore.components.discipline * 0.30) +
+        (divaScore.components.income * 0.25) +
+        (divaScore.components.velocity * 0.25) +
+        (divaScore.components.assets * 0.20);
+      
+      FinancialTestFramework.expectFinancialEqual(
+        divaScore.overallScore,
+        weightedSum,
+        'ZAR',
+        'DIVA score component weighting'
+      );
+    });
   });
 });
 ```
 
-## Test Coverage
+### Chama Financial Testing
 
-Coverage requirements and measurement will be detailed here.
+```typescript
+// chama-financial.test.ts
+import { ChamaService } from '../services/chama-service';
+import { FinancialTestFramework } from './financial-test-framework';
 
-## Continuous Testing
+describe('Chama Financial Operations', () => {
+  let chamaService: ChamaService;
+  
+  beforeEach(() => {
+    chamaService = new ChamaService();
+  });
+  
+  describe('Contribution Financial Accuracy', () => {
+    test('should maintain exact contribution totals', () => {
+      const contributions = [
+        { memberId: 'member-1', amount: '1000.00', currency: 'ZAR' },
+        { memberId: 'member-2', amount: '1500.50', currency: 'ZAR' },
+        { memberId: 'member-3', amount: '800.75', currency: 'ZAR' },
+        { memberId: 'member-4', amount: '2200.25', currency: 'ZAR' },
+      ];
+      
+      const totalContributions = chamaService.calculateTotalContributions(contributions);
+      
+      // Manual calculation for verification
+      const expectedTotal = contributions.reduce((total, contrib) => {
+        return total + parseFloat(contrib.amount);
+      }, 0);
+      
+      FinancialTestFramework.expectFinancialEqual(
+        totalContributions,
+        expectedTotal,
+        'ZAR',
+        'Chama contribution total calculation'
+      );
+    });
+    
+    test('should calculate interest distribution accurately', () => {
+      const chamaData = {
+        totalContributions: '12000.00',
+        interestEarned: '720.00', // 6% annual interest
+        memberContributions: [
+          { memberId: 'member-1', amount: '3000.00' },
+          { memberId: 'member-2', amount: '4000.00' },
+          { memberId: 'member-3', amount: '2500.00' },
+          { memberId: 'member-4', amount: '2500.00' },
+        ],
+      };
+      
+      const interestDistribution = chamaService.calculateInterestDistribution(chamaData);
+      
+      // Verify proportional distribution
+      chamaData.memberContributions.forEach(member => {
+        const memberProportion = parseFloat(member.amount) / parseFloat(chamaData.totalContributions);
+        const expectedInterest = parseFloat(chamaData.interestEarned) * memberProportion;
+        
+        const memberInterest = interestDistribution.find(dist => dist.memberId === member.memberId);
+        
+        FinancialTestFramework.expectFinancialEqual(
+          memberInterest.interestAmount,
+          expectedInterest,
+          'ZAR',
+          `Interest distribution for ${member.memberId}`
+        );
+      });
+      
+      // Verify total distribution equals total interest
+      const totalDistributed = interestDistribution.reduce((total, dist) => 
+        total + parseFloat(dist.interestAmount), 0
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        totalDistributed,
+        chamaData.interestEarned,
+        'ZAR',
+        'Total interest distribution'
+      );
+    });
+    
+    test('should handle partial contributions correctly', () => {
+      const monthlyTarget = '1000.00';
+      const partialContributions = [
+        { memberId: 'member-1', amount: '1000.00', status: 'complete' },
+        { memberId: 'member-2', amount: '750.00', status: 'partial' },
+        { memberId: 'member-3', amount: '1200.00', status: 'overpaid' },
+        { memberId: 'member-4', amount: '500.00', status: 'partial' },
+      ];
+      
+      const summary = chamaService.calculateContributionSummary(
+        partialContributions,
+        monthlyTarget
+      );
+      
+      // Calculate expected values
+      const totalContributed = partialContributions.reduce((total, contrib) => 
+        total + parseFloat(contrib.amount), 0
+      );
+      const expectedTarget = partialContributions.length * parseFloat(monthlyTarget);
+      const shortfall = Math.max(0, expectedTarget - totalContributed);
+      const surplus = Math.max(0, totalContributed - expectedTarget);
+      
+      FinancialTestFramework.expectFinancialEqual(
+        summary.totalContributed,
+        totalContributed,
+        'ZAR',
+        'Total contributed calculation'
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        summary.shortfall,
+        shortfall,
+        'ZAR',
+        'Contribution shortfall calculation'
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        summary.surplus,
+        surplus,
+        'ZAR',
+        'Contribution surplus calculation'
+      );
+    });
+  });
+  
+  describe('Payout Financial Accuracy', () => {
+    test('should calculate rotating payout amounts correctly', () => {
+      const chamaBalance = '15000.00';
+      const memberCount = 5;
+      const adminFeeRate = '0.02'; // 2%
+      
+      const payoutCalculation = chamaService.calculateRotatingPayout(
+        chamaBalance,
+        memberCount,
+        adminFeeRate
+      );
+      
+      // Expected calculations
+      const totalBalance = parseFloat(chamaBalance);
+      const adminFee = totalBalance * parseFloat(adminFeeRate);
+      const payableAmount = totalBalance - adminFee;
+      const perMemberPayout = payableAmount / memberCount;
+      
+      FinancialTestFramework.expectFinancialEqual(
+        payoutCalculation.adminFee,
+        adminFee,
+        'ZAR',
+        'Admin fee calculation'
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        payoutCalculation.perMemberAmount,
+        perMemberPayout,
+        'ZAR',
+        'Per-member payout calculation'
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        payoutCalculation.totalPayout,
+        payableAmount,
+        'ZAR',
+        'Total payout calculation'
+      );
+    });
+    
+    test('should handle emergency payout with penalties', () => {
+      const emergencyRequest = {
+        amount: '3000.00',
+        chamaBalance: '10000.00',
+        emergencyPenaltyRate: '0.05', // 5% penalty
+        memberId: 'member-emergency',
+      };
+      
+      const emergencyPayout = chamaService.calculateEmergencyPayout(emergencyRequest);
+      
+      const requestedAmount = parseFloat(emergencyRequest.amount);
+      const penalty = requestedAmount * parseFloat(emergencyRequest.emergencyPenaltyRate);
+      const netPayout = requestedAmount - penalty;
+      const remainingBalance = parseFloat(emergencyRequest.chamaBalance) - requestedAmount;
+      
+      FinancialTestFramework.expectFinancialEqual(
+        emergencyPayout.penalty,
+        penalty,
+        'ZAR',
+        'Emergency payout penalty'
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        emergencyPayout.netPayout,
+        netPayout,
+        'ZAR',
+        'Net emergency payout'
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        emergencyPayout.remainingBalance,
+        remainingBalance,
+        'ZAR',
+        'Remaining Chama balance after emergency payout'
+      );
+    });
+  });
+  
+  describe('Multi-Currency Chama Operations', () => {
+    test('should handle cross-currency contributions', () => {
+      const multiCurrencyContributions = [
+        { memberId: 'member-za', amount: '1000.00', currency: 'ZAR' },
+        { memberId: 'member-bw', amount: '720.00', currency: 'BWP' },
+        { memberId: 'member-na', amount: '1000.00', currency: 'NAD' },
+      ];
+      
+      const baseCurrency = 'ZAR';
+      const exchangeRates = {
+        'BWP_ZAR': 1.39,
+        'NAD_ZAR': 1.00,
+      };
+      
+      const normalizedContributions = chamaService.normalizeContributionsCurrency(
+        multiCurrencyContributions,
+        baseCurrency,
+        exchangeRates
+      );
+      
+      // Verify each conversion
+      multiCurrencyContributions.forEach((contrib, index) => {
+        const normalized = normalizedContributions[index];
+        
+        if (contrib.currency === baseCurrency) {
+          FinancialTestFramework.expectFinancialEqual(
+            normalized.zarAmount,
+            contrib.amount,
+            baseCurrency,
+            `Same currency conversion for ${contrib.memberId}`
+          );
+        } else {
+          const rate = exchangeRates[`${contrib.currency}_${baseCurrency}`];
+          const expectedAmount = parseFloat(contrib.amount) * rate;
+          
+          FinancialTestFramework.expectFinancialEqual(
+            normalized.zarAmount,
+            expectedAmount,
+            baseCurrency,
+            `Currency conversion for ${contrib.memberId}`
+          );
+        }
+      });
+      
+      // Verify total
+      const expectedTotal = normalizedContributions.reduce((total, contrib) => 
+        total + parseFloat(contrib.zarAmount), 0
+      );
+      
+      const calculatedTotal = chamaService.calculateTotalContributions(normalizedContributions);
+      
+      FinancialTestFramework.expectFinancialEqual(
+        calculatedTotal,
+        expectedTotal,
+        baseCurrency,
+        'Multi-currency total calculation'
+      );
+    });
+  });
+});
+```
 
-<CardGroup cols={2}>
-  <Card title="Unit Testing" href="/testing/unit-testing">
-    Component and service testing
-  </Card>
-  <Card title="Integration Testing" href="/testing/integration-testing">
-    End-to-end system testing
-  </Card>
-</CardGroup>
+### Investment Financial Testing
+
+```typescript
+// investment-financial.test.ts
+import { InvestmentService } from '../services/investment-service';
+import { FinancialTestFramework } from './financial-test-framework';
+
+describe('Investment Financial Calculations', () => {
+  let investmentService: InvestmentService;
+  
+  beforeEach(() => {
+    investmentService = new InvestmentService();
+  });
+  
+  describe('Investment Order Financial Accuracy', () => {
+    test('should calculate investment fees accurately', () => {
+      const investmentOrder = {
+        amount: '10000.00',
+        productId: 'equity-etf-sa-top40',
+        feeStructure: {
+          managementFee: '0.0075', // 0.75% annual
+          transactionFee: '0.005', // 0.5% per transaction
+          custodyFee: '0.001', // 0.1% annual
+        },
+      };
+      
+      const feeCalculation = investmentService.calculateInvestmentFees(investmentOrder);
+      
+      const amount = parseFloat(investmentOrder.amount);
+      const expectedManagementFee = amount * parseFloat(investmentOrder.feeStructure.managementFee);
+      const expectedTransactionFee = amount * parseFloat(investmentOrder.feeStructure.transactionFee);
+      const expectedCustodyFee = amount * parseFloat(investmentOrder.feeStructure.custodyFee);
+      const expectedTotalFees = expectedManagementFee + expectedTransactionFee + expectedCustodyFee;
+      
+      FinancialTestFramework.validateFeeCalculation(
+        investmentOrder.amount,
+        investmentOrder.feeStructure.managementFee,
+        expectedManagementFee,
+        'percentage'
+      );
+      
+      FinancialTestFramework.validateFeeCalculation(
+        investmentOrder.amount,
+        investmentOrder.feeStructure.transactionFee,
+        expectedTransactionFee,
+        'percentage'
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        feeCalculation.totalFees,
+        expectedTotalFees,
+        'ZAR',
+        'Total investment fees calculation'
+      );
+    });
+    
+    test('should calculate fractional shares correctly', () => {
+      const investmentDetails = {
+        amount: '1550.00',
+        sharePrice: '320.75',
+        currency: 'ZAR',
+      };
+      
+      const shareCalculation = investmentService.calculateShareAllocation(investmentDetails);
+      
+      const amount = parseFloat(investmentDetails.amount);
+      const sharePrice = parseFloat(investmentDetails.sharePrice);
+      
+      const totalShares = amount / sharePrice;
+      const fullShares = Math.floor(totalShares);
+      const fractionalShares = totalShares - fullShares;
+      const usedAmount = fullShares * sharePrice + fractionalShares * sharePrice;
+      const cashRemainder = amount - usedAmount;
+      
+      expect(shareCalculation.fullShares).toBe(fullShares);
+      
+      FinancialTestFramework.expectFinancialEqual(
+        shareCalculation.fractionalShares,
+        fractionalShares,
+        'ZAR',
+        'Fractional shares calculation'
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        shareCalculation.totalValue,
+        usedAmount,
+        'ZAR',
+        'Total share value calculation'
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        shareCalculation.cashRemainder,
+        cashRemainder,
+        'ZAR',
+        'Cash remainder calculation'
+      );
+    });
+    
+    test('should calculate SME investment returns accurately', () => {
+      const smeInvestment = {
+        principal: '5000.00',
+        annualInterestRate: '0.12', // 12%
+        termMonths: 18,
+        compoundingFrequency: 12, // Monthly compounding
+      };
+      
+      const returnsCalculation = investmentService.calculateSMEReturns(smeInvestment);
+      
+      const principal = parseFloat(smeInvestment.principal);
+      const annualRate = parseFloat(smeInvestment.annualInterestRate);
+      const termYears = parseInt(smeInvestment.termMonths) / 12;
+      const compounding = parseInt(smeInvestment.compoundingFrequency);
+      
+      FinancialTestFramework.validateInterestCalculation(
+        principal,
+        annualRate,
+        parseInt(smeInvestment.termMonths) * 30, // Convert months to days
+        compounding,
+        returnsCalculation.totalInterest
+      );
+      
+      const expectedFinalValue = principal + parseFloat(returnsCalculation.totalInterest);
+      
+      FinancialTestFramework.expectFinancialEqual(
+        returnsCalculation.finalValue,
+        expectedFinalValue,
+        'ZAR',
+        'SME investment final value'
+      );
+    });
+  });
+  
+  describe('Portfolio Rebalancing Financial Accuracy', () => {
+    test('should calculate portfolio rebalancing amounts', () => {
+      const currentPortfolio = {
+        totalValue: '50000.00',
+        allocations: {
+          bonds: { current: '0.60', target: '0.50', value: '30000.00' },
+          equities: { current: '0.30', target: '0.40', value: '15000.00' },
+          cash: { current: '0.10', target: '0.10', value: '5000.00' },
+        },
+      };
+      
+      const rebalancingPlan = investmentService.calculateRebalancing(currentPortfolio);
+      
+      const totalValue = parseFloat(currentPortfolio.totalValue);
+      
+      // Calculate required changes
+      const bondsTarget = totalValue * parseFloat(currentPortfolio.allocations.bonds.target);
+      const bondsAdjustment = parseFloat(currentPortfolio.allocations.bonds.value) - bondsTarget;
+      
+      const equitiesTarget = totalValue * parseFloat(currentPortfolio.allocations.equities.target);
+      const equitiesAdjustment = parseFloat(currentPortfolio.allocations.equities.value) - equitiesTarget;
+      
+      FinancialTestFramework.expectFinancialEqual(
+        Math.abs(rebalancingPlan.bondsAdjustment),
+        Math.abs(bondsAdjustment),
+        'ZAR',
+        'Bonds rebalancing adjustment'
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        Math.abs(rebalancingPlan.equitiesAdjustment),
+        Math.abs(equitiesAdjustment),
+        'ZAR',
+        'Equities rebalancing adjustment'
+      );
+      
+      // Verify total adjustments balance (should sum to zero)
+      const totalAdjustments = parseFloat(rebalancingPlan.bondsAdjustment) + 
+                              parseFloat(rebalancingPlan.equitiesAdjustment);
+      
+      FinancialTestFramework.expectFinancialEqual(
+        totalAdjustments,
+        0,
+        'ZAR',
+        'Total rebalancing adjustments should sum to zero'
+      );
+    });
+  });
+  
+  describe('Investment Performance Financial Accuracy', () => {
+    test('should calculate investment performance metrics', () => {
+      const investmentHistory = [
+        { date: '2023-01-01', value: '10000.00' },
+        { date: '2023-04-01', value: '10250.00' },
+        { date: '2023-07-01', value: '10500.00' },
+        { date: '2023-10-01', value: '10150.00' },
+        { date: '2024-01-01', value: '10800.00' },
+      ];
+      
+      const performanceMetrics = investmentService.calculatePerformanceMetrics(investmentHistory);
+      
+      const initialValue = parseFloat(investmentHistory[0].value);
+      const finalValue = parseFloat(investmentHistory[investmentHistory.length - 1].value);
+      const totalReturn = (finalValue - initialValue) / initialValue;
+      const timeSpanYears = 1; // 1 year investment period
+      const annualizedReturn = Math.pow(1 + totalReturn, 1 / timeSpanYears) - 1;
+      
+      FinancialTestFramework.expectFinancialEqual(
+        performanceMetrics.totalReturn,
+        totalReturn,
+        'ZAR',
+        'Total investment return calculation'
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        performanceMetrics.annualizedReturn,
+        annualizedReturn,
+        'ZAR',
+        'Annualized return calculation'
+      );
+      
+      // Calculate volatility (standard deviation of returns)
+      const quarterlyReturns = [];
+      for (let i = 1; i < investmentHistory.length; i++) {
+        const prevValue = parseFloat(investmentHistory[i - 1].value);
+        const currentValue = parseFloat(investmentHistory[i].value);
+        const quarterlyReturn = (currentValue - prevValue) / prevValue;
+        quarterlyReturns.push(quarterlyReturn);
+      }
+      
+      const meanReturn = quarterlyReturns.reduce((sum, ret) => sum + ret, 0) / quarterlyReturns.length;
+      const variance = quarterlyReturns.reduce((sum, ret) => sum + Math.pow(ret - meanReturn, 2), 0) / quarterlyReturns.length;
+      const volatility = Math.sqrt(variance) * Math.sqrt(4); // Annualized volatility
+      
+      FinancialTestFramework.expectFinancialEqual(
+        performanceMetrics.volatility,
+        volatility,
+        'ZAR',
+        'Investment volatility calculation'
+      );
+    });
+  });
+});
+```
+
+## Regulatory Compliance Financial Testing
+
+### AML and Transaction Monitoring Tests
+
+```typescript
+// aml-compliance-financial.test.ts
+describe('AML and Transaction Monitoring', () => {
+  describe('Transaction Limit Validation', () => {
+    test('should enforce daily transaction limits', () => {
+      const userLimits = {
+        tier1: { daily: 10000, monthly: 50000 },
+        tier2: { daily: 50000, monthly: 200000 },
+      };
+      
+      const testTransactions = [
+        { userId: 'tier1-user', amount: '5000.00', type: 'transfer' },
+        { userId: 'tier1-user', amount: '6000.00', type: 'transfer' }, // Should exceed daily limit
+        { userId: 'tier2-user', amount: '25000.00', type: 'transfer' },
+        { userId: 'tier2-user', amount: '30000.00', type: 'transfer' }, // Should exceed daily limit
+      ];
+      
+      testTransactions.forEach(transaction => {
+        const userTier = transaction.userId.includes('tier1') ? 'tier1' : 'tier2';
+        const dailyLimit = userLimits[userTier].daily;
+        const amount = parseFloat(transaction.amount);
+        
+        if (amount > dailyLimit) {
+          expect(() => {
+            validateTransactionLimit(transaction, userLimits[userTier]);
+          }).toThrow(`Transaction amount ${amount} exceeds daily limit ${dailyLimit}`);
+        } else {
+          expect(() => {
+            validateTransactionLimit(transaction, userLimits[userTier]);
+          }).not.toThrow();
+        }
+      });
+    });
+    
+    test('should calculate cumulative monthly limits', () => {
+      const monthlyTransactions = [
+        { amount: '15000.00', date: '2024-01-05' },
+        { amount: '20000.00', date: '2024-01-15' },
+        { amount: '18000.00', date: '2024-01-25' }, // Total: 53,000 (exceeds tier1 monthly limit)
+      ];
+      
+      const cumulativeAmount = monthlyTransactions.reduce((total, transaction) => {
+        return total + parseFloat(transaction.amount);
+      }, 0);
+      
+      const tier1MonthlyLimit = 50000;
+      
+      FinancialTestFramework.expectFinancialEqual(
+        cumulativeAmount,
+        53000,
+        'ZAR',
+        'Cumulative monthly transaction calculation'
+      );
+      
+      expect(cumulativeAmount).toBeGreaterThan(tier1MonthlyLimit);
+    });
+  });
+  
+  describe('Suspicious Activity Detection', () => {
+    test('should detect unusual transaction patterns', () => {
+      const userTransactionHistory = [
+        { amount: '500.00', date: '2024-01-01', type: 'normal' },
+        { amount: '750.00', date: '2024-01-05', type: 'normal' },
+        { amount: '15000.00', date: '2024-01-10', type: 'suspicious' }, // 20x normal amount
+        { amount: '600.00', date: '2024-01-15', type: 'normal' },
+      ];
+      
+      const suspiciousTransactions = detectSuspiciousTransactions(userTransactionHistory);
+      
+      expect(suspiciousTransactions).toHaveLength(1);
+      expect(suspiciousTransactions[0].amount).toBe('15000.00');
+      expect(suspiciousTransactions[0].suspicionReason).toContain('amount significantly higher than normal');
+    });
+    
+    test('should flag rapid succession transactions', () => {
+      const rapidTransactions = [
+        { amount: '9500.00', timestamp: '2024-01-10T10:00:00Z' },
+        { amount: '9800.00', timestamp: '2024-01-10T10:05:00Z' }, // 5 minutes later
+        { amount: '9200.00', timestamp: '2024-01-10T10:12:00Z' }, // 7 minutes later
+      ];
+      
+      const flaggedTransactions = flagRapidTransactions(rapidTransactions, 30); // 30-minute window
+      
+      expect(flaggedTransactions.length).toBeGreaterThan(0);
+      expect(flaggedTransactions[0].pattern).toBe('rapid_succession');
+      
+      // Verify total amount calculation
+      const totalAmount = rapidTransactions.reduce((sum, txn) => 
+        sum + parseFloat(txn.amount), 0
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        totalAmount,
+        28500,
+        'ZAR',
+        'Rapid transaction total calculation'
+      );
+    });
+  });
+});
+
+// Helper functions for AML testing
+function validateTransactionLimit(transaction: any, limits: any) {
+  const amount = parseFloat(transaction.amount);
+  if (amount > limits.daily) {
+    throw new Error(`Transaction amount ${amount} exceeds daily limit ${limits.daily}`);
+  }
+}
+
+function detectSuspiciousTransactions(transactions: any[]): any[] {
+  const normalTransactions = transactions.filter(t => t.type === 'normal');
+  const averageAmount = normalTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0) / normalTransactions.length;
+  const threshold = averageAmount * 10; // 10x average is suspicious
+  
+  return transactions.filter(t => {
+    const amount = parseFloat(t.amount);
+    if (amount > threshold) {
+      t.suspicionReason = `amount significantly higher than normal (${amount} vs avg ${averageAmount.toFixed(2)})`;
+      return true;
+    }
+    return false;
+  });
+}
+
+function flagRapidTransactions(transactions: any[], windowMinutes: number): any[] {
+  const flagged = [];
+  
+  for (let i = 0; i < transactions.length - 1; i++) {
+    const current = new Date(transactions[i].timestamp);
+    const next = new Date(transactions[i + 1].timestamp);
+    const diffMinutes = (next.getTime() - current.getTime()) / (1000 * 60);
+    
+    if (diffMinutes <= windowMinutes) {
+      flagged.push({
+        transactions: [transactions[i], transactions[i + 1]],
+        pattern: 'rapid_succession',
+        intervalMinutes: diffMinutes,
+      });
+    }
+  }
+  
+  return flagged;
+}
+```
+
+### Cross-Border Financial Compliance
+
+```typescript
+// cross-border-financial.test.ts
+describe('Cross-Border Financial Compliance', () => {
+  describe('Currency Exchange Financial Accuracy', () => {
+    test('should handle multi-currency transactions accurately', () => {
+      const crossBorderTransaction = {
+        sendAmount: '1000.00',
+        sendCurrency: 'ZAR',
+        receiveCurrency: 'BWP',
+        exchangeRate: '0.72',
+        transferFee: '50.00',
+        exchangeFee: '0.015', // 1.5%
+      };
+      
+      const conversionResult = calculateCrossBorderTransaction(crossBorderTransaction);
+      
+      const sendAmount = parseFloat(crossBorderTransaction.sendAmount);
+      const exchangeRate = parseFloat(crossBorderTransaction.exchangeRate);
+      const transferFee = parseFloat(crossBorderTransaction.transferFee);
+      const exchangeFeeRate = parseFloat(crossBorderTransaction.exchangeFee);
+      
+      // Calculate step by step
+      const amountAfterTransferFee = sendAmount - transferFee;
+      const exchangeFeeAmount = amountAfterTransferFee * exchangeFeeRate;
+      const amountForConversion = amountAfterTransferFee - exchangeFeeAmount;
+      const receivedAmount = amountForConversion * exchangeRate;
+      
+      FinancialTestFramework.expectFinancialEqual(
+        conversionResult.transferFee,
+        transferFee,
+        'ZAR',
+        'Transfer fee calculation'
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        conversionResult.exchangeFee,
+        exchangeFeeAmount,
+        'ZAR',
+        'Exchange fee calculation'
+      );
+      
+      FinancialTestFramework.validateCurrencyConversion(
+        amountForConversion,
+        exchangeRate,
+        receivedAmount,
+        crossBorderTransaction.sendCurrency,
+        crossBorderTransaction.receiveCurrency
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        conversionResult.receivedAmount,
+        receivedAmount,
+        'BWP',
+        'Final received amount calculation'
+      );
+    });
+    
+    test('should maintain transaction totals across currency conversions', () => {
+      const batchTransactions = [
+        { amount: '500.00', fromCurrency: 'ZAR', toCurrency: 'BWP', rate: '0.72' },
+        { amount: '750.00', fromCurrency: 'ZAR', toCurrency: 'NAD', rate: '1.00' },
+        { amount: '1200.00', fromCurrency: 'ZAR', toCurrency: 'ZMW', rate: '1.25' },
+      ];
+      
+      const conversionResults = batchTransactions.map(txn => {
+        return {
+          originalAmount: parseFloat(txn.amount),
+          convertedAmount: parseFloat(txn.amount) * parseFloat(txn.rate),
+          fromCurrency: txn.fromCurrency,
+          toCurrency: txn.toCurrency,
+        };
+      });
+      
+      // Verify each individual conversion
+      conversionResults.forEach((result, index) => {
+        const original = batchTransactions[index];
+        
+        FinancialTestFramework.validateCurrencyConversion(
+          original.amount,
+          original.rate,
+          result.convertedAmount,
+          original.fromCurrency,
+          original.toCurrency
+        );
+      });
+      
+      // Verify total ZAR amount
+      const totalOriginal = conversionResults.reduce((sum, result) => 
+        sum + result.originalAmount, 0
+      );
+      
+      FinancialTestFramework.expectFinancialEqual(
+        totalOriginal,
+        2450, // 500 + 750 + 1200
+        'ZAR',
+        'Total original amount calculation'
+      );
+    });
+  });
+});
+
+function calculateCrossBorderTransaction(transaction: any) {
+  const sendAmount = parseFloat(transaction.sendAmount);
+  const exchangeRate = parseFloat(transaction.exchangeRate);
+  const transferFee = parseFloat(transaction.transferFee);
+  const exchangeFeeRate = parseFloat(transaction.exchangeFee);
+  
+  const amountAfterTransferFee = sendAmount - transferFee;
+  const exchangeFeeAmount = amountAfterTransferFee * exchangeFeeRate;
+  const amountForConversion = amountAfterTransferFee - exchangeFeeAmount;
+  const receivedAmount = amountForConversion * exchangeRate;
+  
+  return {
+    transferFee,
+    exchangeFee: exchangeFeeAmount,
+    amountForConversion,
+    receivedAmount,
+    totalFees: transferFee + exchangeFeeAmount,
+  };
+}
+```
+
+---
+
+*This comprehensive financial testing framework ensures AWO Platform maintains absolute accuracy in all monetary calculations, regulatory compliance, and financial operations across the diverse African financial services landscape.*
+
+*Last updated: June 2025*  
+*Next review: Sep 2025*

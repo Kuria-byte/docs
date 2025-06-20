@@ -1,42 +1,1392 @@
----
-title: "Integration Testing"
-description: "AWO Platform integration testing testing guide"
----
-
 # Integration Testing
 
-## Overview
+AWO Platform's integration testing strategy ensures seamless coordination between services, databases, external APIs, and real-time systems across the African financial technology stack.
+
+## Integration Testing Philosophy
 
 <Info>
-This guide covers integration testing for the AWO Platform financial services.
+AWO's integration testing focuses on validating complete data flows, external service interactions, and cross-system reliability under real African network conditions and financial service requirements.
 </Info>
 
-## Testing Strategy
+### Integration Test Scope
 
-Testing approach and methodologies will be documented here.
+<CardGroup cols={2}>
+  <Card title="Internal Integration" icon="link">
+    **Service Communication**: API layer ↔ Business services  
+    **Database Operations**: Services ↔ PostgreSQL ↔ Redis  
+    **Real-time Events**: Socket.io ↔ Business logic  
+    **State Synchronization**: Cache invalidation and updates
+  </Card>
+  <Card title="External Integration" icon="globe">
+    **Banking APIs**: Stitch, Mono open banking connections  
+    **Payment Gateways**: Flutterwave, M-Pesa integrations  
+    **KYC Services**: Smile ID identity verification  
+    **Notification Services**: SMS, Email, Push notifications
+  </Card>
+</CardGroup>
 
-## Test Implementation
+## API Integration Testing
+
+### Express.js API Route Testing
 
 ```typescript
-// Test example
-describe('Integration Testing', () => {
-  it('should pass validation', () => {
-    // Test implementation
+// API integration tests with real database connections
+import request from 'supertest';
+import { app } from '../src/app';
+import { setupTestDatabase, cleanupTestDatabase } from './helpers/database';
+import { createTestUser, createTestChama } from './helpers/test-data';
+
+describe('AWO API Integration Tests', () => {
+  let testUser: any;
+  let testChama: any;
+  let authToken: string;
+  
+  beforeAll(async () => {
+    await setupTestDatabase();
+    testUser = await createTestUser();
+    testChama = await createTestChama();
+    
+    // Authenticate user for protected routes
+    const loginResponse = await request(app)
+      .post('/api/auth/login')
+      .send({
+        phoneNumber: testUser.phoneNumber,
+        password: 'testpassword123',
+      });
+    
+    authToken = loginResponse.body.accessToken;
+  });
+  
+  afterAll(async () => {
+    await cleanupTestDatabase();
+  });
+  
+  describe('DIVA Score API Integration', () => {
+    test('should calculate and return DIVA score', async () => {
+      // First, create some transaction history
+      await request(app)
+        .post('/api/transactions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          amount: -500,
+          type: 'payment',
+          category: 'utilities',
+          description: 'Electricity bill',
+        })
+        .expect(201);
+      
+      // Request DIVA score calculation
+      const response = await request(app)
+        .post(`/api/diva/calculate/${testUser.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+      
+      expect(response.body).toMatchObject({
+        overallScore: expect.any(Number),
+        components: {
+          discipline: expect.any(Number),
+          income: expect.any(Number),
+          velocity: expect.any(Number),
+          assets: expect.any(Number),
+        },
+        tier: expect.stringMatching(/^(Bronze|Silver|Gold|Platinum)$/),
+        lastCalculated: expect.any(String),
+        nextUpdateDue: expect.any(String),
+      });
+      
+      // Verify score is within valid range
+      expect(response.body.overallScore).toBeGreaterThanOrEqual(0);
+      expect(response.body.overallScore).toBeLessThanOrEqual(1000);
+    });
+    
+    test('should retrieve DIVA score history', async () => {
+      const response = await request(app)
+        .get(`/api/diva/history/${testUser.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+      
+      expect(response.body).toHaveProperty('scores');
+      expect(Array.isArray(response.body.scores)).toBe(true);
+      
+      if (response.body.scores.length > 0) {
+        const latestScore = response.body.scores[0];
+        expect(latestScore).toHaveProperty('overallScore');
+        expect(latestScore).toHaveProperty('calculatedAt');
+      }
+    });
+    
+    test('should handle DIVA score refresh with rate limiting', async () => {
+      // Make multiple rapid requests to test rate limiting
+      const requests = Array(5).fill(null).map(() =>
+        request(app)
+          .post(`/api/diva/refresh/${testUser.id}`)
+          .set('Authorization', `Bearer ${authToken}`)
+      );
+      
+      const responses = await Promise.all(requests);
+      
+      // First request should succeed
+      expect(responses[0].status).toBe(200);
+      
+      // Subsequent requests should be rate limited
+      const rateLimitedResponses = responses.slice(1).filter(r => r.status === 429);
+      expect(rateLimitedResponses.length).toBeGreaterThan(0);
+    });
+  });
+  
+  describe('Chama API Integration', () => {
+    test('should create Chama with valid data', async () => {
+      const chamaData = {
+        name: 'Integration Test Chama',
+        monthlyContribution: 1000,
+        maxMembers: 10,
+        payoutSchedule: 'monthly',
+        governe: {
+          majorityRequired: 0.6,
+          emergencyApprovalThreshold: 0.7,
+        },
+      };
+      
+      const response = await request(app)
+        .post('/api/chamas')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(chamaData)
+        .expect(201);
+      
+      expect(response.body).toMatchObject({
+        id: expect.any(String),
+        name: chamaData.name,
+        monthlyContribution: chamaData.monthlyContribution,
+        memberCount: 1, // Creator is first member
+        currentBalance: 0,
+        status: 'active',
+      });
+      
+      // Verify Chama was persisted to database
+      const retrieveResponse = await request(app)
+        .get(`/api/chamas/${response.body.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+      
+      expect(retrieveResponse.body.name).toBe(chamaData.name);
+    });
+    
+    test('should process Chama contribution end-to-end', async () => {
+      const contributionAmount = 1000;
+      
+      // Get initial balances
+      const initialChamaResponse = await request(app)
+        .get(`/api/chamas/${testChama.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+      
+      const initialWalletResponse = await request(app)
+        .get('/api/wallet/balance')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+      
+      const initialChamaBalance = initialChamaResponse.body.currentBalance;
+      const initialWalletBalance = initialWalletResponse.body.balance;
+      
+      // Make contribution
+      const contributionResponse = await request(app)
+        .post(`/api/chamas/${testChama.id}/contribute`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ amount: contributionAmount })
+        .expect(200);
+      
+      expect(contributionResponse.body).toMatchObject({
+        transactionId: expect.any(String),
+        amount: contributionAmount,
+        status: 'completed',
+      });
+      
+      // Verify balances updated correctly
+      const finalChamaResponse = await request(app)
+        .get(`/api/chamas/${testChama.id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+      
+      const finalWalletResponse = await request(app)
+        .get('/api/wallet/balance')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+      
+      expect(finalChamaResponse.body.currentBalance).toBe(initialChamaBalance + contributionAmount);
+      expect(finalWalletResponse.body.balance).toBe(initialWalletBalance - contributionAmount);
+    });
+    
+    test('should handle Chama voting process', async () => {
+      // Create a proposal
+      const proposalResponse = await request(app)
+        .post(`/api/chamas/${testChama.id}/proposals`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          title: 'Investment in Government Bonds',
+          description: 'Invest 50% of funds in 10-year government bonds',
+          type: 'investment',
+          amount: 5000,
+        })
+        .expect(201);
+      
+      const proposalId = proposalResponse.body.id;
+      
+      // Cast vote
+      const voteResponse = await request(app)
+        .post(`/api/chamas/${testChama.id}/proposals/${proposalId}/vote`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ vote: 'yes' })
+        .expect(200);
+      
+      expect(voteResponse.body).toMatchObject({
+        proposalId,
+        vote: 'yes',
+        voterCount: expect.any(Number),
+        status: expect.stringMatching(/^(pending|approved|rejected)$/),
+      });
+      
+      // Verify vote was recorded
+      const proposalStatusResponse = await request(app)
+        .get(`/api/chamas/${testChama.id}/proposals/${proposalId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+      
+      expect(proposalStatusResponse.body.votes).toContainEqual(
+        expect.objectContaining({
+          userId: testUser.id,
+          vote: 'yes',
+        })
+      );
+    });
+  });
+  
+  describe('Investment API Integration', () => {
+    test('should create investment order based on user tier', async () => {
+      // First ensure user has a DIVA score and tier
+      await request(app)
+        .post(`/api/diva/calculate/${testUser.id}`)
+        .set('Authorization', `Bearer ${authToken}`);
+      
+      const portfolioResponse = await request(app)
+        .get('/api/investments/portfolio')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+      
+      const userTier = portfolioResponse.body.tier;
+      
+      // Create investment order appropriate for tier
+      const orderData = {
+        productId: 'govt_bond_10yr',
+        amount: userTier === 'Bronze' ? 1000 : 5000,
+        orderType: 'buy',
+      };
+      
+      const orderResponse = await request(app)
+        .post('/api/investments/orders')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(orderData)
+        .expect(201);
+      
+      expect(orderResponse.body).toMatchObject({
+        id: expect.any(String),
+        productId: orderData.productId,
+        amount: orderData.amount,
+        status: 'pending',
+        fees: expect.objectContaining({
+          managementFee: expect.any(Number),
+          transactionFee: expect.any(Number),
+          totalFees: expect.any(Number),
+        }),
+      });
+    });
+    
+    test('should reject investment exceeding tier limits', async () => {
+      const excessiveOrderData = {
+        productId: 'high_risk_equity',
+        amount: 100000, // Likely exceeds Bronze/Silver limits
+        orderType: 'buy',
+      };
+      
+      const response = await request(app)
+        .post('/api/investments/orders')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(excessiveOrderData)
+        .expect(400);
+      
+      expect(response.body.error).toMatch(/tier limit|investment limit/i);
+    });
+  });
+  
+  describe('Transaction API Integration', () => {
+    test('should create and retrieve transaction history', async () => {
+      const transactionData = {
+        amount: -250,
+        type: 'payment',
+        category: 'transport',
+        description: 'Taxi fare',
+        merchantInfo: {
+          name: 'Local Taxi',
+          location: 'Johannesburg, SA',
+        },
+      };
+      
+      // Create transaction
+      const createResponse = await request(app)
+        .post('/api/transactions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(transactionData)
+        .expect(201);
+      
+      expect(createResponse.body).toMatchObject({
+        id: expect.any(String),
+        amount: transactionData.amount,
+        type: transactionData.type,
+        status: 'completed',
+        createdAt: expect.any(String),
+      });
+      
+      // Retrieve transaction history
+      const historyResponse = await request(app)
+        .get('/api/transactions?page=1&limit=10')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+      
+      expect(historyResponse.body).toHaveProperty('transactions');
+      expect(historyResponse.body).toHaveProperty('pagination');
+      
+      const transactions = historyResponse.body.transactions;
+      expect(Array.isArray(transactions)).toBe(true);
+      
+      // Find our created transaction
+      const createdTransaction = transactions.find(t => t.id === createResponse.body.id);
+      expect(createdTransaction).toBeTruthy();
+      expect(createdTransaction.description).toBe(transactionData.description);
+    });
+    
+    test('should categorize transactions automatically', async () => {
+      const uncategorizedTransaction = {
+        amount: -120,
+        description: 'Pick n Pay Groceries',
+        merchantInfo: {
+          name: 'Pick n Pay',
+          merchantCode: '5411', // Grocery store MCC
+        },
+      };
+      
+      const response = await request(app)
+        .post('/api/transactions')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(uncategorizedTransaction)
+        .expect(201);
+      
+      // Verify automatic categorization
+      expect(response.body.category).toBe('groceries');
+      expect(response.body.subcategory).toBe('food_and_beverages');
+    });
   });
 });
 ```
 
-## Test Coverage
+### Database Integration Testing
 
-Coverage requirements and measurement will be detailed here.
+```typescript
+// Database integration tests for complex operations
+import { Pool } from 'pg';
+import { Redis } from 'ioredis';
+import { DatabaseManager } from '../src/database/database-manager';
+import { CacheManager } from '../src/cache/cache-manager';
 
-## Continuous Testing
+describe('Database Integration Tests', () => {
+  let dbPool: Pool;
+  let redisClient: Redis;
+  let dbManager: DatabaseManager;
+  let cacheManager: CacheManager;
+  
+  beforeAll(async () => {
+    dbPool = new Pool({
+      connectionString: process.env.TEST_DATABASE_URL,
+    });
+    
+    redisClient = new Redis(process.env.TEST_REDIS_URL);
+    dbManager = new DatabaseManager(dbPool);
+    cacheManager = new CacheManager(redisClient);
+  });
+  
+  afterAll(async () => {
+    await dbPool.end();
+    await redisClient.quit();
+  });
+  
+  describe('DIVA Score Database Operations', () => {
+    test('should calculate DIVA score with database aggregations', async () => {
+      const userId = 'test-user-diva-integration';
+      
+      // Insert test transaction data
+      await dbManager.insertTransactions(userId, [
+        { amount: 15000, type: 'income', date: '2024-01-01', source: 'salary' },
+        { amount: -3000, type: 'payment', date: '2024-01-05', category: 'rent' },
+        { amount: -1000, type: 'savings', date: '2024-01-10', category: 'emergency_fund' },
+        { amount: -500, type: 'payment', date: '2024-01-15', category: 'utilities' },
+      ]);
+      
+      // Calculate DIVA score using database aggregations
+      const divaScore = await dbManager.calculateDivaScore(userId);
+      
+      expect(divaScore).toMatchObject({
+        userId,
+        overallScore: expect.any(Number),
+        discipline: expect.any(Number),
+        income: expect.any(Number),
+        velocity: expect.any(Number),
+        assets: expect.any(Number),
+        calculatedAt: expect.any(Date),
+      });
+      
+      // Verify score is cached
+      const cachedScore = await cacheManager.get(`diva:${userId}`);
+      expect(cachedScore).toBeTruthy();
+      expect(JSON.parse(cachedScore).overallScore).toBe(divaScore.overallScore);
+    });
+    
+    test('should handle concurrent DIVA score calculations', async () => {
+      const userIds = ['user-1', 'user-2', 'user-3'];
+      
+      // Insert different transaction patterns for each user
+      await Promise.all(userIds.map(async (userId, index) => {
+        const transactions = generateTransactionPattern(index);
+        await dbManager.insertTransactions(userId, transactions);
+      }));
+      
+      // Calculate scores concurrently
+      const scorePromises = userIds.map(userId => 
+        dbManager.calculateDivaScore(userId)
+      );
+      
+      const scores = await Promise.all(scorePromises);
+      
+      // Verify all calculations completed
+      expect(scores).toHaveLength(3);
+      scores.forEach((score, index) => {
+        expect(score.userId).toBe(userIds[index]);
+        expect(score.overallScore).toBeGreaterThanOrEqual(0);
+        expect(score.overallScore).toBeLessThanOrEqual(1000);
+      });
+    });
+  });
+  
+  describe('Chama Database Operations', () => {
+    test('should maintain Chama balance consistency across operations', async () => {
+      const chamaId = 'test-chama-balance-consistency';
+      const members = ['member-1', 'member-2', 'member-3'];
+      
+      // Create Chama
+      await dbManager.createChama({
+        id: chamaId,
+        name: 'Balance Test Chama',
+        memberIds: members,
+        monthlyContribution: 1000,
+      });
+      
+      // Perform concurrent contributions
+      const contributionPromises = members.map((memberId, index) =>
+        dbManager.transaction(async (client) => {
+          return dbManager.processChamaContribution(client, {
+            chamaId,
+            memberId,
+            amount: 1000 + (index * 100), // Varying amounts
+          });
+        })
+      );
+      
+      const contributions = await Promise.all(contributionPromises);
+      
+      // Verify balance consistency
+      const chamaBalance = await dbManager.getChamaBalance(chamaId);
+      const expectedBalance = contributions.reduce((sum, c) => sum + c.amount, 0);
+      
+      expect(chamaBalance.totalContributions).toBe(expectedBalance);
+      expect(chamaBalance.currentBalance).toBe(expectedBalance);
+      
+      // Verify individual member contributions
+      const memberContributions = await dbManager.getChamaMemberContributions(chamaId);
+      expect(memberContributions).toHaveLength(3);
+      
+      const totalMemberContributions = memberContributions.reduce(
+        (sum, mc) => sum + mc.totalContributed, 0
+      );
+      expect(totalMemberContributions).toBe(expectedBalance);
+    });
+    
+    test('should handle Chama payout with proper balance updates', async () => {
+      const chamaId = 'test-chama-payout';
+      const payoutAmount = 5000;
+      const recipientId = 'member-1';
+      
+      // Ensure Chama has sufficient balance
+      await dbManager.setChamaBalance(chamaId, 10000);
+      
+      const result = await dbManager.transaction(async (client) => {
+        return dbManager.processChamaPayout(client, {
+          chamaId,
+          recipientId,
+          amount: payoutAmount,
+          type: 'rotating',
+        });
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.transactionId).toBeTruthy();
+      
+      // Verify balance updated
+      const updatedBalance = await dbManager.getChamaBalance(chamaId);
+      expect(updatedBalance.currentBalance).toBe(5000); // 10000 - 5000
+      
+      // Verify payout recorded
+      const payoutHistory = await dbManager.getChamaPayoutHistory(chamaId);
+      expect(payoutHistory).toContainEqual(
+        expect.objectContaining({
+          recipientId,
+          amount: payoutAmount,
+          type: 'rotating',
+          status: 'completed',
+        })
+      );
+    });
+  });
+  
+  describe('Investment Database Operations', () => {
+    test('should create investment order with proper validations', async () => {
+      const userId = 'test-investor-user';
+      const orderData = {
+        userId,
+        productId: 'govt_bond_10yr',
+        amount: 5000,
+        orderType: 'buy',
+      };
+      
+      // Set user tier for validation
+      await dbManager.setUserTier(userId, 'Silver');
+      
+      const order = await dbManager.transaction(async (client) => {
+        return dbManager.createInvestmentOrder(client, orderData);
+      });
+      
+      expect(order).toMatchObject({
+        id: expect.any(String),
+        userId,
+        productId: orderData.productId,
+        amount: orderData.amount,
+        status: 'pending',
+        fees: expect.objectContaining({
+          managementFee: expect.any(Number),
+          transactionFee: expect.any(Number),
+        }),
+      });
+      
+      // Verify order persisted
+      const retrievedOrder = await dbManager.getInvestmentOrder(order.id);
+      expect(retrievedOrder.amount).toBe(orderData.amount);
+    });
+    
+    test('should update portfolio allocation after investment', async () => {
+      const userId = 'test-portfolio-user';
+      const investmentAmount = 3000;
+      
+      // Get initial portfolio
+      const initialPortfolio = await dbManager.getUserPortfolio(userId);
+      const initialBondAllocation = initialPortfolio.allocations.bonds || 0;
+      
+      // Process investment
+      await dbManager.transaction(async (client) => {
+        const order = await dbManager.createInvestmentOrder(client, {
+          userId,
+          productId: 'govt_bond_5yr',
+          amount: investmentAmount,
+          orderType: 'buy',
+        });
+        
+        return dbManager.executeInvestmentOrder(client, order.id);
+      });
+      
+      // Verify portfolio updated
+      const updatedPortfolio = await dbManager.getUserPortfolio(userId);
+      const newBondAllocation = updatedPortfolio.allocations.bonds;
+      
+      expect(newBondAllocation).toBeGreaterThan(initialBondAllocation);
+      expect(updatedPortfolio.totalValue).toBe(initialPortfolio.totalValue + investmentAmount);
+    });
+  });
+});
 
-<CardGroup cols={2}>
-  <Card title="Unit Testing" href="/testing/unit-testing">
-    Component and service testing
-  </Card>
-  <Card title="Integration Testing" href="/testing/integration-testing">
-    End-to-end system testing
-  </Card>
-</CardGroup>
+function generateTransactionPattern(pattern: number): any[] {
+  const patterns = [
+    // Pattern 0: Regular saver
+    [
+      { amount: 12000, type: 'income', date: '2024-01-01' },
+      { amount: -1000, type: 'savings', date: '2024-01-02' },
+      { amount: -2000, type: 'payment', date: '2024-01-05' },
+    ],
+    // Pattern 1: Irregular income
+    [
+      { amount: 5000, type: 'income', date: '2024-01-01' },
+      { amount: 15000, type: 'income', date: '2024-01-15' },
+      { amount: -3000, type: 'payment', date: '2024-01-20' },
+    ],
+    // Pattern 2: High spender
+    [
+      { amount: 20000, type: 'income', date: '2024-01-01' },
+      { amount: -5000, type: 'payment', date: '2024-01-02' },
+      { amount: -3000, type: 'payment', date: '2024-01-03' },
+    ],
+  ];
+  
+  return patterns[pattern] || patterns[0];
+}
+```
+
+## External Service Integration Testing
+
+### Banking API Integration Tests
+
+```typescript
+// Banking API integration tests with mock external services
+import nock from 'nock';
+import { StitchApiClient } from '../src/integrations/stitch-api';
+import { MonoApiClient } from '../src/integrations/mono-api';
+
+describe('Banking API Integration Tests', () => {
+  let stitchClient: StitchApiClient;
+  let monoClient: MonoApiClient;
+  
+  beforeEach(() => {
+    stitchClient = new StitchApiClient({
+      apiKey: 'test-api-key',
+      environment: 'test',
+    });
+    
+    monoClient = new MonoApiClient({
+      apiKey: 'test-mono-key',
+      environment: 'test',
+    });
+  });
+  
+  afterEach(() => {
+    nock.cleanAll();
+  });
+  
+  describe('Stitch Open Banking Integration', () => {
+    test('should connect bank account successfully', async () => {
+      const mockAuthUrl = 'https://stitch.money/connect/auth123';
+      const mockAccessToken = 'stitch_access_token_123';
+      
+      // Mock Stitch API responses
+      nock('https://api.stitch.money')
+        .post('/graphql')
+        .reply(200, {
+          data: {
+            clientTokenCreate: {
+              token: mockAccessToken,
+            },
+          },
+        });
+      
+      nock('https://api.stitch.money')
+        .post('/graphql')
+        .reply(200, {
+          data: {
+            userInitiate: {
+              authorizationRequestUrl: mockAuthUrl,
+            },
+          },
+        });
+      
+      const result = await stitchClient.initiateAccountConnection('test-user-123');
+      
+      expect(result).toMatchObject({
+        authUrl: mockAuthUrl,
+        sessionId: expect.any(String),
+        expiresAt: expect.any(Date),
+      });
+    });
+    
+    test('should retrieve account transactions', async () => {
+      const mockTransactions = [
+        {
+          id: 'txn_123',
+          amount: { quantity: '50000', currency: 'ZAR' },
+          description: 'Salary Payment',
+          date: '2024-01-15',
+          running_balance: { quantity: '125000', currency: 'ZAR' },
+        },
+        {
+          id: 'txn_124',
+          amount: { quantity: '-15000', currency: 'ZAR' },
+          description: 'Rent Payment',
+          date: '2024-01-16',
+          running_balance: { quantity: '110000', currency: 'ZAR' },
+        },
+      ];
+      
+      nock('https://api.stitch.money')
+        .post('/graphql')
+        .reply(200, {
+          data: {
+            node: {
+              transactions: {
+                edges: mockTransactions.map(tx => ({ node: tx })),
+              },
+            },
+          },
+        });
+      
+      const transactions = await stitchClient.getAccountTransactions('account_123');
+      
+      expect(transactions).toHaveLength(2);
+      expect(transactions[0]).toMatchObject({
+        id: 'txn_123',
+        amount: 500, // Converted from cents
+        description: 'Salary Payment',
+        type: 'credit',
+        balance: 1250,
+      });
+    });
+    
+    test('should handle Stitch API errors gracefully', async () => {
+      nock('https://api.stitch.money')
+        .post('/graphql')
+        .reply(400, {
+          errors: [
+            {
+              message: 'Invalid account ID',
+              code: 'INVALID_ACCOUNT',
+            },
+          ],
+        });
+      
+      await expect(
+        stitchClient.getAccountTransactions('invalid_account')
+      ).rejects.toThrow('Invalid account ID');
+    });
+  });
+  
+  describe('Mono Open Banking Integration', () => {
+    test('should connect account via Mono', async () => {
+      const mockConnectUrl = 'https://connect.mono.co/connect123';
+      
+      nock('https://api.mono.co')
+        .post('/account/initiate')
+        .reply(200, {
+          status: 'successful',
+          data: {
+            connect_url: mockConnectUrl,
+            request_id: 'mono_request_123',
+          },
+        });
+      
+      const result = await monoClient.initiateAccountConnection('test-user-456');
+      
+      expect(result.connectUrl).toBe(mockConnectUrl);
+      expect(result.requestId).toBe('mono_request_123');
+    });
+    
+    test('should sync account data from Mono', async () => {
+      const mockAccountData = {
+        account: {
+          id: 'mono_account_123',
+          name: 'Current Account',
+          type: 'CURRENT',
+          balance: 45000, // In cents
+          currency: 'ZAR',
+        },
+        transactions: [
+          {
+            id: 'mono_txn_1',
+            amount: -2500,
+            description: 'POS Purchase',
+            date: '2024-01-20',
+            category: 'shopping',
+          },
+        ],
+      };
+      
+      nock('https://api.mono.co')
+        .get('/accounts/mono_account_123')
+        .reply(200, {
+          status: 'successful',
+          data: mockAccountData.account,
+        });
+      
+      nock('https://api.mono.co')
+        .get('/accounts/mono_account_123/transactions')
+        .reply(200, {
+          status: 'successful',
+          data: mockAccountData.transactions,
+        });
+      
+      const syncResult = await monoClient.syncAccountData('mono_account_123');
+      
+      expect(syncResult.account.balance).toBe(450); // Converted from cents
+      expect(syncResult.transactions).toHaveLength(1);
+      expect(syncResult.transactions[0].amount).toBe(-25);
+    });
+  });
+});
+```
+
+### Payment Gateway Integration Tests
+
+```typescript
+// Payment gateway integration tests
+import { FlutterwaveClient } from '../src/integrations/flutterwave';
+import { MPesaClient } from '../src/integrations/mpesa';
+
+describe('Payment Gateway Integration Tests', () => {
+  let flutterwaveClient: FlutterwaveClient;
+  let mpesaClient: MPesaClient;
+  
+  beforeEach(() => {
+    flutterwaveClient = new FlutterwaveClient({
+      publicKey: 'test-public-key',
+      secretKey: 'test-secret-key',
+      environment: 'test',
+    });
+    
+    mpesaClient = new MPesaClient({
+      consumerKey: 'test-consumer-key',
+      consumerSecret: 'test-consumer-secret',
+      environment: 'test',
+    });
+  });
+  
+  describe('Flutterwave Integration', () => {
+    test('should process mobile money payment', async () => {
+      const paymentData = {
+        amount: 1000,
+        currency: 'ZAR',
+        phoneNumber: '+27123456789',
+        network: 'MTN',
+        email: 'test@awo-platform.com',
+        fullName: 'Test User',
+        transactionRef: 'awo_txn_123',
+      };
+      
+      nock('https://api.flutterwave.com')
+        .post('/v3/charges?type=mobile_money_zambia')
+        .reply(200, {
+          status: 'success',
+          message: 'Charge initiated',
+          data: {
+            id: 12345,
+            flw_ref: 'FLW-MOCK-123456789',
+            status: 'pending',
+            amount: 1000,
+            currency: 'ZAR',
+            tx_ref: 'awo_txn_123',
+          },
+        });
+      
+      const result = await flutterwaveClient.chargeMobileMoney(paymentData);
+      
+      expect(result).toMatchObject({
+        id: 12345,
+        reference: 'FLW-MOCK-123456789',
+        status: 'pending',
+        amount: 1000,
+        transactionRef: 'awo_txn_123',
+      });
+    });
+    
+    test('should verify payment status', async () => {
+      const transactionId = 12345;
+      
+      nock('https://api.flutterwave.com')
+        .get(`/v3/transactions/${transactionId}/verify`)
+        .reply(200, {
+          status: 'success',
+          message: 'Transaction verified successfully',
+          data: {
+            id: transactionId,
+            status: 'successful',
+            amount: 1000,
+            currency: 'ZAR',
+            charged_amount: 1000,
+            processor_response: 'Approved',
+          },
+        });
+      
+      const verification = await flutterwaveClient.verifyTransaction(transactionId);
+      
+      expect(verification.status).toBe('successful');
+      expect(verification.amount).toBe(1000);
+      expect(verification.processorResponse).toBe('Approved');
+    });
+    
+    test('should handle payment webhooks', async () => {
+      const webhookPayload = {
+        event: 'charge.completed',
+        data: {
+          id: 12345,
+          tx_ref: 'awo_txn_123',
+          flw_ref: 'FLW-MOCK-123456789',
+          status: 'successful',
+          amount: 1000,
+          currency: 'ZAR',
+          customer: {
+            email: 'test@awo-platform.com',
+            phone_number: '+27123456789',
+          },
+        },
+      };
+      
+      const webhookSignature = flutterwaveClient.generateWebhookSignature(webhookPayload);
+      
+      const isValid = flutterwaveClient.verifyWebhookSignature(
+        JSON.stringify(webhookPayload),
+        webhookSignature
+      );
+      
+      expect(isValid).toBe(true);
+      
+      const processedWebhook = flutterwaveClient.processWebhook(webhookPayload);
+      expect(processedWebhook.transactionRef).toBe('awo_txn_123');
+      expect(processedWebhook.status).toBe('successful');
+    });
+  });
+  
+  describe('M-Pesa Integration', () => {
+    test('should initiate STK push payment', async () => {
+      const paymentRequest = {
+        phoneNumber: '254700000000',
+        amount: 100,
+        accountReference: 'AWO123',
+        transactionDesc: 'Chama Contribution',
+      };
+      
+      // Mock M-Pesa access token
+      nock('https://api.safaricom.co.ke')
+        .get('/oauth/v1/generate?grant_type=client_credentials')
+        .reply(200, {
+          access_token: 'mock_access_token',
+          expires_in: '3599',
+        });
+      
+      // Mock STK push request
+      nock('https://api.safaricom.co.ke')
+        .post('/mpesa/stkpush/v1/processrequest')
+        .reply(200, {
+          MerchantRequestID: 'mock_merchant_req_123',
+          CheckoutRequestID: 'mock_checkout_req_123',
+          ResponseCode: '0',
+          ResponseDescription: 'Success. Request accepted for processing',
+          CustomerMessage: 'Success. Request accepted for processing',
+        });
+      
+      const result = await mpesaClient.initiateSTKPush(paymentRequest);
+      
+      expect(result).toMatchObject({
+        merchantRequestId: 'mock_merchant_req_123',
+        checkoutRequestId: 'mock_checkout_req_123',
+        responseCode: '0',
+        responseDescription: 'Success. Request accepted for processing',
+      });
+    });
+    
+    test('should query STK push status', async () => {
+      const checkoutRequestId = 'mock_checkout_req_123';
+      
+      nock('https://api.safaricom.co.ke')
+        .post('/mpesa/stkpushquery/v1/query')
+        .reply(200, {
+          ResponseCode: '0',
+          ResponseDescription: 'The service request has been accepted successfully',
+          MerchantRequestID: 'mock_merchant_req_123',
+          CheckoutRequestID: checkoutRequestId,
+          ResultCode: '0',
+          ResultDesc: 'The service request is processed successfully.',
+        });
+      
+      const status = await mpesaClient.querySTKPushStatus(checkoutRequestId);
+      
+      expect(status.resultCode).toBe('0');
+      expect(status.resultDesc).toBe('The service request is processed successfully.');
+    });
+  });
+});
+```
+
+## Real-Time Integration Testing
+
+### Socket.io Integration Tests
+
+```typescript
+// Real-time integration tests
+import { createServer } from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+import { io as SocketIOClient, Socket } from 'socket.io-client';
+import { setupRealtimeHandlers } from '../src/realtime/handlers';
+
+describe('Real-time Integration Tests', () => {
+  let httpServer: any;
+  let ioServer: SocketIOServer;
+  let clientSocket: Socket;
+  let serverSocket: Socket;
+  
+  beforeAll((done) => {
+    httpServer = createServer();
+    ioServer = new SocketIOServer(httpServer);
+    
+    setupRealtimeHandlers(ioServer);
+    
+    httpServer.listen(() => {
+      const port = (httpServer.address() as any).port;
+      clientSocket = SocketIOClient(`http://localhost:${port}`, {
+        auth: {
+          token: 'test_jwt_token',
+          userId: 'test-user-123',
+        },
+      });
+      
+      ioServer.on('connection', (socket) => {
+        serverSocket = socket;
+      });
+      
+      clientSocket.on('connect', done);
+    });
+  });
+  
+  afterAll(() => {
+    ioServer.close();
+    clientSocket.close();
+    httpServer.close();
+  });
+  
+  describe('Chama Real-time Events', () => {
+    test('should broadcast Chama contribution to all members', (done) => {
+      const chamaId = 'test-chama-realtime';
+      const contributionData = {
+        chamaId,
+        amount: 1000,
+        memberId: 'test-user-123',
+        memberName: 'Test User',
+      };
+      
+      // Join Chama room
+      clientSocket.emit('join_chama', { chamaId });
+      
+      // Listen for contribution broadcast
+      clientSocket.on('contribution_received', (data) => {
+        expect(data).toMatchObject({
+          chamaId,
+          contribution: expect.objectContaining({
+            amount: 1000,
+            memberName: 'Test User',
+          }),
+          event: 'member_contributed',
+        });
+        done();
+      });
+      
+      // Simulate contribution from server
+      setTimeout(() => {
+        ioServer.to(`chama_${chamaId}`).emit('contribution_received', {
+          chamaId,
+          contribution: {
+            id: 'contrib_123',
+            amount: 1000,
+            memberName: 'Test User',
+            timestamp: new Date(),
+          },
+          event: 'member_contributed',
+        });
+      }, 100);
+    });
+    
+    test('should handle Chama voting in real-time', (done) => {
+      const proposalData = {
+        chamaId: 'test-chama-realtime',
+        proposalId: 'proposal_123',
+        vote: 'yes',
+        voterName: 'Test User',
+      };
+      
+      let eventsReceived = 0;
+      
+      // Listen for vote cast event
+      clientSocket.on('vote_cast', (data) => {
+        expect(data).toMatchObject({
+          proposalId: 'proposal_123',
+          vote: 'yes',
+          voterName: 'Test User',
+          currentTally: expect.any(Object),
+        });
+        
+        eventsReceived++;
+        if (eventsReceived === 1) done();
+      });
+      
+      // Emit vote from client
+      clientSocket.emit('chama_vote', proposalData);
+    });
+  });
+  
+  describe('DIVA Score Real-time Updates', () => {
+    test('should notify user of DIVA score update', (done) => {
+      const scoreUpdateData = {
+        userId: 'test-user-123',
+        newScore: 725,
+        previousScore: 675,
+        componentChanges: {
+          discipline: { old: 180, new: 190, change: 10 },
+          income: { old: 175, new: 185, change: 10 },
+          velocity: { old: 160, new: 170, change: 10 },
+          assets: { old: 160, new: 180, change: 20 },
+        },
+        tierChanged: false,
+        triggers: ['new_transaction', 'savings_goal_met'],
+      };
+      
+      clientSocket.on('diva_score_updated', (data) => {
+        expect(data).toMatchObject({
+          newScore: 725,
+          previousScore: 675,
+          changes: expect.any(Object),
+          triggers: ['new_transaction', 'savings_goal_met'],
+        });
+        done();
+      });
+      
+      // Simulate score update from server
+      setTimeout(() => {
+        ioServer.to(`user_test-user-123`).emit('diva_score_updated', scoreUpdateData);
+      }, 100);
+    });
+  });
+  
+  describe('Payment Real-time Notifications', () => {
+    test('should notify payment confirmation', (done) => {
+      const paymentData = {
+        transactionId: 'txn_123',
+        amount: 1000,
+        currency: 'ZAR',
+        status: 'completed',
+        recipient: 'Test Chama',
+      };
+      
+      clientSocket.on('payment_confirmed', (data) => {
+        expect(data).toMatchObject({
+          transactionId: 'txn_123',
+          amount: 1000,
+          currency: 'ZAR',
+          status: 'completed',
+        });
+        done();
+      });
+      
+      // Simulate payment confirmation
+      setTimeout(() => {
+        ioServer.to(`user_test-user-123`).emit('payment_confirmed', paymentData);
+      }, 100);
+    });
+  });
+});
+```
+
+## Test Data Management
+
+### Integration Test Data Setup
+
+```typescript
+// Comprehensive test data setup for integration tests
+export class IntegrationTestDataManager {
+  private dbPool: Pool;
+  
+  constructor(dbPool: Pool) {
+    this.dbPool = dbPool;
+  }
+  
+  async setupFullTestScenario(): Promise<TestScenario> {
+    const scenario: TestScenario = {
+      users: [],
+      chamas: [],
+      transactions: [],
+      investments: [],
+    };
+    
+    // Create test users with different profiles
+    scenario.users = await this.createTestUsers();
+    
+    // Create test Chamas with the users
+    scenario.chamas = await this.createTestChamas(scenario.users);
+    
+    // Generate transaction history for DIVA scoring
+    scenario.transactions = await this.createTransactionHistory(scenario.users);
+    
+    // Create investment portfolios
+    scenario.investments = await this.createInvestmentPortfolios(scenario.users);
+    
+    return scenario;
+  }
+  
+  private async createTestUsers(): Promise<TestUser[]> {
+    const userProfiles = [
+      {
+        firstName: 'Nomsa',
+        lastName: 'Dlamini',
+        phoneNumber: '+27123456789',
+        country: 'ZA',
+        monthlyIncome: 15000,
+        savingsGoal: 2000,
+        profile: 'consistent_saver',
+      },
+      {
+        firstName: 'Thandiwe',
+        lastName: 'Mthembu',
+        phoneNumber: '+27987654321',
+        country: 'ZA',
+        monthlyIncome: 25000,
+        savingsGoal: 5000,
+        profile: 'high_earner',
+      },
+      {
+        firstName: 'Fatima',
+        lastName: 'Hassan',
+        phoneNumber: '+27555123456',
+        country: 'ZA',
+        monthlyIncome: 8000,
+        savingsGoal: 800,
+        profile: 'young_professional',
+      },
+    ];
+    
+    const users = [];
+    for (const profile of userProfiles) {
+      const user = await this.createUser(profile);
+      users.push(user);
+    }
+    
+    return users;
+  }
+  
+  private async createTestChamas(users: TestUser[]): Promise<TestChama[]> {
+    const chamaConfigs = [
+      {
+        name: 'Women Entrepreneurs Circle',
+        monthlyContribution: 2000,
+        memberIds: users.slice(0, 3).map(u => u.id),
+        payoutSchedule: 'rotating',
+      },
+      {
+        name: 'Young Professionals Savings',
+        monthlyContribution: 1000,
+        memberIds: users.slice(1, 3).map(u => u.id),
+        payoutSchedule: 'quarterly',
+      },
+    ];
+    
+    const chamas = [];
+    for (const config of chamaConfigs) {
+      const chama = await this.createChama(config);
+      chamas.push(chama);
+    }
+    
+    return chamas;
+  }
+  
+  private async createTransactionHistory(users: TestUser[]): Promise<TestTransaction[]> {
+    const allTransactions = [];
+    
+    for (const user of users) {
+      const transactions = await this.generateUserTransactions(user);
+      allTransactions.push(...transactions);
+    }
+    
+    return allTransactions;
+  }
+  
+  private async generateUserTransactions(user: TestUser): Promise<TestTransaction[]> {
+    const transactions = [];
+    const now = new Date();
+    
+    // Generate 6 months of transaction history
+    for (let month = 0; month < 6; month++) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - month, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - month + 1, 0);
+      
+      // Monthly salary
+      transactions.push({
+        userId: user.id,
+        amount: user.monthlyIncome,
+        type: 'income',
+        category: 'salary',
+        description: 'Monthly salary',
+        date: new Date(monthStart.getTime() + 24 * 60 * 60 * 1000), // 2nd of month
+        status: 'completed',
+      });
+      
+      // Monthly savings (based on profile)
+      transactions.push({
+        userId: user.id,
+        amount: -user.savingsGoal,
+        type: 'savings',
+        category: 'emergency_fund',
+        description: 'Monthly savings',
+        date: new Date(monthStart.getTime() + 3 * 24 * 60 * 60 * 1000), // 4th of month
+        status: 'completed',
+      });
+      
+      // Various expenses based on profile
+      const expenses = this.generateMonthlyExpenses(user, monthStart);
+      transactions.push(...expenses);
+    }
+    
+    // Insert transactions into database
+    for (const transaction of transactions) {
+      await this.insertTransaction(transaction);
+    }
+    
+    return transactions;
+  }
+  
+  private generateMonthlyExpenses(user: TestUser, monthStart: Date): TestTransaction[] {
+    const expenses = [];
+    const baseExpenses = user.monthlyIncome * 0.7; // 70% of income on expenses
+    
+    const expenseCategories = [
+      { category: 'rent', amount: baseExpenses * 0.4, description: 'Monthly rent' },
+      { category: 'groceries', amount: baseExpenses * 0.2, description: 'Grocery shopping' },
+      { category: 'transport', amount: baseExpenses * 0.1, description: 'Transport costs' },
+      { category: 'utilities', amount: baseExpenses * 0.1, description: 'Utilities' },
+      { category: 'entertainment', amount: baseExpenses * 0.1, description: 'Entertainment' },
+      { category: 'other', amount: baseExpenses * 0.1, description: 'Other expenses' },
+    ];
+    
+    expenseCategories.forEach((expense, index) => {
+      expenses.push({
+        userId: user.id,
+        amount: -Math.round(expense.amount),
+        type: 'payment',
+        category: expense.category,
+        description: expense.description,
+        date: new Date(monthStart.getTime() + (index + 5) * 24 * 60 * 60 * 1000),
+        status: 'completed',
+      });
+    });
+    
+    return expenses;
+  }
+  
+  async cleanupTestData(): Promise<void> {
+    await this.dbPool.query('DELETE FROM transactions WHERE user_id LIKE $1', ['test_%']);
+    await this.dbPool.query('DELETE FROM chama_members WHERE chama_id LIKE $1', ['test_%']);
+    await this.dbPool.query('DELETE FROM chamas WHERE id LIKE $1', ['test_%']);
+    await this.dbPool.query('DELETE FROM users WHERE id LIKE $1', ['test_%']);
+  }
+}
+```
+
+---
+
+*This comprehensive integration testing strategy ensures AWO Platform's complex financial systems work seamlessly together, from database operations to external API integrations, providing reliable service across the African financial technology ecosystem.*
+
+*Last updated: June 2025*  
+*Next review: Sep 2025*

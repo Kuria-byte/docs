@@ -1,42 +1,1045 @@
----
-title: "E2e Testing"
-description: "AWO Platform e2e testing testing guide"
----
+# E2E Testing
 
-# E2e Testing
+AWO Platform's end-to-end testing strategy validates complete user journeys across the African financial services ecosystem, ensuring seamless experiences from user registration through complex financial transactions and community savings activities.
 
-## Overview
+## E2E Testing Philosophy
 
 <Info>
-This guide covers e2e testing for the AWO Platform financial services.
+AWO's E2E testing simulates real African user scenarios: variable network conditions, diverse devices, complete financial workflows, and multi-user interactions within Chama groups to ensure platform reliability under real-world conditions.
 </Info>
 
-## Testing Strategy
+### E2E Testing Scope
 
-Testing approach and methodologies will be documented here.
+<CardGroup cols={2}>
+  <Card title="Critical User Journeys" icon="route">
+    **User Onboarding**: Registration → KYC → First transaction  
+    **Financial Operations**: DIVA score → Investment → Portfolio management  
+    **Chama Workflows**: Group creation → Contributions → Payouts  
+    **Cross-Border**: Multi-currency transactions and remittances
+  </Card>
+  <Card title="System Integration" icon="network">
+    **Multi-Device**: iOS, Android, Web across device ranges  
+    **Network Conditions**: 2G, 3G, 4G, WiFi, offline scenarios  
+    **External Services**: Banking APIs, payment gateways, KYC  
+    **Real-time Features**: Live updates, notifications, collaboration
+  </Card>
+</CardGroup>
 
-## Test Implementation
+## E2E Testing Framework
+
+### Detox Configuration for React Native
 
 ```typescript
-// Test example
-describe('E2e Testing', () => {
-  it('should pass validation', () => {
-    // Test implementation
+// detox.config.js - E2E testing configuration
+module.exports = {
+  testRunner: 'jest',
+  runnerConfig: 'e2e/config.json',
+  skipLegacyWorkersInjection: true,
+  apps: {
+    'ios.debug': {
+      type: 'ios.app',
+      binaryPath: 'ios/build/Build/Products/Debug-iphonesimulator/AWO.app',
+      build: 'xcodebuild -workspace ios/AWO.xcworkspace -scheme AWO -configuration Debug -sdk iphonesimulator -derivedDataPath ios/build',
+    },
+    'ios.release': {
+      type: 'ios.app',
+      binaryPath: 'ios/build/Build/Products/Release-iphonesimulator/AWO.app',
+      build: 'xcodebuild -workspace ios/AWO.xcworkspace -scheme AWO -configuration Release -sdk iphonesimulator -derivedDataPath ios/build',
+    },
+    'android.debug': {
+      type: 'android.apk',
+      binaryPath: 'android/app/build/outputs/apk/debug/app-debug.apk',
+      build: 'cd android && ./gradlew assembleDebug assembleAndroidTest -DtestBuildType=debug',
+      reversePorts: [8081],
+    },
+    'android.release': {
+      type: 'android.apk',
+      binaryPath: 'android/app/build/outputs/apk/release/app-release.apk',
+      build: 'cd android && ./gradlew assembleRelease assembleAndroidTest -DtestBuildType=release',
+    },
+  },
+  devices: {
+    simulator: {
+      type: 'ios.simulator',
+      device: {
+        type: 'iPhone 12',
+        os: 'iOS 15.0',
+      },
+    },
+    attached: {
+      type: 'android.attached',
+      device: {
+        adbName: '.*',
+      },
+    },
+    emulator: {
+      type: 'android.emulator',
+      device: {
+        avdName: 'Pixel_4_API_30',
+      },
+    },
+  },
+  configurations: {
+    'ios.sim.debug': {
+      device: 'simulator',
+      app: 'ios.debug',
+    },
+    'ios.sim.release': {
+      device: 'simulator',
+      app: 'ios.release',
+    },
+    'android.emu.debug': {
+      device: 'emulator',
+      app: 'android.debug',
+    },
+    'android.emu.release': {
+      device: 'emulator',
+      app: 'android.release',
+    },
+  },
+};
+```
+
+### E2E Test Utilities
+
+```typescript
+// e2e/utils/test-helpers.ts
+import { device, element, by, expect as detoxExpect, waitFor } from 'detox';
+
+export class E2ETestHelpers {
+  // Network simulation utilities
+  static async simulateNetworkCondition(condition: 'offline' | 'slow' | 'fast') {
+    if (device.getPlatform() === 'ios') {
+      await device.setStatusBar({ 
+        networkType: condition === 'offline' ? 'none' : 'wifi',
+        networkStrength: condition === 'slow' ? 1 : 4,
+      });
+    } else {
+      // Android network simulation
+      await device.reverseTcpPort(8081);
+      if (condition === 'offline') {
+        await device.setURLBlacklist(['*']);
+      } else {
+        await device.setURLBlacklist([]);
+      }
+    }
+  }
+  
+  // User authentication helper
+  static async authenticateUser(phoneNumber: string, password: string = 'TestPass123!') {
+    await element(by.id('phone-input')).typeText(phoneNumber);
+    await element(by.id('password-input')).typeText(password);
+    await element(by.id('login-button')).tap();
+    
+    // Wait for authentication to complete
+    await waitFor(element(by.id('home-screen')))
+      .toBeVisible()
+      .withTimeout(10000);
+  }
+  
+  // Wait for loading states
+  static async waitForLoadingToComplete(timeoutMs: number = 10000) {
+    await waitFor(element(by.id('loading-indicator')))
+      .not.toBeVisible()
+      .withTimeout(timeoutMs);
+  }
+  
+  // Currency amount helpers
+  static formatCurrencyForInput(amount: number, currency: string = 'ZAR'): string {
+    const formatted = amount.toLocaleString('en-ZA', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+    
+    return formatted.replace(/[^\d]/g, ''); // Return just numbers for input
+  }
+  
+  // Screenshot utilities for debugging
+  static async takeScreenshot(name: string) {
+    await device.takeScreenshot(name);
+  }
+  
+  // Device-specific interactions
+  static async scrollToElement(elementId: string, direction: 'up' | 'down' = 'down') {
+    const scrollView = element(by.id('main-scroll-view'));
+    
+    while (true) {
+      try {
+        await waitFor(element(by.id(elementId)))
+          .toBeVisible()
+          .withTimeout(1000);
+        break;
+      } catch (error) {
+        if (direction === 'down') {
+          await scrollView.scroll(200, 'down');
+        } else {
+          await scrollView.scroll(200, 'up');
+        }
+      }
+    }
+  }
+  
+  // Form filling utilities
+  static async fillForm(formData: Record<string, string>) {
+    for (const [fieldId, value] of Object.entries(formData)) {
+      await element(by.id(fieldId)).typeText(value);
+    }
+  }
+  
+  // Notification handling
+  static async handleSystemPermissions() {
+    if (device.getPlatform() === 'ios') {
+      // Handle iOS permission dialogs
+      await device.launchApp({ permissions: { notifications: 'YES', location: 'inuse' } });
+    } else {
+      // Handle Android permissions
+      await device.launchApp({ permissions: { all: true } });
+    }
+  }
+}
+
+// Test data management for E2E
+export class E2ETestData {
+  static generateTestUser(suffix: string = '') {
+    const timestamp = Date.now();
+    return {
+      firstName: `Test${suffix}`,
+      lastName: `User${suffix}`,
+      phoneNumber: `+2712${timestamp.toString().slice(-7)}`,
+      email: `test${suffix}${timestamp}@awo-platform.com`,
+      password: 'TestPass123!',
+      idNumber: `${timestamp.toString().slice(-13)}`,
+    };
+  }
+  
+  static generateTestChama(suffix: string = '') {
+    const timestamp = Date.now();
+    return {
+      name: `Test Chama ${suffix} ${timestamp}`,
+      monthlyContribution: 1000,
+      maxMembers: 10,
+      description: `Test savings group for E2E testing ${suffix}`,
+    };
+  }
+  
+  static generateRandomAmount(min: number = 100, max: number = 5000): number {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+}
+```
+
+## Critical User Journey Tests
+
+### Complete User Onboarding Journey
+
+```typescript
+// e2e/user-onboarding.e2e.ts
+import { device, element, by, expect as detoxExpect, waitFor } from 'detox';
+import { E2ETestHelpers, E2ETestData } from './utils/test-helpers';
+
+describe('User Onboarding Journey', () => {
+  let testUser: any;
+  
+  beforeAll(async () => {
+    testUser = E2ETestData.generateTestUser('onboarding');
+    await device.launchApp();
+    await E2ETestHelpers.handleSystemPermissions();
+  });
+  
+  beforeEach(async () => {
+    await device.reloadReactNative();
+  });
+  
+  it('should complete full user onboarding flow', async () => {
+    // Step 1: Initial app launch and welcome screen
+    await detoxExpect(element(by.id('welcome-screen'))).toBeVisible();
+    await element(by.id('get-started-button')).tap();
+    
+    // Step 2: Phone number registration
+    await detoxExpect(element(by.id('phone-registration-screen'))).toBeVisible();
+    await element(by.id('phone-input')).typeText(testUser.phoneNumber);
+    await element(by.id('continue-button')).tap();
+    
+    // Step 3: OTP verification (simulate)
+    await waitFor(element(by.id('otp-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Enter mock OTP
+    await element(by.id('otp-input')).typeText('123456');
+    await element(by.id('verify-otp-button')).tap();
+    
+    // Step 4: Personal information
+    await waitFor(element(by.id('personal-info-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    await E2ETestHelpers.fillForm({
+      'first-name-input': testUser.firstName,
+      'last-name-input': testUser.lastName,
+      'email-input': testUser.email,
+      'id-number-input': testUser.idNumber,
+    });
+    
+    await element(by.id('continue-button')).tap();
+    
+    // Step 5: Password creation
+    await waitFor(element(by.id('password-setup-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    await element(by.id('password-input')).typeText(testUser.password);
+    await element(by.id('confirm-password-input')).typeText(testUser.password);
+    await element(by.id('create-password-button')).tap();
+    
+    // Step 6: Identity verification (Tier 1 KYC)
+    await waitFor(element(by.id('kyc-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    await element(by.id('upload-id-button')).tap();
+    
+    // Simulate document upload (in real test, would use camera or gallery)
+    await waitFor(element(by.id('document-upload-success')))
+      .toBeVisible()
+      .withTimeout(10000);
+    
+    await element(by.id('continue-kyc-button')).tap();
+    
+    // Step 7: Welcome to AWO and initial setup
+    await waitFor(element(by.id('welcome-to-awo-screen')))
+      .toBeVisible()
+      .withTimeout(10000);
+    
+    await element(by.id('start-using-awo-button')).tap();
+    
+    // Step 8: Verify successful onboarding - should see home screen
+    await waitFor(element(by.id('home-screen')))
+      .toBeVisible()
+      .withTimeout(10000);
+    
+    // Verify user elements are present
+    await detoxExpect(element(by.id('user-greeting'))).toBeVisible();
+    await detoxExpect(element(by.id('diva-score-card'))).toBeVisible();
+    await detoxExpect(element(by.id('wallet-balance'))).toBeVisible();
+    
+    // Take screenshot for debugging
+    await E2ETestHelpers.takeScreenshot('onboarding-complete');
+  });
+  
+  it('should handle onboarding with poor network conditions', async () => {
+    // Simulate slow network
+    await E2ETestHelpers.simulateNetworkCondition('slow');
+    
+    await detoxExpect(element(by.id('welcome-screen'))).toBeVisible();
+    await element(by.id('get-started-button')).tap();
+    
+    // Should show loading states appropriately
+    await detoxExpect(element(by.id('loading-indicator'))).toBeVisible();
+    
+    // Process should still complete successfully
+    await waitFor(element(by.id('phone-registration-screen')))
+      .toBeVisible()
+      .withTimeout(15000); // Longer timeout for slow network
+    
+    // Restore normal network
+    await E2ETestHelpers.simulateNetworkCondition('fast');
+  });
+  
+  it('should handle offline onboarding gracefully', async () => {
+    await E2ETestHelpers.simulateNetworkCondition('offline');
+    
+    await detoxExpect(element(by.id('welcome-screen'))).toBeVisible();
+    await element(by.id('get-started-button')).tap();
+    
+    // Should show offline message
+    await waitFor(element(by.id('offline-message')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    await detoxExpect(element(by.text('No internet connection')))
+      .toBeVisible();
+    
+    // Restore connection and retry
+    await E2ETestHelpers.simulateNetworkCondition('fast');
+    await element(by.id('retry-button')).tap();
+    
+    // Should proceed normally
+    await waitFor(element(by.id('phone-registration-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
   });
 });
 ```
 
-## Test Coverage
+### DIVA Score and Investment Journey
 
-Coverage requirements and measurement will be detailed here.
+```typescript
+// e2e/diva-investment-journey.e2e.ts
+describe('DIVA Score and Investment Journey', () => {
+  let testUser: any;
+  
+  beforeAll(async () => {
+    testUser = E2ETestData.generateTestUser('diva');
+    await device.launchApp();
+  });
+  
+  beforeEach(async () => {
+    // Authenticate user before each test
+    await device.reloadReactNative();
+    await E2ETestHelpers.authenticateUser(testUser.phoneNumber);
+  });
+  
+  it('should complete DIVA score calculation and investment flow', async () => {
+    // Step 1: Navigate to DIVA Score section
+    await element(by.id('diva-score-card')).tap();
+    
+    await waitFor(element(by.id('diva-score-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Step 2: Connect bank account for transaction analysis
+    await element(by.id('connect-bank-button')).tap();
+    
+    await waitFor(element(by.id('bank-selection-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Select a test bank
+    await element(by.id('bank-standard-bank')).tap();
+    await element(by.id('connect-bank-continue')).tap();
+    
+    // Simulate bank authentication flow
+    await waitFor(element(by.id('bank-auth-webview')))
+      .toBeVisible()
+      .withTimeout(10000);
+    
+    // In real scenario, would interact with bank's OAuth flow
+    // For E2E test, simulate successful connection
+    await waitFor(element(by.id('bank-connection-success')))
+      .toBeVisible()
+      .withTimeout(15000);
+    
+    await element(by.id('continue-to-score-button')).tap();
+    
+    // Step 3: Wait for DIVA score calculation
+    await waitFor(element(by.id('diva-score-calculating')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    await waitFor(element(by.id('diva-score-result')))
+      .toBeVisible()
+      .withTimeout(30000); // Score calculation may take time
+    
+    // Verify DIVA score components are displayed
+    await detoxExpect(element(by.id('discipline-score'))).toBeVisible();
+    await detoxExpect(element(by.id('income-score'))).toBeVisible();
+    await detoxExpect(element(by.id('velocity-score'))).toBeVisible();
+    await detoxExpect(element(by.id('assets-score'))).toBeVisible();
+    
+    // Verify tier assignment
+    await detoxExpect(element(by.id('portfolio-tier'))).toBeVisible();
+    
+    // Step 4: Navigate to investment opportunities
+    await element(by.id('explore-investments-button')).tap();
+    
+    await waitFor(element(by.id('investment-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Step 5: View available investment products based on tier
+    await detoxExpect(element(by.id('available-products-list'))).toBeVisible();
+    
+    // Select an investment product
+    await element(by.id('product-govt-bonds')).tap();
+    
+    await waitFor(element(by.id('investment-details-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Step 6: Create investment order
+    await element(by.id('invest-now-button')).tap();
+    
+    await waitFor(element(by.id('investment-order-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Enter investment amount
+    const investmentAmount = E2ETestHelpers.formatCurrencyForInput(2000);
+    await element(by.id('investment-amount-input')).typeText(investmentAmount);
+    
+    // Review investment details
+    await detoxExpect(element(by.id('investment-fees-breakdown'))).toBeVisible();
+    await detoxExpect(element(by.id('expected-returns'))).toBeVisible();
+    
+    // Confirm investment
+    await element(by.id('confirm-investment-button')).tap();
+    
+    // Step 7: Verify investment confirmation
+    await waitFor(element(by.id('investment-confirmation-screen')))
+      .toBeVisible()
+      .withTimeout(10000);
+    
+    await detoxExpect(element(by.text('Investment Order Created')))
+      .toBeVisible();
+    
+    await detoxExpect(element(by.id('order-reference'))).toBeVisible();
+    
+    // Navigate back to portfolio
+    await element(by.id('view-portfolio-button')).tap();
+    
+    // Verify investment appears in portfolio
+    await waitFor(element(by.id('portfolio-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    await detoxExpect(element(by.id('investment-govt-bonds'))).toBeVisible();
+    
+    await E2ETestHelpers.takeScreenshot('investment-complete');
+  });
+  
+  it('should handle RTSM questionnaire and update portfolio tier', async () => {
+    // Navigate to DIVA score
+    await element(by.id('diva-score-card')).tap();
+    
+    // Access RTSM questionnaire
+    await element(by.id('risk-assessment-button')).tap();
+    
+    await waitFor(element(by.id('rtsm-questionnaire-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Answer risk tolerance questions
+    const riskAnswers = [
+      { questionId: 'risk-comfort-1', answer: 'moderate' },
+      { questionId: 'investment-timeline-2', answer: 'long-term' },
+      { questionId: 'market-volatility-3', answer: 'comfortable' },
+      { questionId: 'previous-experience-4', answer: 'some' },
+      { questionId: 'loss-tolerance-5', answer: 'moderate' },
+    ];
+    
+    for (const { questionId, answer } of riskAnswers) {
+      await element(by.id(`${questionId}-${answer}`)).tap();
+      await element(by.id('next-question-button')).tap();
+    }
+    
+    // Complete questionnaire
+    await element(by.id('complete-rtsm-button')).tap();
+    
+    // Verify updated risk profile
+    await waitFor(element(by.id('rtsm-results-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    await detoxExpect(element(by.id('risk-tolerance-level'))).toBeVisible();
+    await detoxExpect(element(by.id('updated-portfolio-tier'))).toBeVisible();
+  });
+});
+```
 
-## Continuous Testing
+### Chama Complete Workflow
+
+```typescript
+// e2e/chama-workflow.e2e.ts
+describe('Chama Complete Workflow', () => {
+  let testUsers: any[];
+  let testChama: any;
+  
+  beforeAll(async () => {
+    // Create multiple test users for Chama testing
+    testUsers = [
+      E2ETestData.generateTestUser('chama1'),
+      E2ETestData.generateTestUser('chama2'),
+      E2ETestData.generateTestUser('chama3'),
+    ];
+    
+    testChama = E2ETestData.generateTestChama('workflow');
+    
+    await device.launchApp();
+  });
+  
+  it('should create Chama, invite members, and process contributions', async () => {
+    // Step 1: Authenticate as first user (Chama creator)
+    await E2ETestHelpers.authenticateUser(testUsers[0].phoneNumber);
+    
+    // Step 2: Navigate to Chama section
+    await element(by.id('chama-tab')).tap();
+    
+    await waitFor(element(by.id('chama-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Step 3: Create new Chama
+    await element(by.id('create-chama-button')).tap();
+    
+    await waitFor(element(by.id('create-chama-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Fill Chama details
+    await E2ETestHelpers.fillForm({
+      'chama-name-input': testChama.name,
+      'monthly-contribution-input': testChama.monthlyContribution.toString(),
+      'max-members-input': testChama.maxMembers.toString(),
+      'description-input': testChama.description,
+    });
+    
+    // Set governance rules
+    await element(by.id('governance-settings-button')).tap();
+    await element(by.id('majority-required-slider')).swipe('right', 'slow', 0.6);
+    await element(by.id('save-governance-button')).tap();
+    
+    // Create Chama
+    await element(by.id('create-chama-confirm-button')).tap();
+    
+    // Step 4: Verify Chama creation
+    await waitFor(element(by.id('chama-created-success')))
+      .toBeVisible()
+      .withTimeout(10000);
+    
+    const chamaId = await element(by.id('chama-id')).getAttributes();
+    
+    // Step 5: Invite members
+    await element(by.id('invite-members-button')).tap();
+    
+    await waitFor(element(by.id('invite-members-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Invite test users
+    for (let i = 1; i < testUsers.length; i++) {
+      await element(by.id('phone-number-input')).typeText(testUsers[i].phoneNumber);
+      await element(by.id('send-invitation-button')).tap();
+      
+      await waitFor(element(by.id('invitation-sent-success')))
+        .toBeVisible()
+        .withTimeout(5000);
+      
+      await element(by.id('invite-another-button')).tap();
+    }
+    
+    await element(by.id('done-inviting-button')).tap();
+    
+    // Step 6: Switch to second user and accept invitation
+    await device.terminateApp();
+    await device.launchApp();
+    await E2ETestHelpers.authenticateUser(testUsers[1].phoneNumber);
+    
+    // Check for invitation notification
+    await waitFor(element(by.id('chama-invitation-notification')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    await element(by.id('view-invitation-button')).tap();
+    
+    await waitFor(element(by.id('chama-invitation-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Accept invitation
+    await element(by.id('accept-invitation-button')).tap();
+    
+    await waitFor(element(by.id('joined-chama-success')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Step 7: Make first contribution
+    await element(by.id('make-contribution-button')).tap();
+    
+    await waitFor(element(by.id('contribution-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Enter contribution amount
+    const contributionAmount = E2ETestHelpers.formatCurrencyForInput(1000);
+    await element(by.id('contribution-amount-input')).typeText(contributionAmount);
+    
+    // Confirm contribution
+    await element(by.id('confirm-contribution-button')).tap();
+    
+    // Wait for payment processing
+    await waitFor(element(by.id('payment-processing')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    await waitFor(element(by.id('contribution-success')))
+      .toBeVisible()
+      .withTimeout(15000);
+    
+    // Step 8: Verify real-time updates
+    // Switch back to first user to see if they receive real-time update
+    await device.terminateApp();
+    await device.launchApp();
+    await E2ETestHelpers.authenticateUser(testUsers[0].phoneNumber);
+    
+    await element(by.id('chama-tab')).tap();
+    await element(by.id(chamaId.text)).tap();
+    
+    // Should see updated contribution total
+    await waitFor(element(by.id('total-contributions')))
+      .toHaveText('R1,000')
+      .withTimeout(10000);
+    
+    // Should see member activity feed
+    await detoxExpect(element(by.id('member-activity-feed'))).toBeVisible();
+    await detoxExpect(element(by.text(`${testUsers[1].firstName} contributed R1,000`)))
+      .toBeVisible();
+    
+    await E2ETestHelpers.takeScreenshot('chama-workflow-complete');
+  });
+  
+  it('should handle Chama voting process', async () => {
+    // Authenticate as Chama creator
+    await E2ETestHelpers.authenticateUser(testUsers[0].phoneNumber);
+    
+    // Navigate to existing Chama
+    await element(by.id('chama-tab')).tap();
+    await element(by.id('existing-chama')).tap();
+    
+    // Create investment proposal
+    await element(by.id('create-proposal-button')).tap();
+    
+    await waitFor(element(by.id('create-proposal-screen')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    await E2ETestHelpers.fillForm({
+      'proposal-title-input': 'Invest in Government Bonds',
+      'proposal-description-input': 'Invest 50% of our funds in 10-year government bonds',
+      'investment-amount-input': '5000',
+    });
+    
+    await element(by.id('proposal-type-investment')).tap();
+    await element(by.id('create-proposal-confirm')).tap();
+    
+    // Verify proposal created
+    await waitFor(element(by.id('proposal-created-success')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Vote on proposal
+    await element(by.id('vote-yes-button')).tap();
+    
+    // Verify vote recorded
+    await waitFor(element(by.id('vote-recorded-success')))
+      .toBeVisible()
+      .withTimeout(5000);
+    
+    // Check voting status
+    await detoxExpect(element(by.id('voting-progress'))).toBeVisible();
+    await detoxExpect(element(by.text('1 of 3 votes received'))).toBeVisible();
+  });
+});
+```
+
+## Cross-Platform Testing
+
+### Device-Specific Test Scenarios
+
+```typescript
+// e2e/device-specific.e2e.ts
+describe('Device-Specific Scenarios', () => {
+  const testScenarios = [
+    {
+      platform: 'ios',
+      device: 'iPhone 12',
+      screenSize: 'large',
+      features: ['face-id', 'haptics', 'dynamic-island'],
+    },
+    {
+      platform: 'android',
+      device: 'Pixel 4',
+      screenSize: 'medium',
+      features: ['fingerprint', 'back-button'],
+    },
+  ];
+  
+  testScenarios.forEach(scenario => {
+    describe(`${scenario.platform} - ${scenario.device}`, () => {
+      beforeAll(async () => {
+        await device.launchApp();
+      });
+      
+      it('should handle platform-specific authentication', async () => {
+        if (scenario.features.includes('face-id')) {
+          // Test Face ID authentication flow
+          await element(by.id('enable-face-id-button')).tap();
+          
+          await waitFor(element(by.id('face-id-prompt')))
+            .toBeVisible()
+            .withTimeout(5000);
+          
+          // Simulate Face ID success
+          await device.setBiometricEnrollment(true);
+          await device.matchFace();
+          
+          await waitFor(element(by.id('face-id-success')))
+            .toBeVisible()
+            .withTimeout(5000);
+        }
+        
+        if (scenario.features.includes('fingerprint')) {
+          // Test fingerprint authentication flow
+          await element(by.id('enable-fingerprint-button')).tap();
+          
+          await waitFor(element(by.id('fingerprint-prompt')))
+            .toBeVisible()
+            .withTimeout(5000);
+          
+          // Simulate fingerprint success
+          await device.setBiometricEnrollment(true);
+          await device.matchFinger();
+          
+          await waitFor(element(by.id('fingerprint-success')))
+            .toBeVisible()
+            .withTimeout(5000);
+        }
+      });
+      
+      it('should adapt UI for screen size', async () => {
+        const testUser = E2ETestData.generateTestUser('screen');
+        await E2ETestHelpers.authenticateUser(testUser.phoneNumber);
+        
+        if (scenario.screenSize === 'large') {
+          // Large screen should show more information
+          await detoxExpected(element(by.id('side-navigation'))).toBeVisible();
+          await detoxExpected(element(by.id('expanded-diva-card'))).toBeVisible();
+        } else {
+          // Medium/small screens should use compact layout
+          await detoxExpected(element(by.id('bottom-navigation'))).toBeVisible();
+          await detoxExpected(element(by.id('compact-diva-card'))).toBeVisible();
+        }
+      });
+      
+      it('should handle platform-specific navigation', async () => {
+        if (scenario.platform === 'android' && scenario.features.includes('back-button')) {
+          // Test Android back button behavior
+          await element(by.id('chama-tab')).tap();
+          await element(by.id('create-chama-button')).tap();
+          
+          // Use Android back button
+          await device.pressBack();
+          
+          // Should return to previous screen
+          await detoxExpected(element(by.id('chama-screen'))).toBeVisible();
+        }
+        
+        if (scenario.platform === 'ios') {
+          // Test iOS swipe back gesture
+          await element(by.id('chama-tab')).tap();
+          await element(by.id('create-chama-button')).tap();
+          
+          // Swipe from edge to go back
+          await element(by.id('create-chama-screen')).swipe('right', 'fast', 0.1);
+          
+          // Should return to previous screen
+          await detoxExpected(element(by.id('chama-screen'))).toBeVisible();
+        }
+      });
+    });
+  });
+});
+```
+
+## Performance and Reliability Testing
+
+### Network Condition E2E Tests
+
+```typescript
+// e2e/network-conditions.e2e.ts
+describe('Network Conditions E2E Tests', () => {
+  const networkScenarios = [
+    { name: 'Slow 2G', condition: 'slow', timeout: 30000 },
+    { name: 'Fast 4G', condition: 'fast', timeout: 10000 },
+    { name: 'Offline Mode', condition: 'offline', timeout: 15000 },
+  ];
+  
+  networkScenarios.forEach(scenario => {
+    describe(`${scenario.name} Network`, () => {
+      let testUser: any;
+      
+      beforeEach(async () => {
+        testUser = E2ETestData.generateTestUser(scenario.name.toLowerCase());
+        await device.launchApp();
+        await E2ETestHelpers.simulateNetworkCondition(scenario.condition);
+      });
+      
+      afterEach(async () => {
+        await E2ETestHelpers.simulateNetworkCondition('fast');
+      });
+      
+      it('should handle transaction processing', async () => {
+        await E2ETestHelpers.authenticateUser(testUser.phoneNumber);
+        
+        if (scenario.condition === 'offline') {
+          // Test offline transaction queuing
+          await element(by.id('wallet-tab')).tap();
+          await element(by.id('send-money-button')).tap();
+          
+          await E2ETestHelpers.fillForm({
+            'recipient-input': '+27987654321',
+            'amount-input': '500',
+          });
+          
+          await element(by.id('send-money-confirm')).tap();
+          
+          // Should show offline queue message
+          await waitFor(element(by.id('offline-queued-message')))
+            .toBeVisible()
+            .withTimeout(5000);
+          
+          // Restore connection and verify auto-sync
+          await E2ETestHelpers.simulateNetworkCondition('fast');
+          
+          await waitFor(element(by.id('transaction-synced-success')))
+            .toBeVisible()
+            .withTimeout(10000);
+        } else {
+          // Test transaction with network condition
+          await element(by.id('wallet-tab')).tap();
+          await element(by.id('send-money-button')).tap();
+          
+          await E2ETestHelpers.fillForm({
+            'recipient-input': '+27987654321',
+            'amount-input': '500',
+          });
+          
+          await element(by.id('send-money-confirm')).tap();
+          
+          // Should complete within timeout for network condition
+          await waitFor(element(by.id('transaction-success')))
+            .toBeVisible()
+            .withTimeout(scenario.timeout);
+        }
+      });
+      
+      it('should handle DIVA score calculation', async () => {
+        await E2ETestHelpers.authenticateUser(testUser.phoneNumber);
+        
+        await element(by.id('diva-score-card')).tap();
+        await element(by.id('refresh-score-button')).tap();
+        
+        if (scenario.condition === 'offline') {
+          // Should show cached score with offline indicator
+          await waitFor(element(by.id('offline-score-indicator')))
+            .toBeVisible()
+            .withTimeout(5000);
+        } else {
+          // Should complete calculation within network timeout
+          await waitFor(element(by.id('diva-score-updated')))
+            .toBeVisible()
+            .withTimeout(scenario.timeout);
+        }
+      });
+    });
+  });
+});
+```
+
+## E2E Test Execution Strategy
+
+### Test Suite Organization
 
 <CardGroup cols={2}>
-  <Card title="Unit Testing" href="/testing/unit-testing">
-    Component and service testing
+  <Card title="Smoke Tests" icon="smoke">
+    **Duration**: 5-10 minutes  
+    **Frequency**: Every commit  
+    **Coverage**: Critical user paths, basic functionality  
+    **Devices**: Single device per platform
   </Card>
-  <Card title="Integration Testing" href="/testing/integration-testing">
-    End-to-end system testing
+  <Card title="Full E2E Suite" icon="test-tube">
+    **Duration**: 2-4 hours  
+    **Frequency**: Nightly builds  
+    **Coverage**: All user journeys, edge cases, network conditions  
+    **Devices**: Multiple devices and configurations
   </Card>
 </CardGroup>
+
+### CI/CD Integration
+
+```yaml
+# GitHub Actions E2E Testing
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e-ios:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd ios && pod install
+    
+    - name: Build iOS app for testing
+      run: npx detox build --configuration ios.sim.release
+    
+    - name: Run E2E tests on iOS
+      run: npx detox test --configuration ios.sim.release --cleanup
+    
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: ios-e2e-artifacts
+        path: |
+          e2e/artifacts/
+          detox-instruments-logs/
+
+  e2e-android:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Android environment
+      uses: android-actions/setup-android@v2
+    
+    - name: Create AVD
+      run: |
+        echo "y" | $ANDROID_HOME/tools/bin/sdkmanager --install "system-images;android-30;google_apis;x86"
+        echo "no" | $ANDROID_HOME/tools/bin/avdmanager create avd -n Pixel_4_API_30 -k "system-images;android-30;google_apis;x86"
+    
+    - name: Start emulator
+      run: |
+        $ANDROID_HOME/emulator/emulator @Pixel_4_API_30 &
+        adb wait-for-device
+    
+    - name: Build Android app for testing
+      run: npx detox build --configuration android.emu.release
+    
+    - name: Run E2E tests on Android
+      run: npx detox test --configuration android.emu.release --cleanup
+    
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: android-e2e-artifacts
+        path: |
+          e2e/artifacts/
+          android/app/build/reports/
+```
+
+---
+
+*This comprehensive E2E testing strategy ensures AWO Platform delivers reliable, seamless user experiences across the diverse African mobile ecosystem, validating complete financial workflows under real-world conditions.*
+
+*Last updated: June 2025*  
+*Next review: Sep 2025*

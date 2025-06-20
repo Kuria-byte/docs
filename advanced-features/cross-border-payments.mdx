@@ -1,41 +1,1076 @@
----
-title: "Cross Border Payments"
-description: "AWO Platform cross border payments advanced functionality"
----
+# Cross-Border Payments & Remittances
 
-# Cross Border Payments
+AWO's Cross-Border Payments platform enables seamless, cost-effective money transfers across the SADC region and internationally, with a focus on supporting African diaspora communities and facilitating intra-African trade and investment flows.
 
 ## Overview
 
 <Info>
-Cross Border Payments is an advanced feature of the AWO Platform, providing sophisticated financial services for experienced users.
+Cross-border payments address one of Africa's most significant financial challenges by providing affordable, transparent, and fast international money transfers. AWO leverages modern payment rails and strategic partnerships to dramatically reduce the cost and complexity of sending money across borders.
 </Info>
 
-## Advanced Capabilities
+**Platform Capabilities:**
+- **SADC Regional Focus**: Optimized corridors for Southern African Development Community countries
+- **Diaspora Support**: Affordable remittances for African communities worldwide
+- **Trade Facilitation**: Business payment solutions for cross-border commerce
+- **Multi-Currency Management**: Real-time currency conversion and hedging
+- **Regulatory Compliance**: Full compliance with international AML/KYC requirements
 
-Advanced functionality will be documented here.
+## Regional Payment Corridors
 
-## Configuration
+### Primary SADC Corridors
 
-<Accordion title="Advanced Configuration Options">
-Configuration details for cross border payments will be provided here.
-</Accordion>
-
-## Implementation Guide
-
-Detailed implementation steps will be included here.
-
-## Performance Considerations
-
-Performance optimization tips will be documented here.
-
-## Enterprise Features
-
+**High-Volume Regional Routes:**
 <CardGroup cols={2}>
-  <Card title="SME Marketplace" href="/advanced-features/sme-marketplace">
-    Business investment opportunities
+  <Card title="South Africa Hub" icon="flag">
+    **Outbound Routes**: SA → Botswana, Namibia, Zambia, Zimbabwe, Mozambique  
+    **Monthly Volume**: R2.5 billion+ in worker remittances and business transfers  
+    **Processing Time**: 30 minutes to 4 hours depending on destination  
+    **Cost**: 2-4% total cost including exchange rate margins
   </Card>
-  <Card title="Wealth Coaching" href="/advanced-features/wealth-coaching">
-    Professional financial advisory
+  <Card title="East Africa Integration" icon="globe">
+    **Key Routes**: Kenya ↔ Tanzania ↔ Uganda, Rwanda integration  
+    **M-Pesa Network**: Leveraging existing mobile money infrastructure  
+    **Processing Time**: 15 minutes to 2 hours  
+    **Cost**: 1.5-3% leveraging mobile money networks
   </Card>
 </CardGroup>
+
+### International Diaspora Routes
+
+**Major Diaspora Corridors:**
+<CardGroup cols={3}>
+  <Card title="UK → Africa" icon="coins">
+    **Primary Recipients**: Nigeria, Ghana, Kenya, South Africa  
+    **Volume**: £2.8 billion annually  
+    **AWO Target**: 15% cost reduction vs. traditional providers  
+    **Processing**: Same-day delivery to mobile wallets
+  </Card>
+  <Card title="USA → Africa" icon="dollar-sign">
+    **Primary Recipients**: Nigeria, Kenya, Ghana, Ethiopia  
+    **Volume**: $15 billion annually  
+    **AWO Target**: 20% cost reduction vs. traditional providers  
+    **Processing**: Real-time to mobile money, 1-2 days to banks
+  </Card>
+  <Card title="Middle East → Africa" icon="building">
+    **Primary Recipients**: Somalia, Sudan, Uganda, Kenya  
+    **Volume**: $3.2 billion annually  
+    **AWO Target**: Competitive with Hawala networks  
+    **Processing**: Near real-time through partnership network
+  </Card>
+</CardGroup>
+
+## Multi-Currency Architecture
+
+### Comprehensive Currency Support
+
+```typescript
+interface CrossBorderCurrency {
+  currencyCode: string;
+  currencyName: string;
+  country: string;
+  region: 'SADC' | 'West_Africa' | 'East_Africa' | 'International';
+  
+  // Trading characteristics
+  tradingPairs: TradingPair[];
+  liquidityLevel: 'high' | 'medium' | 'low';
+  volatility: 'low' | 'medium' | 'high';
+  
+  // AWO platform integration
+  nativeSupport: boolean;
+  partnerSupport: PartnerSupport[];
+  settlementMethods: SettlementMethod[];
+  
+  // Regulatory information
+  capitalControls: CapitalControl[];
+  reportingRequirements: ReportingRequirement[];
+  sanctionStatus: SanctionStatus;
+  
+  // Operational details
+  cutoffTimes: CutoffTime[];
+  holidaySchedule: Holiday[];
+  minimumTransferAmount: number;
+  maximumTransferAmount: number;
+  
+  // Pricing
+  exchangeRateSource: ExchangeRateSource;
+  spreads: CurrencySpread[];
+  fees: TransferFee[];
+}
+
+interface TradingPair {
+  baseCurrency: string;
+  quoteCurrency: string;
+  direction: 'inbound' | 'outbound' | 'bidirectional';
+  
+  // Rate management
+  rateSource: RateSource;
+  updateFrequency: number; // seconds
+  spread: number; // basis points
+  
+  // Volume and limits
+  dailyVolumeLimit: number;
+  singleTransactionLimit: number;
+  minimumAmount: number;
+  
+  // Settlement
+  settlementTime: number; // minutes
+  settlementMethod: SettlementMethod;
+  nostroRequirement: number; // minimum balance
+}
+
+class CurrencyManager {
+  async getSupportedCurrencies(region?: string): Promise<CrossBorderCurrency[]> {
+    const allCurrencies = await this.getAllSupportedCurrencies();
+    
+    if (region) {
+      return allCurrencies.filter(currency => currency.region === region);
+    }
+    
+    return allCurrencies;
+  }
+
+  async getOptimalExchangeRate(
+    fromCurrency: string,
+    toCurrency: string,
+    amount: number,
+    urgency: 'immediate' | 'standard' | 'economy'
+  ): Promise<ExchangeRateQuote> {
+    
+    // Get current market rates from multiple sources
+    const marketRates = await this.getMarketRates(fromCurrency, toCurrency);
+    
+    // Apply AWO spreads based on urgency and amount
+    const awoSpread = this.calculateAWOSpread(amount, urgency, fromCurrency, toCurrency);
+    
+    // Check for promotional rates or volume discounts
+    const discounts = await this.checkDiscounts(fromCurrency, toCurrency, amount);
+    
+    // Calculate final rate
+    const finalRate = this.calculateFinalRate(marketRates.midRate, awoSpread, discounts);
+    
+    // Generate quote with validity period
+    return {
+      fromCurrency,
+      toCurrency,
+      amount,
+      exchangeRate: finalRate,
+      estimatedReceiveAmount: amount * finalRate,
+      spreads: awoSpread,
+      fees: await this.calculateFees(fromCurrency, toCurrency, amount),
+      quoteValidUntil: this.calculateQuoteExpiry(urgency),
+      guaranteedRate: urgency === 'immediate',
+      rateBreakdown: this.generateRateBreakdown(marketRates, awoSpread, discounts)
+    };
+  }
+
+  private calculateAWOSpread(
+    amount: number,
+    urgency: string,
+    fromCurrency: string,
+    toCurrency: string
+  ): CurrencySpread {
+    
+    let baseSpread = this.getBaseCurrencySpread(fromCurrency, toCurrency);
+    
+    // Volume-based pricing
+    if (amount > 100000) { // Large transfers get better rates
+      baseSpread *= 0.7;
+    } else if (amount > 50000) {
+      baseSpread *= 0.8;
+    } else if (amount > 10000) {
+      baseSpread *= 0.9;
+    }
+    
+    // Urgency-based pricing
+    switch (urgency) {
+      case 'immediate':
+        baseSpread *= 1.5; // Premium for immediate settlement
+        break;
+      case 'standard':
+        baseSpread *= 1.0; // Standard rate
+        break;
+      case 'economy':
+        baseSpread *= 0.7; // Discount for slower settlement
+        break;
+    }
+    
+    // Corridor-based pricing
+    if (this.isSADCCorridor(fromCurrency, toCurrency)) {
+      baseSpread *= 0.8; // Regional discount
+    }
+    
+    return {
+      baseSpread,
+      volumeAdjustment: this.calculateVolumeAdjustment(amount),
+      urgencyAdjustment: this.calculateUrgencyAdjustment(urgency),
+      corridorAdjustment: this.calculateCorridorAdjustment(fromCurrency, toCurrency),
+      finalSpread: baseSpread
+    };
+  }
+}
+```
+
+## Payment Rails and Settlement Network
+
+### Hybrid Settlement Architecture
+
+**Multi-Rail Settlement Strategy:**
+<CardGroup cols={2}>
+  <Card title="Direct Banking Rails" icon="building">
+    **SWIFT Network**: Traditional correspondent banking for major currencies  
+    **Local ACH**: Direct integration with domestic clearing systems  
+    **Real-Time Gross Settlement**: Central bank RTGS systems where available  
+    **Settlement Time**: 2-24 hours depending on corridor and time of day
+  </Card>
+  <Card title="Modern Payment Rails" icon="bolt">
+    **Blockchain Settlement**: Stablecoin and CBDC integration for faster settlement  
+    **Mobile Money Networks**: Direct integration with M-Pesa, MTN MoMo, etc.  
+    **Fintech Partnerships**: API connections with regional fintech providers  
+    **Settlement Time**: 5 minutes to 4 hours for most transactions
+  </Card>
+</CardGroup>
+
+### Settlement Network Implementation
+
+```typescript
+interface SettlementNetwork {
+  networkId: string;
+  networkName: string;
+  networkType: 'traditional_banking' | 'mobile_money' | 'blockchain' | 'fintech_api';
+  
+  // Geographic coverage
+  supportedCountries: Country[];
+  supportedCurrencies: string[];
+  regionalFocus: 'SADC' | 'West_Africa' | 'East_Africa' | 'Global';
+  
+  // Settlement characteristics
+  settlementSpeed: SettlementSpeed;
+  operatingHours: OperatingHours;
+  cutoffTimes: CutoffTime[];
+  holidaySchedule: Holiday[];
+  
+  // Financial details
+  nostroAccounts: NostroAccount[];
+  creditLines: CreditLine[];
+  reserveRequirements: ReserveRequirement[];
+  
+  // Integration details
+  apiEndpoints: APIEndpoint[];
+  webhookSupport: boolean;
+  realTimeStatusUpdates: boolean;
+  
+  // Risk and compliance
+  amlCompliance: AMLCompliance;
+  sanctionScreening: SanctionScreening;
+  regulatoryApprovals: RegulatoryApproval[];
+  
+  // Performance metrics
+  successRate: number;
+  averageSettlementTime: number;
+  uptimePercentage: number;
+  costPerTransaction: number;
+}
+
+class SettlementNetworkManager {
+  async selectOptimalSettlementPath(
+    transfer: CrossBorderTransfer,
+    priorityFactors: PriorityFactors
+  ): Promise<SettlementPath> {
+    
+    // Get available networks for this corridor
+    const availableNetworks = await this.getAvailableNetworks(
+      transfer.sendCurrency,
+      transfer.receiveCurrency,
+      transfer.sendCountry,
+      transfer.receiveCountry
+    );
+    
+    // Score networks based on priority factors
+    const scoredNetworks = availableNetworks.map(network => ({
+      network,
+      score: this.calculateNetworkScore(network, transfer, priorityFactors)
+    }));
+    
+    // Select primary and backup networks
+    const rankedNetworks = scoredNetworks.sort((a, b) => b.score - a.score);
+    const primaryNetwork = rankedNetworks[0].network;
+    const backupNetwork = rankedNetworks[1]?.network;
+    
+    // Build settlement path with routing logic
+    const settlementPath = await this.buildSettlementPath(
+      transfer,
+      primaryNetwork,
+      backupNetwork
+    );
+    
+    return settlementPath;
+  }
+
+  private calculateNetworkScore(
+    network: SettlementNetwork,
+    transfer: CrossBorderTransfer,
+    priorities: PriorityFactors
+  ): number {
+    let score = 0;
+    
+    // Speed factor (0-40 points)
+    const speedScore = this.calculateSpeedScore(network, transfer.urgency);
+    score += speedScore * priorities.speedWeight;
+    
+    // Cost factor (0-30 points)
+    const costScore = this.calculateCostScore(network, transfer.amount);
+    score += costScore * priorities.costWeight;
+    
+    // Reliability factor (0-20 points)
+    const reliabilityScore = this.calculateReliabilityScore(network);
+    score += reliabilityScore * priorities.reliabilityWeight;
+    
+    // Coverage factor (0-10 points)
+    const coverageScore = this.calculateCoverageScore(network, transfer);
+    score += coverageScore * priorities.coverageWeight;
+    
+    return score;
+  }
+
+  async executeSettlement(
+    transfer: CrossBorderTransfer,
+    settlementPath: SettlementPath
+  ): Promise<SettlementResult> {
+    
+    try {
+      // Prepare settlement transaction
+      const settlementTx = await this.prepareSettlementTransaction(transfer, settlementPath);
+      
+      // Execute on primary network
+      const primaryResult = await this.executeOnPrimaryNetwork(
+        settlementTx,
+        settlementPath.primaryNetwork
+      );
+      
+      if (primaryResult.status === 'success') {
+        return {
+          status: 'success',
+          network: settlementPath.primaryNetwork,
+          settlementTime: primaryResult.settlementTime,
+          transactionId: primaryResult.transactionId,
+          confirmationDetails: primaryResult.confirmationDetails
+        };
+      } else {
+        // Fallback to backup network
+        if (settlementPath.backupNetwork) {
+          const backupResult = await this.executeOnBackupNetwork(
+            settlementTx,
+            settlementPath.backupNetwork
+          );
+          
+          return {
+            status: backupResult.status,
+            network: settlementPath.backupNetwork,
+            settlementTime: backupResult.settlementTime,
+            transactionId: backupResult.transactionId,
+            primaryNetworkFailure: primaryResult.error,
+            confirmationDetails: backupResult.confirmationDetails
+          };
+        } else {
+          throw new Error(`Settlement failed: ${primaryResult.error}`);
+        }
+      }
+    } catch (error) {
+      return {
+        status: 'failed',
+        error: error.message,
+        retryRecommendation: await this.generateRetryRecommendation(transfer, error)
+      };
+    }
+  }
+}
+```
+
+## Compliance and Regulatory Framework
+
+### Multi-Jurisdictional Compliance
+
+**Regulatory Compliance Matrix:**
+<CardGroup cols={2}>
+  <Card title="Source Country Compliance" icon="gavel">
+    **South Africa**: SARB regulations, FICA compliance, exchange control  
+    **Kenya**: CBK regulations, Proceeds of Crime Act  
+    **Nigeria**: CBN regulations, EFCC compliance  
+    **UK**: FCA authorization, MLR 2017 compliance
+  </Card>
+  <Card title="Destination Country Compliance" icon="shield">
+    **AML/KYC**: Enhanced due diligence for high-risk corridors  
+    **Sanctions Screening**: Real-time OFAC, EU, UN sanctions checking  
+    **Reporting**: CTR, SAR, and regulatory reporting automation  
+    **Documentation**: Complete audit trail and documentation retention
+  </Card>
+</CardGroup>
+
+### Compliance Engine Implementation
+
+```typescript
+interface ComplianceFramework {
+  complianceId: string;
+  corridor: PaymentCorridor;
+  applicableRegulations: Regulation[];
+  
+  // KYC/AML requirements
+  kycRequirements: {
+    senderKYC: KYCRequirement;
+    recipientKYC: KYCRequirement;
+    beneficiaryKYC: KYCRequirement;
+    enhancedDueDiligence: EDDTrigger[];
+  };
+  
+  // Transaction monitoring
+  transactionMonitoring: {
+    velocityRules: VelocityRule[];
+    amountThresholds: AmountThreshold[];
+    patternDetection: PatternDetectionRule[];
+    sanctionScreening: SanctionScreeningRule[];
+  };
+  
+  // Reporting requirements
+  reportingRequirements: {
+    ctr: CTRRequirement;
+    sar: SARRequirement;
+    regulatoryReporting: RegulatoryReporting[];
+    recordRetention: RecordRetentionRequirement;
+  };
+  
+  // Risk management
+  riskManagement: {
+    countryRiskRating: CountryRiskRating;
+    corridorRiskAssessment: CorridorRiskAssessment;
+    customerRiskProfiling: CustomerRiskProfiling;
+    ongoingMonitoring: OngoingMonitoring;
+  };
+}
+
+class CrossBorderComplianceEngine {
+  async performComplianceChecks(
+    transfer: CrossBorderTransferRequest
+  ): Promise<ComplianceCheckResult> {
+    
+    // Get compliance framework for this corridor
+    const framework = await this.getComplianceFramework(
+      transfer.sendCountry,
+      transfer.receiveCountry,
+      transfer.sendCurrency,
+      transfer.receiveCurrency
+    );
+    
+    // Perform sanctions screening
+    const sanctionsCheck = await this.performSanctionsScreening(
+      transfer.sender,
+      transfer.recipient,
+      transfer.beneficiary
+    );
+    
+    // KYC/AML verification
+    const kycCheck = await this.performKYCVerification(
+      transfer,
+      framework.kycRequirements
+    );
+    
+    // Transaction monitoring
+    const monitoringCheck = await this.performTransactionMonitoring(
+      transfer,
+      framework.transactionMonitoring
+    );
+    
+    // Risk assessment
+    const riskAssessment = await this.performRiskAssessment(
+      transfer,
+      framework.riskManagement
+    );
+    
+    // Determine overall compliance status
+    const overallStatus = this.determineOverallComplianceStatus([
+      sanctionsCheck,
+      kycCheck,
+      monitoringCheck,
+      riskAssessment
+    ]);
+    
+    // Generate regulatory reporting if required
+    const reportingActions = await this.generateRegulatoryReporting(
+      transfer,
+      overallStatus,
+      framework.reportingRequirements
+    );
+    
+    return {
+      transferId: transfer.transferId,
+      complianceStatus: overallStatus.status,
+      checkResults: {
+        sanctionsCheck,
+        kycCheck,
+        monitoringCheck,
+        riskAssessment
+      },
+      approvalRequired: overallStatus.requiresManualReview,
+      reportingActions,
+      retentionRequirements: framework.reportingRequirements.recordRetention,
+      nextReviewDate: this.calculateNextReviewDate(overallStatus, riskAssessment)
+    };
+  }
+
+  private async performSanctionsScreening(
+    sender: TransferParty,
+    recipient: TransferParty,
+    beneficiary?: TransferParty
+  ): Promise<SanctionsScreeningResult> {
+    
+    const partiesToScreen = [sender, recipient];
+    if (beneficiary) partiesToScreen.push(beneficiary);
+    
+    const screeningResults = await Promise.all(
+      partiesToScreen.map(party => this.screenPartyAgainstSanctionsList(party))
+    );
+    
+    // Check for any matches
+    const hasMatches = screeningResults.some(result => result.matches.length > 0);
+    const allMatches = screeningResults.flatMap(result => result.matches);
+    
+    return {
+      status: hasMatches ? 'blocked' : 'clear',
+      matches: allMatches,
+      screeningTimestamp: new Date(),
+      sanctionListsChecked: this.getSanctionListsChecked(),
+      requiresManualReview: hasMatches || this.requiresManualReview(screeningResults),
+      blockingReasons: hasMatches ? this.generateBlockingReasons(allMatches) : []
+    };
+  }
+
+  private async performTransactionMonitoring(
+    transfer: CrossBorderTransferRequest,
+    monitoringRules: TransactionMonitoring
+  ): Promise<TransactionMonitoringResult> {
+    
+    // Velocity rule checks
+    const velocityChecks = await this.checkVelocityRules(
+      transfer.sender.userId,
+      transfer.amount,
+      monitoringRules.velocityRules
+    );
+    
+    // Amount threshold checks
+    const thresholdChecks = this.checkAmountThresholds(
+      transfer.amount,
+      monitoringRules.amountThresholds
+    );
+    
+    // Pattern detection
+    const patternChecks = await this.checkSuspiciousPatterns(
+      transfer,
+      monitoringRules.patternDetection
+    );
+    
+    // Determine if transaction should be flagged
+    const flagged = this.shouldFlagTransaction(velocityChecks, thresholdChecks, patternChecks);
+    
+    return {
+      status: flagged ? 'flagged' : 'clear',
+      velocityChecks,
+      thresholdChecks,
+      patternChecks,
+      riskScore: this.calculateTransactionRiskScore(velocityChecks, thresholdChecks, patternChecks),
+      recommendedAction: flagged ? 'manual_review' : 'proceed',
+      monitoringNotes: this.generateMonitoringNotes(velocityChecks, thresholdChecks, patternChecks)
+    };
+  }
+}
+```
+
+## Real-Time Transfer Processing
+
+### End-to-End Transfer Workflow
+
+**Transfer Processing Pipeline:**
+<Steps>
+  <Step title="Initiation & Validation">
+    **User Input**: Transfer details, recipient information, amount, currency  
+    **Validation**: Real-time validation of all transfer parameters  
+    **Quote Generation**: Live exchange rate quote with expiry timer  
+    **Fee Calculation**: Transparent fee breakdown and total cost
+  </Step>
+  <Step title="Compliance & Risk">
+    **KYC Verification**: Sender and recipient verification status check  
+    **Sanctions Screening**: Real-time screening against global sanctions lists  
+    **AML Monitoring**: Transaction monitoring for suspicious patterns  
+    **Risk Assessment**: Corridor-specific risk evaluation
+  </Step>
+  <Step title="Payment & Settlement">
+    **Payment Collection**: Secure collection from sender's account  
+    **Currency Exchange**: Real-time currency conversion at locked rate  
+    **Settlement Routing**: Optimal routing through settlement networks  
+    **Delivery**: Final delivery to recipient account or cash pickup
+  </Step>
+  <Step title="Confirmation & Tracking">
+    **Sender Confirmation**: Immediate confirmation with tracking reference  
+    **Real-Time Updates**: Status updates throughout processing  
+    **Recipient Notification**: Notification of incoming funds  
+    **Completion**: Final confirmation of successful delivery
+  </Step>
+</Steps>
+
+### Real-Time Processing Engine
+
+```typescript
+interface CrossBorderTransfer {
+  transferId: string;
+  initiationTimestamp: Date;
+  
+  // Transfer details
+  sender: TransferParty;
+  recipient: TransferParty;
+  beneficiary?: TransferParty;
+  
+  // Financial details
+  sendAmount: number;
+  sendCurrency: string;
+  receiveAmount: number;
+  receiveCurrency: string;
+  exchangeRate: number;
+  
+  // Processing details
+  fees: TransferFee[];
+  totalCost: number;
+  estimatedDeliveryTime: Date;
+  actualDeliveryTime?: Date;
+  
+  // Routing information
+  settlementPath: SettlementPath;
+  processingSteps: ProcessingStep[];
+  
+  // Status and tracking
+  status: TransferStatus;
+  trackingReference: string;
+  statusHistory: StatusUpdate[];
+  
+  // Compliance
+  complianceResult: ComplianceCheckResult;
+  riskScore: number;
+  
+  // Notifications
+  senderNotifications: Notification[];
+  recipientNotifications: Notification[];
+}
+
+class RealTimeTransferProcessor {
+  async processTransfer(transferRequest: CrossBorderTransferRequest): Promise<TransferProcessingResult> {
+    
+    // Initialize transfer record
+    const transfer = await this.initializeTransfer(transferRequest);
+    
+    try {
+      // Step 1: Compliance and risk checks
+      await this.updateTransferStatus(transfer.transferId, 'compliance_check');
+      const complianceResult = await this.complianceEngine.performComplianceChecks(transferRequest);
+      
+      if (complianceResult.complianceStatus !== 'approved') {
+        return await this.handleComplianceFailure(transfer, complianceResult);
+      }
+      
+      // Step 2: Lock exchange rate and collect funds
+      await this.updateTransferStatus(transfer.transferId, 'rate_lock');
+      const rateLock = await this.lockExchangeRate(transfer);
+      
+      await this.updateTransferStatus(transfer.transferId, 'payment_collection');
+      const paymentResult = await this.collectPayment(transfer, rateLock);
+      
+      if (paymentResult.status !== 'success') {
+        return await this.handlePaymentFailure(transfer, paymentResult);
+      }
+      
+      // Step 3: Currency conversion and settlement routing
+      await this.updateTransferStatus(transfer.transferId, 'currency_conversion');
+      const conversionResult = await this.performCurrencyConversion(transfer, rateLock);
+      
+      await this.updateTransferStatus(transfer.transferId, 'settlement_routing');
+      const settlementResult = await this.executeSettlement(transfer);
+      
+      if (settlementResult.status !== 'success') {
+        return await this.handleSettlementFailure(transfer, settlementResult);
+      }
+      
+      // Step 4: Final delivery and confirmation
+      await this.updateTransferStatus(transfer.transferId, 'final_delivery');
+      const deliveryResult = await this.executeDelivery(transfer, settlementResult);
+      
+      await this.updateTransferStatus(transfer.transferId, 'completed');
+      await this.sendCompletionNotifications(transfer, deliveryResult);
+      
+      return {
+        status: 'success',
+        transferId: transfer.transferId,
+        trackingReference: transfer.trackingReference,
+        actualDeliveryTime: deliveryResult.deliveryTime,
+        finalAmount: deliveryResult.deliveredAmount,
+        deliveryMethod: deliveryResult.deliveryMethod,
+        confirmationDetails: deliveryResult.confirmationDetails
+      };
+      
+    } catch (error) {
+      await this.handleTransferError(transfer, error);
+      return {
+        status: 'failed',
+        transferId: transfer.transferId,
+        error: error.message,
+        retryPossible: this.isRetryPossible(transfer, error),
+        refundInitiated: await this.initiateRefund(transfer, error)
+      };
+    }
+  }
+
+  private async updateTransferStatus(
+    transferId: string,
+    status: TransferStatus,
+    additionalInfo?: any
+  ): Promise<void> {
+    
+    const statusUpdate = {
+      status,
+      timestamp: new Date(),
+      additionalInfo
+    };
+    
+    // Update database
+    await this.updateTransferRecord(transferId, statusUpdate);
+    
+    // Send real-time notifications
+    await this.sendStatusUpdateNotifications(transferId, statusUpdate);
+    
+    // Update external tracking systems
+    await this.updateExternalTrackingSystems(transferId, statusUpdate);
+  }
+
+  private async executeDelivery(
+    transfer: CrossBorderTransfer,
+    settlementResult: SettlementResult
+  ): Promise<DeliveryResult> {
+    
+    const deliveryMethod = await this.determineDeliveryMethod(
+      transfer.recipient,
+      transfer.receiveCurrency,
+      transfer.receiveAmount
+    );
+    
+    switch (deliveryMethod.type) {
+      case 'bank_account':
+        return await this.deliverToBankAccount(transfer, settlementResult, deliveryMethod);
+      
+      case 'mobile_money':
+        return await this.deliverToMobileMoney(transfer, settlementResult, deliveryMethod);
+      
+      case 'cash_pickup':
+        return await this.deliverToCashPickup(transfer, settlementResult, deliveryMethod);
+      
+      case 'digital_wallet':
+        return await this.deliverToDigitalWallet(transfer, settlementResult, deliveryMethod);
+      
+      default:
+        throw new Error(`Unsupported delivery method: ${deliveryMethod.type}`);
+    }
+  }
+}
+```
+
+## Cost Optimization and Pricing
+
+### Transparent Pricing Model
+
+**Cost Components:**
+<CardGroup cols={3}>
+  <Card title="Exchange Rate Spread" icon="exchange">
+    **Range**: 0.5% - 2.5% depending on corridor and volume  
+    **Factors**: Currency pair liquidity, volume, urgency  
+    **Transparency**: Real-time rate comparison with competitors  
+    **Optimization**: Volume discounts and loyalty pricing
+  </Card>
+  <Card title="Transfer Fees" icon="credit-card">
+    **Fixed Fees**: R15-R50 depending on corridor and method  
+    **Percentage Fees**: 0.1% - 1.0% for high-value transfers  
+    **Premium Services**: Express delivery, rate guarantees  
+    **Free Transfers**: High-value transfers and loyalty members
+  </Card>
+  <Card title="Third-Party Costs" icon="link">
+    **Correspondent Banks**: SWIFT fees, nostro account costs  
+    **Mobile Money**: Operator fees and revenue sharing  
+    **Compliance**: KYC, sanctions screening, reporting costs  
+    **Technology**: API fees, blockchain transaction costs
+  </Card>
+</CardGroup>
+
+### Dynamic Pricing Engine
+
+```typescript
+interface PricingCalculation {
+  transferRequest: CrossBorderTransferRequest;
+  pricingFactors: PricingFactor[];
+  
+  // Cost breakdown
+  exchangeRateComponent: {
+    marketRate: number;
+    awoSpread: number;
+    spreadPercentage: number;
+    competitorComparison: CompetitorRate[];
+  };
+  
+  transferFeeComponent: {
+    baseFee: number;
+    percentageFee: number;
+    premiumServices: PremiumService[];
+    discounts: Discount[];
+  };
+  
+  thirdPartyCosts: {
+    correspondentBankFees: number;
+    mobileMoneyFees: number;
+    complianceCosts: number;
+    technologyFees: number;
+  };
+  
+  // Total pricing
+  totalCost: number;
+  costBreakdown: CostBreakdown;
+  competitorComparison: CompetitorComparison;
+  valueProposition: ValueProposition;
+}
+
+class DynamicPricingEngine {
+  async calculateTransferPricing(
+    transferRequest: CrossBorderTransferRequest,
+    userProfile: UserProfile
+  ): Promise<PricingCalculation> {
+    
+    // Get base pricing for corridor
+    const basePricing = await this.getBasePricing(
+      transferRequest.sendCurrency,
+      transferRequest.receiveCurrency,
+      transferRequest.amount
+    );
+    
+    // Apply volume-based pricing
+    const volumePricing = this.applyVolumePricing(
+      basePricing,
+      transferRequest.amount,
+      userProfile.transferHistory
+    );
+    
+    // Apply user loyalty discounts
+    const loyaltyPricing = this.applyLoyaltyDiscounts(
+      volumePricing,
+      userProfile.loyaltyLevel,
+      userProfile.relationshipDuration
+    );
+    
+    // Apply corridor-specific optimizations
+    const corridorPricing = await this.applyCorriderOptimizations(
+      loyaltyPricing,
+      transferRequest.sendCountry,
+      transferRequest.receiveCountry
+    );
+    
+    // Apply real-time market adjustments
+    const marketPricing = await this.applyMarketAdjustments(
+      corridorPricing,
+      transferRequest.urgency
+    );
+    
+    // Calculate competitor comparison
+    const competitorComparison = await this.getCompetitorComparison(
+      transferRequest,
+      marketPricing
+    );
+    
+    return {
+      transferRequest,
+      pricingFactors: this.extractPricingFactors(marketPricing),
+      exchangeRateComponent: marketPricing.exchangeComponent,
+      transferFeeComponent: marketPricing.feeComponent,
+      thirdPartyCosts: marketPricing.thirdPartyCosts,
+      totalCost: marketPricing.totalCost,
+      costBreakdown: this.generateCostBreakdown(marketPricing),
+      competitorComparison,
+      valueProposition: this.generateValueProposition(marketPricing, competitorComparison)
+    };
+  }
+
+  private applyVolumePricing(
+    basePricing: BasePricing,
+    transferAmount: number,
+    transferHistory: TransferHistory
+  ): VolumePricing {
+    
+    const monthlyVolume = this.calculateMonthlyVolume(transferHistory);
+    const annualVolume = this.calculateAnnualVolume(transferHistory);
+    
+    // Volume-based spread discounts
+    let spreadDiscount = 0;
+    if (annualVolume > 1000000) { // R1M+ annual volume
+      spreadDiscount = 0.5; // 50% spread discount
+    } else if (annualVolume > 500000) { // R500K+ annual volume
+      spreadDiscount = 0.3; // 30% spread discount
+    } else if (monthlyVolume > 100000) { // R100K+ monthly volume
+      spreadDiscount = 0.2; // 20% spread discount
+    } else if (transferAmount > 50000) { // R50K+ single transfer
+      spreadDiscount = 0.1; // 10% spread discount
+    }
+    
+    // Volume-based fee discounts
+    let feeDiscount = 0;
+    if (transferAmount > 100000) {
+      feeDiscount = 1.0; // Free transfer for large amounts
+    } else if (transferAmount > 50000) {
+      feeDiscount = 0.5; // 50% fee discount
+    } else if (monthlyVolume > 50000) {
+      feeDiscount = 0.3; // 30% fee discount for regular users
+    }
+    
+    return {
+      basePricing,
+      volumeMetrics: {
+        currentTransferAmount: transferAmount,
+        monthlyVolume,
+        annualVolume
+      },
+      discounts: {
+        spreadDiscount,
+        feeDiscount
+      },
+      adjustedPricing: this.applyDiscounts(basePricing, spreadDiscount, feeDiscount)
+    };
+  }
+}
+```
+
+## API Integration Examples
+
+### Cross-Border Transfer APIs
+
+```typescript
+// Get transfer quote
+const quote = await awoClient.crossBorder.getQuote({
+  sendCurrency: 'ZAR',
+  receiveCurrency: 'USD',
+  sendAmount: 10000,
+  receiveCountry: 'USA',
+  urgency: 'standard',
+  deliveryMethod: 'bank_account'
+});
+
+// Initiate cross-border transfer
+const transfer = await awoClient.crossBorder.initiateTransfer({
+  quoteId: quote.quoteId,
+  sender: {
+    firstName: 'Jane',
+    lastName: 'Doe',
+    phoneNumber: '+27821234567',
+    country: 'ZA'
+  },
+  recipient: {
+    firstName: 'John',
+    lastName: 'Smith',
+    phoneNumber: '+1234567890',
+    country: 'USA',
+    bankAccount: {
+      routingNumber: '021000021',
+      accountNumber: '1234567890',
+      accountType: 'checking'
+    }
+  },
+  purpose: 'family_support',
+  sourceOfFunds: 'salary'
+});
+
+// Track transfer status
+const status = await awoClient.crossBorder.getTransferStatus(transfer.transferId);
+
+// Get transfer history
+const history = await awoClient.crossBorder.getTransferHistory(userId, {
+  startDate: '2025-01-01',
+  endDate: '2025-01-31',
+  currencies: ['ZAR', 'USD', 'GBP'],
+  statuses: ['completed', 'pending']
+});
+```
+
+### Corridor and Pricing APIs
+
+```typescript
+// Get supported corridors
+const corridors = await awoClient.crossBorder.getSupportedCorridors({
+  fromCountry: 'ZA',
+  includeVolumeLimits: true,
+  includeProcessingTimes: true
+});
+
+// Get real-time exchange rates
+const rates = await awoClient.crossBorder.getExchangeRates({
+  baseCurrency: 'ZAR',
+  targetCurrencies: ['USD', 'GBP', 'EUR'],
+  amount: 10000,
+  includeCompetitorComparison: true
+});
+
+// Calculate transfer fees
+const fees = await awoClient.crossBorder.calculateFees({
+  corridor: 'ZAR-USD',
+  amount: 10000,
+  userTier: 'gold',
+  deliveryMethod: 'bank_account',
+  urgency: 'standard'
+});
+
+// Get corridor analytics
+const analytics = await awoClient.crossBorder.getCorridorAnalytics({
+  corridor: 'ZAR-USD',
+  period: 'last_12_months',
+  includeVolumeData: true,
+  includePricingTrends: true
+});
+```
+
+### Compliance and Regulatory APIs
+
+```typescript
+// Perform sanctions screening
+const screeningResult = await awoClient.crossBorder.performSanctionsScreening({
+  parties: [
+    { name: 'Jane Doe', country: 'ZA', dateOfBirth: '1990-01-01' },
+    { name: 'John Smith', country: 'USA', dateOfBirth: '1985-05-15' }
+  ],
+  transactionAmount: 10000,
+  transactionCurrency: 'USD'
+});
+
+// Check regulatory requirements
+const requirements = await awoClient.crossBorder.getRegulatoryRequirements({
+  fromCountry: 'ZA',
+  toCountry: 'USA',
+  amount: 10000,
+  currency: 'USD',
+  transferPurpose: 'family_support'
+});
+
+// Submit compliance documentation
+await awoClient.crossBorder.submitComplianceDocumentation(transferId, {
+  documents: [
+    { type: 'source_of_funds', fileUrl: 'document_url' },
+    { type: 'purpose_of_transfer', fileUrl: 'document_url' }
+  ],
+  additionalInfo: {
+    employmentDetails: 'Software Engineer at Tech Company',
+    relationshipToRecipient: 'spouse'
+  }
+});
+```
+
+---
+
+*AWO's Cross-Border Payments platform provides affordable, transparent, and compliant international money transfer services that serve African communities worldwide while facilitating regional economic integration across the SADC region. Through innovative settlement networks, comprehensive compliance frameworks, and transparent pricing, AWO makes international money transfers accessible to all users.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

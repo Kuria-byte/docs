@@ -1,41 +1,1001 @@
----
-title: "Sme Marketplace"
-description: "AWO Platform sme marketplace advanced functionality"
----
+# SME Marketplace
 
-# Sme Marketplace
+AWO's SME Marketplace creates a curated platform for investment in women-led small and medium enterprises across the SADC region, enabling AWO users to directly support female entrepreneurs while earning attractive returns and contributing to economic empowerment.
 
 ## Overview
 
 <Info>
-Sme Marketplace is an advanced feature of the AWO Platform, providing sophisticated financial services for experienced users.
+The SME Marketplace addresses the $12.6 billion gender investment gap in SADC by connecting AWO investors with vetted women-led businesses seeking growth capital. This creates a virtuous cycle where women investors support women entrepreneurs, building wealth for both parties while strengthening economic communities.
 </Info>
 
-## Advanced Capabilities
+**Platform Mission:**
+- **Gender-Focused Impact**: Exclusively supporting women-led and women-owned SMEs
+- **Democratic Investment**: Making SME investing accessible to everyday investors
+- **Risk-Managed Returns**: Curated opportunities with appropriate risk assessment
+- **Community Building**: Connecting investors and entrepreneurs for mutual support
+- **Economic Empowerment**: Measurable impact on women's economic participation
 
-Advanced functionality will be documented here.
+## SME Investment Structure
 
-## Configuration
+### Investment Access by Portfolio Tier
 
-<Accordion title="Advanced Configuration Options">
-Configuration details for sme marketplace will be provided here.
-</Accordion>
-
-## Implementation Guide
-
-Detailed implementation steps will be included here.
-
-## Performance Considerations
-
-Performance optimization tips will be documented here.
-
-## Enterprise Features
-
+**Tiered Access Control:**
 <CardGroup cols={2}>
-  <Card title="SME Marketplace" href="/advanced-features/sme-marketplace">
-    Business investment opportunities
+  <Card title="Gold Tier Access (DIVA 650-849)" icon="award" style="border-color: #ffd700;">
+    **SME Access**: Limited SME debt investment opportunities  
+    **Max Investment**: R50,000 per SME, maximum 2 concurrent investments  
+    **Risk Level**: Lower-risk, established SMEs with strong track records  
+    **Interest Rates**: 12-16% per annum
   </Card>
-  <Card title="Wealth Coaching" href="/advanced-features/wealth-coaching">
-    Professional financial advisory
+  <Card title="Platinum Tier Access (DIVA 850-1000)" icon="award" style="border-color: #e5e4e2;">
+    **SME Access**: Full SME marketplace access including higher-risk opportunities  
+    **Max Investment**: R200,000 per SME, maximum 5 concurrent investments  
+    **Risk Level**: All risk levels including growth-stage and expansion capital  
+    **Interest Rates**: 10-25% per annum depending on risk profile
   </Card>
 </CardGroup>
+
+### Investment Limits and Concentration Rules
+
+**Individual Investment Constraints:**
+| Constraint Type | Gold Tier | Platinum Tier | Reasoning |
+|----------------|-----------|---------------|-----------|
+| **Max per SME** | R50,000 | R200,000 | Prevent over-concentration in single business |
+| **Concurrent SMEs** | 2 active | 5 active | Promote diversification across businesses |
+| **Total SME Allocation** | 20% of portfolio | 30% of portfolio | Limit illiquid alternative investment exposure |
+| **Geographic Concentration** | Max 60% in one country | Max 80% in one country | Reduce country-specific risk |
+| **Sector Concentration** | Max 40% in one sector | Max 50% in one sector | Promote sector diversification |
+
+### SME Investment Types
+
+**Available Investment Instruments:**
+<CardGroup cols={2}>
+  <Card title="Revenue-Based Financing" icon="chart-line">
+    **Structure**: Investment repaid as percentage of monthly revenue  
+    **Term**: 12-36 months typically  
+    **Returns**: 15-25% IRR depending on business growth  
+    **Risk**: Moderate - tied to business performance  
+    **Liquidity**: Limited - designed to be held to maturity
+  </Card>
+  <Card title="Term Loans" icon="calendar">
+    **Structure**: Fixed-term debt with regular interest payments  
+    **Term**: 6-60 months  
+    **Returns**: 12-20% per annum  
+    **Risk**: Lower to moderate - predictable payment schedule  
+    **Liquidity**: Secondary market available for some loans
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Convertible Notes" icon="divide">
+    **Structure**: Debt that can convert to equity under certain conditions  
+    **Term**: 24-48 months  
+    **Returns**: 8-15% interest + potential equity upside  
+    **Risk**: Higher - equity exposure and business risk  
+    **Liquidity**: Very limited - long-term commitment
+  </Card>
+  <Card title="Trade Finance" icon="truck">
+    **Structure**: Short-term financing for specific trade transactions  
+    **Term**: 30-180 days  
+    **Returns**: 10-18% annualized  
+    **Risk**: Lower - secured by trade receivables or inventory  
+    **Liquidity**: Higher - shorter terms and trade backing
+  </Card>
+</CardGroup>
+
+## SME Curation and Due Diligence
+
+### Multi-Stage Curation Process
+
+<Steps>
+  <Step title="Initial Screening">
+    **Eligibility**: Women-led/owned businesses in SADC region  
+    **Minimum Criteria**: 2+ years operating, R500k+ annual revenue  
+    **Legal Structure**: Registered businesses with proper documentation  
+    **Sector Focus**: Priority sectors with strong growth potential
+  </Step>
+  <Step title="Financial Assessment">
+    **Financial Analysis**: 24-month financial history and cash flow analysis  
+    **Credit Scoring**: Proprietary SME credit scoring model  
+    **Debt Capacity**: Assessment of ability to service additional debt  
+    **Growth Projections**: Realistic revenue and profit growth forecasts
+  </Step>
+  <Step title="Business Evaluation">
+    **Market Analysis**: Market size, competition, and positioning assessment  
+    **Management Team**: Leadership team experience and track record  
+    **Business Model**: Sustainability and scalability of business model  
+    **Impact Assessment**: Social and economic impact measurement
+  </Step>
+  <Step title="Risk Assessment">
+    **Risk Rating**: Comprehensive risk score (A to E rating)  
+    **Mitigants**: Security, guarantees, or other risk mitigation measures  
+    **Stress Testing**: Scenario analysis for business resilience  
+    **Final Approval**: Investment committee review and approval
+  </Step>
+</Steps>
+
+### SME Credit Scoring Model
+
+```typescript
+interface SMECreditAssessment {
+  smeId: string;
+  assessmentDate: Date;
+  overallRating: CreditRating; // AAA to D
+  creditScore: number; // 0-1000 scale
+  
+  assessmentComponents: {
+    financialHealth: FinancialHealthScore;
+    businessQuality: BusinessQualityScore;
+    managementTeam: ManagementScore;
+    marketPosition: MarketPositionScore;
+    impactPotential: ImpactScore;
+  };
+  
+  riskFactors: RiskFactor[];
+  strengthFactors: StrengthFactor[];
+  
+  recommendedInvestmentRange: InvestmentRange;
+  suggestedTerms: InvestmentTerms;
+  
+  nextReviewDate: Date;
+  analystNotes: string;
+}
+
+class SMECreditScoringEngine {
+  async assessSME(smeProfile: SMEProfile): Promise<SMECreditAssessment> {
+    // Financial health analysis (40% weight)
+    const financialHealth = await this.assessFinancialHealth(smeProfile);
+    
+    // Business quality evaluation (25% weight)
+    const businessQuality = await this.assessBusinessQuality(smeProfile);
+    
+    // Management team assessment (20% weight)
+    const managementTeam = await this.assessManagementTeam(smeProfile);
+    
+    // Market position analysis (10% weight)
+    const marketPosition = await this.assessMarketPosition(smeProfile);
+    
+    // Impact potential evaluation (5% weight)
+    const impactPotential = await this.assessImpactPotential(smeProfile);
+    
+    // Calculate overall score
+    const overallScore = 
+      (financialHealth.score * 0.40) +
+      (businessQuality.score * 0.25) +
+      (managementTeam.score * 0.20) +
+      (marketPosition.score * 0.10) +
+      (impactPotential.score * 0.05);
+    
+    const creditRating = this.determineRating(overallScore);
+    
+    return {
+      smeId: smeProfile.smeId,
+      assessmentDate: new Date(),
+      overallRating: creditRating,
+      creditScore: Math.round(overallScore),
+      assessmentComponents: {
+        financialHealth,
+        businessQuality,
+        managementTeam,
+        marketPosition,
+        impactPotential
+      },
+      riskFactors: await this.identifyRiskFactors(smeProfile, overallScore),
+      strengthFactors: await this.identifyStrengthFactors(smeProfile, overallScore),
+      recommendedInvestmentRange: this.calculateInvestmentRange(creditRating),
+      suggestedTerms: this.suggestInvestmentTerms(creditRating, smeProfile),
+      nextReviewDate: this.calculateNextReviewDate(creditRating),
+      analystNotes: await this.generateAnalystNotes(smeProfile, overallScore)
+    };
+  }
+
+  private async assessFinancialHealth(smeProfile: SMEProfile): Promise<FinancialHealthScore> {
+    const financials = smeProfile.financialStatements;
+    
+    // Revenue stability and growth
+    const revenueStability = this.calculateRevenueStability(financials);
+    const revenueGrowth = this.calculateRevenueGrowth(financials);
+    
+    // Profitability analysis
+    const profitabilityTrend = this.analyzeProfitabilityTrend(financials);
+    const marginAnalysis = this.analyzeMargins(financials);
+    
+    // Cash flow assessment
+    const cashFlowStability = this.assessCashFlowStability(financials);
+    const workingCapitalManagement = this.assessWorkingCapital(financials);
+    
+    // Debt management
+    const debtServiceCoverage = this.calculateDebtServiceCoverage(financials);
+    const debtToEquityRatio = this.calculateDebtToEquity(financials);
+    
+    // Financial controls and reporting
+    const reportingQuality = this.assessReportingQuality(financials);
+    const financialControls = this.assessFinancialControls(smeProfile);
+    
+    const componentscore = this.weightFinancialComponents({
+      revenueStability: revenueStability * 0.15,
+      revenueGrowth: revenueGrowth * 0.15,
+      profitabilityTrend: profitabilityTrend * 0.15,
+      marginAnalysis: marginAnalysis * 0.10,
+      cashFlowStability: cashFlowStability * 0.20,
+      workingCapitalManagement: workingCapitalManagement * 0.10,
+      debtServiceCoverage: debtServiceCoverage * 0.10,
+      debtToEquityRatio: debtToEquityRatio * 0.03,
+      reportingQuality: reportingQuality * 0.01,
+      financialControls: financialControls * 0.01
+    });
+    
+    return {
+      score: componentscore,
+      components: {
+        revenueStability,
+        revenueGrowth,
+        profitabilityTrend,
+        marginAnalysis,
+        cashFlowStability,
+        workingCapitalManagement,
+        debtServiceCoverage,
+        debtToEquityRatio,
+        reportingQuality,
+        financialControls
+      },
+      insights: this.generateFinancialInsights(financials),
+      recommendations: this.generateFinancialRecommendations(financials)
+    };
+  }
+}
+```
+
+## SME Profile and Investment Opportunities
+
+### Comprehensive SME Profiles
+
+**SME Profile Components:**
+<CardGroup cols={2}>
+  <Card title="Business Overview" icon="briefcase">
+    **Company Story**: Founder journey and business mission  
+    **Business Model**: Revenue streams and value proposition  
+    **Market Position**: Competitive landscape and differentiation  
+    **Growth Strategy**: Expansion plans and capital utilization
+  </Card>
+  <Card title="Financial Information" icon="chart-bar">
+    **Financial Performance**: 24-month revenue and profit history  
+    **Cash Flow Analysis**: Monthly cash flow patterns and seasonality  
+    **Use of Funds**: Detailed breakdown of capital deployment plans  
+    **Return Projections**: Realistic repayment schedules and terms
+  </Card>
+</CardGroup>
+
+### SME Investment Opportunity Structure
+
+```typescript
+interface SMEInvestmentOpportunity {
+  opportunityId: string;
+  smeProfile: SMEProfile;
+  investmentDetails: InvestmentDetails;
+  riskAssessment: SMERiskAssessment;
+  impactMetrics: ImpactMetrics;
+  
+  funding: {
+    targetAmount: number;
+    minimumInvestment: number;
+    maximumInvestment: number;
+    currentFunding: number;
+    investorCount: number;
+    fundingDeadline: Date;
+    fundingProgress: number; // 0-100%
+  };
+  
+  terms: {
+    investmentType: SMEInvestmentType;
+    interestRate: number;
+    term: number; // months
+    repaymentSchedule: RepaymentSchedule;
+    security: SecurityDetails;
+    covenants: LoanCovenant[];
+  };
+  
+  documentation: {
+    pitchDeck: string;
+    financialStatements: string;
+    businessPlan: string;
+    legalDocuments: string[];
+    dueDiligenceReport: string;
+  };
+  
+  status: 'draft' | 'live' | 'funding' | 'funded' | 'active' | 'completed' | 'defaulted';
+  
+  timeline: {
+    listingDate: Date;
+    fundingStartDate: Date;
+    fundingEndDate: Date;
+    expectedFirstPayment: Date;
+    maturityDate: Date;
+  };
+}
+
+interface SMEProfile {
+  smeId: string;
+  businessName: string;
+  registrationNumber: string;
+  country: string;
+  industry: Industry;
+  subSector: string;
+  
+  foundingInfo: {
+    foundedDate: Date;
+    founders: Founder[];
+    ownershipStructure: OwnershipStructure;
+    womenOwnershipPercentage: number;
+    womenLeadershipPercentage: number;
+  };
+  
+  businessDetails: {
+    description: string;
+    businessModel: string;
+    targetMarket: string;
+    competitors: Competitor[];
+    uniqueValueProposition: string;
+    customerBase: CustomerBaseInfo;
+  };
+  
+  financial: {
+    annualRevenue: number;
+    monthlyRevenue: number[];
+    profitMargin: number;
+    employeeCount: number;
+    assetBase: number;
+    existingDebt: number;
+  };
+  
+  impactMetrics: {
+    jobsCreated: number;
+    womenEmployed: number;
+    communityImpact: string;
+    environmentalImpact: EnvironmentalImpact;
+    sdgAlignment: SDGAlignment[];
+  };
+  
+  verification: {
+    kycStatus: 'pending' | 'verified' | 'rejected';
+    businessRegistration: VerificationStatus;
+    financialVerification: VerificationStatus;
+    ownershipVerification: VerificationStatus;
+    lastVerificationDate: Date;
+  };
+}
+```
+
+## Investment Process and Management
+
+### SME Investment Workflow
+
+<Steps>
+  <Step title="Opportunity Discovery">
+    **Browse Marketplace**: Curated list of investment opportunities by risk and sector  
+    **Filtering**: Filter by investment amount, term, sector, country, impact focus  
+    **Detailed Review**: Access comprehensive SME profiles and due diligence reports  
+    **Preliminary Interest**: Express interest and receive additional documentation
+  </Step>
+  <Step title="Due Diligence and Decision">
+    **Document Review**: Business plans, financial statements, legal documentation  
+    **Risk Assessment**: Review AWO's risk assessment and independent analysis  
+    **Q&A Sessions**: Optional video calls with SME management team  
+    **Investment Decision**: Commit to investment amount within user's limits
+  </Step>
+  <Step title="Investment Execution">
+    **Suitability Confirmation**: Final suitability check based on user profile  
+    **Legal Documentation**: Digital signing of investment agreements  
+    **Funds Transfer**: Transfer from AWO Wallet to escrow account  
+    **Investment Activation**: Investment becomes active once minimum funding reached
+  </Step>
+  <Step title="Ongoing Management">
+    **Regular Reporting**: Monthly financial and operational updates from SME  
+    **Payment Processing**: Automated interest and principal payment processing  
+    **Performance Monitoring**: Continuous monitoring of SME financial health  
+    **Exit Management**: Management of investment maturity or early repayment
+  </Step>
+</Steps>
+
+### SME Investment Monitoring
+
+```typescript
+class SMEInvestmentMonitor {
+  async monitorActiveInvestments(): Promise<void> {
+    const activeInvestments = await this.getActiveInvestments();
+    
+    for (const investment of activeInvestments) {
+      await this.performInvestmentHealthCheck(investment);
+    }
+  }
+
+  private async performInvestmentHealthCheck(investment: ActiveSMEInvestment): Promise<void> {
+    // Financial performance monitoring
+    const latestFinancials = await this.getLatestFinancials(investment.smeId);
+    const performanceAlert = await this.assessPerformanceAlert(investment, latestFinancials);
+    
+    if (performanceAlert.severity > 0.7) {
+      await this.triggerPerformanceAlert(investment, performanceAlert);
+    }
+    
+    // Payment schedule monitoring
+    const paymentStatus = await this.checkPaymentStatus(investment);
+    if (paymentStatus.daysOverdue > 7) {
+      await this.initiateCollectionProcess(investment, paymentStatus);
+    }
+    
+    // Market condition monitoring
+    const marketRisks = await this.assessMarketRisks(investment);
+    if (marketRisks.some(risk => risk.severity === 'high')) {
+      await this.notifyInvestorsOfMarketRisks(investment, marketRisks);
+    }
+    
+    // Covenant compliance monitoring
+    const covenantStatus = await this.checkCovenantCompliance(investment);
+    if (!covenantStatus.compliant) {
+      await this.handleCovenantBreach(investment, covenantStatus);
+    }
+  }
+
+  private async assessPerformanceAlert(
+    investment: ActiveSMEInvestment, 
+    financials: SMEFinancials
+  ): Promise<PerformanceAlert> {
+    const benchmark = await this.getPerformanceBenchmark(investment);
+    
+    // Revenue performance vs. projections
+    const revenueVariance = (financials.actualRevenue - benchmark.projectedRevenue) / benchmark.projectedRevenue;
+    
+    // Cash flow adequacy for debt service
+    const cashFlowCoverage = financials.operatingCashFlow / investment.monthlyPayment;
+    
+    // Profitability trends
+    const profitTrend = this.calculateProfitTrend(financials.monthlyProfits);
+    
+    let severity = 0;
+    const alerts: string[] = [];
+    
+    if (revenueVariance < -0.15) { // 15% below projection
+      severity += 0.3;
+      alerts.push(`Revenue ${Math.abs(revenueVariance * 100).toFixed(1)}% below projection`);
+    }
+    
+    if (cashFlowCoverage < 1.2) { // Less than 1.2x coverage
+      severity += 0.4;
+      alerts.push(`Insufficient cash flow coverage: ${cashFlowCoverage.toFixed(2)}x`);
+    }
+    
+    if (profitTrend < -0.1) { // Declining profit trend
+      severity += 0.3;
+      alerts.push('Declining profitability trend observed');
+    }
+    
+    return {
+      severity: Math.min(1, severity),
+      alerts,
+      recommendations: this.generatePerformanceRecommendations(severity, alerts),
+      requiresAction: severity > 0.6
+    };
+  }
+}
+```
+
+## Democratic Investment and Group Participation
+
+### Chama SME Investment Integration
+
+**Group Investment Features:**
+<CardGroup cols={2}>
+  <Card title="Collective Investment Power" icon="users">
+    **Pooled Resources**: Chama groups can pool funds for larger SME investments  
+    **Democratic Decision Making**: Group voting on SME investment opportunities  
+    **Shared Due Diligence**: Collective research and decision-making process  
+    **Risk Distribution**: Spread individual risk across group members
+  </Card>
+  <Card title="Enhanced Access" icon="key">
+    **Higher Investment Limits**: Groups can access larger investment opportunities  
+    **Exclusive Opportunities**: Group-only investment opportunities  
+    **Preferred Terms**: Better rates and terms for group investments  
+    **Direct Engagement**: Group meetings with SME management teams
+  </Card>
+</CardGroup>
+
+### Group Investment Process
+
+```typescript
+class ChamaSMEInvestmentService {
+  async proposeGroupInvestment(
+    chamaId: string, 
+    proposerId: string, 
+    smeOpportunityId: string, 
+    proposedAmount: number
+  ): Promise<GroupInvestmentProposal> {
+    
+    // Validate proposer permissions
+    await this.validateProposerPermissions(chamaId, proposerId);
+    
+    // Check group investment capacity
+    const chamaProfile = await this.getChamaProfile(chamaId);
+    await this.validateGroupInvestmentCapacity(chamaProfile, proposedAmount);
+    
+    // Create proposal
+    const proposal = await this.createInvestmentProposal({
+      chamaId,
+      proposerId,
+      smeOpportunityId,
+      proposedAmount,
+      proposalDate: new Date(),
+      votingDeadline: addDays(new Date(), 7), // 7-day voting period
+      status: 'voting'
+    });
+    
+    // Notify all group members
+    await this.notifyGroupMembers(chamaId, proposal);
+    
+    // Schedule automatic closure
+    await this.scheduleProposalClosure(proposal.proposalId);
+    
+    return proposal;
+  }
+
+  async processGroupVote(
+    proposalId: string, 
+    voterId: string, 
+    vote: Vote
+  ): Promise<VoteResult> {
+    
+    const proposal = await this.getProposal(proposalId);
+    
+    // Validate voter eligibility
+    await this.validateVoterEligibility(proposal.chamaId, voterId);
+    
+    // Record vote
+    await this.recordVote(proposalId, voterId, vote);
+    
+    // Check if voting is complete
+    const votingResult = await this.checkVotingCompletion(proposalId);
+    
+    if (votingResult.complete) {
+      if (votingResult.approved) {
+        await this.executeGroupInvestment(proposal);
+      } else {
+        await this.rejectGroupInvestment(proposal);
+      }
+    }
+    
+    return votingResult;
+  }
+
+  private async executeGroupInvestment(proposal: GroupInvestmentProposal): Promise<void> {
+    // Calculate individual member contributions
+    const memberContributions = await this.calculateMemberContributions(
+      proposal.chamaId, 
+      proposal.proposedAmount
+    );
+    
+    // Process individual investments
+    const investmentPromises = memberContributions.map(contribution => 
+      this.processMemberInvestment(proposal, contribution)
+    );
+    
+    await Promise.all(investmentPromises);
+    
+    // Create group investment record
+    await this.createGroupInvestmentRecord(proposal, memberContributions);
+    
+    // Notify successful investment
+    await this.notifySuccessfulGroupInvestment(proposal);
+  }
+}
+```
+
+## Impact Measurement and Reporting
+
+### Comprehensive Impact Tracking
+
+**Impact Categories:**
+<CardGroup cols={2}>
+  <Card title="Economic Impact" icon="chart-line">
+    **Job Creation**: Number of direct and indirect jobs created  
+    **Revenue Growth**: SME revenue growth attributable to investment  
+    **Market Expansion**: New markets or customer segments reached  
+    **Supplier Development**: Local supplier relationships strengthened
+  </Card>
+  <Card title="Social Impact" icon="heart">
+    **Women Empowerment**: Women hired, promoted, or trained  
+    **Skills Development**: Training and capacity building programs  
+    **Community Benefits**: Community projects or local procurement  
+    **Financial Inclusion**: Access to formal financial services
+  </Card>
+</CardGroup>
+
+### Impact Reporting Framework
+
+```typescript
+interface SMEImpactReport {
+  reportId: string;
+  smeId: string;
+  reportingPeriod: ReportingPeriod;
+  generatedDate: Date;
+  
+  economicImpact: {
+    jobsCreated: JobCreationMetrics;
+    revenueGrowth: RevenueGrowthMetrics;
+    marketExpansion: MarketExpansionMetrics;
+    supplierDevelopment: SupplierDevelopmentMetrics;
+  };
+  
+  socialImpact: {
+    womenEmpowerment: WomenEmpowermentMetrics;
+    skillsDevelopment: SkillsDevelopmentMetrics;
+    communityBenefits: CommunityBenefitMetrics;
+    financialInclusion: FinancialInclusionMetrics;
+  };
+  
+  environmentalImpact: {
+    carbonFootprint: CarbonFootprintMetrics;
+    resourceEfficiency: ResourceEfficiencyMetrics;
+    wasteReduction: WasteReductionMetrics;
+    sustainablePractices: SustainablePracticeMetrics;
+  };
+  
+  financialPerformance: {
+    revenueGrowth: number;
+    profitabilityImprovement: number;
+    paymentPerformance: PaymentPerformanceMetrics;
+    debtServiceCoverage: number;
+  };
+  
+  sdgAlignment: SDGAlignmentReport[];
+  investorReturns: InvestorReturnMetrics;
+  
+  verification: {
+    verifiedBy: string;
+    verificationDate: Date;
+    verificationMethod: VerificationMethod;
+    confidenceLevel: number;
+  };
+}
+
+class SMEImpactTracker {
+  async generateImpactReport(smeId: string, period: ReportingPeriod): Promise<SMEImpactReport> {
+    const sme = await this.getSMEProfile(smeId);
+    const baseline = await this.getBaselineMetrics(smeId);
+    const currentMetrics = await this.getCurrentMetrics(smeId, period);
+    
+    // Calculate economic impact
+    const economicImpact = await this.calculateEconomicImpact(baseline, currentMetrics);
+    
+    // Calculate social impact
+    const socialImpact = await this.calculateSocialImpact(baseline, currentMetrics);
+    
+    // Calculate environmental impact
+    const environmentalImpact = await this.calculateEnvironmentalImpact(baseline, currentMetrics);
+    
+    // Calculate financial performance
+    const financialPerformance = await this.calculateFinancialPerformance(baseline, currentMetrics);
+    
+    // Assess SDG alignment
+    const sdgAlignment = await this.assessSDGAlignment(sme, currentMetrics);
+    
+    // Calculate investor returns
+    const investorReturns = await this.calculateInvestorReturns(smeId, period);
+    
+    // Generate verified report
+    const report = {
+      reportId: generateUUID(),
+      smeId,
+      reportingPeriod: period,
+      generatedDate: new Date(),
+      economicImpact,
+      socialImpact,
+      environmentalImpact,
+      financialPerformance,
+      sdgAlignment,
+      investorReturns,
+      verification: await this.verifyImpactData(smeId, currentMetrics)
+    };
+    
+    // Store report and notify stakeholders
+    await this.storeImpactReport(report);
+    await this.notifyStakeholders(report);
+    
+    return report;
+  }
+}
+```
+
+## Risk Management and Default Handling
+
+### Multi-Layered Risk Management
+
+**Risk Mitigation Strategies:**
+<CardGroup cols={3}>
+  <Card title="Pre-Investment" icon="shield">
+    **Due Diligence**: Comprehensive financial and business analysis  
+    **Credit Scoring**: Proprietary SME credit assessment model  
+    **Security Requirements**: Collateral or guarantees where appropriate  
+    **Covenant Structure**: Financial and operational covenants
+  </Card>
+  <Card title="During Investment" icon="chart-bar">
+    **Continuous Monitoring**: Monthly financial and operational reporting  
+    **Early Warning System**: Automated alerts for performance issues  
+    **Covenant Monitoring**: Real-time covenant compliance tracking  
+    **Market Risk Assessment**: Ongoing sector and economic risk evaluation
+  </Card>
+  <Card title="Default Management" icon="triangle">
+    **Workout Process**: Structured approach to financial difficulties  
+    **Investor Communication**: Transparent communication with investors  
+    **Recovery Procedures**: Asset recovery and liquidation processes  
+    **Loss Mitigation**: Minimize losses through negotiated settlements
+  </Card>
+</CardGroup>
+
+### Default Resolution Framework
+
+```typescript
+class SMEDefaultManager {
+  async handlePaymentDefault(investmentId: string, daysOverdue: number): Promise<DefaultResolution> {
+    const investment = await this.getInvestment(investmentId);
+    const defaultSeverity = this.assessDefaultSeverity(daysOverdue, investment);
+    
+    switch (defaultSeverity) {
+      case 'mild': // 1-15 days
+        return await this.handleMildDefault(investment);
+      
+      case 'moderate': // 16-45 days
+        return await this.handleModerateDefault(investment);
+      
+      case 'severe': // 46-90 days
+        return await this.handleSevereDefault(investment);
+      
+      case 'critical': // 90+ days
+        return await this.handleCriticalDefault(investment);
+    }
+  }
+
+  private async handleMildDefault(investment: ActiveSMEInvestment): Promise<DefaultResolution> {
+    // Friendly reminder and support approach
+    await this.sendPaymentReminder(investment);
+    await this.offerPaymentSupport(investment);
+    
+    // Schedule follow-up
+    await this.scheduleFollowUp(investment, 7); // 7 days
+    
+    return {
+      action: 'reminder_sent',
+      severity: 'mild',
+      nextAction: 'automated_follow_up',
+      investorNotification: false
+    };
+  }
+
+  private async handleModerateDefault(investment: ActiveSMEInvestment): Promise<DefaultResolution> {
+    // More formal approach with payment plan options
+    await this.initiateFormContact(investment);
+    
+    // Assess SME financial situation
+    const financialAssessment = await this.assessSMEFinancialSituation(investment.smeId);
+    
+    if (financialAssessment.viabilityScore > 0.6) {
+      // Offer payment plan
+      const paymentPlan = await this.proposePaymentPlan(investment, financialAssessment);
+      await this.notifyInvestorsOfPaymentPlan(investment, paymentPlan);
+      
+      return {
+        action: 'payment_plan_offered',
+        severity: 'moderate',
+        paymentPlan,
+        investorNotification: true
+      };
+    } else {
+      // Escalate to severe handling
+      return await this.handleSevereDefault(investment);
+    }
+  }
+
+  private async handleSevereDefault(investment: ActiveSMEInvestment): Promise<DefaultResolution> {
+    // Formal default notice and recovery initiation
+    await this.issueFormalDefaultNotice(investment);
+    await this.engageRecoverySpecialists(investment);
+    
+    // Notify all investors
+    await this.notifyInvestorsOfDefault(investment, 'severe');
+    
+    // Begin security enforcement if applicable
+    if (investment.security) {
+      await this.initiateSecurityEnforcement(investment);
+    }
+    
+    return {
+      action: 'formal_recovery_initiated',
+      severity: 'severe',
+      recoveryTimeline: '60-120 days',
+      investorNotification: true,
+      expectedRecovery: await this.estimateRecoveryAmount(investment)
+    };
+  }
+}
+```
+
+## Secondary Market and Liquidity
+
+### SME Investment Secondary Market
+
+**Liquidity Options:**
+<CardGroup cols={2}>
+  <Card title="Peer-to-Peer Trading" icon="handshake">
+    **Platform**: Built-in secondary market for SME investments  
+    **Pricing**: Market-determined pricing based on supply and demand  
+    **Fees**: 2-3% transaction fee for secondary market trades  
+    **Settlement**: T+2 settlement for completed trades
+  </Card>
+  <Card title="AWO Buyback Program" icon="shield">
+    **Emergency Liquidity**: AWO provides limited buyback for urgent needs  
+    **Pricing**: Discounted pricing (typically 5-15% below fair value)  
+    **Eligibility**: Emergency circumstances, limited to 1-2 times per year  
+    **Process**: Verification of emergency need and approval process
+  </Card>
+</CardGroup>
+
+### Secondary Market Implementation
+
+```typescript
+class SMESecondaryMarket {
+  async listInvestmentForSale(
+    sellerId: string, 
+    investmentId: string, 
+    askingPrice: number, 
+    minimumPrice?: number
+  ): Promise<MarketListing> {
+    
+    // Validate seller ownership
+    await this.validateOwnership(sellerId, investmentId);
+    
+    // Assess investment for secondary market eligibility
+    const eligibility = await this.assessSecondaryMarketEligibility(investmentId);
+    if (!eligibility.eligible) {
+      throw new Error(`Investment not eligible for secondary market: ${eligibility.reason}`);
+    }
+    
+    // Create market listing
+    const listing = await this.createMarketListing({
+      sellerId,
+      investmentId,
+      askingPrice,
+      minimumPrice: minimumPrice || askingPrice * 0.8,
+      listingDate: new Date(),
+      expiryDate: addDays(new Date(), 30), // 30-day listing
+      status: 'active'
+    });
+    
+    // Notify potential buyers
+    await this.notifyPotentialBuyers(listing);
+    
+    return listing;
+  }
+
+  async matchBuyerAndSeller(listingId: string, buyerId: string, offerPrice: number): Promise<TradeExecution> {
+    const listing = await this.getMarketListing(listingId);
+    
+    // Validate buyer eligibility
+    await this.validateBuyerEligibility(buyerId, listing.investmentId);
+    
+    // Check price acceptance
+    if (offerPrice >= listing.minimumPrice) {
+      // Execute trade
+      const trade = await this.executeTrade(listing, buyerId, offerPrice);
+      
+      // Transfer ownership
+      await this.transferInvestmentOwnership(
+        listing.investmentId,
+        listing.sellerId,
+        buyerId
+      );
+      
+      // Process payments
+      await this.processTradePayments(trade);
+      
+      // Update records
+      await this.updateInvestmentRecords(trade);
+      
+      return trade;
+    } else {
+      // Create counter-offer or reject
+      return await this.handleCounterOffer(listing, buyerId, offerPrice);
+    }
+  }
+}
+```
+
+## Performance Analytics and Reporting
+
+### Comprehensive Performance Tracking
+
+**Investor Dashboard Metrics:**
+<CardGroup cols={3}>
+  <Card title="Portfolio Performance" icon="chart-bar">
+    **Total Returns**: Cumulative returns across all SME investments  
+    **IRR Calculation**: Internal rate of return for individual and portfolio  
+    **Cash Flow Tracking**: Principal and interest payments received  
+    **Performance Attribution**: Returns by SME, sector, and geography
+  </Card>
+  <Card title="Risk Analytics" icon="shield">
+    **Portfolio Risk**: Concentration and diversification analysis  
+    **Default Rates**: Historical and projected default rates  
+    **Recovery Rates**: Recovery percentages on defaulted investments  
+    **Stress Testing**: Portfolio performance under adverse scenarios
+  </Card>
+  <Card title="Impact Metrics" icon="heart">
+    **Jobs Supported**: Number of jobs supported through investments  
+    **Women Empowered**: Women-led businesses and female employees supported  
+    **Economic Impact**: Estimated economic multiplier effects  
+    **SDG Contribution**: Progress toward Sustainable Development Goals
+  </Card>
+</CardGroup>
+
+## API Integration Examples
+
+### SME Marketplace APIs
+
+```typescript
+// Get available SME investment opportunities
+const opportunities = await awoClient.sme.getOpportunities({
+  tier: 'gold',
+  minAmount: 10000,
+  maxAmount: 50000,
+  sectors: ['technology', 'retail', 'manufacturing'],
+  countries: ['ZA', 'BW'],
+  riskLevels: ['low', 'medium']
+});
+
+// Get detailed SME profile
+const smeProfile = await awoClient.sme.getSMEProfile(smeId, {
+  includeFinancials: true,
+  includeDueDiligence: true,
+  includeImpactMetrics: true
+});
+
+// Submit SME investment
+const investment = await awoClient.sme.invest({
+  userId: 'user123',
+  smeId: 'sme456',
+  amount: 25000,
+  investmentType: 'term_loan',
+  fundingSource: 'awo_wallet'
+});
+
+// Get SME investment performance
+const performance = await awoClient.sme.getInvestmentPerformance(investmentId, {
+  includeImpactMetrics: true,
+  includeProjections: true
+});
+```
+
+### Group Investment APIs
+
+```typescript
+// Propose group SME investment
+const proposal = await awoClient.chamas.proposeSMEInvestment(chamaId, {
+  smeId: 'sme789',
+  proposedAmount: 100000,
+  proposalDescription: 'High-growth tech SME opportunity',
+  votingDeadline: '2025-02-15'
+});
+
+// Vote on group investment proposal
+const voteResult = await awoClient.chamas.voteOnInvestment(proposalId, {
+  vote: 'approve',
+  comments: 'Strong business fundamentals and good impact potential'
+});
+
+// Get group investment performance
+const groupPerformance = await awoClient.chamas.getSMEInvestmentPerformance(chamaId);
+```
+
+---
+
+*AWO's SME Marketplace creates meaningful opportunities for women investors to support women entrepreneurs, generating attractive returns while building stronger economic communities across the SADC region. Through careful curation, democratic participation, and comprehensive impact measurement, the platform drives both financial returns and social change.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

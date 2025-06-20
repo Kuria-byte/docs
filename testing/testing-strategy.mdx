@@ -1,42 +1,878 @@
----
-title: "Testing Strategy"
-description: "AWO Platform testing strategy testing guide"
----
-
 # Testing Strategy
 
-## Overview
+AWO Platform implements a comprehensive testing strategy specifically designed for African financial services, ensuring reliability across diverse devices, network conditions, and regulatory requirements throughout the SADC region.
+
+## Testing Philosophy
 
 <Info>
-This guide covers testing strategy for the AWO Platform financial services.
+AWO's testing approach prioritizes financial transaction integrity, African market conditions (variable connectivity, diverse devices), regulatory compliance, and user trust through comprehensive validation of all financial operations.
 </Info>
 
-## Testing Strategy
+### Core Testing Principles
 
-Testing approach and methodologies will be documented here.
+<CardGroup cols={2}>
+  <Card title="Financial Integrity" icon="shield">
+    **Zero Tolerance**: No financial discrepancies allowed  
+    **Transaction Accuracy**: Every cent must be accounted for  
+    **Audit Trail**: Complete traceability of all operations  
+    **Regulatory Compliance**: Meet SADC financial regulations
+  </Card>
+  <Card title="African Market Reality" icon="globe-africa">
+    **Device Diversity**: Test on actual African mid-range devices  
+    **Network Variability**: Simulate poor connectivity scenarios  
+    **Data Costs**: Optimize for expensive mobile data  
+    **Offline Scenarios**: Robust offline functionality testing
+  </Card>
+</CardGroup>
 
-## Test Implementation
+## Testing Pyramid Structure
+
+```
+                    ┌─────────────────────┐
+                    │    E2E TESTS        │ ← 10%
+                    │  Critical User      │
+                    │   Journeys          │
+                    └─────────────────────┘
+                ┌───────────────────────────────┐
+                │     INTEGRATION TESTS         │ ← 20%
+                │   API, Database, External     │
+                │      Service Tests            │
+                └───────────────────────────────┘
+            ┌─────────────────────────────────────────┐
+            │              UNIT TESTS                 │ ← 70%
+            │  Components, Services, Utilities        │
+            │        Business Logic                   │
+            └─────────────────────────────────────────┘
+```
+
+### Testing Distribution Strategy
+
+**Unit Tests (70%)**:
+- Business logic validation
+- Component behavior testing
+- Utility function verification
+- Financial calculation accuracy
+- DIVA scoring algorithms
+
+**Integration Tests (20%)**:
+- API endpoint testing
+- Database integration
+- External service connections
+- Real-time event handling
+- Cross-service communication
+
+**End-to-End Tests (10%)**:
+- Critical user journeys
+- Complete transaction flows
+- Multi-device scenarios
+- Regulatory compliance workflows
+- Emergency and error scenarios
+
+## Financial Testing Standards
+
+### Transaction Testing Framework
 
 ```typescript
-// Test example
-describe('Testing Strategy', () => {
-  it('should pass validation', () => {
-    // Test implementation
+// Financial transaction testing framework
+import { expect } from '@jest/globals';
+import { Decimal } from 'decimal.js';
+
+class FinancialTestFramework {
+  // Precision testing for financial calculations
+  static expectFinancialEqual(actual: number | string, expected: number | string, message?: string) {
+    const actualDecimal = new Decimal(actual);
+    const expectedDecimal = new Decimal(expected);
+    
+    if (!actualDecimal.equals(expectedDecimal)) {
+      throw new Error(
+        `Financial precision error: Expected ${expectedDecimal.toString()}, got ${actualDecimal.toString()}. ${message || ''}`
+      );
+    }
+  }
+  
+  // Currency conversion testing
+  static expectCurrencyConversion(
+    amount: number,
+    fromCurrency: string,
+    toCurrency: string,
+    exchangeRate: number,
+    expectedResult: number
+  ) {
+    const actualResult = new Decimal(amount)
+      .mul(exchangeRate)
+      .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+      .toNumber();
+    
+    this.expectFinancialEqual(actualResult, expectedResult, 
+      `Currency conversion ${amount} ${fromCurrency} to ${toCurrency} at rate ${exchangeRate}`
+    );
+  }
+  
+  // DIVA score calculation testing
+  static expectDivaScoreRange(score: number, component: string) {
+    expect(score).toBeGreaterThanOrEqual(0);
+    expect(score).toBeLessThanOrEqual(1000);
+    expect(Number.isInteger(score)).toBe(true);
+    
+    // Log for audit trail
+    console.log(`✅ DIVA ${component} score ${score} within valid range [0-1000]`);
+  }
+  
+  // Transaction balance validation
+  static expectBalanceIntegrity(
+    initialBalance: number,
+    transactions: Array<{ amount: number; type: 'debit' | 'credit' }>,
+    finalBalance: number
+  ) {
+    const calculatedBalance = transactions.reduce((balance, transaction) => {
+      const amount = new Decimal(transaction.amount);
+      return transaction.type === 'credit' 
+        ? balance.add(amount)
+        : balance.sub(amount);
+    }, new Decimal(initialBalance));
+    
+    this.expectFinancialEqual(calculatedBalance.toNumber(), finalBalance, 
+      'Balance integrity check failed'
+    );
+  }
+  
+  // Chama contribution testing
+  static expectChamaContributionIntegrity(
+    chama: any,
+    contributions: Array<{ memberId: string; amount: number }>,
+    expectedTotal: number
+  ) {
+    const actualTotal = contributions.reduce((total, contribution) => {
+      return new Decimal(total).add(contribution.amount).toNumber();
+    }, 0);
+    
+    this.expectFinancialEqual(actualTotal, expectedTotal, 
+      `Chama ${chama.id} contribution total mismatch`
+    );
+    
+    // Verify all members contributed
+    const uniqueMembers = new Set(contributions.map(c => c.memberId));
+    expect(uniqueMembers.size).toBe(chama.memberCount);
+  }
+}
+
+// Test data generators for African financial scenarios
+class AfricanFinancialTestData {
+  static generateSADCCurrencies() {
+    return [
+      { code: 'ZAR', name: 'South African Rand', symbol: 'R' },
+      { code: 'BWP', name: 'Botswana Pula', symbol: 'P' },
+      { code: 'NAD', name: 'Namibian Dollar', symbol: 'N$' },
+      { code: 'ZMW', name: 'Zambian Kwacha', symbol: 'ZK' },
+    ];
+  }
+  
+  static generateTypicalMobileMoneyAmounts() {
+    return [
+      50,    // Small airtime purchase
+      100,   // Basic groceries
+      500,   // Monthly savings contribution
+      1000,  // Utility bill payment
+      2500,  // Monthly salary (partial)
+      5000,  // School fees payment
+    ];
+  }
+  
+  static generateChamaScenarios() {
+    return [
+      {
+        name: 'Small Friends Group',
+        memberCount: 5,
+        monthlyContribution: 500,
+        duration: 12, // months
+        payoutSchedule: 'rotating',
+      },
+      {
+        name: 'Women\'s Business Circle',
+        memberCount: 12,
+        monthlyContribution: 1000,
+        duration: 12,
+        payoutSchedule: 'quarterly',
+      },
+      {
+        name: 'Community Investment Group',
+        memberCount: 20,
+        monthlyContribution: 2000,
+        duration: 24,
+        payoutSchedule: 'annual',
+      },
+    ];
+  }
+  
+  static generateDivaTestProfiles() {
+    return [
+      {
+        name: 'Young Professional',
+        age: 28,
+        monthlyIncome: 15000,
+        savingsRate: 0.15,
+        transactionFrequency: 'high',
+        paymentPunctuality: 0.9,
+        expectedTier: 'Silver',
+      },
+      {
+        name: 'Small Business Owner',
+        age: 35,
+        monthlyIncome: 25000,
+        savingsRate: 0.25,
+        transactionFrequency: 'very_high',
+        paymentPunctuality: 0.95,
+        expectedTier: 'Gold',
+      },
+      {
+        name: 'Student',
+        age: 22,
+        monthlyIncome: 3000,
+        savingsRate: 0.05,
+        transactionFrequency: 'low',
+        paymentPunctuality: 0.8,
+        expectedTier: 'Bronze',
+      },
+    ];
+  }
+}
+```
+
+### Regulatory Compliance Testing
+
+```typescript
+// Compliance testing framework for SADC regulations
+class ComplianceTestFramework {
+  static validateKYCCompliance(userData: any, tier: 'tier1' | 'tier2') {
+    const requiredFields = tier === 'tier1' 
+      ? ['firstName', 'lastName', 'phoneNumber', 'idNumber']
+      : ['firstName', 'lastName', 'phoneNumber', 'idNumber', 'address', 'bankAccount', 'biometricData'];
+    
+    requiredFields.forEach(field => {
+      expect(userData[field]).toBeDefined();
+      expect(userData[field]).not.toBe('');
+      expect(userData[field]).not.toBe(null);
+    });
+    
+    // Validate ID number format for different SADC countries
+    if (userData.country === 'ZA') {
+      expect(userData.idNumber).toMatch(/^\d{13}$/); // SA ID format
+    }
+    
+    console.log(`✅ KYC compliance validated for ${tier}`);
+  }
+  
+  static validateAMLTransactionLimits(transaction: any, userTier: string) {
+    const limits = {
+      tier1: { daily: 10000, monthly: 50000 },
+      tier2: { daily: 50000, monthly: 200000 },
+    };
+    
+    const userLimits = limits[userTier] || limits.tier1;
+    
+    expect(transaction.amount).toBeLessThanOrEqual(userLimits.daily);
+    
+    // This would need to be tested with actual user transaction history
+    console.log(`✅ AML limits validated for ${userTier}: ${transaction.amount} <= ${userLimits.daily}`);
+  }
+  
+  static validateDataRetention(userData: any, retentionPeriod: number) {
+    const dataAge = Date.now() - new Date(userData.createdAt).getTime();
+    const maxAge = retentionPeriod * 365 * 24 * 60 * 60 * 1000; // Convert years to milliseconds
+    
+    if (dataAge > maxAge) {
+      expect(userData.isArchived).toBe(true);
+      expect(userData.personalData).toBeUndefined();
+    }
+    
+    console.log(`✅ Data retention policy validated`);
+  }
+  
+  static validateCrossBorderCompliance(transaction: any) {
+    if (transaction.isCrossBorder) {
+      expect(transaction.senderKYC).toBe('tier2');
+      expect(transaction.recipientKYC).toBe('tier2');
+      expect(transaction.purpose).toBeDefined();
+      expect(transaction.sourceOfFunds).toBeDefined();
+      
+      // Validate against SADC cross-border limits
+      expect(transaction.amount).toBeLessThanOrEqual(100000); // Example limit
+    }
+    
+    console.log(`✅ Cross-border compliance validated`);
+  }
+}
+```
+
+## Device and Network Testing Strategy
+
+### African Device Testing Matrix
+
+```typescript
+// Device testing configuration for African market
+const AfricanDeviceTestMatrix = {
+  // Low-end devices (40% of market)
+  lowEnd: {
+    devices: [
+      { name: 'Samsung Galaxy A10', ram: '2GB', storage: '32GB', android: '9.0' },
+      { name: 'Tecno Spark 6', ram: '3GB', storage: '64GB', android: '10.0' },
+      { name: 'Infinix Smart 5', ram: '2GB', storage: '32GB', android: '10.0' },
+    ],
+    testCriteria: {
+      maxStartupTime: 5000, // 5 seconds
+      maxMemoryUsage: 150, // MB
+      minFPS: 30,
+      batteryLifeHours: 8,
+    },
+  },
+  
+  // Mid-range devices (50% of market)
+  midRange: {
+    devices: [
+      { name: 'Samsung Galaxy A32', ram: '4GB', storage: '128GB', android: '11.0' },
+      { name: 'Xiaomi Redmi Note 9', ram: '4GB', storage: '128GB', android: '10.0' },
+      { name: 'Huawei Y9s', ram: '6GB', storage: '128GB', android: '9.0' },
+    ],
+    testCriteria: {
+      maxStartupTime: 3000, // 3 seconds
+      maxMemoryUsage: 200, // MB
+      minFPS: 45,
+      batteryLifeHours: 12,
+    },
+  },
+  
+  // High-end devices (10% of market)
+  highEnd: {
+    devices: [
+      { name: 'Samsung Galaxy S21', ram: '8GB', storage: '256GB', android: '12.0' },
+      { name: 'iPhone 12', ram: '6GB', storage: '128GB', ios: '15.0' },
+    ],
+    testCriteria: {
+      maxStartupTime: 2000, // 2 seconds
+      maxMemoryUsage: 300, // MB
+      minFPS: 60,
+      batteryLifeHours: 16,
+    },
+  },
+};
+
+// Network condition testing for African connectivity
+const AfricanNetworkTestMatrix = {
+  // Poor connectivity (30% of usage time)
+  poor: {
+    type: '2G',
+    downloadSpeed: '50kbps',
+    uploadSpeed: '25kbps',
+    latency: '500ms',
+    packetLoss: '5%',
+    testScenarios: [
+      'Transaction during poor connectivity',
+      'DIVA score refresh on 2G',
+      'Chama contribution with high latency',
+      'Offline-to-online sync',
+    ],
+  },
+  
+  // Moderate connectivity (50% of usage time)
+  moderate: {
+    type: '3G',
+    downloadSpeed: '1Mbps',
+    uploadSpeed: '500kbps',
+    latency: '200ms',
+    packetLoss: '2%',
+    testScenarios: [
+      'Normal app usage patterns',
+      'Real-time Chama updates',
+      'Investment portfolio sync',
+      'Image loading optimization',
+    ],
+  },
+  
+  // Good connectivity (20% of usage time)
+  good: {
+    type: '4G/WiFi',
+    downloadSpeed: '10Mbps',
+    uploadSpeed: '5Mbps',
+    latency: '50ms',
+    packetLoss: '0.1%',
+    testScenarios: [
+      'Optimal user experience',
+      'Video coaching sessions',
+      'Large data synchronization',
+      'Real-time collaboration features',
+    ],
+  },
+};
+```
+
+### Network Simulation Testing
+
+```typescript
+// Network condition simulation for testing
+class NetworkSimulator {
+  private originalFetch: typeof fetch;
+  
+  constructor() {
+    this.originalFetch = global.fetch;
+  }
+  
+  simulateNetworkCondition(condition: 'poor' | 'moderate' | 'good' | 'offline') {
+    const conditions = {
+      poor: { delay: 2000, successRate: 0.8, timeoutRate: 0.1 },
+      moderate: { delay: 500, successRate: 0.95, timeoutRate: 0.02 },
+      good: { delay: 100, successRate: 0.99, timeoutRate: 0.005 },
+      offline: { delay: 0, successRate: 0, timeoutRate: 0 },
+    };
+    
+    const config = conditions[condition];
+    
+    global.fetch = async (input: RequestInfo, init?: RequestInit) => {
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, config.delay));
+      
+      // Simulate connection failures
+      if (Math.random() > config.successRate) {
+        throw new Error('Network error (simulated)');
+      }
+      
+      // Simulate timeouts
+      if (Math.random() < config.timeoutRate) {
+        throw new Error('Request timeout (simulated)');
+      }
+      
+      return this.originalFetch(input, init);
+    };
+  }
+  
+  restoreNetwork() {
+    global.fetch = this.originalFetch;
+  }
+  
+  async testWithNetworkConditions<T>(
+    condition: 'poor' | 'moderate' | 'good' | 'offline',
+    testFunction: () => Promise<T>
+  ): Promise<T> {
+    this.simulateNetworkCondition(condition);
+    
+    try {
+      const result = await testFunction();
+      return result;
+    } finally {
+      this.restoreNetwork();
+    }
+  }
+}
+
+// Usage in tests
+describe('Transaction Tests with Network Conditions', () => {
+  const networkSimulator = new NetworkSimulator();
+  
+  test('should handle transaction on poor network', async () => {
+    await networkSimulator.testWithNetworkConditions('poor', async () => {
+      const result = await chamaService.contributeToChama('chama123', 500);
+      expect(result.status).toBe('completed');
+    });
+  });
+  
+  test('should queue transactions when offline', async () => {
+    await networkSimulator.testWithNetworkConditions('offline', async () => {
+      const initialQueueSize = offlineManager.getQueueSize();
+      
+      try {
+        await chamaService.contributeToChama('chama123', 500);
+      } catch (error) {
+        // Expected to fail when offline
+      }
+      
+      expect(offlineManager.getQueueSize()).toBe(initialQueueSize + 1);
+    });
   });
 });
 ```
 
-## Test Coverage
+## Test Data Management
 
-Coverage requirements and measurement will be detailed here.
+### Test Database Strategy
 
-## Continuous Testing
+```typescript
+// Test database management for African financial scenarios
+class TestDatabaseManager {
+  private testUsers: Map<string, any> = new Map();
+  private testChamas: Map<string, any> = new Map();
+  private testTransactions: Array<any> = [];
+  
+  async setupTestEnvironment() {
+    // Create test users representing different African user profiles
+    await this.createTestUsers();
+    await this.createTestChamas();
+    await this.createTestTransactions();
+    await this.createTestInvestmentPortfolios();
+  }
+  
+  private async createTestUsers() {
+    const testProfiles = AfricanFinancialTestData.generateDivaTestProfiles();
+    
+    for (const profile of testProfiles) {
+      const user = {
+        id: `test_user_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        firstName: profile.name.split(' ')[0],
+        lastName: profile.name.split(' ')[1] || 'User',
+        age: profile.age,
+        phoneNumber: `+27${Math.floor(Math.random() * 1000000000)}`,
+        country: 'ZA',
+        monthlyIncome: profile.monthlyIncome,
+        savingsRate: profile.savingsRate,
+        kycLevel: 'tier2',
+        divaScore: null, // Will be calculated
+        createdAt: new Date(),
+      };
+      
+      this.testUsers.set(user.id, user);
+    }
+  }
+  
+  private async createTestChamas() {
+    const chamaScenarios = AfricanFinancialTestData.generateChamaScenarios();
+    
+    for (const scenario of chamaScenarios) {
+      const chama = {
+        id: `test_chama_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        name: scenario.name,
+        memberCount: scenario.memberCount,
+        monthlyContribution: scenario.monthlyContribution,
+        totalContributions: 0,
+        currentRound: 1,
+        payoutSchedule: scenario.payoutSchedule,
+        members: Array.from(this.testUsers.keys()).slice(0, scenario.memberCount),
+        createdAt: new Date(),
+      };
+      
+      this.testChamas.set(chama.id, chama);
+    }
+  }
+  
+  private async createTestTransactions() {
+    const amounts = AfricanFinancialTestData.generateTypicalMobileMoneyAmounts();
+    
+    for (const [userId, user] of this.testUsers) {
+      // Generate 3 months of transaction history
+      for (let month = 0; month < 3; month++) {
+        for (let i = 0; i < 10; i++) {
+          const transaction = {
+            id: `test_txn_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+            userId,
+            amount: amounts[Math.floor(Math.random() * amounts.length)],
+            type: Math.random() > 0.3 ? 'debit' : 'credit',
+            category: this.getRandomCategory(),
+            description: this.getRandomDescription(),
+            date: new Date(Date.now() - (month * 30 + i) * 24 * 60 * 60 * 1000),
+            status: 'completed',
+          };
+          
+          this.testTransactions.push(transaction);
+        }
+      }
+    }
+  }
+  
+  private async createTestInvestmentPortfolios() {
+    for (const [userId, user] of this.testUsers) {
+      const portfolio = {
+        userId,
+        tier: this.calculateExpectedTier(user),
+        totalValue: user.monthlyIncome * user.savingsRate * 12, // Annual savings
+        investments: [
+          {
+            productId: 'bond_govt_10yr',
+            amount: user.monthlyIncome * user.savingsRate * 6,
+            purchaseDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
+          },
+        ],
+      };
+      
+      user.portfolio = portfolio;
+    }
+  }
+  
+  private calculateExpectedTier(user: any): string {
+    // Simplified tier calculation for testing
+    const score = (user.monthlyIncome / 100) + (user.savingsRate * 1000) + (user.age * 5);
+    
+    if (score >= 800) return 'Platinum';
+    if (score >= 600) return 'Gold';
+    if (score >= 400) return 'Silver';
+    return 'Bronze';
+  }
+  
+  private getRandomCategory(): string {
+    const categories = [
+      'groceries', 'transport', 'utilities', 'entertainment', 
+      'healthcare', 'education', 'savings', 'investment'
+    ];
+    return categories[Math.floor(Math.random() * categories.length)];
+  }
+  
+  private getRandomDescription(): string {
+    const descriptions = [
+      'Shoprite purchase', 'Taxi fare', 'Electricity bill', 'Movie tickets',
+      'Doctor visit', 'School fees', 'Monthly savings', 'Investment contribution'
+    ];
+    return descriptions[Math.floor(Math.random() * descriptions.length)];
+  }
+  
+  async cleanupTestEnvironment() {
+    this.testUsers.clear();
+    this.testChamas.clear();
+    this.testTransactions = [];
+  }
+  
+  // Helper methods for tests
+  getTestUser(criteria: Partial<any>): any {
+    for (const [id, user] of this.testUsers) {
+      if (Object.keys(criteria).every(key => user[key] === criteria[key])) {
+        return user;
+      }
+    }
+    return null;
+  }
+  
+  getTestChama(memberCount: number): any {
+    for (const [id, chama] of this.testChamas) {
+      if (chama.memberCount === memberCount) {
+        return chama;
+      }
+    }
+    return null;
+  }
+  
+  getTestTransactions(userId: string): any[] {
+    return this.testTransactions.filter(txn => txn.userId === userId);
+  }
+}
+```
+
+## Test Automation Strategy
+
+### Continuous Integration Testing
+
+```yaml
+# GitHub Actions workflow for AWO testing
+name: AWO Platform Test Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run unit tests
+      run: npm run test:unit
+      env:
+        NODE_ENV: test
+        DB_URL: ${{ secrets.TEST_DB_URL }}
+    
+    - name: Run financial calculation tests
+      run: npm run test:financial
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: awo_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:6
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run database migrations
+      run: npm run db:migrate:test
+    
+    - name: Run integration tests
+      run: npm run test:integration
+      env:
+        NODE_ENV: test
+        DATABASE_URL: postgresql://postgres:test@localhost:5432/awo_test
+        REDIS_URL: redis://localhost:6379
+    
+    - name: Run API tests
+      run: npm run test:api
+
+  mobile-tests:
+    runs-on: macos-latest
+    needs: unit-tests
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd mobile && npm ci
+    
+    - name: Setup iOS Simulator
+      run: |
+        xcrun simctl create "iPhone 12" "iPhone 12" "iOS15.0"
+        xcrun simctl boot "iPhone 12"
+    
+    - name: Run mobile tests
+      run: |
+        cd mobile
+        npm run test:ios
+        npm run test:android
+    
+    - name: Run E2E tests on iOS
+      run: |
+        cd mobile
+        npm run e2e:ios
+
+  security-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Run security audit
+      run: npm audit --audit-level high
+    
+    - name: Run SAST scan
+      uses: github/super-linter@v4
+      env:
+        DEFAULT_BRANCH: main
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Run dependency vulnerability scan
+      run: npm run security:scan
+
+  compliance-tests:
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run compliance tests
+      run: npm run test:compliance
+      env:
+        NODE_ENV: test
+    
+    - name: Generate compliance report
+      run: npm run compliance:report
+    
+    - name: Upload compliance artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: compliance-reports
+        path: reports/compliance/
+```
+
+## Test Quality Metrics
+
+### Coverage and Quality Targets
 
 <CardGroup cols={2}>
-  <Card title="Unit Testing" href="/testing/unit-testing">
-    Component and service testing
+  <Card title="Code Coverage" icon="percentage">
+    **Target**: &gt;90% overall coverage  
+    **Critical Paths**: 100% coverage for financial operations  
+    **Business Logic**: 95% coverage for DIVA calculations  
+    **API Endpoints**: 90% coverage for all endpoints
   </Card>
-  <Card title="Integration Testing" href="/testing/integration-testing">
-    End-to-end system testing
+  <Card title="Test Quality" icon="check-circle">
+    **Mutation Testing**: &gt;80% mutation score  
+    **Performance Tests**: All critical paths under target times  
+    **Flaky Tests**: &lt;1% flaky test rate  
+    **Test Maintenance**: Regular test review and updates
   </Card>
 </CardGroup>
+
+### Quality Gates
+
+<Steps>
+  <Step title="Pre-Commit">
+    **Unit Tests**: All unit tests must pass  
+    **Linting**: Code style and quality checks  
+    **Type Checking**: TypeScript compilation without errors  
+    **Security**: Basic security scan passes
+  </Step>
+  <Step title="Pull Request">
+    **Coverage**: Maintains or improves coverage  
+    **Integration Tests**: All integration tests pass  
+    **Performance**: No performance regressions  
+    **Documentation**: Tests include proper documentation
+  </Step>
+  <Step title="Deployment">
+    **E2E Tests**: Critical user journeys pass  
+    **Load Tests**: Performance under expected load  
+    **Security Tests**: Full security scan passes  
+    **Compliance**: All regulatory compliance tests pass
+  </Step>
+</Steps>
+
+---
+
+*This comprehensive testing strategy ensures AWO Platform maintains the highest standards of reliability, security, and user experience across the diverse African financial services landscape while meeting all regulatory requirements in the SADC region.*
+
+*Last updated: June 2025*  
+*Next review: July 2025*

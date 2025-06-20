@@ -1,42 +1,1129 @@
----
-title: "Debugging"
-description: "AWO Platform debugging development guide"
----
-
 # Debugging
 
-## Overview
+AWO Platform provides comprehensive debugging tools and strategies specifically designed for African mobile development challenges, including variable network conditions, diverse device capabilities, and complex financial transaction flows.
+
+## Debugging Philosophy
 
 <Info>
-This guide covers debugging for AWO Platform development.
+AWO's debugging approach prioritizes real-world African development challenges: debugging across multiple devices with varying capabilities, troubleshooting network-related issues, and ensuring financial data integrity in distributed systems.
 </Info>
 
-## Development Setup
-
-Development setup instructions will be provided here.
-
-## Code Examples
-
-```typescript
-// Development example
-import { AWOPlatform } from '@awo-platform/core';
-
-const awo = new AWOPlatform({
-  apiKey: process.env.AWO_API_KEY
-});
-```
-
-## Best Practices
-
-Development best practices will be documented here.
-
-## Tools and Resources
+### Debug Environment Setup
 
 <CardGroup cols={2}>
-  <Card title="API Reference" href="/api-reference/introduction">
-    Complete API documentation
+  <Card title="Development Environment" icon="code">
+    **Flipper Integration**: Advanced React Native debugging  
+    **Remote Debugging**: Debug on physical devices  
+    **Network Inspector**: Monitor API calls and responses
   </Card>
-  <Card title="Testing Guide" href="/testing/testing-strategy">
-    Testing strategies and tools
+  <Card title="Production Monitoring" icon="server">
+    **Sentry Integration**: Real-time error tracking  
+    **Custom Logging**: Structured logging for analysis  
+    **Performance Monitoring**: Track performance metrics
   </Card>
 </CardGroup>
+
+## Development Debugging Tools
+
+### React Native Debugging Setup
+
+```typescript
+// Enhanced debugging configuration for React Native
+import { NativeModules } from 'react-native';
+import Flipper from 'react-native-flipper';
+
+class DebugManager {
+  private static isDebugMode = __DEV__;
+  private static flipperConnection: any;
+  
+  static initialize() {
+    if (this.isDebugMode) {
+      this.setupFlipper();
+      this.setupConsoleOverrides();
+      this.setupNetworkDebugging();
+      this.setupPerformanceDebugging();
+    }
+  }
+  
+  private static setupFlipper() {
+    // Flipper network plugin for API debugging
+    this.flipperConnection = Flipper.connect('AWODebugger');
+    
+    this.flipperConnection.onReceive('debugAction', (data: any) => {
+      console.log('🔍 Flipper debug action:', data);
+      
+      switch (data.action) {
+        case 'clearCache':
+          this.clearAllCaches();
+          break;
+        case 'simulateNetworkError':
+          this.simulateNetworkError();
+          break;
+        case 'triggerDivaRefresh':
+          this.triggerDivaScoreRefresh(data.userId);
+          break;
+      }
+    });
+  }
+  
+  private static setupConsoleOverrides() {
+    // Enhanced console logging with context
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    
+    console.log = (...args) => {
+      const timestamp = new Date().toISOString();
+      const stack = new Error().stack?.split('\n')[2] || '';
+      originalLog(`[${timestamp}] 📝`, ...args, `\n${stack}`);
+      
+      // Send to Flipper
+      this.flipperConnection?.send('consoleLog', {
+        level: 'log',
+        message: args.join(' '),
+        timestamp,
+        stack,
+      });
+    };
+    
+    console.error = (...args) => {
+      const timestamp = new Date().toISOString();
+      const stack = new Error().stack || '';
+      originalError(`[${timestamp}] ❌`, ...args, `\n${stack}`);
+      
+      // Send to error tracking
+      this.logError({
+        level: 'error',
+        message: args.join(' '),
+        timestamp,
+        stack,
+      });
+    };
+    
+    console.warn = (...args) => {
+      const timestamp = new Date().toISOString();
+      originalWarn(`[${timestamp}] ⚠️`, ...args);
+      
+      this.flipperConnection?.send('consoleWarn', {
+        level: 'warn',
+        message: args.join(' '),
+        timestamp,
+      });
+    };
+  }
+  
+  private static setupNetworkDebugging() {
+    // Intercept all network requests for debugging
+    const originalFetch = global.fetch;
+    
+    global.fetch = async (input: RequestInfo, init?: RequestInit) => {
+      const startTime = Date.now();
+      const url = typeof input === 'string' ? input : input.url;
+      
+      console.log(`🌐 Network Request: ${init?.method || 'GET'} ${url}`);
+      
+      try {
+        const response = await originalFetch(input, init);
+        const duration = Date.now() - startTime;
+        
+        console.log(`✅ Network Response: ${response.status} ${url} (${duration}ms)`);
+        
+        // Send to Flipper Network Plugin
+        this.flipperConnection?.send('networkRequest', {
+          url,
+          method: init?.method || 'GET',
+          status: response.status,
+          duration,
+          headers: Object.fromEntries(response.headers.entries()),
+        });
+        
+        return response;
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        console.error(`❌ Network Error: ${url} (${duration}ms)`, error);
+        
+        this.flipperConnection?.send('networkError', {
+          url,
+          method: init?.method || 'GET',
+          error: error.message,
+          duration,
+        });
+        
+        throw error;
+      }
+    };
+  }
+  
+  private static setupPerformanceDebugging() {
+    // Monitor component render times
+    if (typeof global.performance === 'undefined') {
+      const { performance } = require('perf_hooks');
+      global.performance = performance;
+    }
+    
+    // Track expensive operations
+    this.trackAsyncOperation = (name: string, operation: () => Promise<any>) => {
+      return async (...args: any[]) => {
+        const startTime = performance.now();
+        
+        try {
+          const result = await operation(...args);
+          const duration = performance.now() - startTime;
+          
+          console.log(`⚡ Operation ${name} completed in ${duration.toFixed(2)}ms`);
+          
+          if (duration > 1000) {
+            console.warn(`🐌 Slow operation detected: ${name} took ${duration.toFixed(2)}ms`);
+          }
+          
+          return result;
+        } catch (error) {
+          const duration = performance.now() - startTime;
+          console.error(`❌ Operation ${name} failed after ${duration.toFixed(2)}ms:`, error);
+          throw error;
+        }
+      };
+    };
+  }
+  
+  // Debug utilities
+  static clearAllCaches() {
+    console.log('🧹 Clearing all caches...');
+    // Clear React Query cache
+    queryClient.clear();
+    // Clear AsyncStorage cache
+    AsyncStorage.clear();
+    // Clear MMKV cache
+    storage.clearAll();
+  }
+  
+  static simulateNetworkError() {
+    console.log('📡 Simulating network error...');
+    // Temporarily override fetch to simulate network failure
+    const originalFetch = global.fetch;
+    global.fetch = () => Promise.reject(new Error('Simulated network error'));
+    
+    setTimeout(() => {
+      global.fetch = originalFetch;
+      console.log('📡 Network simulation ended');
+    }, 5000);
+  }
+  
+  static async triggerDivaScoreRefresh(userId: string) {
+    console.log(`🔄 Triggering DIVA score refresh for user ${userId}`);
+    try {
+      await divaService.refreshScore(userId);
+      console.log('✅ DIVA score refresh completed');
+    } catch (error) {
+      console.error('❌ DIVA score refresh failed:', error);
+    }
+  }
+  
+  private static logError(error: any) {
+    // Send to error tracking service
+    if (this.flipperConnection) {
+      this.flipperConnection.send('error', error);
+    }
+  }
+}
+
+// Initialize debugging in development
+if (__DEV__) {
+  DebugManager.initialize();
+}
+```
+
+### Custom Debug Components
+
+```typescript
+// Debug overlay for financial data inspection
+import React, { useState, useEffect } from 'react';
+import { Modal, View, Text, ScrollView, TouchableOpacity } from 'react-native';
+
+const DebugOverlay = ({ visible, onClose }: DebugOverlayProps) => {
+  const [debugData, setDebugData] = useState({});
+  const [activeTab, setActiveTab] = useState('state');
+  
+  useEffect(() => {
+    if (visible) {
+      collectDebugData();
+    }
+  }, [visible]);
+  
+  const collectDebugData = () => {
+    const data = {
+      state: {
+        auth: useAuthStore.getState(),
+        ui: useUIStore.getState(),
+        network: useNetworkStore.getState(),
+      },
+      cache: {
+        queryCache: queryClient.getQueryCache().getAll(),
+        asyncStorage: AsyncStorage.getAllKeys(),
+      },
+      performance: {
+        memoryUsage: performance.memory,
+        timing: performance.timing,
+      },
+      network: {
+        connectionType: NetInfo.getCurrentState(),
+        pendingRequests: NetworkManager.getPendingRequests(),
+      },
+    };
+    
+    setDebugData(data);
+  };
+  
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'state':
+        return <StateDebugView data={debugData.state} />;
+      case 'cache':
+        return <CacheDebugView data={debugData.cache} />;
+      case 'performance':
+        return <PerformanceDebugView data={debugData.performance} />;
+      case 'network':
+        return <NetworkDebugView data={debugData.network} />;
+      default:
+        return null;
+    }
+  };
+  
+  return (
+    <Modal visible={visible} animationType="slide">
+      <View style={styles.debugOverlay}>
+        <View style={styles.debugHeader}>
+          <Text style={styles.debugTitle}>AWO Debug Console</Text>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Text style={styles.closeButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.debugTabs}>
+          {['state', 'cache', 'performance', 'network'].map(tab => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.debugTab, activeTab === tab && styles.activeTab]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={styles.debugTabText}>{tab.toUpperCase()}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        
+        <ScrollView style={styles.debugContent}>
+          {renderTabContent()}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+};
+
+// State inspection component
+const StateDebugView = ({ data }: { data: any }) => (
+  <View>
+    <Text style={styles.sectionTitle}>Application State</Text>
+    {Object.entries(data).map(([key, value]) => (
+      <View key={key} style={styles.stateItem}>
+        <Text style={styles.stateKey}>{key}:</Text>
+        <Text style={styles.stateValue}>
+          {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}
+        </Text>
+      </View>
+    ))}
+  </View>
+);
+
+// Performance metrics component
+const PerformanceDebugView = ({ data }: { data: any }) => (
+  <View>
+    <Text style={styles.sectionTitle}>Performance Metrics</Text>
+    <View style={styles.metricItem}>
+      <Text style={styles.metricLabel}>Memory Usage:</Text>
+      <Text style={styles.metricValue}>
+        {data.memoryUsage ? `${(data.memoryUsage.usedJSHeapSize / 1024 / 1024).toFixed(2)} MB` : 'N/A'}
+      </Text>
+    </View>
+    <View style={styles.metricItem}>
+      <Text style={styles.metricLabel}>App Load Time:</Text>
+      <Text style={styles.metricValue}>
+        {data.timing ? `${data.timing.loadEventEnd - data.timing.navigationStart}ms` : 'N/A'}
+      </Text>
+    </View>
+  </View>
+);
+```
+
+## Error Tracking and Monitoring
+
+### Sentry Integration for Production
+
+```typescript
+// Production error tracking with Sentry
+import * as Sentry from '@sentry/react-native';
+
+class ErrorTracker {
+  static initialize() {
+    Sentry.init({
+      dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+      environment: process.env.NODE_ENV,
+      
+      // African market specific configuration
+      beforeSend(event, hint) {
+        // Add African context
+        event.tags = {
+          ...event.tags,
+          region: 'SADC',
+          market: 'African',
+        };
+        
+        // Add device information for African device debugging
+        event.contexts = {
+          ...event.contexts,
+          device: {
+            ...event.contexts?.device,
+            connection_type: NetInfo.getCurrentState().type,
+          },
+        };
+        
+        return event;
+      },
+    });
+  }
+  
+  // Financial transaction error tracking
+  static trackFinancialError(error: Error, context: FinancialErrorContext) {
+    Sentry.withScope((scope) => {
+      scope.setTag('error_type', 'financial');
+      scope.setContext('financial_transaction', {
+        transactionId: context.transactionId,
+        amount: context.amount,
+        currency: context.currency,
+        paymentMethod: context.paymentMethod,
+        userId: context.userId,
+      });
+      
+      // Add breadcrumbs for transaction flow
+      scope.addBreadcrumb({
+        message: 'Financial transaction started',
+        level: 'info',
+        data: {
+          step: context.step,
+          timestamp: new Date().toISOString(),
+        },
+      });
+      
+      Sentry.captureException(error);
+    });
+  }
+  
+  // DIVA score calculation errors
+  static trackDivaError(error: Error, userId: string, scoreContext: any) {
+    Sentry.withScope((scope) => {
+      scope.setTag('error_type', 'diva_calculation');
+      scope.setContext('diva_score', {
+        userId,
+        scoreComponents: scoreContext.components,
+        dataAvailable: scoreContext.dataAvailable,
+        calculationStep: scoreContext.step,
+      });
+      
+      Sentry.captureException(error);
+    });
+  }
+  
+  // Network error tracking with African context
+  static trackNetworkError(error: Error, requestContext: NetworkRequestContext) {
+    Sentry.withScope((scope) => {
+      scope.setTag('error_type', 'network');
+      scope.setContext('network_request', {
+        url: requestContext.url,
+        method: requestContext.method,
+        connectionType: requestContext.connectionType,
+        latency: requestContext.latency,
+        retryAttempt: requestContext.retryAttempt,
+      });
+      
+      // Add African network context
+      scope.setContext('african_network', {
+        isLowBandwidth: requestContext.connectionType === '2g',
+        isExpensiveData: true, // Assume expensive data in African markets
+        networkProvider: requestContext.networkProvider,
+      });
+      
+      Sentry.captureException(error);
+    });
+  }
+  
+  // User feedback integration
+  static captureUserFeedback(feedbackData: UserFeedback) {
+    const user = Sentry.getCurrentHub().getScope()?.getUser();
+    
+    Sentry.captureUserFeedback({
+      event_id: Sentry.lastEventId(),
+      name: user?.username || 'Anonymous',
+      email: user?.email || 'unknown@awo-platform.com',
+      comments: feedbackData.comments,
+    });
+  }
+}
+```
+
+### Custom Logging System
+
+```typescript
+// Structured logging system for African development
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+enum LogLevel {
+  DEBUG = 0,
+  INFO = 1,
+  WARN = 2,
+  ERROR = 3,
+}
+
+interface LogEntry {
+  level: LogLevel;
+  message: string;
+  timestamp: number;
+  context?: any;
+  userId?: string;
+  sessionId: string;
+  tags: string[];
+}
+
+class Logger {
+  private static logs: LogEntry[] = [];
+  private static sessionId = Math.random().toString(36).substring(7);
+  private static readonly MAX_LOGS = 1000;
+  
+  static debug(message: string, context?: any, tags: string[] = []) {
+    this.log(LogLevel.DEBUG, message, context, tags);
+  }
+  
+  static info(message: string, context?: any, tags: string[] = []) {
+    this.log(LogLevel.INFO, message, context, tags);
+  }
+  
+  static warn(message: string, context?: any, tags: string[] = []) {
+    this.log(LogLevel.WARN, message, context, tags);
+  }
+  
+  static error(message: string, context?: any, tags: string[] = []) {
+    this.log(LogLevel.ERROR, message, context, tags);
+  }
+  
+  private static log(level: LogLevel, message: string, context?: any, tags: string[] = []) {
+    const entry: LogEntry = {
+      level,
+      message,
+      timestamp: Date.now(),
+      context,
+      userId: useAuthStore.getState().user?.id,
+      sessionId: this.sessionId,
+      tags: [...tags, 'awo-platform'],
+    };
+    
+    this.logs.push(entry);
+    
+    // Keep only recent logs
+    if (this.logs.length > this.MAX_LOGS) {
+      this.logs.shift();
+    }
+    
+    // Console output in development
+    if (__DEV__) {
+      const levelNames = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
+      const levelEmojis = ['🔍', 'ℹ️', '⚠️', '❌'];
+      
+      console.log(
+        `${levelEmojis[level]} [${levelNames[level]}] ${message}`,
+        context ? JSON.stringify(context, null, 2) : ''
+      );
+    }
+    
+    // Send critical logs to remote service
+    if (level >= LogLevel.ERROR) {
+      this.sendToRemoteLogging(entry);
+    }
+    
+    // Store logs locally for offline debugging
+    this.persistLogs();
+  }
+  
+  // Financial transaction logging
+  static logTransaction(event: string, transactionData: any) {
+    this.info(`Transaction ${event}`, {
+      transactionId: transactionData.id,
+      amount: transactionData.amount,
+      currency: transactionData.currency,
+      status: transactionData.status,
+      timestamp: new Date().toISOString(),
+    }, ['financial', 'transaction']);
+  }
+  
+  // DIVA score logging
+  static logDivaCalculation(userId: string, step: string, data: any) {
+    this.debug(`DIVA calculation: ${step}`, {
+      userId,
+      step,
+      data,
+      timestamp: new Date().toISOString(),
+    }, ['diva', 'calculation']);
+  }
+  
+  // Chama activity logging
+  static logChamaActivity(chamaId: string, activity: string, data: any) {
+    this.info(`Chama activity: ${activity}`, {
+      chamaId,
+      activity,
+      data,
+      timestamp: new Date().toISOString(),
+    }, ['chama', 'activity']);
+  }
+  
+  // Network request logging
+  static logNetworkRequest(url: string, method: string, duration: number, status: number) {
+    const level = status >= 400 ? LogLevel.ERROR : LogLevel.DEBUG;
+    
+    this.log(level, `Network ${method} ${url}`, {
+      url,
+      method,
+      duration,
+      status,
+      connectionType: NetInfo.getCurrentState().type,
+    }, ['network', 'api']);
+  }
+  
+  private static async persistLogs() {
+    try {
+      const recentLogs = this.logs.slice(-100); // Keep last 100 logs
+      await AsyncStorage.setItem('awo_logs', JSON.stringify(recentLogs));
+    } catch (error) {
+      console.error('Failed to persist logs:', error);
+    }
+  }
+  
+  private static async sendToRemoteLogging(entry: LogEntry) {
+    try {
+      if (!__DEV__ && process.env.EXPO_PUBLIC_LOGGING_ENDPOINT) {
+        await fetch(process.env.EXPO_PUBLIC_LOGGING_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...entry,
+            platform: 'mobile',
+            version: process.env.EXPO_PUBLIC_APP_VERSION,
+          }),
+        });
+      }
+    } catch (error) {
+      console.error('Failed to send log to remote service:', error);
+    }
+  }
+  
+  // Get logs for debugging
+  static getLogs(level?: LogLevel, tags?: string[]): LogEntry[] {
+    let filteredLogs = this.logs;
+    
+    if (level !== undefined) {
+      filteredLogs = filteredLogs.filter(log => log.level >= level);
+    }
+    
+    if (tags) {
+      filteredLogs = filteredLogs.filter(log => 
+        tags.some(tag => log.tags.includes(tag))
+      );
+    }
+    
+    return filteredLogs;
+  }
+  
+  // Export logs for analysis
+  static async exportLogs(): Promise<string> {
+    const allLogs = await this.getAllStoredLogs();
+    return JSON.stringify(allLogs, null, 2);
+  }
+  
+  private static async getAllStoredLogs(): Promise<LogEntry[]> {
+    try {
+      const stored = await AsyncStorage.getItem('awo_logs');
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('Failed to retrieve stored logs:', error);
+      return [];
+    }
+  }
+}
+```
+
+## Debugging Financial Workflows
+
+### Transaction Debugging
+
+```typescript
+// Transaction flow debugging utilities
+class TransactionDebugger {
+  private static transactionFlows = new Map<string, TransactionFlow>();
+  
+  static startTransactionFlow(transactionId: string, type: string, amount: number) {
+    const flow: TransactionFlow = {
+      id: transactionId,
+      type,
+      amount,
+      startTime: Date.now(),
+      steps: [],
+      status: 'started',
+    };
+    
+    this.transactionFlows.set(transactionId, flow);
+    Logger.logTransaction('started', { id: transactionId, type, amount });
+    
+    return flow;
+  }
+  
+  static addTransactionStep(transactionId: string, step: string, data?: any) {
+    const flow = this.transactionFlows.get(transactionId);
+    if (!flow) return;
+    
+    const stepData = {
+      step,
+      timestamp: Date.now(),
+      data,
+      duration: Date.now() - flow.startTime,
+    };
+    
+    flow.steps.push(stepData);
+    Logger.logTransaction(`step:${step}`, { transactionId, ...stepData });
+    
+    // Check for suspicious delays
+    if (stepData.duration > 30000) { // 30 seconds
+      Logger.warn(`Transaction step taking too long: ${step}`, {
+        transactionId,
+        duration: stepData.duration,
+        step,
+      });
+    }
+  }
+  
+  static completeTransactionFlow(transactionId: string, status: 'success' | 'failed', error?: any) {
+    const flow = this.transactionFlows.get(transactionId);
+    if (!flow) return;
+    
+    flow.status = status;
+    flow.endTime = Date.now();
+    flow.totalDuration = flow.endTime - flow.startTime;
+    flow.error = error;
+    
+    Logger.logTransaction('completed', {
+      transactionId,
+      status,
+      totalDuration: flow.totalDuration,
+      stepCount: flow.steps.length,
+      error: error?.message,
+    });
+    
+    // Generate flow report for failed transactions
+    if (status === 'failed') {
+      this.generateTransactionReport(flow);
+    }
+    
+    // Clean up old flows
+    setTimeout(() => {
+      this.transactionFlows.delete(transactionId);
+    }, 300000); // 5 minutes
+  }
+  
+  private static generateTransactionReport(flow: TransactionFlow) {
+    const report = {
+      transactionId: flow.id,
+      type: flow.type,
+      amount: flow.amount,
+      totalDuration: flow.totalDuration,
+      failureStep: flow.steps[flow.steps.length - 1]?.step,
+      stepDurations: flow.steps.map(step => ({
+        step: step.step,
+        duration: step.duration,
+      })),
+      error: flow.error,
+      timestamp: new Date().toISOString(),
+    };
+    
+    Logger.error('Transaction flow failed', report, ['transaction', 'failure']);
+    
+    // Send to error tracking
+    ErrorTracker.trackFinancialError(
+      new Error(`Transaction failed: ${flow.error?.message || 'Unknown error'}`),
+      {
+        transactionId: flow.id,
+        amount: flow.amount,
+        currency: 'ZAR', // Default, should be dynamic
+        step: report.failureStep,
+        userId: useAuthStore.getState().user?.id,
+      }
+    );
+  }
+  
+  // Debug specific transaction types
+  static debugChamaContribution(chamaId: string, userId: string, amount: number) {
+    const transactionId = `chama_${Date.now()}`;
+    const flow = this.startTransactionFlow(transactionId, 'chama_contribution', amount);
+    
+    // Add Chama-specific context
+    Logger.logChamaActivity(chamaId, 'contribution_debug', {
+      userId,
+      amount,
+      transactionId,
+      chamaBalance: 'TODO: Get from state',
+      memberCount: 'TODO: Get from state',
+    });
+    
+    return flow;
+  }
+  
+  static debugInvestmentOrder(userId: string, productId: string, amount: number) {
+    const transactionId = `investment_${Date.now()}`;
+    const flow = this.startTransactionFlow(transactionId, 'investment_order', amount);
+    
+    // Add investment-specific context
+    Logger.info('Investment order debug', {
+      userId,
+      productId,
+      amount,
+      transactionId,
+      portfolioTier: 'TODO: Get from DIVA score',
+      riskLevel: 'TODO: Get from RTSM',
+    }, ['investment', 'debug']);
+    
+    return flow;
+  }
+}
+```
+
+### DIVA Score Debugging
+
+```typescript
+// DIVA score calculation debugging
+class DivaScoreDebugger {
+  static debugScoreCalculation(userId: string) {
+    Logger.logDivaCalculation(userId, 'calculation_started', {
+      timestamp: new Date().toISOString(),
+    });
+    
+    return {
+      debugDiscipline: (transactions: any[]) => {
+        Logger.logDivaCalculation(userId, 'discipline_calculation', {
+          transactionCount: transactions.length,
+          dateRange: {
+            from: transactions[0]?.date,
+            to: transactions[transactions.length - 1]?.date,
+          },
+        });
+        
+        return this.analyzeDisciplineComponent(transactions);
+      },
+      
+      debugIncome: (transactions: any[]) => {
+        Logger.logDivaCalculation(userId, 'income_calculation', {
+          transactionCount: transactions.length,
+          incomeTransactions: transactions.filter(t => t.amount > 0).length,
+        });
+        
+        return this.analyzeIncomeComponent(transactions);
+      },
+      
+      debugVelocity: (transactions: any[]) => {
+        Logger.logDivaCalculation(userId, 'velocity_calculation', {
+          transactionCount: transactions.length,
+          avgDaysBetweenTransactions: this.calculateAvgDaysBetween(transactions),
+        });
+        
+        return this.analyzeVelocityComponent(transactions);
+      },
+      
+      debugAssets: (accounts: any[]) => {
+        Logger.logDivaCalculation(userId, 'assets_calculation', {
+          accountCount: accounts.length,
+          totalBalance: accounts.reduce((sum, acc) => sum + acc.balance, 0),
+        });
+        
+        return this.analyzeAssetsComponent(accounts);
+      },
+    };
+  }
+  
+  private static analyzeDisciplineComponent(transactions: any[]) {
+    const analysis = {
+      punctualityScore: 0,
+      savingsRegularity: 0,
+      overdraftAvoidance: 0,
+      debugInfo: {
+        latePayments: 0,
+        missedSavings: 0,
+        overdrafts: 0,
+      },
+    };
+    
+    // Analyze payment punctuality
+    const paymentTransactions = transactions.filter(t => t.type === 'payment');
+    analysis.debugInfo.latePayments = paymentTransactions.filter(t => t.isLate).length;
+    analysis.punctualityScore = Math.max(0, 100 - (analysis.debugInfo.latePayments * 10));
+    
+    // Analyze savings regularity
+    const savingsTransactions = transactions.filter(t => t.type === 'savings');
+    const expectedSavings = this.calculateExpectedSavings(transactions);
+    analysis.debugInfo.missedSavings = Math.max(0, expectedSavings - savingsTransactions.length);
+    analysis.savingsRegularity = Math.max(0, 100 - (analysis.debugInfo.missedSavings * 15));
+    
+    // Analyze overdraft avoidance
+    analysis.debugInfo.overdrafts = transactions.filter(t => t.amount < 0 && t.balance < 0).length;
+    analysis.overdraftAvoidance = Math.max(0, 100 - (analysis.debugInfo.overdrafts * 20));
+    
+    Logger.logDivaCalculation('debug', 'discipline_analysis_complete', analysis);
+    
+    return analysis;
+  }
+  
+  private static analyzeIncomeComponent(transactions: any[]) {
+    const incomeTransactions = transactions.filter(t => t.amount > 0 && t.type === 'income');
+    
+    const analysis = {
+      stabilityScore: 0,
+      growthScore: 0,
+      diversificationScore: 0,
+      debugInfo: {
+        monthlyIncomes: this.groupIncomeByMonth(incomeTransactions),
+        incomeSources: this.countIncomeSources(incomeTransactions),
+        growthRate: this.calculateIncomeGrowth(incomeTransactions),
+      },
+    };
+    
+    // Calculate stability (consistency of income)
+    const monthlyVariation = this.calculateMonthlyVariation(analysis.debugInfo.monthlyIncomes);
+    analysis.stabilityScore = Math.max(0, 100 - (monthlyVariation * 2));
+    
+    // Calculate growth
+    analysis.growthScore = Math.min(100, Math.max(0, analysis.debugInfo.growthRate * 10));
+    
+    // Calculate diversification
+    analysis.diversificationScore = Math.min(100, analysis.debugInfo.incomeSources * 25);
+    
+    Logger.logDivaCalculation('debug', 'income_analysis_complete', analysis);
+    
+    return analysis;
+  }
+  
+  private static analyzeVelocityComponent(transactions: any[]) {
+    const analysis = {
+      efficiencyScore: 0,
+      timingScore: 0,
+      debugInfo: {
+        avgTransactionTime: this.calculateAvgTransactionTime(transactions),
+        peakUsageHours: this.analyzePeakUsage(transactions),
+        delayedTransactions: transactions.filter(t => t.processedAfter > 24).length, // 24 hours
+      },
+    };
+    
+    // Calculate efficiency based on transaction processing time
+    analysis.efficiencyScore = Math.max(0, 100 - (analysis.debugInfo.avgTransactionTime / 60)); // Convert to minutes
+    
+    // Calculate timing based on transaction patterns
+    analysis.timingScore = Math.max(0, 100 - (analysis.debugInfo.delayedTransactions * 5));
+    
+    Logger.logDivaCalculation('debug', 'velocity_analysis_complete', analysis);
+    
+    return analysis;
+  }
+  
+  private static analyzeAssetsComponent(accounts: any[]) {
+    const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+    const savingsAccounts = accounts.filter(acc => acc.type === 'savings');
+    const investmentAccounts = accounts.filter(acc => acc.type === 'investment');
+    
+    const analysis = {
+      savingsRateScore: 0,
+      investmentBalanceScore: 0,
+      netWorthGrowthScore: 0,
+      debugInfo: {
+        totalBalance,
+        savingsBalance: savingsAccounts.reduce((sum, acc) => sum + acc.balance, 0),
+        investmentBalance: investmentAccounts.reduce((sum, acc) => sum + acc.balance, 0),
+        accountTypes: accounts.map(acc => acc.type),
+      },
+    };
+    
+    // Calculate savings rate (savings vs total balance)
+    const savingsRatio = analysis.debugInfo.savingsBalance / totalBalance;
+    analysis.savingsRateScore = Math.min(100, savingsRatio * 200); // Max at 50% savings rate
+    
+    // Calculate investment balance score
+    const investmentRatio = analysis.debugInfo.investmentBalance / totalBalance;
+    analysis.investmentBalanceScore = Math.min(100, investmentRatio * 300); // Max at 33% investment rate
+    
+    // Net worth growth (would need historical data)
+    analysis.netWorthGrowthScore = 50; // Placeholder - needs historical calculation
+    
+    Logger.logDivaCalculation('debug', 'assets_analysis_complete', analysis);
+    
+    return analysis;
+  }
+  
+  // Helper methods
+  private static calculateExpectedSavings(transactions: any[]): number {
+    // Simplified calculation - should be based on user's savings goals
+    const months = this.getMonthsRange(transactions);
+    return months * 1; // Expect 1 savings transaction per month
+  }
+  
+  private static getMonthsRange(transactions: any[]): number {
+    if (transactions.length === 0) return 0;
+    
+    const dates = transactions.map(t => new Date(t.date));
+    const earliest = new Date(Math.min(...dates.map(d => d.getTime())));
+    const latest = new Date(Math.max(...dates.map(d => d.getTime())));
+    
+    return Math.max(1, Math.floor((latest.getTime() - earliest.getTime()) / (30 * 24 * 60 * 60 * 1000)));
+  }
+  
+  private static calculateAvgDaysBetween(transactions: any[]): number {
+    if (transactions.length < 2) return 0;
+    
+    const sortedTransactions = transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    let totalDays = 0;
+    
+    for (let i = 1; i < sortedTransactions.length; i++) {
+      const prevDate = new Date(sortedTransactions[i - 1].date);
+      const currentDate = new Date(sortedTransactions[i].date);
+      const daysDiff = (currentDate.getTime() - prevDate.getTime()) / (24 * 60 * 60 * 1000);
+      totalDays += daysDiff;
+    }
+    
+    return totalDays / (sortedTransactions.length - 1);
+  }
+  
+  private static groupIncomeByMonth(incomeTransactions: any[]): Record<string, number> {
+    const monthlyIncomes: Record<string, number> = {};
+    
+    incomeTransactions.forEach(transaction => {
+      const month = new Date(transaction.date).toISOString().substring(0, 7); // YYYY-MM
+      monthlyIncomes[month] = (monthlyIncomes[month] || 0) + transaction.amount;
+    });
+    
+    return monthlyIncomes;
+  }
+  
+  private static countIncomeSources(incomeTransactions: any[]): number {
+    const sources = new Set(incomeTransactions.map(t => t.source || t.description));
+    return sources.size;
+  }
+  
+  private static calculateIncomeGrowth(incomeTransactions: any[]): number {
+    const monthlyIncomes = this.groupIncomeByMonth(incomeTransactions);
+    const months = Object.keys(monthlyIncomes).sort();
+    
+    if (months.length < 2) return 0;
+    
+    const firstMonth = monthlyIncomes[months[0]];
+    const lastMonth = monthlyIncomes[months[months.length - 1]];
+    
+    return ((lastMonth - firstMonth) / firstMonth) * 100;
+  }
+  
+  private static calculateMonthlyVariation(monthlyIncomes: Record<string, number>): number {
+    const amounts = Object.values(monthlyIncomes);
+    if (amounts.length === 0) return 0;
+    
+    const avg = amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length;
+    const variance = amounts.reduce((sum, amount) => sum + Math.pow(amount - avg, 2), 0) / amounts.length;
+    
+    return Math.sqrt(variance) / avg * 100; // Coefficient of variation as percentage
+  }
+  
+  private static calculateAvgTransactionTime(transactions: any[]): number {
+    const processedTransactions = transactions.filter(t => t.processedAfter);
+    if (processedTransactions.length === 0) return 0;
+    
+    const totalTime = processedTransactions.reduce((sum, t) => sum + t.processedAfter, 0);
+    return totalTime / processedTransactions.length;
+  }
+  
+  private static analyzePeakUsage(transactions: any[]): number[] {
+    const hourCounts = new Array(24).fill(0);
+    
+    transactions.forEach(transaction => {
+      const hour = new Date(transaction.date).getHours();
+      hourCounts[hour]++;
+    });
+    
+    return hourCounts;
+  }
+}
+```
+
+## Debugging Best Practices
+
+### Debugging Checklist for African Markets
+
+<CardGroup cols={2}>
+  <Card title="Network Issues" icon="wifi">
+    **Check Connection**: Verify network type and quality  
+    **Test Offline**: Ensure offline functionality works  
+    **Monitor Latency**: Track response times across regions
+  </Card>
+  <Card title="Device Performance" icon="mobile">
+    **Memory Usage**: Monitor RAM usage on mid-range devices  
+    **Battery Impact**: Check for excessive battery drain  
+    **Storage Space**: Verify app works with limited storage
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Financial Data" icon="dollar-sign">
+    **Transaction Integrity**: Verify all financial operations  
+    **Currency Handling**: Test multi-currency scenarios  
+    **Precision**: Ensure decimal precision in calculations
+  </Card>
+  <Card title="User Experience" icon="users">
+    **Localization**: Test in different African languages  
+    **Accessibility**: Verify screen reader compatibility  
+    **Error Messages**: Ensure user-friendly error communication
+  </Card>
+</CardGroup>
+
+### Common Debug Scenarios
+
+<Steps>
+  <Step title="Transaction Failures">
+    **Check Network**: Verify connectivity and retry logic  
+    **Validate Data**: Ensure transaction data is complete  
+    **Monitor Flow**: Track transaction through all steps  
+    **Error Recovery**: Test graceful failure handling
+  </Step>
+  <Step title="DIVA Score Issues">
+    **Data Availability**: Verify required transaction data exists  
+    **Calculation Steps**: Debug each component calculation  
+    **Cache State**: Check for stale cached scores  
+    **Real-time Updates**: Verify score updates propagate correctly
+  </Step>
+  <Step title="Chama Synchronization">
+    **Member State**: Check all members see same data  
+    **Real-time Events**: Verify Socket.io connections  
+    **Offline Handling**: Test offline contribution queuing  
+    **Conflict Resolution**: Handle concurrent operations
+  </Step>
+  <Step title="Performance Issues">
+    **Memory Leaks**: Check for growing memory usage  
+    **Slow Queries**: Identify database bottlenecks  
+    **Network Optimization**: Verify request batching  
+    **UI Responsiveness**: Test on low-end devices
+  </Step>
+</Steps>
+
+---
+
+*These debugging tools and strategies ensure AWO Platform can be effectively debugged and maintained across the diverse technical landscape of African markets, providing developers with comprehensive visibility into system behavior and user experience.*
+
+*Last updated: June 2025*  
+*Next review: Sep 2025*

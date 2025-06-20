@@ -1,42 +1,1019 @@
----
-title: "Unit Testing"
-description: "AWO Platform unit testing testing guide"
----
-
 # Unit Testing
 
-## Overview
+AWO Platform's unit testing strategy focuses on ensuring rock-solid financial calculations, reliable business logic, and robust component behavior across the diverse African mobile ecosystem.
+
+## Unit Testing Philosophy
 
 <Info>
-This guide covers unit testing for the AWO Platform financial services.
+AWO's unit testing prioritizes financial accuracy, business logic correctness, and component reliability. Every financial calculation must be tested to ensure zero tolerance for monetary discrepancies in African financial services.
 </Info>
 
-## Testing Strategy
+### Testing Principles
 
-Testing approach and methodologies will be documented here.
+<CardGroup cols={2}>
+  <Card title="Financial Precision" icon="calculator">
+    **Zero Tolerance**: Every cent must be accounted for correctly  
+    **Decimal Precision**: Use Decimal.js for financial calculations  
+    **Currency Handling**: Test all SADC currency scenarios  
+    **Rounding Rules**: Validate proper rounding behaviors
+  </Card>
+  <Card title="Business Logic Integrity" icon="cogs">
+    **DIVA Calculations**: Comprehensive scoring algorithm tests  
+    **Chama Rules**: Validate all group savings logic  
+    **Investment Logic**: Test portfolio assignment rules  
+    **Regulatory Compliance**: Ensure KYC/AML rule enforcement
+  </Card>
+</CardGroup>
 
-## Test Implementation
+## Financial Calculation Testing
+
+### DIVA Score Unit Tests
 
 ```typescript
-// Test example
-describe('Unit Testing', () => {
-  it('should pass validation', () => {
-    // Test implementation
+// DIVA Score calculation unit tests
+import { DivaScoreCalculator } from '../services/diva-score-calculator';
+import { FinancialTestFramework } from '../test-utils/financial-framework';
+
+describe('DivaScoreCalculator', () => {
+  let calculator: DivaScoreCalculator;
+  let mockTransactionData: Transaction[];
+  
+  beforeEach(() => {
+    calculator = new DivaScoreCalculator();
+    mockTransactionData = createMockTransactionData();
+  });
+  
+  describe('Discipline Component (30% weight)', () => {
+    test('should calculate perfect discipline score for punctual payments', () => {
+      const transactions = [
+        { type: 'payment', amount: -500, dueDate: '2024-01-01', paidDate: '2024-01-01', isLate: false },
+        { type: 'payment', amount: -300, dueDate: '2024-02-01', paidDate: '2024-01-31', isLate: false },
+        { type: 'payment', amount: -450, dueDate: '2024-03-01', paidDate: '2024-02-28', isLate: false },
+      ];
+      
+      const disciplineScore = calculator.calculateDiscipline(transactions);
+      
+      // Perfect punctuality should yield high discipline score
+      expect(disciplineScore.punctualityScore).toBe(100);
+      expect(disciplineScore.overallDiscipline).toBeGreaterThan(90);
+      
+      FinancialTestFramework.expectDivaScoreRange(disciplineScore.overallDiscipline, 'discipline');
+    });
+    
+    test('should penalize late payments correctly', () => {
+      const transactions = [
+        { type: 'payment', amount: -500, dueDate: '2024-01-01', paidDate: '2024-01-05', isLate: true, daysLate: 4 },
+        { type: 'payment', amount: -300, dueDate: '2024-02-01', paidDate: '2024-02-10', isLate: true, daysLate: 9 },
+      ];
+      
+      const disciplineScore = calculator.calculateDiscipline(transactions);
+      
+      // Late payments should reduce discipline score
+      expect(disciplineScore.punctualityScore).toBeLessThan(80);
+      expect(disciplineScore.latePaymentPenalty).toBeGreaterThan(0);
+    });
+    
+    test('should reward consistent savings behavior', () => {
+      const transactions = generateConsistentSavingsTransactions(12); // 12 months
+      
+      const disciplineScore = calculator.calculateDiscipline(transactions);
+      
+      expect(disciplineScore.savingsRegularityScore).toBeGreaterThan(85);
+      expect(disciplineScore.savingsConsistencyMonths).toBe(12);
+    });
+    
+    test('should penalize overdrafts appropriately', () => {
+      const transactions = [
+        { type: 'debit', amount: -1000, balance: -50, timestamp: '2024-01-15' },
+        { type: 'debit', amount: -200, balance: -250, timestamp: '2024-02-20' },
+      ];
+      
+      const disciplineScore = calculator.calculateDiscipline(transactions);
+      
+      expect(disciplineScore.overdraftCount).toBe(2);
+      expect(disciplineScore.overdraftPenalty).toBeGreaterThan(0);
+      expect(disciplineScore.overallDiscipline).toBeLessThan(70);
+    });
+  });
+  
+  describe('Income Component (25% weight)', () => {
+    test('should calculate income stability correctly', () => {
+      const stableIncomeTransactions = [
+        { type: 'income', amount: 15000, date: '2024-01-01', source: 'salary' },
+        { type: 'income', amount: 15000, date: '2024-02-01', source: 'salary' },
+        { type: 'income', amount: 15000, date: '2024-03-01', source: 'salary' },
+        { type: 'income', amount: 15000, date: '2024-04-01', source: 'salary' },
+      ];
+      
+      const incomeScore = calculator.calculateIncome(stableIncomeTransactions);
+      
+      expect(incomeScore.stabilityScore).toBeGreaterThan(90);
+      expect(incomeScore.monthlyAverage).toBe(15000);
+      expect(incomeScore.variationCoefficient).toBeLessThan(0.1); // Low variation
+      
+      FinancialTestFramework.expectDivaScoreRange(incomeScore.overallIncome, 'income');
+    });
+    
+    test('should reward income growth', () => {
+      const growingIncomeTransactions = [
+        { type: 'income', amount: 10000, date: '2024-01-01', source: 'salary' },
+        { type: 'income', amount: 12000, date: '2024-02-01', source: 'salary' },
+        { type: 'income', amount: 14000, date: '2024-03-01', source: 'salary' },
+        { type: 'income', amount: 16000, date: '2024-04-01', source: 'salary' },
+      ];
+      
+      const incomeScore = calculator.calculateIncome(growingIncomeTransactions);
+      
+      expect(incomeScore.growthRate).toBeGreaterThan(0.15); // 15% growth
+      expect(incomeScore.growthScore).toBeGreaterThan(80);
+    });
+    
+    test('should reward income diversification', () => {
+      const diversifiedIncomeTransactions = [
+        { type: 'income', amount: 10000, date: '2024-01-01', source: 'salary' },
+        { type: 'income', amount: 2000, date: '2024-01-15', source: 'freelance' },
+        { type: 'income', amount: 500, date: '2024-01-20', source: 'investment_dividends' },
+        { type: 'income', amount: 1000, date: '2024-01-25', source: 'side_business' },
+      ];
+      
+      const incomeScore = calculator.calculateIncome(diversifiedIncomeTransactions);
+      
+      expect(incomeScore.diversificationScore).toBeGreaterThan(75);
+      expect(incomeScore.incomeSourceCount).toBe(4);
+    });
+  });
+  
+  describe('Velocity Component (25% weight)', () => {
+    test('should calculate cash flow timing efficiency', () => {
+      const efficientTransactions = [
+        { type: 'income', amount: 15000, date: '2024-01-01' },
+        { type: 'savings', amount: -3000, date: '2024-01-02' }, // Quick savings
+        { type: 'payment', amount: -5000, date: '2024-01-03' }, // Quick bill payment
+        { type: 'investment', amount: -2000, date: '2024-01-05' }, // Quick investment
+      ];
+      
+      const velocityScore = calculator.calculateVelocity(efficientTransactions);
+      
+      expect(velocityScore.timingEfficiencyScore).toBeGreaterThan(85);
+      expect(velocityScore.avgDaysToAction).toBeLessThan(3);
+      
+      FinancialTestFramework.expectDivaScoreRange(velocityScore.overallVelocity, 'velocity');
+    });
+    
+    test('should penalize delayed financial actions', () => {
+      const delayedTransactions = [
+        { type: 'income', amount: 15000, date: '2024-01-01' },
+        { type: 'savings', amount: -3000, date: '2024-01-20' }, // Delayed savings
+        { type: 'payment', amount: -5000, date: '2024-01-25' }, // Delayed payment
+      ];
+      
+      const velocityScore = calculator.calculateVelocity(delayedTransactions);
+      
+      expect(velocityScore.timingEfficiencyScore).toBeLessThan(60);
+      expect(velocityScore.avgDaysToAction).toBeGreaterThan(15);
+    });
+  });
+  
+  describe('Assets Component (20% weight)', () => {
+    test('should calculate asset growth correctly', () => {
+      const assetData = [
+        { type: 'savings', balance: 10000, date: '2024-01-01' },
+        { type: 'savings', balance: 12000, date: '2024-02-01' },
+        { type: 'savings', balance: 14000, date: '2024-03-01' },
+        { type: 'investment', balance: 5000, date: '2024-01-01' },
+        { type: 'investment', balance: 5500, date: '2024-03-01' },
+      ];
+      
+      const assetsScore = calculator.calculateAssets(assetData);
+      
+      expect(assetsScore.savingsGrowthRate).toBeGreaterThan(0.15); // 15% growth
+      expect(assetsScore.investmentGrowthRate).toBeGreaterThan(0.05); // 5% growth
+      expect(assetsScore.totalNetWorth).toBe(19500);
+      
+      FinancialTestFramework.expectDivaScoreRange(assetsScore.overallAssets, 'assets');
+    });
+    
+    test('should reward balanced asset allocation', () => {
+      const balancedAssets = [
+        { type: 'emergency_fund', balance: 5000 },
+        { type: 'savings', balance: 10000 },
+        { type: 'investment', balance: 8000 },
+        { type: 'property', balance: 50000 },
+      ];
+      
+      const assetsScore = calculator.calculateAssets(balancedAssets);
+      
+      expect(assetsScore.diversificationScore).toBeGreaterThan(80);
+      expect(assetsScore.emergencyFundRatio).toBeGreaterThan(0.06); // >6% in emergency fund
+    });
+  });
+  
+  describe('Overall DIVA Score Integration', () => {
+    test('should calculate weighted overall score correctly', () => {
+      const mockUserData = {
+        transactions: generateMockTransactions(),
+        accounts: generateMockAccounts(),
+        userId: 'test-user-123',
+      };
+      
+      const divaScore = calculator.calculateOverallScore(mockUserData);
+      
+      // Verify component weights
+      const expectedScore = 
+        (divaScore.components.discipline * 0.30) +
+        (divaScore.components.income * 0.25) +
+        (divaScore.components.velocity * 0.25) +
+        (divaScore.components.assets * 0.20);
+      
+      FinancialTestFramework.expectFinancialEqual(
+        divaScore.overallScore, 
+        expectedScore,
+        'DIVA component weighting calculation'
+      );
+      
+      FinancialTestFramework.expectDivaScoreRange(divaScore.overallScore, 'overall');
+    });
+    
+    test('should determine correct portfolio tier', () => {
+      const testCases = [
+        { score: 150, expectedTier: 'Bronze' },
+        { score: 450, expectedTier: 'Silver' },
+        { score: 720, expectedTier: 'Gold' },
+        { score: 880, expectedTier: 'Platinum' },
+      ];
+      
+      testCases.forEach(({ score, expectedTier }) => {
+        const tier = calculator.determinePortfolioTier(score);
+        expect(tier).toBe(expectedTier);
+      });
+    });
+    
+    test('should handle edge cases and missing data', () => {
+      const incompleteData = {
+        transactions: [], // No transaction history
+        accounts: [],
+        userId: 'new-user-456',
+      };
+      
+      const divaScore = calculator.calculateOverallScore(incompleteData);
+      
+      expect(divaScore.overallScore).toBeGreaterThanOrEqual(0);
+      expect(divaScore.overallScore).toBeLessThanOrEqual(1000);
+      expect(divaScore.dataCompleteness).toBeLessThan(0.5); // Low data completeness
+      expect(divaScore.confidence).toBe('low');
+    });
+  });
+});
+
+// Helper functions for test data generation
+function createMockTransactionData(): Transaction[] {
+  return [
+    {
+      id: 'txn-1',
+      userId: 'user-123',
+      amount: -500,
+      type: 'payment',
+      category: 'utilities',
+      date: '2024-01-01',
+      description: 'Electricity bill',
+      status: 'completed',
+    },
+    // Add more mock transactions...
+  ];
+}
+
+function generateConsistentSavingsTransactions(months: number): Transaction[] {
+  const transactions = [];
+  for (let i = 0; i < months; i++) {
+    const date = new Date();
+    date.setMonth(date.getMonth() - i);
+    
+    transactions.push({
+      type: 'savings',
+      amount: -1000, // Consistent R1000 savings
+      date: date.toISOString(),
+      description: 'Monthly savings',
+      isRegular: true,
+    });
+  }
+  return transactions;
+}
+
+function generateMockTransactions(): Transaction[] {
+  // Generate realistic transaction patterns for testing
+  return [
+    // Income transactions
+    { type: 'income', amount: 15000, date: '2024-01-01', source: 'salary' },
+    { type: 'income', amount: 15000, date: '2024-02-01', source: 'salary' },
+    
+    // Expense transactions
+    { type: 'payment', amount: -3000, date: '2024-01-05', category: 'rent' },
+    { type: 'payment', amount: -500, date: '2024-01-10', category: 'utilities' },
+    
+    // Savings transactions
+    { type: 'savings', amount: -2000, date: '2024-01-15', category: 'emergency_fund' },
+    { type: 'savings', amount: -1000, date: '2024-01-20', category: 'investment' },
+  ];
+}
+
+function generateMockAccounts(): Account[] {
+  return [
+    { type: 'checking', balance: 5000, currency: 'ZAR' },
+    { type: 'savings', balance: 15000, currency: 'ZAR' },
+    { type: 'investment', balance: 8000, currency: 'ZAR' },
+  ];
+}
+```
+
+### Chama Business Logic Tests
+
+```typescript
+// Chama (savings group) business logic unit tests
+import { ChamaService } from '../services/chama-service';
+import { FinancialTestFramework } from '../test-utils/financial-framework';
+
+describe('ChamaService', () => {
+  let chamaService: ChamaService;
+  let mockChama: Chama;
+  
+  beforeEach(() => {
+    chamaService = new ChamaService();
+    mockChama = createMockChama();
+  });
+  
+  describe('Contribution Calculations', () => {
+    test('should calculate correct total contributions', () => {
+      const contributions = [
+        { memberId: 'member-1', amount: 1000 },
+        { memberId: 'member-2', amount: 1000 },
+        { memberId: 'member-3', amount: 1000 },
+      ];
+      
+      FinancialTestFramework.expectChamaContributionIntegrity(
+        mockChama,
+        contributions,
+        3000
+      );
+    });
+    
+    test('should handle partial contributions correctly', () => {
+      const contributions = [
+        { memberId: 'member-1', amount: 1000 },
+        { memberId: 'member-2', amount: 500 }, // Partial contribution
+        { memberId: 'member-3', amount: 1000 },
+      ];
+      
+      const result = chamaService.processContributions(mockChama.id, contributions);
+      
+      expect(result.totalCollected).toBe(2500);
+      expect(result.shortfall).toBe(500);
+      expect(result.completionRate).toBe(0.833); // 2.5/3 members fully contributed
+    });
+    
+    test('should enforce contribution limits', () => {
+      const excessiveContribution = {
+        memberId: 'member-1',
+        amount: 5000, // Exceeds maximum allowed
+      };
+      
+      expect(() => {
+        chamaService.validateContribution(mockChama, excessiveContribution);
+      }).toThrow('Contribution exceeds maximum allowed amount');
+    });
+    
+    test('should calculate interest distribution correctly', () => {
+      const principal = 12000; // Total contributions
+      const interestEarned = 600; // 5% annual interest
+      const memberCount = 4;
+      
+      const distribution = chamaService.calculateInterestDistribution(
+        principal,
+        interestEarned,
+        memberCount
+      );
+      
+      expect(distribution.perMember).toBe(150); // 600/4
+      expect(distribution.total).toBe(600);
+      
+      FinancialTestFramework.expectFinancialEqual(
+        distribution.perMember * memberCount,
+        interestEarned,
+        'Interest distribution calculation'
+      );
+    });
+  });
+  
+  describe('Payout Calculations', () => {
+    test('should calculate rotating payout correctly', () => {
+      const chamaBalance = 15000;
+      const memberCount = 5;
+      const currentRound = 3;
+      
+      const payout = chamaService.calculateRotatingPayout(
+        chamaBalance,
+        memberCount,
+        currentRound
+      );
+      
+      expect(payout.amount).toBe(3000); // 15000/5
+      expect(payout.recipientIndex).toBe(2); // Round 3 = index 2 (0-based)
+      expect(payout.remainingBalance).toBe(12000);
+    });
+    
+    test('should handle emergency payout scenarios', () => {
+      const emergencyRequest = {
+        memberId: 'member-2',
+        amount: 2000,
+        reason: 'medical_emergency',
+        approvals: ['member-1', 'member-3', 'member-4'], // 3/5 approvals
+      };
+      
+      const result = chamaService.processEmergencyPayout(mockChama, emergencyRequest);
+      
+      expect(result.approved).toBe(true);
+      expect(result.requiredApprovals).toBe(3); // 60% of 5 members
+      expect(result.receivedApprovals).toBe(3);
+    });
+    
+    test('should enforce payout governance rules', () => {
+      const invalidPayout = {
+        memberId: 'member-1',
+        amount: 10000, // Exceeds available balance
+      };
+      
+      expect(() => {
+        chamaService.validatePayout(mockChama, invalidPayout);
+      }).toThrow('Payout amount exceeds available balance');
+    });
+  });
+  
+  describe('Voting and Governance', () => {
+    test('should calculate voting results correctly', () => {
+      const proposal = {
+        id: 'proposal-1',
+        type: 'investment',
+        description: 'Invest in government bonds',
+        requiredMajority: 0.6, // 60% majority
+      };
+      
+      const votes = [
+        { memberId: 'member-1', vote: 'yes' },
+        { memberId: 'member-2', vote: 'yes' },
+        { memberId: 'member-3', vote: 'yes' },
+        { memberId: 'member-4', vote: 'no' },
+        { memberId: 'member-5', vote: 'abstain' },
+      ];
+      
+      const result = chamaService.calculateVotingResult(proposal, votes);
+      
+      expect(result.yesPercentage).toBe(0.75); // 3/4 voting members (excluding abstain)
+      expect(result.approved).toBe(true);
+      expect(result.votingMembersCount).toBe(4); // Excluding abstentions
+    });
+    
+    test('should handle tied votes correctly', () => {
+      const votes = [
+        { memberId: 'member-1', vote: 'yes' },
+        { memberId: 'member-2', vote: 'yes' },
+        { memberId: 'member-3', vote: 'no' },
+        { memberId: 'member-4', vote: 'no' },
+      ];
+      
+      const result = chamaService.calculateVotingResult(mockChama.defaultProposal, votes);
+      
+      expect(result.yesPercentage).toBe(0.5);
+      expect(result.approved).toBe(false); // Requires >50% for approval
+      expect(result.status).toBe('rejected_tie');
+    });
+  });
+  
+  describe('Member Management', () => {
+    test('should add new member correctly', () => {
+      const newMember = {
+        userId: 'new-user-123',
+        joinDate: new Date(),
+        invitedBy: 'member-1',
+      };
+      
+      const result = chamaService.addMember(mockChama.id, newMember);
+      
+      expect(result.success).toBe(true);
+      expect(result.newMemberCount).toBe(mockChama.memberCount + 1);
+      expect(result.newMember.status).toBe('active');
+    });
+    
+    test('should enforce member limits', () => {
+      const fullChama = { ...mockChama, memberCount: 20, maxMembers: 20 };
+      
+      expect(() => {
+        chamaService.addMember(fullChama.id, { userId: 'new-user' });
+      }).toThrow('Chama has reached maximum member limit');
+    });
+    
+    test('should calculate member dues correctly', () => {
+      const memberActivity = {
+        memberId: 'member-1',
+        contributionsThisRound: 2500,
+        requiredContribution: 3000,
+        missedContributions: 1,
+      };
+      
+      const dues = chamaService.calculateMemberDues(memberActivity);
+      
+      expect(dues.shortfall).toBe(500);
+      expect(dues.lateFee).toBeGreaterThan(0);
+      expect(dues.totalDue).toBe(dues.shortfall + dues.lateFee);
+    });
+  });
+});
+
+function createMockChama(): Chama {
+  return {
+    id: 'chama-123',
+    name: 'Test Savings Group',
+    memberCount: 5,
+    monthlyContribution: 1000,
+    totalContributions: 15000,
+    currentBalance: 15000,
+    currentRound: 1,
+    maxMembers: 20,
+    governe: {
+      majorityRequired: 0.6,
+      emergencyApprovalThreshold: 0.6,
+      contributionGracePeriod: 7, // days
+    },
+    members: [
+      'member-1', 'member-2', 'member-3', 'member-4', 'member-5'
+    ],
+    createdAt: new Date(),
+  };
+}
+```
+
+### Investment Logic Tests
+
+```typescript
+// Investment and portfolio management unit tests
+import { InvestmentService } from '../services/investment-service';
+import { PortfolioTier } from '../types/investment-types';
+
+describe('InvestmentService', () => {
+  let investmentService: InvestmentService;
+  
+  beforeEach(() => {
+    investmentService = new InvestmentService();
+  });
+  
+  describe('Portfolio Tier Assignment', () => {
+    test('should assign correct tier based on DIVA score', () => {
+      const testCases = [
+        { divaScore: 250, expectedTier: 'Bronze', maxInvestment: 10000 },
+        { divaScore: 550, expectedTier: 'Silver', maxInvestment: 50000 },
+        { divaScore: 750, expectedTier: 'Gold', maxInvestment: 200000 },
+        { divaScore: 900, expectedTier: 'Platinum', maxInvestment: Infinity },
+      ];
+      
+      testCases.forEach(({ divaScore, expectedTier, maxInvestment }) => {
+        const tier = investmentService.determineTier(divaScore);
+        
+        expect(tier.name).toBe(expectedTier);
+        expect(tier.maxInvestment).toBe(maxInvestment);
+      });
+    });
+    
+    test('should provide appropriate investment products by tier', () => {
+      const bronzeTier = investmentService.getAvailableProducts('Bronze');
+      const platinumTier = investmentService.getAvailableProducts('Platinum');
+      
+      // Bronze should have limited, low-risk products
+      expect(bronzeTier.length).toBeLessThan(5);
+      expect(bronzeTier.every(p => p.riskLevel === 'low')).toBe(true);
+      
+      // Platinum should have access to all products
+      expect(platinumTier.length).toBeGreaterThan(bronzeTier.length);
+      expect(platinumTier.some(p => p.riskLevel === 'high')).toBe(true);
+    });
+  });
+  
+  describe('Investment Order Processing', () => {
+    test('should validate investment amount limits', () => {
+      const silverUser = { tier: 'Silver', divaScore: 600 };
+      const largeOrder = { productId: 'bond-1', amount: 75000 }; // Exceeds Silver limit
+      
+      expect(() => {
+        investmentService.validateOrder(silverUser, largeOrder);
+      }).toThrow('Investment amount exceeds tier limit');
+    });
+    
+    test('should calculate fees correctly', () => {
+      const order = { productId: 'etf-1', amount: 10000 };
+      const feeStructure = { managementFee: 0.01, transactionFee: 0.005 };
+      
+      const fees = investmentService.calculateFees(order, feeStructure);
+      
+      FinancialTestFramework.expectFinancialEqual(fees.managementFee, 100, 'Management fee');
+      FinancialTestFramework.expectFinancialEqual(fees.transactionFee, 50, 'Transaction fee');
+      FinancialTestFramework.expectFinancialEqual(fees.totalFees, 150, 'Total fees');
+    });
+    
+    test('should handle fractional shares correctly', () => {
+      const order = { productId: 'etf-1', amount: 1550 };
+      const sharePrice = 300;
+      
+      const allocation = investmentService.calculateShareAllocation(order, sharePrice);
+      
+      expect(allocation.fullShares).toBe(5);
+      expect(allocation.fractionalShares).toBe(0.1667); // 50/300, rounded
+      expect(allocation.cashRemainder).toBe(0); // Should use all money
+      
+      FinancialTestFramework.expectFinancialEqual(
+        allocation.totalValue,
+        1550,
+        'Share allocation value'
+      );
+    });
+  });
+  
+  describe('SME Investment Logic', () => {
+    test('should enforce SME investment limits', () => {
+      const user = { tier: 'Gold', activeSMEInvestments: 3 };
+      
+      expect(() => {
+        investmentService.validateSMEInvestment(user, { amount: 5000 });
+      }).toThrow('Maximum SME investment limit reached (3)');
+    });
+    
+    test('should calculate SME returns correctly', () => {
+      const smeInvestment = {
+        principal: 10000,
+        interestRate: 0.12, // 12% annual
+        termMonths: 6,
+      };
+      
+      const returns = investmentService.calculateSMEReturns(smeInvestment);
+      
+      expect(returns.interestEarned).toBe(600); // 10000 * 0.12 * 0.5
+      expect(returns.totalReturn).toBe(10600);
+      expect(returns.annualizedReturn).toBe(0.12);
+    });
+    
+    test('should assess SME investment risk correctly', () => {
+      const smeProfile = {
+        businessAge: 2, // years
+        monthlyRevenue: 50000,
+        creditScore: 650,
+        industryRisk: 'medium',
+        ownerExperience: 5, // years
+      };
+      
+      const riskAssessment = investmentService.assessSMERisk(smeProfile);
+      
+      expect(riskAssessment.riskLevel).toBe('medium');
+      expect(riskAssessment.score).toBeGreaterThan(50);
+      expect(riskAssessment.score).toBeLessThan(80);
+      expect(riskAssessment.recommendedTiers).toContain('Gold');
+    });
+  });
+  
+  describe('Portfolio Rebalancing', () => {
+    test('should calculate rebalancing requirements', () => {
+      const currentPortfolio = [
+        { assetClass: 'bonds', allocation: 0.7, targetAllocation: 0.6 },
+        { assetClass: 'equities', allocation: 0.2, targetAllocation: 0.3 },
+        { assetClass: 'sme_debt', allocation: 0.1, targetAllocation: 0.1 },
+      ];
+      
+      const rebalancing = investmentService.calculateRebalancing(currentPortfolio, 50000);
+      
+      expect(rebalancing.bondsAction).toBe('sell');
+      expect(rebalancing.equitiesAction).toBe('buy');
+      expect(rebalancing.bondsSellAmount).toBe(5000); // 50000 * (0.7 - 0.6)
+      expect(rebalancing.equitiesBuyAmount).toBe(5000); // 50000 * (0.3 - 0.2)
+    });
+    
+    test('should respect minimum transaction amounts in rebalancing', () => {
+      const smallPortfolio = [
+        { assetClass: 'bonds', allocation: 0.55, targetAllocation: 0.5 },
+        { assetClass: 'equities', allocation: 0.45, targetAllocation: 0.5 },
+      ];
+      
+      const rebalancing = investmentService.calculateRebalancing(smallPortfolio, 1000);
+      
+      // Small adjustment (R50) should be ignored due to minimum transaction amount
+      expect(rebalancing.rebalanceRequired).toBe(false);
+      expect(rebalancing.reason).toBe('Adjustments below minimum transaction threshold');
+    });
   });
 });
 ```
 
-## Test Coverage
+## Component Testing (React Native)
 
-Coverage requirements and measurement will be detailed here.
+### Financial Component Tests
 
-## Continuous Testing
+```typescript
+// React Native component unit tests
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { DivaScoreDisplay } from '../components/DivaScoreDisplay';
+import { ChamaContributionForm } from '../components/ChamaContributionForm';
 
-<CardGroup cols={2}>
-  <Card title="Unit Testing" href="/testing/unit-testing">
-    Component and service testing
-  </Card>
-  <Card title="Integration Testing" href="/testing/integration-testing">
-    End-to-end system testing
-  </Card>
-</CardGroup>
+describe('DivaScoreDisplay Component', () => {
+  const mockDivaScore = {
+    overallScore: 675,
+    components: {
+      discipline: 180,
+      income: 175,
+      velocity: 160,
+      assets: 160,
+    },
+    tier: 'Gold',
+    lastUpdated: new Date('2024-01-15'),
+    nextUpdateDue: new Date('2024-04-15'),
+  };
+  
+  test('should display DIVA score correctly', () => {
+    const { getByText, getByTestId } = render(
+      <DivaScoreDisplay score={mockDivaScore} />
+    );
+    
+    expect(getByText('675')).toBeTruthy();
+    expect(getByText('Gold')).toBeTruthy();
+    expect(getByTestId('discipline-score')).toHaveTextContent('180');
+    expect(getByTestId('income-score')).toHaveTextContent('175');
+  });
+  
+  test('should show score improvement suggestions', () => {
+    const lowScore = {
+      ...mockDivaScore,
+      overallScore: 350,
+      tier: 'Bronze',
+      improvementSuggestions: [
+        { component: 'discipline', suggestion: 'Set up automatic savings', impact: 50 },
+        { component: 'velocity', suggestion: 'Pay bills earlier', impact: 30 },
+      ],
+    };
+    
+    const { getByText } = render(<DivaScoreDisplay score={lowScore} />);
+    
+    expect(getByText('Set up automatic savings')).toBeTruthy();
+    expect(getByText('+50 points')).toBeTruthy();
+  });
+  
+  test('should handle loading state', () => {
+    const { getByTestId } = render(<DivaScoreDisplay score={null} loading={true} />);
+    
+    expect(getByTestId('score-loading')).toBeTruthy();
+  });
+  
+  test('should handle error state', () => {
+    const { getByText } = render(
+      <DivaScoreDisplay 
+        score={null} 
+        error="Failed to load score" 
+      />
+    );
+    
+    expect(getByText('Failed to load score')).toBeTruthy();
+  });
+});
+
+describe('ChamaContributionForm Component', () => {
+  const mockChama = {
+    id: 'chama-123',
+    name: 'Test Chama',
+    monthlyContribution: 1000,
+    userBalance: 5000,
+    contributionDue: new Date('2024-01-31'),
+  };
+  
+  const mockOnSubmit = jest.fn();
+  
+  beforeEach(() => {
+    mockOnSubmit.mockClear();
+  });
+  
+  test('should validate contribution amount', async () => {
+    const { getByTestId, getByText } = render(
+      <ChamaContributionForm chama={mockChama} onSubmit={mockOnSubmit} />
+    );
+    
+    const amountInput = getByTestId('contribution-amount-input');
+    const submitButton = getByTestId('contribution-submit-button');
+    
+    // Test invalid amount (exceeds balance)
+    fireEvent.changeText(amountInput, '6000');
+    fireEvent.press(submitButton);
+    
+    await waitFor(() => {
+      expect(getByText('Insufficient balance')).toBeTruthy();
+    });
+    
+    expect(mockOnSubmit).not.toHaveBeenCalled();
+  });
+  
+  test('should validate minimum contribution', async () => {
+    const { getByTestId, getByText } = render(
+      <ChamaContributionForm chama={mockChama} onSubmit={mockOnSubmit} />
+    );
+    
+    const amountInput = getByTestId('contribution-amount-input');
+    const submitButton = getByTestId('contribution-submit-button');
+    
+    // Test amount below minimum
+    fireEvent.changeText(amountInput, '50');
+    fireEvent.press(submitButton);
+    
+    await waitFor(() => {
+      expect(getByText('Minimum contribution is R100')).toBeTruthy();
+    });
+  });
+  
+  test('should submit valid contribution', async () => {
+    const { getByTestId } = render(
+      <ChamaContributionForm chama={mockChama} onSubmit={mockOnSubmit} />
+    );
+    
+    const amountInput = getByTestId('contribution-amount-input');
+    const submitButton = getByTestId('contribution-submit-button');
+    
+    fireEvent.changeText(amountInput, '1000');
+    fireEvent.press(submitButton);
+    
+    await waitFor(() => {
+      expect(mockOnSubmit).toHaveBeenCalledWith({
+        chamaId: 'chama-123',
+        amount: 1000,
+        type: 'regular',
+      });
+    });
+  });
+  
+  test('should handle network errors gracefully', async () => {
+    const mockOnSubmitWithError = jest.fn().mockRejectedValue(
+      new Error('Network error')
+    );
+    
+    const { getByTestId, getByText } = render(
+      <ChamaContributionForm chama={mockChama} onSubmit={mockOnSubmitWithError} />
+    );
+    
+    const amountInput = getByTestId('contribution-amount-input');
+    const submitButton = getByTestId('contribution-submit-button');
+    
+    fireEvent.changeText(amountInput, '1000');
+    fireEvent.press(submitButton);
+    
+    await waitFor(() => {
+      expect(getByText('Network error - contribution will be retried')).toBeTruthy();
+    });
+  });
+});
+```
+
+## Test Utilities and Helpers
+
+### Custom Test Matchers
+
+```typescript
+// Custom Jest matchers for financial testing
+import { Decimal } from 'decimal.js';
+
+declare global {
+  namespace jest {
+    interface Matchers<R> {
+      toBeFinanciallyEqual(expected: number | string): R;
+      toBeValidDivaScore(): R;
+      toBeValidCurrency(currency: string): R;
+      toHaveValidTransactionStructure(): R;
+    }
+  }
+}
+
+expect.extend({
+  toBeFinanciallyEqual(received: number | string, expected: number | string) {
+    const receivedDecimal = new Decimal(received);
+    const expectedDecimal = new Decimal(expected);
+    
+    const pass = receivedDecimal.equals(expectedDecimal);
+    
+    return {
+      message: () =>
+        `expected ${receivedDecimal.toString()} ${pass ? 'not ' : ''}to financially equal ${expectedDecimal.toString()}`,
+      pass,
+    };
+  },
+  
+  toBeValidDivaScore(received: number) {
+    const pass = received >= 0 && received <= 1000 && Number.isInteger(received);
+    
+    return {
+      message: () =>
+        `expected ${received} ${pass ? 'not ' : ''}to be a valid DIVA score (0-1000, integer)`,
+      pass,
+    };
+  },
+  
+  toBeValidCurrency(received: number, currency: string) {
+    const decimalPlaces = currency === 'ZAR' ? 2 : 2; // Most SADC currencies use 2 decimal places
+    const multiplier = Math.pow(10, decimalPlaces);
+    const rounded = Math.round(received * multiplier) / multiplier;
+    
+    const pass = received === rounded && received >= 0;
+    
+    return {
+      message: () =>
+        `expected ${received} ${pass ? 'not ' : ''}to be a valid ${currency} amount`,
+      pass,
+    };
+  },
+  
+  toHaveValidTransactionStructure(received: any) {
+    const requiredFields = ['id', 'userId', 'amount', 'type', 'date', 'status'];
+    const missingFields = requiredFields.filter(field => !(field in received));
+    
+    const pass = missingFields.length === 0;
+    
+    return {
+      message: () =>
+        `expected transaction ${pass ? 'not ' : ''}to have valid structure. Missing: ${missingFields.join(', ')}`,
+      pass,
+    };
+  },
+});
+```
+
+### Mock Data Factory
+
+```typescript
+// Factory for generating consistent test data
+export class TestDataFactory {
+  static createUser(overrides: Partial<User> = {}): User {
+    return {
+      id: `user_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'test@awo-platform.com',
+      phoneNumber: '+27123456789',
+      country: 'ZA',
+      kycLevel: 'tier2',
+      divaScore: null,
+      createdAt: new Date(),
+      ...overrides,
+    };
+  }
+  
+  static createChama(overrides: Partial<Chama> = {}): Chama {
+    return {
+      id: `chama_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      name: 'Test Savings Group',
+      memberCount: 5,
+      monthlyContribution: 1000,
+      totalContributions: 5000,
+      currentBalance: 5000,
+      currentRound: 1,
+      createdAt: new Date(),
+      ...overrides,
+    };
+  }
+  
+  static createTransaction(overrides: Partial<Transaction> = {}): Transaction {
+    return {
+      id: `txn_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      userId: 'user_123',
+      amount: -500,
+      type: 'payment',
+      category: 'utilities',
+      description: 'Test transaction',
+      date: new Date().toISOString(),
+      status: 'completed',
+      ...overrides,
+    };
+  }
+  
+  static createDivaScore(overrides: Partial<DivaScore> = {}): DivaScore {
+    return {
+      overallScore: 675,
+      components: {
+        discipline: 180,
+        income: 175,
+        velocity: 160,
+        assets: 160,
+      },
+      tier: 'Gold',
+      confidence: 'high',
+      dataCompleteness: 0.9,
+      lastCalculated: new Date(),
+      nextUpdateDue: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days
+      ...overrides,
+    };
+  }
+}
+```
+
+---
+
+*These comprehensive unit tests ensure AWO Platform's financial calculations, business logic, and component behavior are thoroughly validated, providing the foundation for reliable African financial services.*
+
+*Last updated: June 2025*  
+*Next review: Sep 2025*

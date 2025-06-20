@@ -1,42 +1,1533 @@
----
-title: "Performance Testing"
-description: "AWO Platform performance testing testing guide"
----
-
 # Performance Testing
 
-## Overview
+AWO Platform implements comprehensive performance testing to ensure optimal user experience across African mobile networks, diverse device capabilities, and varying user loads throughout the SADC region.
+
+## Performance Testing Philosophy
 
 <Info>
-This guide covers performance testing for the AWO Platform financial services.
+AWO's performance testing focuses on real African conditions: mid-range Android devices, expensive mobile data, variable connectivity, and high user expectations for financial service reliability and speed.
 </Info>
 
-## Testing Strategy
-
-Testing approach and methodologies will be documented here.
-
-## Test Implementation
-
-```typescript
-// Test example
-describe('Performance Testing', () => {
-  it('should pass validation', () => {
-    // Test implementation
-  });
-});
-```
-
-## Test Coverage
-
-Coverage requirements and measurement will be detailed here.
-
-## Continuous Testing
+### Performance Testing Objectives
 
 <CardGroup cols={2}>
-  <Card title="Unit Testing" href="/testing/unit-testing">
-    Component and service testing
+  <Card title="User Experience" icon="users">
+    **App Startup**: &lt;3 seconds on mid-range devices  
+    **Transaction Processing**: &lt;5 seconds end-to-end  
+    **DIVA Score Calculation**: &lt;10 seconds  
+    **Real-time Updates**: &lt;1 second for notifications
   </Card>
-  <Card title="Integration Testing" href="/testing/integration-testing">
-    End-to-end system testing
+  <Card title="System Reliability" icon="server">
+    **API Response Time**: &lt;300ms for 95th percentile  
+    **Database Queries**: &lt;100ms for 95% of queries  
+    **Concurrent Users**: 10,000+ simultaneous users  
+    **System Uptime**: &gt;99.9% availability
   </Card>
 </CardGroup>
+
+## Load Testing Framework
+
+### Backend Load Testing with Artillery
+
+```javascript
+// artillery-config.yml
+config:
+  target: 'https://api.awo-platform.com'
+  phases:
+    # Warm-up phase
+    - duration: 60
+      arrivalRate: 10
+      name: "Warm-up"
+    
+    # Ramp-up phase  
+    - duration: 300
+      arrivalRate: 10
+      rampTo: 100
+      name: "Ramp-up to normal load"
+    
+    # Sustained load phase
+    - duration: 600
+      arrivalRate: 100
+      name: "Sustained normal load"
+    
+    # Peak load phase
+    - duration: 300
+      arrivalRate: 100
+      rampTo: 500
+      name: "Peak load simulation"
+    
+    # Stress testing phase
+    - duration: 180
+      arrivalRate: 500
+      rampTo: 1000
+      name: "Stress testing"
+  
+  # African network simulation
+  http:
+    timeout: 30
+    pool: 10
+  
+  # Performance thresholds
+  ensure:
+    # Response time requirements
+    p95: 300  # 95th percentile under 300ms
+    p99: 500  # 99th percentile under 500ms
+    
+    # Error rate thresholds
+    maxErrorRate: 1  # Less than 1% error rate
+
+# Authentication setup
+before:
+  flow:
+    - post:
+        url: "/auth/login"
+        json:
+          phoneNumber: "{{ $randomPhoneNumber() }}"
+          password: "TestPassword123!"
+        capture:
+          - json: "$.accessToken"
+            as: "authToken"
+
+scenarios:
+  # User authentication flow
+  - name: "User Authentication"
+    weight: 20
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            phoneNumber: "{{ $randomPhoneNumber() }}"
+            password: "TestPassword123!"
+          expect:
+            - statusCode: 200
+            - hasProperty: "accessToken"
+      
+      - think: 2  # 2 second pause
+      
+      - get:
+          url: "/user/profile"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+
+  # DIVA score calculation load test
+  - name: "DIVA Score Operations"
+    weight: 25
+    flow:
+      - get:
+          url: "/diva/score/{{ $randomUserId() }}"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+            - hasProperty: "overallScore"
+      
+      - think: 5
+      
+      - post:
+          url: "/diva/refresh/{{ $randomUserId() }}"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+
+  # Chama operations load test
+  - name: "Chama Operations"
+    weight: 30
+    flow:
+      - get:
+          url: "/chamas"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+      
+      - think: 3
+      
+      - post:
+          url: "/chamas/{{ $randomChamaId() }}/contribute"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            amount: "{{ $randomAmount() }}"
+          expect:
+            - statusCode: 200
+
+  # Transaction processing load test
+  - name: "Transaction Processing"
+    weight: 15
+    flow:
+      - post:
+          url: "/transactions"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            amount: "{{ $randomAmount() }}"
+            recipient: "{{ $randomPhoneNumber() }}"
+            type: "transfer"
+          expect:
+            - statusCode: 201
+      
+      - think: 2
+      
+      - get:
+          url: "/wallet/balance"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+
+  # Investment operations load test
+  - name: "Investment Operations"
+    weight: 10
+    flow:
+      - get:
+          url: "/investments/portfolio"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+      
+      - think: 4
+      
+      - post:
+          url: "/investments/orders"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            productId: "{{ $randomProductId() }}"
+            amount: "{{ $randomInvestmentAmount() }}"
+            orderType: "buy"
+          expect:
+            - statusCode: 201
+
+# Custom functions for realistic data generation
+functions:
+  $randomPhoneNumber: |
+    return "+2771" + Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
+  
+  $randomUserId: |
+    return "user_" + Math.floor(Math.random() * 10000);
+  
+  $randomChamaId: |
+    return "chama_" + Math.floor(Math.random() * 1000);
+  
+  $randomAmount: |
+    return Math.floor(Math.random() * 5000) + 100; // 100-5000 ZAR
+  
+  $randomInvestmentAmount: |
+    return Math.floor(Math.random() * 20000) + 1000; // 1000-20000 ZAR
+  
+  $randomProductId: |
+    const products = ["govt_bonds_10yr", "equity_etf_sa_top40", "money_market_fund"];
+    return products[Math.floor(Math.random() * products.length)];
+```
+
+### Database Performance Testing
+
+```typescript
+// database-performance.test.ts
+import { Pool } from 'pg';
+import { performance } from 'perf_hooks';
+
+describe('Database Performance Tests', () => {
+  let dbPool: Pool;
+  let testUsers: string[];
+  let testChamas: string[];
+  
+  beforeAll(async () => {
+    dbPool = new Pool({
+      connectionString: process.env.TEST_DATABASE_URL,
+      max: 20, // Connection pool size
+    });
+    
+    // Create test data
+    testUsers = await createTestUsers(1000);
+    testChamas = await createTestChamas(100);
+  });
+  
+  afterAll(async () => {
+    await cleanupTestData();
+    await dbPool.end();
+  });
+  
+  describe('DIVA Score Query Performance', () => {
+    test('should calculate DIVA scores under performance threshold', async () => {
+      const performanceResults = [];
+      
+      // Test with different data sizes
+      const testSizes = [1, 10, 50, 100];
+      
+      for (const size of testSizes) {
+        const selectedUsers = testUsers.slice(0, size);
+        const startTime = performance.now();
+        
+        const scores = await Promise.all(
+          selectedUsers.map(userId => calculateDivaScore(dbPool, userId))
+        );
+        
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        const avgTimePerUser = duration / size;
+        
+        performanceResults.push({
+          userCount: size,
+          totalTime: duration,
+          avgTimePerUser,
+          scores: scores.length,
+        });
+        
+        // Performance assertions
+        expect(avgTimePerUser).toBeLessThan(1000); // Less than 1 second per user
+        expect(scores).toHaveLength(size);
+        scores.forEach(score => {
+          expect(score.overallScore).toBeGreaterThanOrEqualTo(0);
+          expect(score.overallScore).toBeLessThanOrEqualTo(1000);
+        });
+      }
+      
+      console.log('DIVA Score Performance Results:', performanceResults);
+    });
+    
+    test('should handle concurrent DIVA score calculations', async () => {
+      const concurrentUsers = 50;
+      const selectedUsers = testUsers.slice(0, concurrentUsers);
+      
+      const startTime = performance.now();
+      
+      // Run concurrent calculations
+      const scorePromises = selectedUsers.map(userId => 
+        calculateDivaScore(dbPool, userId)
+      );
+      
+      const scores = await Promise.all(scorePromises);
+      
+      const endTime = performance.now();
+      const totalTime = endTime - startTime;
+      const avgTimePerUser = totalTime / concurrentUsers;
+      
+      // Should handle concurrency efficiently
+      expect(avgTimePerUser).toBeLessThan(2000); // Less than 2 seconds average
+      expect(scores).toHaveLength(concurrentUsers);
+      
+      console.log(`Concurrent DIVA calculations: ${concurrentUsers} users in ${totalTime.toFixed(2)}ms`);
+    });
+  });
+  
+  describe('Chama Operations Performance', () => {
+    test('should process bulk contributions efficiently', async () => {
+      const chamaId = testChamas[0];
+      const contributionCount = 100;
+      
+      const contributions = Array.from({ length: contributionCount }, (_, index) => ({
+        chamaId,
+        memberId: testUsers[index % testUsers.length],
+        amount: Math.floor(Math.random() * 1000) + 100,
+        timestamp: new Date(),
+      }));
+      
+      const startTime = performance.now();
+      
+      // Process contributions in batch
+      const result = await processBulkContributions(dbPool, contributions);
+      
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+      const avgTimePerContribution = duration / contributionCount;
+      
+      // Performance assertions
+      expect(duration).toBeLessThan(5000); // Less than 5 seconds for 100 contributions
+      expect(avgTimePerContribution).toBeLessThan(50); // Less than 50ms per contribution
+      expect(result.successCount).toBe(contributionCount);
+      
+      console.log(`Bulk contributions: ${contributionCount} in ${duration.toFixed(2)}ms`);
+    });
+    
+    test('should calculate Chama balances efficiently', async () => {
+      const chamaCount = 20;
+      const selectedChamas = testChamas.slice(0, chamaCount);
+      
+      const startTime = performance.now();
+      
+      const balancePromises = selectedChamas.map(chamaId =>
+        calculateChamaBalance(dbPool, chamaId)
+      );
+      
+      const balances = await Promise.all(balancePromises);
+      
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+      const avgTimePerChama = duration / chamaCount;
+      
+      // Performance assertions
+      expect(avgTimePerChama).toBeLessThan(100); // Less than 100ms per Chama
+      expect(balances).toHaveLength(chamaCount);
+      
+      balances.forEach(balance => {
+        expect(balance.totalContributions).toBeGreaterThanOrEqualTo(0);
+        expect(balance.currentBalance).toBeGreaterThanOrEqualTo(0);
+      });
+      
+      console.log(`Chama balance calculations: ${chamaCount} in ${duration.toFixed(2)}ms`);
+    });
+  });
+  
+  describe('Query Optimization Tests', () => {
+    test('should use database indexes effectively', async () => {
+      const testQueries = [
+        {
+          name: 'User by phone number',
+          query: 'SELECT * FROM users WHERE phone_number = $1',
+          params: ['+27123456789'],
+          expectedMaxTime: 50, // 50ms
+        },
+        {
+          name: 'Transactions by user',
+          query: 'SELECT * FROM transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
+          params: [testUsers[0]],
+          expectedMaxTime: 100, // 100ms
+        },
+        {
+          name: 'Chama members',
+          query: 'SELECT u.* FROM users u JOIN chama_members cm ON u.id = cm.user_id WHERE cm.chama_id = $1',
+          params: [testChamas[0]],
+          expectedMaxTime: 75, // 75ms
+        },
+        {
+          name: 'User DIVA score history',
+          query: 'SELECT * FROM diva_scores WHERE user_id = $1 ORDER BY calculated_at DESC LIMIT 10',
+          params: [testUsers[0]],
+          expectedMaxTime: 50, // 50ms
+        },
+      ];
+      
+      for (const testQuery of testQueries) {
+        const startTime = performance.now();
+        
+        const result = await dbPool.query(testQuery.query, testQuery.params);
+        
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        
+        expect(duration).toBeLessThan(testQuery.expectedMaxTime);
+        expect(result.rows).toBeDefined();
+        
+        console.log(`${testQuery.name}: ${duration.toFixed(2)}ms`);
+      }
+    });
+    
+    test('should handle complex aggregation queries efficiently', async () => {
+      const complexQueries = [
+        {
+          name: 'Monthly transaction summary',
+          query: `
+            SELECT 
+              DATE_TRUNC('month', created_at) as month,
+              COUNT(*) as transaction_count,
+              SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) as total_credits,
+              SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) as total_debits
+            FROM transactions 
+            WHERE user_id = $1 
+              AND created_at >= NOW() - INTERVAL '12 months'
+            GROUP BY DATE_TRUNC('month', created_at)
+            ORDER BY month DESC
+          `,
+          params: [testUsers[0]],
+          expectedMaxTime: 200,
+        },
+        {
+          name: 'Chama contribution ranking',
+          query: `
+            SELECT 
+              u.first_name,
+              u.last_name,
+              SUM(cc.amount) as total_contributions,
+              COUNT(cc.id) as contribution_count,
+              RANK() OVER (ORDER BY SUM(cc.amount) DESC) as rank
+            FROM users u
+            JOIN chama_contributions cc ON u.id = cc.user_id
+            WHERE cc.chama_id = $1
+            GROUP BY u.id, u.first_name, u.last_name
+            ORDER BY total_contributions DESC
+          `,
+          params: [testChamas[0]],
+          expectedMaxTime: 150,
+        },
+      ];
+      
+      for (const query of complexQueries) {
+        const startTime = performance.now();
+        
+        const result = await dbPool.query(query.query, query.params);
+        
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        
+        expect(duration).toBeLessThan(query.expectedMaxTime);
+        expect(result.rows).toBeDefined();
+        
+        console.log(`${query.name}: ${duration.toFixed(2)}ms, ${result.rows.length} rows`);
+      }
+    });
+  });
+  
+  describe('Connection Pool Performance', () => {
+    test('should handle connection pool efficiently under load', async () => {
+      const concurrentQueries = 50;
+      const queryPromises = [];
+      
+      const startTime = performance.now();
+      
+      // Create concurrent database operations
+      for (let i = 0; i < concurrentQueries; i++) {
+        const promise = dbPool.query(
+          'SELECT * FROM users WHERE id = $1',
+          [testUsers[i % testUsers.length]]
+        );
+        queryPromises.push(promise);
+      }
+      
+      const results = await Promise.all(queryPromises);
+      
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+      const avgTimePerQuery = duration / concurrentQueries;
+      
+      // Performance assertions
+      expect(avgTimePerQuery).toBeLessThan(50); // Less than 50ms average
+      expect(results).toHaveLength(concurrentQueries);
+      
+      // Verify pool statistics
+      const poolStats = {
+        totalConnections: dbPool.totalCount,
+        idleConnections: dbPool.idleCount,
+        waitingClients: dbPool.waitingCount,
+      };
+      
+      console.log('Connection pool stats:', poolStats);
+      console.log(`${concurrentQueries} concurrent queries: ${duration.toFixed(2)}ms total`);
+    });
+  });
+});
+
+// Helper functions for database performance testing
+async function calculateDivaScore(pool: Pool, userId: string) {
+  const client = await pool.connect();
+  
+  try {
+    // Simulate DIVA score calculation with multiple queries
+    const [transactions, accounts, goals] = await Promise.all([
+      client.query('SELECT * FROM transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100', [userId]),
+      client.query('SELECT * FROM user_accounts WHERE user_id = $1', [userId]),
+      client.query('SELECT * FROM savings_goals WHERE user_id = $1', [userId]),
+    ]);
+    
+    // Simulate score calculation logic
+    const score = {
+      overallScore: Math.floor(Math.random() * 1000),
+      discipline: Math.floor(Math.random() * 250),
+      income: Math.floor(Math.random() * 250),
+      velocity: Math.floor(Math.random() * 250),
+      assets: Math.floor(Math.random() * 250),
+      calculatedAt: new Date(),
+    };
+    
+    // Insert calculated score
+    await client.query(
+      'INSERT INTO diva_scores (user_id, overall_score, discipline, income, velocity, assets, calculated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [userId, score.overallScore, score.discipline, score.income, score.velocity, score.assets, score.calculatedAt]
+    );
+    
+    return score;
+  } finally {
+    client.release();
+  }
+}
+
+async function processBulkContributions(pool: Pool, contributions: any[]) {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    let successCount = 0;
+    
+    for (const contribution of contributions) {
+      await client.query(
+        'INSERT INTO chama_contributions (chama_id, member_id, amount, created_at) VALUES ($1, $2, $3, $4)',
+        [contribution.chamaId, contribution.memberId, contribution.amount, contribution.timestamp]
+      );
+      successCount++;
+    }
+    
+    await client.query('COMMIT');
+    
+    return { successCount };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function calculateChamaBalance(pool: Pool, chamaId: string) {
+  const result = await pool.query(`
+    SELECT 
+      COALESCE(SUM(amount), 0) as total_contributions,
+      COALESCE(SUM(amount), 0) as current_balance,
+      COUNT(*) as contribution_count
+    FROM chama_contributions 
+    WHERE chama_id = $1
+  `, [chamaId]);
+  
+  return result.rows[0];
+}
+
+async function createTestUsers(count: number): Promise<string[]> {
+  // Implementation for creating test users
+  return Array.from({ length: count }, (_, i) => `test_user_${i}`);
+}
+
+async function createTestChamas(count: number): Promise<string[]> {
+  // Implementation for creating test chamas
+  return Array.from({ length: count }, (_, i) => `test_chama_${i}`);
+}
+
+async function cleanupTestData(): Promise<void> {
+  // Implementation for cleaning up test data
+}
+```
+
+## Mobile Performance Testing
+
+### React Native Performance Tests
+
+```typescript
+// mobile-performance.test.ts
+import { performance } from 'perf_hooks';
+import { NativeModules, Dimensions } from 'react-native';
+
+describe('Mobile Performance Tests', () => {
+  describe('App Startup Performance', () => {
+    test('should start app within performance threshold', async () => {
+      const startTime = performance.now();
+      
+      // Simulate app initialization
+      const initializationTasks = [
+        initializeAuthentication(),
+        loadUserPreferences(),
+        setupNotifications(),
+        initializeDatabase(),
+        loadCriticalData(),
+      ];
+      
+      await Promise.all(initializationTasks);
+      
+      const endTime = performance.now();
+      const startupTime = endTime - startTime;
+      
+      // App should start in under 3 seconds on mid-range devices
+      expect(startupTime).toBeLessThan(3000);
+      
+      console.log(`App startup time: ${startupTime.toFixed(2)}ms`);
+    });
+    
+    test('should handle cold start efficiently', async () => {
+      const coldStartMetrics = await measureColdStart();
+      
+      expect(coldStartMetrics.timeToFirstFrame).toBeLessThan(1500);
+      expect(coldStartMetrics.timeToInteractive).toBeLessThan(3000);
+      expect(coldStartMetrics.memoryUsage).toBeLessThan(150 * 1024 * 1024); // 150MB
+      
+      console.log('Cold start metrics:', coldStartMetrics);
+    });
+  });
+  
+  describe('Component Rendering Performance', () => {
+    test('should render transaction list efficiently', async () => {
+      const transactionCount = 100;
+      const mockTransactions = generateMockTransactions(transactionCount);
+      
+      const renderMetrics = await measureComponentRender(
+        'TransactionList',
+        { transactions: mockTransactions }
+      );
+      
+      // Should render large lists efficiently
+      expect(renderMetrics.initialRenderTime).toBeLessThan(500); // 500ms
+      expect(renderMetrics.scrollPerformance.fps).toBeGreaterThan(45); // 45+ FPS
+      expect(renderMetrics.memoryIncrease).toBeLessThan(20 * 1024 * 1024); // 20MB increase
+      
+      console.log('Transaction list render metrics:', renderMetrics);
+    });
+    
+    test('should handle DIVA score animation smoothly', async () => {
+      const animationMetrics = await measureDivaScoreAnimation({
+        fromScore: 650,
+        toScore: 725,
+        duration: 2000,
+      });
+      
+      expect(animationMetrics.fps).toBeGreaterThan(55); // Smooth 60fps animation
+      expect(animationMetrics.droppedFrames).toBeLessThan(5); // Minimal dropped frames
+      expect(animationMetrics.jank).toBeLessThan(2); // Low jank count
+      
+      console.log('DIVA score animation metrics:', animationMetrics);
+    });
+    
+    test('should handle Chama member list efficiently', async () => {
+      const memberCount = 20;
+      const mockMembers = generateMockChamaMembers(memberCount);
+      
+      const renderMetrics = await measureComponentRender(
+        'ChamaMemberList',
+        { members: mockMembers }
+      );
+      
+      expect(renderMetrics.initialRenderTime).toBeLessThan(200);
+      expect(renderMetrics.reRenderTime).toBeLessThan(100); // Fast re-renders
+      
+      console.log('Chama member list metrics:', renderMetrics);
+    });
+  });
+  
+  describe('Memory Management Performance', () => {
+    test('should manage memory efficiently during navigation', async () => {
+      const navigationFlow = [
+        'Home',
+        'DivaScore',
+        'Chama',
+        'ChamaDetails',
+        'Investment',
+        'Portfolio',
+        'Profile',
+        'Home', // Return to start
+      ];
+      
+      const memoryMetrics = await measureNavigationMemory(navigationFlow);
+      
+      // Memory should not grow excessively during navigation
+      expect(memoryMetrics.peakMemoryUsage).toBeLessThan(200 * 1024 * 1024); // 200MB
+      expect(memoryMetrics.memoryLeakDetected).toBe(false);
+      expect(memoryMetrics.gcCollections).toBeGreaterThan(0); // GC should run
+      
+      console.log('Navigation memory metrics:', memoryMetrics);
+    });
+    
+    test('should handle large datasets without memory issues', async () => {
+      const largeDatasets = {
+        transactions: generateMockTransactions(1000),
+        chamaMembers: generateMockChamaMembers(50),
+        investmentHistory: generateMockInvestmentHistory(500),
+      };
+      
+      const memoryMetrics = await measureLargeDatasetHandling(largeDatasets);
+      
+      expect(memoryMetrics.initialMemory).toBeLessThan(300 * 1024 * 1024); // 300MB
+      expect(memoryMetrics.memoryGrowth).toBeLessThan(100 * 1024 * 1024); // 100MB growth
+      expect(memoryMetrics.renderTime).toBeLessThan(1000); // 1 second render
+      
+      console.log('Large dataset memory metrics:', memoryMetrics);
+    });
+  });
+  
+  describe('Network Performance', () => {
+    test('should handle poor network conditions gracefully', async () => {
+      const networkConditions = [
+        { name: '2G', latency: 500, bandwidth: 50 }, // 50 kbps
+        { name: '3G', latency: 200, bandwidth: 500 }, // 500 kbps
+        { name: '4G', latency: 50, bandwidth: 5000 }, // 5 Mbps
+      ];
+      
+      for (const condition of networkConditions) {
+        const performanceMetrics = await measureNetworkPerformance(condition);
+        
+        // Adjust expectations based on network condition
+        const expectedTimeout = condition.name === '2G' ? 30000 : 15000;
+        
+        expect(performanceMetrics.apiResponseTime).toBeLessThan(expectedTimeout);
+        expect(performanceMetrics.successRate).toBeGreaterThan(0.95); // 95% success rate
+        expect(performanceMetrics.retryCount).toBeLessThan(3); // Reasonable retry count
+        
+        console.log(`${condition.name} performance:`, performanceMetrics);
+      }
+    });
+    
+    test('should optimize data usage for African markets', async () => {
+      const dataUsageMetrics = await measureDataUsage({
+        operations: [
+          'user-login',
+          'diva-score-refresh',
+          'chama-contribution',
+          'investment-order',
+          'transaction-history',
+        ],
+        duration: 300000, // 5 minutes
+      });
+      
+      // Data usage should be optimized for expensive mobile data
+      expect(dataUsageMetrics.totalDataUsed).toBeLessThan(10 * 1024 * 1024); // 10MB
+      expect(dataUsageMetrics.compressionRatio).toBeGreaterThan(0.3); // 30% compression
+      expect(dataUsageMetrics.cacheHitRate).toBeGreaterThan(0.6); // 60% cache hits
+      
+      console.log('Data usage metrics:', dataUsageMetrics);
+    });
+  });
+});
+
+// Helper functions for mobile performance testing
+async function measureColdStart() {
+  const startTime = performance.now();
+  
+  // Simulate cold start process
+  await new Promise(resolve => setTimeout(resolve, 1200)); // First frame time
+  const timeToFirstFrame = performance.now() - startTime;
+  
+  await new Promise(resolve => setTimeout(resolve, 800)); // Interactive time
+  const timeToInteractive = performance.now() - startTime;
+  
+  return {
+    timeToFirstFrame,
+    timeToInteractive,
+    memoryUsage: getMemoryUsage(),
+  };
+}
+
+async function measureComponentRender(componentName: string, props: any) {
+  const startTime = performance.now();
+  const startMemory = getMemoryUsage();
+  
+  // Simulate component rendering
+  await renderComponent(componentName, props);
+  
+  const initialRenderTime = performance.now() - startTime;
+  const memoryIncrease = getMemoryUsage() - startMemory;
+  
+  // Measure scroll performance
+  const scrollMetrics = await measureScrollPerformance();
+  
+  return {
+    initialRenderTime,
+    memoryIncrease,
+    scrollPerformance: scrollMetrics,
+    reRenderTime: await measureReRender(componentName, props),
+  };
+}
+
+async function measureDivaScoreAnimation(animationConfig: any) {
+  const frameRecorder = new FrameRecorder();
+  frameRecorder.start();
+  
+  // Simulate DIVA score animation
+  await animateValue(
+    animationConfig.fromScore,
+    animationConfig.toScore,
+    animationConfig.duration
+  );
+  
+  const metrics = frameRecorder.stop();
+  
+  return {
+    fps: metrics.averageFPS,
+    droppedFrames: metrics.droppedFrames,
+    jank: metrics.jankCount,
+    duration: metrics.actualDuration,
+  };
+}
+
+async function measureNavigationMemory(screens: string[]) {
+  const memorySnapshots = [];
+  let gcCollections = 0;
+  
+  // Monitor memory during navigation
+  const memoryMonitor = setInterval(() => {
+    const usage = getMemoryUsage();
+    memorySnapshots.push(usage);
+    
+    if (shouldTriggerGC(usage)) {
+      triggerGarbageCollection();
+      gcCollections++;
+    }
+  }, 1000);
+  
+  try {
+    for (const screen of screens) {
+      await navigateToScreen(screen);
+      await new Promise(resolve => setTimeout(resolve, 500)); // Wait for screen load
+    }
+    
+    const peakMemoryUsage = Math.max(...memorySnapshots);
+    const memoryLeakDetected = detectMemoryLeak(memorySnapshots);
+    
+    return {
+      peakMemoryUsage,
+      memoryLeakDetected,
+      gcCollections,
+      memorySnapshots,
+    };
+  } finally {
+    clearInterval(memoryMonitor);
+  }
+}
+
+async function measureNetworkPerformance(networkCondition: any) {
+  // Simulate network condition
+  setNetworkCondition(networkCondition);
+  
+  const startTime = performance.now();
+  let successfulRequests = 0;
+  let totalRequests = 0;
+  let retryCount = 0;
+  
+  const testRequests = [
+    '/auth/login',
+    '/diva/score/test-user',
+    '/chamas',
+    '/wallet/balance',
+    '/transactions',
+  ];
+  
+  for (const endpoint of testRequests) {
+    totalRequests++;
+    
+    try {
+      const response = await makeApiRequest(endpoint);
+      if (response.status === 200) {
+        successfulRequests++;
+      }
+    } catch (error) {
+      retryCount++;
+      // Implement retry logic
+      try {
+        const retryResponse = await makeApiRequest(endpoint);
+        if (retryResponse.status === 200) {
+          successfulRequests++;
+        }
+      } catch (retryError) {
+        // Final failure
+      }
+    }
+  }
+  
+  const totalTime = performance.now() - startTime;
+  
+  return {
+    apiResponseTime: totalTime / totalRequests,
+    successRate: successfulRequests / totalRequests,
+    retryCount,
+    networkCondition: networkCondition.name,
+  };
+}
+
+// Utility functions
+function getMemoryUsage(): number {
+  // In real implementation, use actual memory APIs
+  return Math.random() * 100 * 1024 * 1024; // Simulate memory usage
+}
+
+async function renderComponent(componentName: string, props: any): Promise<void> {
+  // Simulate component rendering
+  await new Promise(resolve => setTimeout(resolve, Math.random() * 200));
+}
+
+async function measureScrollPerformance() {
+  return {
+    fps: 58 + Math.random() * 4, // Simulate 58-62 FPS
+    jankCount: Math.floor(Math.random() * 3),
+  };
+}
+
+class FrameRecorder {
+  private startTime: number;
+  private frames: number[] = [];
+  
+  start() {
+    this.startTime = performance.now();
+    this.frames = [];
+  }
+  
+  stop() {
+    const endTime = performance.now();
+    const duration = endTime - this.startTime;
+    
+    // Simulate frame recording
+    const frameCount = Math.floor(duration / 16.67); // 60 FPS target
+    const averageFPS = (frameCount / duration) * 1000;
+    const droppedFrames = Math.floor(frameCount * 0.05); // 5% dropped frames
+    
+    return {
+      averageFPS,
+      droppedFrames,
+      jankCount: Math.floor(droppedFrames / 2),
+      actualDuration: duration,
+    };
+  }
+}
+
+async function animateValue(from: number, to: number, duration: number): Promise<void> {
+  // Simulate animation
+  await new Promise(resolve => setTimeout(resolve, duration));
+}
+
+function generateMockTransactions(count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `txn_${i}`,
+    amount: Math.random() * 1000,
+    description: `Transaction ${i}`,
+    date: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
+  }));
+}
+
+function generateMockChamaMembers(count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `member_${i}`,
+    name: `Member ${i}`,
+    totalContributions: Math.random() * 10000,
+    lastContribution: new Date(),
+  }));
+}
+
+function generateMockInvestmentHistory(count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `investment_${i}`,
+    amount: Math.random() * 5000,
+    product: 'Government Bonds',
+    date: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
+    performance: (Math.random() - 0.5) * 0.2, // -10% to +10%
+  }));
+}
+```
+
+## API Performance Testing
+
+### Stress Testing with Custom Framework
+
+```typescript
+// api-stress-testing.ts
+class APIStressTester {
+  private baseUrl: string;
+  private authToken: string;
+  private metrics: PerformanceMetric[] = [];
+  
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
+  }
+  
+  async authenticate(): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phoneNumber: '+27123456789',
+        password: 'TestPassword123!',
+      }),
+    });
+    
+    const data = await response.json();
+    this.authToken = data.accessToken;
+  }
+  
+  async runStressTest(config: StressTestConfig): Promise<StressTestResults> {
+    console.log(`Starting stress test: ${config.name}`);
+    
+    const results: StressTestResults = {
+      testName: config.name,
+      totalRequests: 0,
+      successfulRequests: 0,
+      failedRequests: 0,
+      averageResponseTime: 0,
+      p95ResponseTime: 0,
+      p99ResponseTime: 0,
+      throughput: 0,
+      errorRate: 0,
+      errors: [],
+    };
+    
+    const requestPromises: Promise<RequestResult>[] = [];
+    const startTime = Date.now();
+    
+    // Generate concurrent requests
+    for (let i = 0; i < config.concurrentUsers; i++) {
+      for (let j = 0; j < config.requestsPerUser; j++) {
+        const delay = (i * config.rampUpDelay) + (j * config.requestInterval);
+        
+        const promise = this.makeDelayedRequest(
+          config.endpoint,
+          config.method,
+          config.payload,
+          delay
+        );
+        
+        requestPromises.push(promise);
+      }
+    }
+    
+    // Wait for all requests to complete
+    const requestResults = await Promise.allSettled(requestPromises);
+    
+    const endTime = Date.now();
+    const totalDuration = endTime - startTime;
+    
+    // Process results
+    const successfulResults: RequestResult[] = [];
+    const failedResults: any[] = [];
+    
+    requestResults.forEach(result => {
+      if (result.status === 'fulfilled') {
+        successfulResults.push(result.value);
+        if (result.value.success) {
+          results.successfulRequests++;
+        } else {
+          results.failedRequests++;
+          results.errors.push(result.value.error);
+        }
+      } else {
+        results.failedRequests++;
+        failedResults.push(result.reason);
+      }
+      results.totalRequests++;
+    });
+    
+    // Calculate metrics
+    if (successfulResults.length > 0) {
+      const responseTimes = successfulResults.map(r => r.responseTime);
+      responseTimes.sort((a, b) => a - b);
+      
+      results.averageResponseTime = responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length;
+      results.p95ResponseTime = responseTimes[Math.floor(responseTimes.length * 0.95)];
+      results.p99ResponseTime = responseTimes[Math.floor(responseTimes.length * 0.99)];
+    }
+    
+    results.throughput = (results.successfulRequests / totalDuration) * 1000; // Requests per second
+    results.errorRate = (results.failedRequests / results.totalRequests) * 100;
+    
+    console.log(`Stress test completed: ${config.name}`, results);
+    
+    return results;
+  }
+  
+  private async makeDelayedRequest(
+    endpoint: string,
+    method: string,
+    payload: any,
+    delay: number
+  ): Promise<RequestResult> {
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    const startTime = Date.now();
+    
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.authToken}`,
+        },
+        body: payload ? JSON.stringify(payload) : undefined,
+      });
+      
+      const endTime = Date.now();
+      const responseTime = endTime - startTime;
+      
+      return {
+        success: response.ok,
+        statusCode: response.status,
+        responseTime,
+        error: response.ok ? null : `HTTP ${response.status}`,
+      };
+    } catch (error) {
+      const endTime = Date.now();
+      const responseTime = endTime - startTime;
+      
+      return {
+        success: false,
+        statusCode: 0,
+        responseTime,
+        error: error.message,
+      };
+    }
+  }
+  
+  async runDivaScoreStressTest(): Promise<StressTestResults> {
+    return this.runStressTest({
+      name: 'DIVA Score Calculation Stress Test',
+      endpoint: '/diva/calculate/test-user-123',
+      method: 'POST',
+      concurrentUsers: 100,
+      requestsPerUser: 5,
+      requestInterval: 1000, // 1 second between requests per user
+      rampUpDelay: 100, // 100ms between user starts
+      payload: null,
+    });
+  }
+  
+  async runChamaContributionStressTest(): Promise<StressTestResults> {
+    return this.runStressTest({
+      name: 'Chama Contribution Stress Test',
+      endpoint: '/chamas/test-chama-123/contribute',
+      method: 'POST',
+      concurrentUsers: 50,
+      requestsPerUser: 10,
+      requestInterval: 2000, // 2 seconds between contributions
+      rampUpDelay: 200, // 200ms between user starts
+      payload: { amount: 1000 },
+    });
+  }
+  
+  async runTransactionStressTest(): Promise<StressTestResults> {
+    return this.runStressTest({
+      name: 'Transaction Processing Stress Test',
+      endpoint: '/transactions',
+      method: 'POST',
+      concurrentUsers: 200,
+      requestsPerUser: 3,
+      requestInterval: 1500,
+      rampUpDelay: 50,
+      payload: {
+        amount: 500,
+        recipient: '+27987654321',
+        type: 'transfer',
+      },
+    });
+  }
+}
+
+// Usage example
+describe('API Stress Testing', () => {
+  let stressTester: APIStressTester;
+  
+  beforeAll(async () => {
+    stressTester = new APIStressTester(process.env.API_BASE_URL);
+    await stressTester.authenticate();
+  });
+  
+  test('should handle DIVA score calculation under stress', async () => {
+    const results = await stressTester.runDivaScoreStressTest();
+    
+    expect(results.errorRate).toBeLessThan(5); // Less than 5% error rate
+    expect(results.p95ResponseTime).toBeLessThan(5000); // 95th percentile under 5 seconds
+    expect(results.throughput).toBeGreaterThan(10); // At least 10 requests per second
+  });
+  
+  test('should handle concurrent Chama contributions', async () => {
+    const results = await stressTester.runChamaContributionStressTest();
+    
+    expect(results.errorRate).toBeLessThan(2); // Less than 2% error rate for financial operations
+    expect(results.p99ResponseTime).toBeLessThan(3000); // 99th percentile under 3 seconds
+    expect(results.successfulRequests).toBe(results.totalRequests - results.failedRequests);
+  });
+  
+  test('should process transactions under high load', async () => {
+    const results = await stressTester.runTransactionStressTest();
+    
+    expect(results.errorRate).toBeLessThan(1); // Less than 1% error rate for transactions
+    expect(results.averageResponseTime).toBeLessThan(1000); // Average under 1 second
+    expect(results.throughput).toBeGreaterThan(50); // At least 50 transactions per second
+  });
+});
+
+// Type definitions
+interface StressTestConfig {
+  name: string;
+  endpoint: string;
+  method: string;
+  concurrentUsers: number;
+  requestsPerUser: number;
+  requestInterval: number;
+  rampUpDelay: number;
+  payload?: any;
+}
+
+interface StressTestResults {
+  testName: string;
+  totalRequests: number;
+  successfulRequests: number;
+  failedRequests: number;
+  averageResponseTime: number;
+  p95ResponseTime: number;
+  p99ResponseTime: number;
+  throughput: number;
+  errorRate: number;
+  errors: string[];
+}
+
+interface RequestResult {
+  success: boolean;
+  statusCode: number;
+  responseTime: number;
+  error: string | null;
+}
+
+interface PerformanceMetric {
+  timestamp: number;
+  operation: string;
+  duration: number;
+  success: boolean;
+  metadata?: any;
+}
+```
+
+## Performance Monitoring and Alerting
+
+### Real-time Performance Monitoring
+
+```typescript
+// performance-monitoring.ts
+class PerformanceMonitor {
+  private metrics: Map<string, PerformanceMetric[]> = new Map();
+  private alerts: PerformanceAlert[] = [];
+  private thresholds: PerformanceThresholds;
+  
+  constructor(thresholds: PerformanceThresholds) {
+    this.thresholds = thresholds;
+    this.startMonitoring();
+  }
+  
+  recordMetric(operation: string, duration: number, metadata?: any) {
+    const metric: PerformanceMetric = {
+      timestamp: Date.now(),
+      operation,
+      duration,
+      success: true,
+      metadata,
+    };
+    
+    if (!this.metrics.has(operation)) {
+      this.metrics.set(operation, []);
+    }
+    
+    const operationMetrics = this.metrics.get(operation)!;
+    operationMetrics.push(metric);
+    
+    // Keep only recent metrics (last 1000 entries)
+    if (operationMetrics.length > 1000) {
+      operationMetrics.shift();
+    }
+    
+    // Check for performance alerts
+    this.checkPerformanceThresholds(operation, duration);
+  }
+  
+  private checkPerformanceThresholds(operation: string, duration: number) {
+    const threshold = this.thresholds[operation];
+    if (!threshold) return;
+    
+    if (duration > threshold.errorThreshold) {
+      this.triggerAlert({
+        level: 'error',
+        operation,
+        message: `${operation} exceeded error threshold: ${duration}ms > ${threshold.errorThreshold}ms`,
+        timestamp: Date.now(),
+        value: duration,
+        threshold: threshold.errorThreshold,
+      });
+    } else if (duration > threshold.warningThreshold) {
+      this.triggerAlert({
+        level: 'warning',
+        operation,
+        message: `${operation} exceeded warning threshold: ${duration}ms > ${threshold.warningThreshold}ms`,
+        timestamp: Date.now(),
+        value: duration,
+        threshold: threshold.warningThreshold,
+      });
+    }
+  }
+  
+  private triggerAlert(alert: PerformanceAlert) {
+    this.alerts.push(alert);
+    
+    // Send alert to monitoring service
+    this.sendAlert(alert);
+    
+    // Keep only recent alerts (last 100)
+    if (this.alerts.length > 100) {
+      this.alerts.shift();
+    }
+  }
+  
+  private async sendAlert(alert: PerformanceAlert) {
+    try {
+      await fetch(process.env.MONITORING_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: `🚨 Performance Alert: ${alert.message}`,
+          attachments: [{
+            color: alert.level === 'error' ? 'danger' : 'warning',
+            fields: [
+              { title: 'Operation', value: alert.operation, short: true },
+              { title: 'Value', value: `${alert.value}ms`, short: true },
+              { title: 'Threshold', value: `${alert.threshold}ms`, short: true },
+              { title: 'Time', value: new Date(alert.timestamp).toISOString(), short: true },
+            ],
+          }],
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to send performance alert:', error);
+    }
+  }
+  
+  getPerformanceReport(operation?: string): PerformanceReport {
+    if (operation) {
+      const metrics = this.metrics.get(operation) || [];
+      return this.calculateOperationStats(operation, metrics);
+    }
+    
+    const report: PerformanceReport = {
+      timestamp: Date.now(),
+      operations: {},
+      summary: {
+        totalOperations: 0,
+        averageResponseTime: 0,
+        errorRate: 0,
+        throughput: 0,
+      },
+    };
+    
+    let totalMetrics = 0;
+    let totalDuration = 0;
+    let totalErrors = 0;
+    
+    for (const [op, metrics] of this.metrics.entries()) {
+      const operationStats = this.calculateOperationStats(op, metrics);
+      report.operations[op] = operationStats;
+      
+      totalMetrics += metrics.length;
+      totalDuration += metrics.reduce((sum, m) => sum + m.duration, 0);
+      totalErrors += metrics.filter(m => !m.success).length;
+    }
+    
+    if (totalMetrics > 0) {
+      report.summary.totalOperations = totalMetrics;
+      report.summary.averageResponseTime = totalDuration / totalMetrics;
+      report.summary.errorRate = (totalErrors / totalMetrics) * 100;
+      
+      // Calculate throughput (operations per second) for last minute
+      const oneMinuteAgo = Date.now() - 60000;
+      const recentMetrics = Array.from(this.metrics.values())
+        .flat()
+        .filter(m => m.timestamp > oneMinuteAgo);
+      report.summary.throughput = recentMetrics.length / 60;
+    }
+    
+    return report;
+  }
+  
+  private calculateOperationStats(operation: string, metrics: PerformanceMetric[]): OperationStats {
+    if (metrics.length === 0) {
+      return {
+        operation,
+        count: 0,
+        averageTime: 0,
+        minTime: 0,
+        maxTime: 0,
+        p95Time: 0,
+        p99Time: 0,
+        errorRate: 0,
+        successRate: 100,
+      };
+    }
+    
+    const durations = metrics.map(m => m.duration).sort((a, b) => a - b);
+    const successfulMetrics = metrics.filter(m => m.success);
+    
+    return {
+      operation,
+      count: metrics.length,
+      averageTime: durations.reduce((sum, d) => sum + d, 0) / durations.length,
+      minTime: Math.min(...durations),
+      maxTime: Math.max(...durations),
+      p95Time: durations[Math.floor(durations.length * 0.95)] || 0,
+      p99Time: durations[Math.floor(durations.length * 0.99)] || 0,
+      errorRate: ((metrics.length - successfulMetrics.length) / metrics.length) * 100,
+      successRate: (successfulMetrics.length / metrics.length) * 100,
+    };
+  }
+  
+  private startMonitoring() {
+    // Generate performance report every minute
+    setInterval(() => {
+      const report = this.getPerformanceReport();
+      console.log('📊 Performance Report:', report.summary);
+    }, 60000);
+    
+    // Clean up old metrics every 10 minutes
+    setInterval(() => {
+      const tenMinutesAgo = Date.now() - 600000;
+      
+      for (const [operation, metrics] of this.metrics.entries()) {
+        const filteredMetrics = metrics.filter(m => m.timestamp > tenMinutesAgo);
+        this.metrics.set(operation, filteredMetrics);
+      }
+    }, 600000);
+  }
+}
+
+// Performance thresholds for African fintech
+const AFRICAN_PERFORMANCE_THRESHOLDS: PerformanceThresholds = {
+  'api_auth_login': { warningThreshold: 2000, errorThreshold: 5000 },
+  'api_diva_calculate': { warningThreshold: 8000, errorThreshold: 15000 },
+  'api_chama_contribute': { warningThreshold: 3000, errorThreshold: 8000 },
+  'api_transaction_create': { warningThreshold: 2000, errorThreshold: 5000 },
+  'api_investment_order': { warningThreshold: 3000, errorThreshold: 8000 },
+  'db_query_user': { warningThreshold: 100, errorThreshold: 500 },
+  'db_query_transactions': { warningThreshold: 200, errorThreshold: 1000 },
+  'db_query_chama_balance': { warningThreshold: 150, errorThreshold: 800 },
+  'mobile_app_startup': { warningThreshold: 3000, errorThreshold: 8000 },
+  'mobile_component_render': { warningThreshold: 500, errorThreshold: 2000 },
+  'mobile_navigation': { warningThreshold: 300, errorThreshold: 1000 },
+};
+
+// Type definitions
+interface PerformanceThresholds {
+  [operation: string]: {
+    warningThreshold: number;
+    errorThreshold: number;
+  };
+}
+
+interface PerformanceAlert {
+  level: 'warning' | 'error';
+  operation: string;
+  message: string;
+  timestamp: number;
+  value: number;
+  threshold: number;
+}
+
+interface PerformanceReport {
+  timestamp: number;
+  operations: { [operation: string]: OperationStats };
+  summary: {
+    totalOperations: number;
+    averageResponseTime: number;
+    errorRate: number;
+    throughput: number;
+  };
+}
+
+interface OperationStats {
+  operation: string;
+  count: number;
+  averageTime: number;
+  minTime: number;
+  maxTime: number;
+  p95Time: number;
+  p99Time: number;
+  errorRate: number;
+  successRate: number;
+}
+
+// Initialize performance monitoring
+export const performanceMonitor = new PerformanceMonitor(AFRICAN_PERFORMANCE_THRESHOLDS);
+```
+
+---
+
+*This comprehensive performance testing framework ensures AWO Platform delivers optimal user experience across the diverse African mobile and network landscape, maintaining high performance standards while adapting to local constraints and user expectations.*
+
+*Last updated: June 2025*  
+*Next review: Sep 2025*

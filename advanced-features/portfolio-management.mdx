@@ -1,41 +1,963 @@
----
-title: "Portfolio Management"
-description: "AWO Platform portfolio management advanced functionality"
----
-
 # Portfolio Management
+
+AWO's Portfolio Management system provides sophisticated, automated portfolio optimization and rebalancing services that adapt to users' changing financial circumstances, market conditions, and investment goals while maintaining appropriate risk levels based on DIVA scores and RTSM assessments.
 
 ## Overview
 
 <Info>
-Portfolio Management is an advanced feature of the AWO Platform, providing sophisticated financial services for experienced users.
+Portfolio Management combines modern portfolio theory with African market dynamics and cultural preferences to create personalized investment strategies that evolve with users' financial journeys, from first-time investors to sophisticated wealth builders across the SADC region.
 </Info>
 
-## Advanced Capabilities
+**Core Portfolio Management Principles:**
+- **Dynamic Optimization**: Continuous optimization based on changing user profiles and market conditions
+- **Risk-Aligned Management**: Portfolio strategies strictly aligned with DIVA + RTSM assessments
+- **Cost-Conscious**: Minimize fees and transaction costs while maintaining optimal allocations
+- **Goal-Oriented**: Portfolio construction focused on achieving specific financial objectives
+- **African Market Integration**: Incorporation of local market opportunities and constraints
 
-Advanced functionality will be documented here.
+## Adaptive Portfolio Construction
 
-## Configuration
+### Dynamic Portfolio Architecture
 
-<Accordion title="Advanced Configuration Options">
-Configuration details for portfolio management will be provided here.
-</Accordion>
-
-## Implementation Guide
-
-Detailed implementation steps will be included here.
-
-## Performance Considerations
-
-Performance optimization tips will be documented here.
-
-## Enterprise Features
-
+**Portfolio construction responds to multiple input factors:**
 <CardGroup cols={2}>
-  <Card title="SME Marketplace" href="/advanced-features/sme-marketplace">
-    Business investment opportunities
+  <Card title="User Profile Inputs" icon="user">
+    **DIVA Score**: Financial capacity and health assessment  
+    **RTSM Profile**: Risk tolerance and behavioral preferences  
+    **Investment Goals**: Specific objectives and timelines  
+    **Life Stage**: Age, career stage, and family circumstances  
+    **Liquidity Needs**: Expected cash flow requirements
   </Card>
-  <Card title="Wealth Coaching" href="/advanced-features/wealth-coaching">
-    Professional financial advisory
+  <Card title="Market Context Inputs" icon="globe">
+    **Market Conditions**: Current market valuations and trends  
+    **Economic Environment**: Inflation, interest rates, currency movements  
+    **Sector Opportunities**: Emerging sectors and investment themes  
+    **Regulatory Changes**: New investment options or restrictions  
+    **Regional Dynamics**: SADC-specific market developments
   </Card>
 </CardGroup>
+
+### Portfolio Model Framework
+
+```typescript
+interface PortfolioModel {
+  modelId: string;
+  userId: string;
+  modelType: 'strategic' | 'tactical' | 'adaptive';
+  
+  // User-specific parameters
+  targetRiskLevel: number; // 0-100 scale
+  investmentHorizon: number; // years
+  liquidityRequirement: number; // percentage that must remain liquid
+  
+  // Strategic asset allocation
+  strategicAllocation: AssetAllocation;
+  tacticalRanges: TacticalRanges; // Allowed deviations from strategic
+  
+  // Constraints and preferences
+  constraints: PortfolioConstraints;
+  preferences: InvestmentPreferences;
+  
+  // Performance objectives
+  targetReturn: number; // expected annual return
+  maxDrawdown: number; // maximum acceptable loss
+  benchmarks: Benchmark[];
+  
+  // Rebalancing parameters
+  rebalancingTriggers: RebalancingTrigger[];
+  rebalancingFrequency: RebalancingFrequency;
+  
+  // Model metadata
+  createdDate: Date;
+  lastUpdated: Date;
+  nextReview: Date;
+  modelVersion: string;
+}
+
+interface AssetAllocation {
+  cashAndMoneyMarket: AllocationRange;
+  governmentBonds: AllocationRange;
+  corporateBonds: AllocationRange;
+  domesticEquity: AllocationRange;
+  internationalEquity: AllocationRange;
+  realEstate: AllocationRange;
+  commodities: AllocationRange;
+  alternatives: AllocationRange; // Including SME investments
+  
+  // Geographic allocation
+  domesticAllocation: number;
+  sacdAllocation: number;
+  internationalAllocation: number;
+  
+  // Currency allocation
+  localCurrencyWeight: number;
+  foreignCurrencyWeight: number;
+}
+
+interface AllocationRange {
+  target: number; // target percentage
+  minimum: number; // minimum allowed
+  maximum: number; // maximum allowed
+  current?: number; // current actual allocation
+}
+```
+
+### Portfolio Construction Engine
+
+```typescript
+class PortfolioConstructionEngine {
+  async constructOptimalPortfolio(userId: string): Promise<OptimalPortfolio> {
+    // Gather user inputs
+    const userProfile = await this.getUserInvestmentProfile(userId);
+    const divaScore = await this.getDivaScore(userId);
+    const rtsmAssessment = await this.getRTSMAssessment(userId);
+    const investmentGoals = await this.getInvestmentGoals(userId);
+    
+    // Determine portfolio tier and constraints
+    const portfolioTier = this.determinePortfolioTier(divaScore.overallScore);
+    const availableAssetClasses = await this.getAvailableAssetClasses(portfolioTier);
+    
+    // Build strategic asset allocation
+    const strategicAllocation = await this.buildStrategicAllocation(
+      rtsmAssessment,
+      investmentGoals,
+      availableAssetClasses
+    );
+    
+    // Apply portfolio optimization
+    const optimizedAllocation = await this.optimizePortfolio(
+      strategicAllocation,
+      userProfile.constraints,
+      await this.getMarketData()
+    );
+    
+    // Select specific investments
+    const investmentSelection = await this.selectSpecificInvestments(
+      optimizedAllocation,
+      portfolioTier,
+      userProfile.preferences
+    );
+    
+    return {
+      allocation: optimizedAllocation,
+      investments: investmentSelection,
+      expectedReturn: await this.calculateExpectedReturn(optimizedAllocation),
+      expectedRisk: await this.calculateExpectedRisk(optimizedAllocation),
+      rationale: this.generateAllocationRationale(optimizedAllocation, userProfile)
+    };
+  }
+
+  private async buildStrategicAllocation(
+    rtsmAssessment: RTSMAssessment,
+    goals: InvestmentGoal[],
+    availableAssetClasses: AssetClass[]
+  ): Promise<AssetAllocation> {
+    
+    // Base allocation from risk profile
+    let baseAllocation = this.getBaseAllocationForRiskProfile(rtsmAssessment.riskProfile);
+    
+    // Adjust for investment timeline
+    const timelineAdjustment = this.calculateTimelineAdjustment(goals);
+    baseAllocation = this.applyTimelineAdjustment(baseAllocation, timelineAdjustment);
+    
+    // Adjust for African market context
+    const africanMarketAdjustment = await this.getAfricanMarketAdjustment();
+    baseAllocation = this.applyAfricanMarketAdjustment(baseAllocation, africanMarketAdjustment);
+    
+    // Apply goal-specific adjustments
+    for (const goal of goals) {
+      const goalAdjustment = this.calculateGoalAdjustment(goal);
+      baseAllocation = this.applyGoalAdjustment(baseAllocation, goalAdjustment);
+    }
+    
+    // Constrain to available asset classes
+    return this.constrainToAvailableAssetClasses(baseAllocation, availableAssetClasses);
+  }
+
+  private async optimizePortfolio(
+    strategicAllocation: AssetAllocation,
+    constraints: PortfolioConstraints,
+    marketData: MarketData
+  ): Promise<AssetAllocation> {
+    
+    // Mean-variance optimization with constraints
+    const optimizer = new PortfolioOptimizer(marketData);
+    
+    // Set up optimization problem
+    const optimizationProblem = {
+      expectedReturns: marketData.expectedReturns,
+      covarianceMatrix: marketData.covarianceMatrix,
+      constraints: this.convertToOptimizerConstraints(strategicAllocation, constraints),
+      objectiveFunction: 'maximize_sharpe_ratio'
+    };
+    
+    // Solve optimization
+    const optimizedWeights = await optimizer.solve(optimizationProblem);
+    
+    // Convert back to asset allocation format
+    return this.convertWeightsToAllocation(optimizedWeights, strategicAllocation);
+  }
+}
+```
+
+## Intelligent Rebalancing System
+
+### Multi-Trigger Rebalancing
+
+**Rebalancing Trigger Types:**
+<CardGroup cols={2}>
+  <Card title="Threshold-Based Triggers" icon="triangle">
+    **Percentage Drift**: Rebalance when any asset class drifts 5%+ from target  
+    **Absolute Drift**: Rebalance when drift exceeds R10,000 in any position  
+    **Portfolio Risk**: Rebalance when portfolio risk exceeds tolerance by 10%  
+    **Correlation Changes**: Rebalance when correlations change significantly
+  </Card>
+  <Card title="Time-Based Triggers" icon="calendar">
+    **Calendar Rebalancing**: Quarterly, semi-annual, or annual rebalancing  
+    **Goal-Date Triggers**: Rebalance as investment goals approach maturity  
+    **Life Event Triggers**: Rebalance when user circumstances change  
+    **Market Regime Changes**: Rebalance when market conditions shift significantly
+  </Card>
+</CardGroup>
+
+### Smart Rebalancing Algorithm
+
+```typescript
+class SmartRebalancingEngine {
+  async evaluateRebalancingNeed(userId: string): Promise<RebalancingRecommendation> {
+    const currentPortfolio = await this.getCurrentPortfolio(userId);
+    const targetAllocation = await this.getTargetAllocation(userId);
+    const rebalancingRules = await this.getRebalancingRules(userId);
+    
+    // Calculate current drift from target
+    const driftAnalysis = this.calculateDrift(currentPortfolio, targetAllocation);
+    
+    // Evaluate all rebalancing triggers
+    const triggerEvaluations = await Promise.all([
+      this.evaluateThresholdTriggers(driftAnalysis, rebalancingRules),
+      this.evaluateTimeTriggers(currentPortfolio, rebalancingRules),
+      this.evaluateRiskTriggers(currentPortfolio, targetAllocation),
+      this.evaluateMarketTriggers(currentPortfolio),
+      this.evaluateGoalTriggers(userId, currentPortfolio)
+    ]);
+    
+    const triggeredRebalancing = triggerEvaluations.some(evaluation => evaluation.triggered);
+    
+    if (triggeredRebalancing) {
+      // Calculate optimal rebalancing trades
+      const optimalTrades = await this.calculateOptimalRebalancing(
+        currentPortfolio,
+        targetAllocation,
+        await this.getTradingConstraints(userId)
+      );
+      
+      // Estimate costs and benefits
+      const costBenefit = await this.analyzeCostBenefit(optimalTrades, driftAnalysis);
+      
+      // Generate recommendation
+      return {
+        recommended: costBenefit.netBenefit > 0,
+        urgency: this.calculateUrgency(triggerEvaluations),
+        proposedTrades: optimalTrades,
+        costBenefit,
+        reasoning: this.generateRebalancingReasoning(triggerEvaluations, costBenefit),
+        alternativeOptions: await this.generateAlternativeOptions(driftAnalysis)
+      };
+    } else {
+      return {
+        recommended: false,
+        reasoning: 'Portfolio within acceptable ranges',
+        nextEvaluation: this.calculateNextEvaluationDate(rebalancingRules)
+      };
+    }
+  }
+
+  private async calculateOptimalRebalancing(
+    currentPortfolio: Portfolio,
+    targetAllocation: AssetAllocation,
+    constraints: TradingConstraints
+  ): Promise<RebalancingTrade[]> {
+    
+    const trades: RebalancingTrade[] = [];
+    const portfolioValue = currentPortfolio.totalValue;
+    
+    // Calculate target values for each asset class
+    const targetValues = this.calculateTargetValues(targetAllocation, portfolioValue);
+    const currentValues = this.getCurrentValues(currentPortfolio);
+    
+    // Identify assets to sell (over-allocated)
+    const assetsToSell = this.identifyOverAllocatedAssets(currentValues, targetValues);
+    
+    // Identify assets to buy (under-allocated)
+    const assetsToBuy = this.identifyUnderAllocatedAssets(currentValues, targetValues);
+    
+    // Optimize trading to minimize costs
+    const optimizedTrades = await this.optimizeTradingCosts(
+      assetsToSell,
+      assetsToBuy,
+      constraints
+    );
+    
+    return optimizedTrades;
+  }
+
+  private async optimizeTradingCosts(
+    assetsToSell: AssetRebalancing[],
+    assetsToBuy: AssetRebalancing[],
+    constraints: TradingConstraints
+  ): Promise<RebalancingTrade[]> {
+    
+    const trades: RebalancingTrade[] = [];
+    
+    // Sort by cost efficiency (minimize bid-ask spreads and fees)
+    const sortedSells = assetsToSell.sort((a, b) => a.tradingCost - b.tradingCost);
+    const sortedBuys = assetsToBuy.sort((a, b) => a.tradingCost - b.tradingCost);
+    
+    // Match sells with buys to minimize net trading
+    for (const sellAsset of sortedSells) {
+      let remainingToSell = sellAsset.excessAmount;
+      
+      for (const buyAsset of sortedBuys) {
+        if (remainingToSell <= 0) break;
+        if (buyAsset.deficitAmount <= 0) continue;
+        
+        // Calculate optimal trade size
+        const tradeSize = Math.min(remainingToSell, buyAsset.deficitAmount);
+        
+        // Check if trade meets minimum thresholds
+        if (tradeSize >= constraints.minimumTradeSize) {
+          trades.push({
+            sellAsset: sellAsset.assetId,
+            buyAsset: buyAsset.assetId,
+            amount: tradeSize,
+            estimatedCost: this.calculateTradeCost(sellAsset, buyAsset, tradeSize),
+            priority: this.calculateTradePriority(sellAsset, buyAsset, tradeSize)
+          });
+          
+          remainingToSell -= tradeSize;
+          buyAsset.deficitAmount -= tradeSize;
+        }
+      }
+    }
+    
+    // Sort trades by priority and cost efficiency
+    return trades.sort((a, b) => b.priority - a.priority);
+  }
+}
+```
+
+## Goal-Based Portfolio Management
+
+### Multi-Goal Portfolio Architecture
+
+**Goal-Specific Sub-Portfolios:**
+<CardGroup cols={2}>
+  <Card title="Goal Segregation" icon="square">
+    **Emergency Fund**: Ultra-liquid, capital preservation focus  
+    **Short-term Goals**: 1-3 years, low volatility emphasis  
+    **Medium-term Goals**: 3-10 years, balanced growth approach  
+    **Long-term Goals**: 10+ years, growth-oriented strategy  
+    **Retirement**: Age-appropriate glide path allocation
+  </Card>
+  <Card title="Goal Coordination" icon="link">
+    **Shared Resources**: Efficient use of portfolio diversification  
+    **Tax Optimization**: Goal coordination for optimal tax outcomes  
+    **Rebalancing Synergies**: Cross-goal rebalancing opportunities  
+    **Risk Management**: Portfolio-wide risk monitoring and control  
+    **Liquidity Management**: Coordinated liquidity across all goals
+  </Card>
+</CardGroup>
+
+### Goal-Based Allocation Engine
+
+```typescript
+interface FinancialGoal {
+  goalId: string;
+  userId: string;
+  goalType: GoalType;
+  
+  // Goal parameters
+  targetAmount: number;
+  currentValue: number;
+  targetDate: Date;
+  priority: GoalPriority;
+  
+  // Investment parameters
+  riskTolerance: RiskTolerance;
+  liquidityNeeds: LiquidityRequirement;
+  taxConsiderations: TaxConsiderations;
+  
+  // Progress tracking
+  monthlyContribution: number;
+  progressPercentage: number;
+  onTrackProbability: number;
+  
+  // Portfolio allocation
+  dedicatedAllocation: AssetAllocation;
+  sharedAllocation: AssetAllocation;
+  currentAllocation: AssetAllocation;
+}
+
+class GoalBasedPortfolioManager {
+  async constructGoalBasedPortfolio(userId: string): Promise<GoalBasedPortfolio> {
+    const goals = await this.getUserGoals(userId);
+    const userProfile = await this.getUserProfile(userId);
+    const availableCapital = await this.getAvailableInvestmentCapital(userId);
+    
+    // Prioritize goals
+    const prioritizedGoals = this.prioritizeGoals(goals, userProfile);
+    
+    // Allocate capital across goals
+    const capitalAllocation = await this.allocateCapitalToGoals(
+      prioritizedGoals,
+      availableCapital,
+      userProfile.riskProfile
+    );
+    
+    // Design goal-specific portfolios
+    const goalPortfolios = await Promise.all(
+      prioritizedGoals.map(goal => 
+        this.designGoalPortfolio(goal, capitalAllocation[goal.goalId])
+      )
+    );
+    
+    // Optimize across goals for efficiency
+    const optimizedPortfolio = await this.optimizeAcrossGoals(goalPortfolios);
+    
+    // Generate implementation plan
+    const implementationPlan = await this.generateImplementationPlan(optimizedPortfolio);
+    
+    return {
+      goals: prioritizedGoals,
+      portfolios: goalPortfolios,
+      combinedPortfolio: optimizedPortfolio,
+      implementation: implementationPlan,
+      expectedOutcomes: await this.projectGoalOutcomes(optimizedPortfolio)
+    };
+  }
+
+  private async designGoalPortfolio(
+    goal: FinancialGoal,
+    allocatedCapital: number
+  ): Promise<GoalPortfolio> {
+    
+    // Calculate time to goal
+    const yearsToGoal = this.calculateYearsToGoal(goal.targetDate);
+    
+    // Determine appropriate risk level for timeline
+    const timelineRiskLevel = this.calculateTimelineRisk(yearsToGoal);
+    
+    // Combine with user's risk tolerance
+    const effectiveRiskLevel = Math.min(
+      goal.riskTolerance,
+      timelineRiskLevel,
+      this.getMaxRiskForGoalType(goal.goalType)
+    );
+    
+    // Build strategic allocation
+    const strategicAllocation = this.buildStrategicAllocationForGoal(
+      effectiveRiskLevel,
+      yearsToGoal,
+      goal.goalType
+    );
+    
+    // Apply glide path if appropriate
+    if (this.requiresGlidePath(goal)) {
+      strategicAllocation = this.applyGlidePath(strategicAllocation, yearsToGoal);
+    }
+    
+    // Select specific investments
+    const investments = await this.selectInvestmentsForGoal(
+      strategicAllocation,
+      allocatedCapital,
+      goal.preferences
+    );
+    
+    return {
+      goal,
+      allocation: strategicAllocation,
+      investments,
+      capitalAllocated: allocatedCapital,
+      expectedReturn: await this.calculateExpectedReturn(strategicAllocation),
+      achievementProbability: await this.calculateAchievementProbability(goal, strategicAllocation)
+    };
+  }
+
+  private calculateAchievementProbability(
+    goal: FinancialGoal,
+    allocation: AssetAllocation
+  ): Promise<number> {
+    // Monte Carlo simulation for goal achievement
+    const simulations = 10000;
+    const yearsToGoal = this.calculateYearsToGoal(goal.targetDate);
+    const currentValue = goal.currentValue;
+    const monthlyContribution = goal.monthlyContribution;
+    
+    let successCount = 0;
+    
+    for (let i = 0; i < simulations; i++) {
+      const finalValue = this.simulatePortfolioGrowth(
+        currentValue,
+        monthlyContribution,
+        allocation,
+        yearsToGoal
+      );
+      
+      if (finalValue >= goal.targetAmount) {
+        successCount++;
+      }
+    }
+    
+    return successCount / simulations;
+  }
+}
+```
+
+## Tax-Optimized Portfolio Management
+
+### Tax-Efficient Strategies
+
+**South African Tax Optimization:**
+<CardGroup cols={2}>
+  <Card title="Tax-Free Savings Account" icon="shield">
+    **Annual Limit**: R36,000 per year (2025 limit)  
+    **Lifetime Limit**: R500,000 total contributions  
+    **Tax Benefits**: No tax on dividends, interest, or capital gains  
+    **Strategy**: Prioritize high-growth investments in TFSA
+  </Card>
+  <Card title="Retirement Annuities" icon="calendar">
+    **Tax Deduction**: Up to 27.5% of income or R350,000 annually  
+    **Tax Deferral**: Growth is tax-deferred until withdrawal  
+    **Strategy**: Use for long-term goal funding and tax reduction  
+    **Flexibility**: Modern RAs offer investment choice
+  </Card>
+</CardGroup>
+
+### Tax-Loss Harvesting Implementation
+
+```typescript
+class TaxOptimizationEngine {
+  async implementTaxLossHarvesting(userId: string): Promise<TaxHarvestingPlan> {
+    const portfolio = await this.getCurrentPortfolio(userId);
+    const taxProfile = await this.getUserTaxProfile(userId);
+    const currentTaxYear = this.getCurrentTaxYear();
+    
+    // Identify positions with unrealized losses
+    const lossPositions = this.identifyLossPositions(portfolio);
+    
+    // Identify positions with unrealized gains
+    const gainPositions = this.identifyGainPositions(portfolio);
+    
+    // Calculate optimal harvesting strategy
+    const harvestingOpportunities = await this.calculateHarvestingOpportunities(
+      lossPositions,
+      gainPositions,
+      taxProfile
+    );
+    
+    // Check wash sale rules
+    const validOpportunities = this.filterWashSaleViolations(harvestingOpportunities);
+    
+    // Optimize for portfolio maintenance
+    const optimizedPlan = await this.optimizeForPortfolioMaintenance(
+      validOpportunities,
+      portfolio.targetAllocation
+    );
+    
+    return {
+      harvestingTrades: optimizedPlan.trades,
+      estimatedTaxSavings: optimizedPlan.taxSavings,
+      portfolioImpact: optimizedPlan.allocationImpact,
+      implementationTimeline: optimizedPlan.timeline,
+      monitoring: optimizedPlan.monitoringPlan
+    };
+  }
+
+  private async calculateHarvestingOpportunities(
+    lossPositions: Position[],
+    gainPositions: Position[],
+    taxProfile: UserTaxProfile
+  ): Promise<HarvestingOpportunity[]> {
+    
+    const opportunities: HarvestingOpportunity[] = [];
+    
+    for (const lossPosition of lossPositions) {
+      // Calculate tax benefit of realizing loss
+      const taxBenefit = this.calculateTaxBenefit(lossPosition, taxProfile);
+      
+      // Find suitable replacement investments
+      const replacements = await this.findReplacementInvestments(lossPosition);
+      
+      // Calculate total opportunity value
+      const opportunityValue = taxBenefit - this.calculateTransactionCosts(lossPosition, replacements);
+      
+      if (opportunityValue > 0) {
+        opportunities.push({
+          position: lossPosition,
+          taxBenefit,
+          replacements,
+          opportunityValue,
+          urgency: this.calculateHarvestingUrgency(lossPosition, taxProfile)
+        });
+      }
+    }
+    
+    return opportunities.sort((a, b) => b.opportunityValue - a.opportunityValue);
+  }
+}
+```
+
+## Risk Management and Monitoring
+
+### Continuous Risk Monitoring
+
+**Multi-Dimensional Risk Assessment:**
+<CardGroup cols={3}>
+  <Card title="Market Risk" icon="chart-line">
+    **Value at Risk**: Daily VaR calculation for portfolio  
+    **Stress Testing**: Scenario analysis for market shocks  
+    **Correlation Monitoring**: Changing asset correlations  
+    **Volatility Tracking**: Portfolio volatility vs. target
+  </Card>
+  <Card title="Concentration Risk" icon="circle">
+    **Asset Concentration**: Single asset position limits  
+    **Sector Concentration**: Sector exposure monitoring  
+    **Geographic Concentration**: Country/region risk limits  
+    **Currency Concentration**: Foreign exchange exposure
+  </Card>
+  <Card title="Liquidity Risk" icon="triangle">
+    **Liquidity Coverage**: Liquid assets vs. short-term needs  
+    **Redemption Risk**: Portfolio liquidity under stress  
+    **Market Liquidity**: Ability to trade positions efficiently  
+    **Funding Liquidity**: Access to additional capital
+  </Card>
+</CardGroup>
+
+### Risk Monitoring Implementation
+
+```typescript
+class PortfolioRiskMonitor {
+  async performDailyRiskAssessment(userId: string): Promise<RiskAssessment> {
+    const portfolio = await this.getCurrentPortfolio(userId);
+    const userProfile = await this.getUserRiskProfile(userId);
+    const marketData = await this.getCurrentMarketData();
+    
+    // Calculate Value at Risk
+    const valueAtRisk = await this.calculateValueAtRisk(portfolio, marketData);
+    
+    // Assess concentration risks
+    const concentrationRisks = this.assessConcentrationRisks(portfolio);
+    
+    // Evaluate liquidity risks
+    const liquidityRisks = await this.assessLiquidityRisks(portfolio, userProfile);
+    
+    // Check correlation risks
+    const correlationRisks = await this.assessCorrelationRisks(portfolio, marketData);
+    
+    // Calculate overall risk score
+    const overallRiskScore = this.calculateOverallRiskScore([
+      valueAtRisk,
+      concentrationRisks,
+      liquidityRisks,
+      correlationRisks
+    ]);
+    
+    // Generate risk alerts if necessary
+    const riskAlerts = this.generateRiskAlerts(overallRiskScore, userProfile.riskTolerance);
+    
+    return {
+      assessmentDate: new Date(),
+      overallRiskScore,
+      valueAtRisk,
+      concentrationRisks,
+      liquidityRisks,
+      correlationRisks,
+      riskAlerts,
+      recommendations: this.generateRiskRecommendations(overallRiskScore, userProfile)
+    };
+  }
+
+  private async calculateValueAtRisk(
+    portfolio: Portfolio,
+    marketData: MarketData,
+    confidenceLevel: number = 0.95,
+    timeHorizon: number = 1
+  ): Promise<ValueAtRiskAnalysis> {
+    
+    // Historical simulation method
+    const historicalReturns = await this.getHistoricalReturns(portfolio.holdings, marketData);
+    const portfolioReturns = this.calculatePortfolioReturns(portfolio.holdings, historicalReturns);
+    
+    // Sort returns and find VaR percentile
+    const sortedReturns = portfolioReturns.sort((a, b) => a - b);
+    const varIndex = Math.floor((1 - confidenceLevel) * sortedReturns.length);
+    const historicalVaR = sortedReturns[varIndex] * portfolio.totalValue;
+    
+    // Parametric method for comparison
+    const portfolioVolatility = this.calculatePortfolioVolatility(portfolio.holdings, marketData);
+    const parametricVaR = this.calculateParametricVaR(
+      portfolio.totalValue,
+      portfolioVolatility,
+      confidenceLevel,
+      timeHorizon
+    );
+    
+    // Monte Carlo simulation
+    const monteCarloVaR = await this.calculateMonteCarloVaR(
+      portfolio,
+      marketData,
+      confidenceLevel,
+      timeHorizon
+    );
+    
+    return {
+      confidenceLevel,
+      timeHorizon,
+      historicalVaR,
+      parametricVaR,
+      monteCarloVaR,
+      recommendedVaR: Math.max(historicalVaR, parametricVaR, monteCarloVaR),
+      expectedShortfall: this.calculateExpectedShortfall(sortedReturns, confidenceLevel)
+    };
+  }
+}
+```
+
+## Performance Attribution and Analytics
+
+### Multi-Factor Performance Attribution
+
+**Attribution Analysis Components:**
+<CardGroup cols={2}>
+  <Card title="Return Attribution" icon="chart-bar">
+    **Asset Allocation**: Return contribution from allocation decisions  
+    **Security Selection**: Return from individual investment choices  
+    **Interaction Effect**: Combined impact of allocation and selection  
+    **Currency Effect**: Impact of foreign exchange movements
+  </Card>
+  <Card title="Risk Attribution" icon="shield">
+    **Factor Exposures**: Risk contribution from market factors  
+    **Specific Risk**: Idiosyncratic risk from individual holdings  
+    **Concentration Risk**: Risk from portfolio concentration  
+    **Timing Risk**: Risk from rebalancing timing decisions
+  </Card>
+</CardGroup>
+
+### Performance Analytics Engine
+
+```typescript
+class PerformanceAttributionEngine {
+  async generateAttributionAnalysis(
+    userId: string,
+    period: AnalysisPeriod
+  ): Promise<PerformanceAttribution> {
+    
+    const portfolio = await this.getPortfolioHistory(userId, period);
+    const benchmark = await this.getBenchmarkHistory(userId, period);
+    const transactions = await this.getTransactionHistory(userId, period);
+    
+    // Calculate time-weighted returns
+    const portfolioReturns = this.calculateTimeWeightedReturns(portfolio, transactions);
+    const benchmarkReturns = this.calculateBenchmarkReturns(benchmark);
+    
+    // Perform Brinson attribution analysis
+    const brinsonAttribution = this.performBrinsonAttribution(
+      portfolio,
+      benchmark,
+      portfolioReturns,
+      benchmarkReturns
+    );
+    
+    // Calculate factor-based attribution
+    const factorAttribution = await this.performFactorAttribution(
+      portfolio,
+      period
+    );
+    
+    // Analyze transaction impact
+    const transactionAttribution = this.analyzeTransactionImpact(
+      transactions,
+      portfolioReturns
+    );
+    
+    return {
+      period,
+      totalReturn: portfolioReturns.totalReturn,
+      benchmarkReturn: benchmarkReturns.totalReturn,
+      excessReturn: portfolioReturns.totalReturn - benchmarkReturns.totalReturn,
+      
+      attribution: {
+        assetAllocation: brinsonAttribution.allocationEffect,
+        securitySelection: brinsonAttribution.selectionEffect,
+        interactionEffect: brinsonAttribution.interactionEffect,
+        currencyEffect: brinsonAttribution.currencyEffect
+      },
+      
+      factorAttribution,
+      transactionAttribution,
+      
+      insights: this.generateAttributionInsights(brinsonAttribution, factorAttribution),
+      recommendations: this.generateAttributionRecommendations(brinsonAttribution)
+    };
+  }
+
+  private performBrinsonAttribution(
+    portfolio: PortfolioHistory,
+    benchmark: BenchmarkHistory,
+    portfolioReturns: Returns,
+    benchmarkReturns: Returns
+  ): BrinsonAttribution {
+    
+    const assetClasses = this.getAssetClasses(portfolio, benchmark);
+    
+    let allocationEffect = 0;
+    let selectionEffect = 0;
+    let interactionEffect = 0;
+    
+    for (const assetClass of assetClasses) {
+      const portfolioWeight = this.getPortfolioWeight(portfolio, assetClass);
+      const benchmarkWeight = this.getBenchmarkWeight(benchmark, assetClass);
+      const portfolioReturn = this.getAssetClassReturn(portfolio, assetClass);
+      const benchmarkReturn = this.getAssetClassReturn(benchmark, assetClass);
+      
+      // Allocation effect: (Portfolio Weight - Benchmark Weight) × Benchmark Return
+      const assetAllocationEffect = (portfolioWeight - benchmarkWeight) * benchmarkReturn;
+      allocationEffect += assetAllocationEffect;
+      
+      // Selection effect: Benchmark Weight × (Portfolio Return - Benchmark Return)
+      const assetSelectionEffect = benchmarkWeight * (portfolioReturn - benchmarkReturn);
+      selectionEffect += assetSelectionEffect;
+      
+      // Interaction effect: (Portfolio Weight - Benchmark Weight) × (Portfolio Return - Benchmark Return)
+      const assetInteractionEffect = (portfolioWeight - benchmarkWeight) * (portfolioReturn - benchmarkReturn);
+      interactionEffect += assetInteractionEffect;
+    }
+    
+    return {
+      allocationEffect,
+      selectionEffect,
+      interactionEffect,
+      currencyEffect: this.calculateCurrencyEffect(portfolio, benchmark),
+      totalAttribution: allocationEffect + selectionEffect + interactionEffect
+    };
+  }
+}
+```
+
+## API Integration Examples
+
+### Portfolio Management APIs
+
+```typescript
+// Get current portfolio with performance metrics
+const portfolio = await awoClient.portfolio.getPortfolio(userId, {
+  includePerformance: true,
+  includeAttribution: true,
+  includeRiskMetrics: true
+});
+
+// Get rebalancing recommendations
+const rebalancing = await awoClient.portfolio.getRebalancingRecommendation(userId, {
+  includeAlternatives: true,
+  includeCostAnalysis: true
+});
+
+// Execute portfolio rebalancing
+const rebalanceResult = await awoClient.portfolio.executeRebalancing(userId, {
+  trades: rebalancingTrades,
+  executionType: 'gradual', // or 'immediate'
+  maxSlippage: 0.5 // 0.5%
+});
+
+// Get goal-based portfolio analysis
+const goalAnalysis = await awoClient.portfolio.analyzeGoalProgress(userId, {
+  goalId: 'retirement_goal',
+  includeProjections: true,
+  includeAlternativeScenarios: true
+});
+```
+
+### Risk Management APIs
+
+```typescript
+// Get current risk assessment
+const riskAssessment = await awoClient.portfolio.getRiskAssessment(userId, {
+  includeVaR: true,
+  includeStressTesting: true,
+  includeConcentrationAnalysis: true
+});
+
+// Set up risk monitoring alerts
+await awoClient.portfolio.setupRiskAlerts(userId, {
+  maxPortfolioVaR: 50000, // R50,000
+  maxSinglePositionWeight: 0.15, // 15%
+  maxSectorConcentration: 0.25, // 25%
+  alertFrequency: 'daily'
+});
+
+// Get performance attribution analysis
+const attribution = await awoClient.portfolio.getPerformanceAttribution(userId, {
+  period: 'last_12_months',
+  includeFactor Attribution: true,
+  includeTransactionAnalysis: true
+});
+```
+
+### Tax Optimization APIs
+
+```typescript
+// Get tax-loss harvesting opportunities
+const taxHarvesting = await awoClient.portfolio.getTaxHarvestingOpportunities(userId, {
+  minimumLoss: 1000, // R1,000 minimum
+  includereplacementOptions: true
+});
+
+// Execute tax-optimized rebalancing
+const taxOptimizedRebalancing = await awoClient.portfolio.executeTaxOptimizedRebalancing(userId, {
+  harvestLosses: true,
+  optimizeAssetLocation: true,
+  considerWashSaleRules: true
+});
+
+// Get tax-efficient portfolio recommendations
+const taxEfficient = await awoClient.portfolio.getTaxEfficientRecommendations(userId, {
+  includeRetirementAccounts: true,
+  includeTFSAOptimization: true,
+  taxYear: 2025
+});
+```
+
+## Advanced Portfolio Features
+
+### Multi-Currency Portfolio Management
+
+**Currency Considerations for SADC Investors:**
+<CardGroup cols={2}>
+  <Card title="Currency Allocation" icon="globe">
+    **Base Currency**: User's primary currency (ZAR, BWP, NAD, ZMW)  
+    **Foreign Exposure**: Strategic allocation to foreign currencies  
+    **Hedging Strategies**: Currency hedging for risk management  
+    **Inflation Protection**: Currency diversification for inflation hedging
+  </Card>
+  <Card title="Currency Risk Management" icon="shield">
+    **Exposure Monitoring**: Track currency exposure across portfolio  
+    **Hedging Costs**: Monitor costs of currency hedging strategies  
+    **Natural Hedging**: Use foreign investments for natural hedging  
+    **Dynamic Hedging**: Adjust hedging based on market conditions
+  </Card>
+</CardGroup>
+
+### ESG and Impact Integration
+
+**ESG Portfolio Integration:**
+- **ESG Screening**: Integration of environmental, social, and governance factors
+- **Impact Measurement**: Tracking social and environmental impact of investments
+- **SDG Alignment**: Alignment with United Nations Sustainable Development Goals
+- **Community Impact**: Focus on investments that benefit local African communities
+
+---
+
+*AWO's Portfolio Management system provides sophisticated investment management capabilities while maintaining simplicity and transparency for users across the SADC region. Through continuous optimization, risk monitoring, and goal-based management, users can confidently build wealth while staying aligned with their financial objectives and risk tolerance.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

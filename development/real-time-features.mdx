@@ -1,42 +1,1004 @@
----
-title: "Real Time Features"
-description: "AWO Platform real time features development guide"
----
-
 # Real Time Features
 
-## Overview
+AWO Platform's real-time infrastructure delivers instant updates for financial transactions, Chama activities, and community interactions across the SADC region, designed to work reliably even with variable African connectivity patterns.
+
+## Real-Time Architecture Overview
 
 <Info>
-This guide covers real time features for AWO Platform development.
+AWO's real-time system combines Socket.io for instant bidirectional communication, Redis Streams for event processing, and intelligent connection management to ensure users stay connected to their financial communities regardless of network conditions.
 </Info>
 
-## Development Setup
+### System Architecture
 
-Development setup instructions will be provided here.
+```
+┌─────────────────────────────────────────────────────────┐
+│                MOBILE CLIENTS                           │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐ │
+│  │   Socket.io │ │ Auto-Reconnect│ │   Offline Queue     │ │
+│  │   Client    │ │   Manager     │ │   + Persistence     │ │
+│  └─────────────┘ └─────────────┘ └─────────────────────┘ │
+└─────────────────┬───────────────────────────────────────┘
+                  │ WSS (WebSocket Secure)
+┌─────────────────▼───────────────────────────────────────┐
+│                LOAD BALANCER                            │
+│            (Sticky Sessions)                            │
+└─────────────────┬───────────────────────────────────────┘
+                  │
+┌─────────────────▼───────────────────────────────────────┐
+│              SOCKET.IO SERVERS                          │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │           Connection Manager                        │ │
+│  │     ┌─────────┐ ┌─────────┐ ┌─────────────────────┐ │ │
+│  │     │  Auth   │ │  Rate   │ │    Room Management  │ │ │
+│  │     │Middleware│ │ Limiting│ │   (Chamas, Users)   │ │ │
+│  │     └─────────┘ └─────────┘ └─────────────────────┘ │ │
+│  └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              Event Handlers                         │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │ Chama   │ │  DIVA   │ │Payment  │ │   User      ││ │
+│  │  │Events   │ │ Score   │ │ Events  │ │ Presence    ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────┬───────────────────────────────────────┘
+                  │
+┌─────────────────▼───────────────────────────────────────┐
+│               REDIS CLUSTER                             │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐ │
+│  │ Redis Pub/  │ │Redis Streams│ │   Session Store     │ │
+│  │ Sub Adapter │ │Event Queue  │ │  + Presence Data    │ │
+│  └─────────────┘ └─────────────┘ └─────────────────────┘ │
+└─────────────────┬───────────────────────────────────────┘
+                  │
+┌─────────────────▼───────────────────────────────────────┐
+│             BUSINESS SERVICES                           │
+│   ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐   │
+│   │  DIVA   │ │  Chama  │ │Payment  │ │Notification │   │
+│   │ Service │ │ Service │ │ Service │ │  Service    │   │
+│   └─────────┘ └─────────┘ └─────────┘ └─────────────┘   │
+└─────────────────────────────────────────────────────────┘
+```
 
-## Code Examples
+## Core Real-Time Features
+
+### 1. Chama Real-Time Updates
+
+**Purpose**: Instant transparency and engagement for community savings groups.
+
+**Key Events**:
+- Member contributions and withdrawals
+- Voting events and governance decisions
+- Payout distributions and approvals
+- Member joins/leaves notifications
+- Group milestone achievements
+
+**Implementation**:
 
 ```typescript
-// Development example
-import { AWOPlatform } from '@awo-platform/core';
+// Chama real-time event handler
+class ChamaRealtimeHandler {
+  constructor(private io: Server, private chamaService: ChamaService) {
+    this.setupEventHandlers();
+  }
+  
+  private setupEventHandlers() {
+    this.io.on('connection', (socket) => {
+      // Join user to their Chama rooms
+      socket.on('join_chamas', async (data) => {
+        const { userId, accessToken } = data;
+        
+        try {
+          const user = await this.authenticateUser(accessToken);
+          const userChamas = await this.chamaService.getUserChamas(userId);
+          
+          // Join all user's Chama rooms
+          userChamas.forEach(chama => {
+            socket.join(`chama_${chama.id}`);
+            socket.join(`chama_${chama.id}_members`);
+          });
+          
+          // Send current online members
+          this.broadcastMemberPresence(socket, userChamas);
+          
+          socket.emit('chamas_joined', {
+            chamas: userChamas.map(c => c.id),
+            timestamp: new Date(),
+          });
+        } catch (error) {
+          socket.emit('error', { message: 'Failed to join Chama rooms' });
+        }
+      });
+      
+      // Handle contribution events
+      socket.on('chama_contribute', async (data) => {
+        const { chamaId, amount, userId } = data;
+        
+        try {
+          // Process contribution through service
+          const contribution = await this.chamaService.processContribution({
+            chamaId,
+            amount,
+            userId,
+            source: 'realtime',
+          });
+          
+          // Broadcast to all Chama members
+          this.io.to(`chama_${chamaId}`).emit('contribution_received', {
+            chamaId,
+            contribution: {
+              id: contribution.id,
+              amount,
+              memberName: contribution.memberName,
+              timestamp: new Date(),
+              runningTotal: contribution.newTotal,
+            },
+            event: 'member_contributed',
+          });
+          
+          // Send confirmation to contributor
+          socket.emit('contribution_confirmed', {
+            contributionId: contribution.id,
+            newBalance: contribution.newBalance,
+            chamaTotal: contribution.newTotal,
+          });
+          
+        } catch (error) {
+          socket.emit('contribution_failed', {
+            error: error.message,
+            chamaId,
+            amount,
+          });
+        }
+      });
+      
+      // Handle voting events
+      socket.on('chama_vote', async (data) => {
+        const { chamaId, proposalId, vote, userId } = data;
+        
+        try {
+          const voteResult = await this.chamaService.castVote({
+            chamaId,
+            proposalId,
+            vote,
+            userId,
+          });
+          
+          // Broadcast vote update to all members
+          this.io.to(`chama_${chamaId}`).emit('vote_cast', {
+            proposalId,
+            vote,
+            voterName: voteResult.voterName,
+            currentTally: voteResult.tally,
+            timestamp: new Date(),
+          });
+          
+          // Check if proposal is decided
+          if (voteResult.isDecided) {
+            this.io.to(`chama_${chamaId}`).emit('proposal_decided', {
+              proposalId,
+              result: voteResult.result,
+              finalTally: voteResult.tally,
+              timestamp: new Date(),
+            });
+          }
+          
+        } catch (error) {
+          socket.emit('vote_failed', { error: error.message });
+        }
+      });
+    });
+  }
+  
+  private async broadcastMemberPresence(socket: Socket, chamas: Chama[]) {
+    for (const chama of chamas) {
+      const onlineMembers = await this.getOnlineMembers(chama.id);
+      socket.emit('member_presence', {
+        chamaId: chama.id,
+        onlineMembers,
+        totalMembers: chama.memberCount,
+      });
+    }
+  }
+}
+```
 
-const awo = new AWOPlatform({
-  apiKey: process.env.AWO_API_KEY
+### 2. DIVA Score Real-Time Updates
+
+**Purpose**: Instant notification of financial health score changes and insights.
+
+```typescript
+// DIVA Score real-time manager
+class DivaScoreRealtimeManager {
+  constructor(private io: Server, private divaService: DivaService) {}
+  
+  async notifyScoreUpdate(userId: string, scoreUpdate: DivaScoreUpdate) {
+    const userSocket = this.getUserSocket(userId);
+    
+    if (userSocket) {
+      // Send immediate notification
+      userSocket.emit('diva_score_updated', {
+        newScore: scoreUpdate.newScore,
+        previousScore: scoreUpdate.previousScore,
+        changes: scoreUpdate.componentChanges,
+        triggers: scoreUpdate.triggers,
+        timestamp: new Date(),
+        nextUpdateDue: scoreUpdate.nextUpdateDue,
+      });
+      
+      // Send portfolio tier change notification if applicable
+      if (scoreUpdate.tierChanged) {
+        userSocket.emit('portfolio_tier_changed', {
+          previousTier: scoreUpdate.previousTier,
+          newTier: scoreUpdate.newTier,
+          newLimits: scoreUpdate.newLimits,
+          newProducts: scoreUpdate.availableProducts,
+          timestamp: new Date(),
+        });
+      }
+      
+      // Send improvement suggestions
+      if (scoreUpdate.suggestions?.length > 0) {
+        userSocket.emit('diva_improvement_suggestions', {
+          suggestions: scoreUpdate.suggestions,
+          estimatedImpact: scoreUpdate.estimatedImpact,
+          timeframe: scoreUpdate.timeframe,
+        });
+      }
+    }
+    
+    // Also notify user's Chama if they're a member
+    const userChamas = await this.chamaService.getUserChamas(userId);
+    userChamas.forEach(chama => {
+      this.io.to(`chama_${chama.id}_members`).emit('member_score_improved', {
+        memberName: scoreUpdate.userName,
+        scoreIncrease: scoreUpdate.newScore - scoreUpdate.previousScore,
+        newTier: scoreUpdate.newTier,
+        timestamp: new Date(),
+      });
+    });
+  }
+  
+  async broadcastScoreRecalculation(userId: string) {
+    const userSocket = this.getUserSocket(userId);
+    
+    if (userSocket) {
+      userSocket.emit('diva_score_recalculating', {
+        message: 'Your DIVA score is being recalculated...',
+        estimatedCompletionTime: 30, // seconds
+        timestamp: new Date(),
+      });
+    }
+  }
+}
+```
+
+### 3. Payment Real-Time Notifications
+
+**Purpose**: Instant confirmation and status updates for all financial transactions.
+
+```typescript
+// Payment real-time notification system
+class PaymentRealtimeNotifier {
+  constructor(private io: Server) {}
+  
+  async notifyPaymentInitiated(userId: string, payment: PaymentTransaction) {
+    const userSocket = this.getUserSocket(userId);
+    
+    userSocket?.emit('payment_initiated', {
+      transactionId: payment.id,
+      amount: payment.amount,
+      currency: payment.currency,
+      recipient: payment.recipientInfo,
+      estimatedCompletionTime: payment.estimatedTime,
+      status: 'processing',
+      timestamp: new Date(),
+    });
+  }
+  
+  async notifyPaymentConfirmed(userId: string, payment: PaymentTransaction) {
+    const userSocket = this.getUserSocket(userId);
+    
+    userSocket?.emit('payment_confirmed', {
+      transactionId: payment.id,
+      amount: payment.amount,
+      currency: payment.currency,
+      finalAmount: payment.finalAmount, // after fees
+      fees: payment.fees,
+      reference: payment.reference,
+      status: 'completed',
+      timestamp: new Date(),
+    });
+    
+    // Update wallet balance in real-time
+    const newBalance = await this.walletService.getBalance(userId);
+    userSocket?.emit('wallet_balance_updated', {
+      newBalance,
+      lastTransaction: {
+        id: payment.id,
+        amount: payment.amount,
+        type: payment.type,
+      },
+      timestamp: new Date(),
+    });
+  }
+  
+  async notifyPaymentFailed(userId: string, payment: PaymentTransaction, error: PaymentError) {
+    const userSocket = this.getUserSocket(userId);
+    
+    userSocket?.emit('payment_failed', {
+      transactionId: payment.id,
+      amount: payment.amount,
+      currency: payment.currency,
+      error: {
+        code: error.code,
+        message: error.userFriendlyMessage,
+        retryable: error.retryable,
+        suggestedAction: error.suggestedAction,
+      },
+      status: 'failed',
+      timestamp: new Date(),
+    });
+  }
+}
+```
+
+## Client-Side Real-Time Implementation
+
+### Socket.io Client Setup
+
+```typescript
+// React Native Socket.io client with African connectivity optimization
+import io, { Socket } from 'socket.io-client';
+import NetInfo from '@react-native-netinfo/netinfo';
+import { useAuthStore } from '../stores/auth-store';
+import { useUIStore } from '../stores/ui-store';
+
+class AWORealtimeClient {
+  private socket: Socket | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 10;
+  private reconnectDelay = 1000;
+  private isOnline = true;
+  
+  constructor() {
+    this.setupNetworkMonitoring();
+  }
+  
+  connect(userId: string, accessToken: string) {
+    const wsUrl = process.env.EXPO_PUBLIC_WS_URL || 'wss://api.awo-platform.com';
+    
+    this.socket = io(wsUrl, {
+      auth: {
+        token: accessToken,
+        userId,
+        platform: 'mobile',
+        version: '1.0.0',
+      },
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true,
+      // African connectivity optimizations
+      reconnection: true,
+      reconnectionDelay: this.reconnectDelay,
+      reconnectionAttempts: this.maxReconnectAttempts,
+      randomizationFactor: 0.5,
+    });
+    
+    this.setupEventHandlers();
+    this.setupConnectionManagement();
+  }
+  
+  private setupEventHandlers() {
+    if (!this.socket) return;
+    
+    // Connection events
+    this.socket.on('connect', () => {
+      console.log('🔗 Connected to AWO real-time service');
+      this.reconnectAttempts = 0;
+      useUIStore.getState().setConnectionStatus('connected');
+      
+      // Join user rooms
+      this.joinUserRooms();
+    });
+    
+    this.socket.on('disconnect', (reason) => {
+      console.log('🔌 Disconnected from real-time service:', reason);
+      useUIStore.getState().setConnectionStatus('disconnected');
+      
+      // Auto-reconnect for network issues
+      if (reason === 'io server disconnect') {
+        this.socket?.connect();
+      }
+    });
+    
+    this.socket.on('connect_error', (error) => {
+      console.error('❌ Connection error:', error);
+      this.handleConnectionError(error);
+    });
+    
+    // Chama events
+    this.socket.on('contribution_received', (data) => {
+      useUIStore.getState().addChamaActivity({
+        type: 'contribution',
+        chamaId: data.chamaId,
+        data: data.contribution,
+        timestamp: data.timestamp,
+      });
+      
+      // Show notification
+      useUIStore.getState().showNotification({
+        type: 'success',
+        title: 'New Contribution',
+        message: `${data.contribution.memberName} contributed ${data.contribution.amount}`,
+        action: {
+          label: 'View Chama',
+          onPress: () => this.navigateToChama(data.chamaId),
+        },
+      });
+    });
+    
+    this.socket.on('vote_cast', (data) => {
+      useUIStore.getState().updateChamaProposal(data.proposalId, {
+        currentTally: data.currentTally,
+        lastVote: {
+          vote: data.vote,
+          voterName: data.voterName,
+          timestamp: data.timestamp,
+        },
+      });
+    });
+    
+    // DIVA Score events
+    this.socket.on('diva_score_updated', (data) => {
+      useUIStore.getState().updateDivaScore(data.newScore);
+      
+      const scoreChange = data.newScore.overallScore - data.previousScore.overallScore;
+      const isImprovement = scoreChange > 0;
+      
+      useUIStore.getState().showNotification({
+        type: isImprovement ? 'success' : 'warning',
+        title: 'DIVA Score Updated',
+        message: `Your score ${isImprovement ? 'increased' : 'decreased'} by ${Math.abs(scoreChange)} points`,
+        action: {
+          label: 'View Details',
+          onPress: () => this.navigateToDivaScore(),
+        },
+      });
+    });
+    
+    // Payment events
+    this.socket.on('payment_confirmed', (data) => {
+      useUIStore.getState().addTransaction(data);
+      useUIStore.getState().updateWalletBalance(data.newBalance);
+      
+      useUIStore.getState().showNotification({
+        type: 'success',
+        title: 'Payment Confirmed',
+        message: `${data.amount} ${data.currency} payment completed`,
+        duration: 5000,
+      });
+    });
+    
+    this.socket.on('payment_failed', (data) => {
+      useUIStore.getState().showNotification({
+        type: 'error',
+        title: 'Payment Failed',
+        message: data.error.message,
+        action: data.error.retryable ? {
+          label: 'Retry',
+          onPress: () => this.retryPayment(data.transactionId),
+        } : undefined,
+      });
+    });
+  }
+  
+  private setupConnectionManagement() {
+    if (!this.socket) return;
+    
+    // Heartbeat to detect connection issues
+    setInterval(() => {
+      if (this.socket?.connected) {
+        this.socket.emit('ping', Date.now());
+      }
+    }, 30000);
+    
+    this.socket.on('pong', (startTime) => {
+      const latency = Date.now() - startTime;
+      useUIStore.getState().setConnectionLatency(latency);
+    });
+  }
+  
+  private handleConnectionError(error: Error) {
+    this.reconnectAttempts++;
+    
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      useUIStore.getState().setConnectionStatus('failed');
+      useUIStore.getState().showNotification({
+        type: 'error',
+        title: 'Connection Failed',
+        message: 'Unable to connect to real-time service. Some features may be limited.',
+        persistent: true,
+      });
+    } else {
+      // Exponential backoff with jitter
+      const delay = Math.min(
+        this.reconnectDelay * Math.pow(2, this.reconnectAttempts) + 
+        Math.random() * 1000,
+        30000
+      );
+      
+      setTimeout(() => {
+        if (this.isOnline) {
+          this.socket?.connect();
+        }
+      }, delay);
+    }
+  }
+  
+  private setupNetworkMonitoring() {
+    NetInfo.addEventListener(state => {
+      const wasOnline = this.isOnline;
+      this.isOnline = state.isConnected && state.isInternetReachable;
+      
+      if (!wasOnline && this.isOnline) {
+        // Coming back online - attempt reconnection
+        this.reconnectAttempts = 0;
+        if (this.socket && !this.socket.connected) {
+          this.socket.connect();
+        }
+      } else if (wasOnline && !this.isOnline) {
+        // Going offline
+        useUIStore.getState().setConnectionStatus('offline');
+      }
+    });
+  }
+  
+  // Public methods for emitting events
+  contributeToChama(chamaId: string, amount: number) {
+    this.socket?.emit('chama_contribute', {
+      chamaId,
+      amount,
+      userId: useAuthStore.getState().user?.id,
+      timestamp: new Date(),
+    });
+  }
+  
+  voteOnProposal(chamaId: string, proposalId: string, vote: 'yes' | 'no' | 'abstain') {
+    this.socket?.emit('chama_vote', {
+      chamaId,
+      proposalId,
+      vote,
+      userId: useAuthStore.getState().user?.id,
+      timestamp: new Date(),
+    });
+  }
+  
+  requestDivaRefresh() {
+    this.socket?.emit('request_diva_refresh', {
+      userId: useAuthStore.getState().user?.id,
+      timestamp: new Date(),
+    });
+  }
+  
+  private joinUserRooms() {
+    const userId = useAuthStore.getState().user?.id;
+    if (userId) {
+      this.socket?.emit('join_user_rooms', { userId });
+    }
+  }
+  
+  disconnect() {
+    this.socket?.disconnect();
+    this.socket = null;
+  }
+}
+
+// React hook for real-time functionality
+export const useRealtimeConnection = () => {
+  const [client] = useState(() => new AWORealtimeClient());
+  const { user, accessToken } = useAuthStore();
+  
+  useEffect(() => {
+    if (user && accessToken) {
+      client.connect(user.id, accessToken);
+    }
+    
+    return () => client.disconnect();
+  }, [user?.id, accessToken]);
+  
+  return {
+    contributeToChama: client.contributeToChama.bind(client),
+    voteOnProposal: client.voteOnProposal.bind(client),
+    requestDivaRefresh: client.requestDivaRefresh.bind(client),
+  };
+};
+```
+
+## Offline Real-Time Handling
+
+### Event Queuing for Poor Connectivity
+
+```typescript
+// Offline event queue manager
+class OfflineRealtimeManager {
+  private eventQueue: QueuedEvent[] = [];
+  private storage = new MMKV({ id: 'realtime-queue' });
+  
+  constructor() {
+    this.loadQueueFromStorage();
+  }
+  
+  queueEvent(event: RealtimeEvent) {
+    const queuedEvent: QueuedEvent = {
+      id: `queued_${Date.now()}_${Math.random()}`,
+      event,
+      queuedAt: Date.now(),
+      attempts: 0,
+      maxAttempts: 5,
+    };
+    
+    this.eventQueue.push(queuedEvent);
+    this.saveQueueToStorage();
+    
+    // Show user feedback
+    useUIStore.getState().showNotification({
+      type: 'info',
+      title: 'Action Queued',
+      message: 'Your action will be processed when connection is restored',
+      duration: 3000,
+    });
+  }
+  
+  async processQueue(socket: Socket) {
+    const failedEvents: QueuedEvent[] = [];
+    
+    for (const queuedEvent of this.eventQueue) {
+      try {
+        await this.sendQueuedEvent(socket, queuedEvent);
+        console.log(`✅ Processed queued event: ${queuedEvent.event.type}`);
+      } catch (error) {
+        queuedEvent.attempts++;
+        
+        if (queuedEvent.attempts < queuedEvent.maxAttempts) {
+          failedEvents.push(queuedEvent);
+        } else {
+          console.error(`❌ Failed to process event after ${queuedEvent.maxAttempts} attempts:`, error);
+          
+          // Notify user of permanent failure
+          useUIStore.getState().showNotification({
+            type: 'error',
+            title: 'Action Failed',
+            message: `Unable to process ${queuedEvent.event.type}. Please try again.`,
+          });
+        }
+      }
+    }
+    
+    this.eventQueue = failedEvents;
+    this.saveQueueToStorage();
+    
+    if (failedEvents.length === 0) {
+      useUIStore.getState().showNotification({
+        type: 'success',
+        title: 'All Actions Processed',
+        message: 'Your queued actions have been completed',
+        duration: 3000,
+      });
+    }
+  }
+  
+  private async sendQueuedEvent(socket: Socket, queuedEvent: QueuedEvent): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Event emission timeout'));
+      }, 10000);
+      
+      const ackHandler = (response: any) => {
+        clearTimeout(timeout);
+        if (response.success) {
+          resolve();
+        } else {
+          reject(new Error(response.error || 'Event processing failed'));
+        }
+      };
+      
+      socket.emit(queuedEvent.event.type, queuedEvent.event.data, ackHandler);
+    });
+  }
+  
+  private loadQueueFromStorage() {
+    try {
+      const stored = this.storage.getString('event_queue');
+      if (stored) {
+        this.eventQueue = JSON.parse(stored);
+      }
+    } catch (error) {
+      console.error('Failed to load event queue from storage:', error);
+      this.eventQueue = [];
+    }
+  }
+  
+  private saveQueueToStorage() {
+    try {
+      this.storage.set('event_queue', JSON.stringify(this.eventQueue));
+    } catch (error) {
+      console.error('Failed to save event queue to storage:', error);
+    }
+  }
+}
+```
+
+## Performance Optimization
+
+### Connection Optimization for Africa
+
+<CardGroup cols={2}>
+  <Card title="Smart Reconnection" icon="crystal-ball">
+    Exponential backoff with jitter prevents server overload while ensuring reliable reconnection during network instability
+  </Card>
+  <Card title="Selective Events" icon="filter">
+    Users only receive events relevant to their Chamas and activities, reducing bandwidth usage and battery consumption
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Compression" icon="bolt">
+    Event payloads are compressed and optimized for mobile data costs common in African markets
+  </Card>
+  <Card title="Batching" icon="server">
+    Non-critical events are batched together to reduce the number of individual transmissions
+  </Card>
+</CardGroup>
+
+### Event Deduplication
+
+```typescript
+// Event deduplication to handle duplicate events during poor connectivity
+class EventDeduplicator {
+  private recentEvents = new Map<string, number>();
+  private readonly TTL = 5 * 60 * 1000; // 5 minutes
+  
+  constructor() {
+    // Clean up old events every minute
+    setInterval(() => this.cleanup(), 60 * 1000);
+  }
+  
+  isDuplicate(eventId: string): boolean {
+    const now = Date.now();
+    const lastSeen = this.recentEvents.get(eventId);
+    
+    if (lastSeen && (now - lastSeen) < this.TTL) {
+      return true;
+    }
+    
+    this.recentEvents.set(eventId, now);
+    return false;
+  }
+  
+  private cleanup() {
+    const now = Date.now();
+    for (const [eventId, timestamp] of this.recentEvents.entries()) {
+      if (now - timestamp > this.TTL) {
+        this.recentEvents.delete(eventId);
+      }
+    }
+  }
+}
+```
+
+## Real-Time Analytics
+
+### Connection Quality Monitoring
+
+```typescript
+// Real-time connection analytics for African market insights
+class ConnectionAnalytics {
+  private metrics = {
+    connectionAttempts: 0,
+    successfulConnections: 0,
+    disconnections: 0,
+    averageLatency: 0,
+    dataUsage: 0,
+    eventsSent: 0,
+    eventsReceived: 0,
+  };
+  
+  recordConnectionAttempt() {
+    this.metrics.connectionAttempts++;
+  }
+  
+  recordSuccessfulConnection() {
+    this.metrics.successfulConnections++;
+  }
+  
+  recordDisconnection() {
+    this.metrics.disconnections++;
+  }
+  
+  recordLatency(latency: number) {
+    this.metrics.averageLatency = (this.metrics.averageLatency + latency) / 2;
+  }
+  
+  recordDataUsage(bytes: number) {
+    this.metrics.dataUsage += bytes;
+  }
+  
+  getConnectionReliability(): number {
+    if (this.metrics.connectionAttempts === 0) return 1;
+    return this.metrics.successfulConnections / this.metrics.connectionAttempts;
+  }
+  
+  getMetrics() {
+    return {
+      ...this.metrics,
+      reliability: this.getConnectionReliability(),
+      averageLatency: Math.round(this.metrics.averageLatency),
+      dataUsageMB: (this.metrics.dataUsage / (1024 * 1024)).toFixed(2),
+    };
+  }
+}
+```
+
+## Testing Real-Time Features
+
+### Mock Socket.io Server for Testing
+
+```typescript
+// Mock Socket.io server for testing real-time features
+class MockRealtimeServer {
+  private events = new Map<string, Function[]>();
+  private connected = false;
+  
+  on(event: string, handler: Function) {
+    if (!this.events.has(event)) {
+      this.events.set(event, []);
+    }
+    this.events.get(event)!.push(handler);
+  }
+  
+  emit(event: string, data: any, callback?: Function) {
+    const handlers = this.events.get(event) || [];
+    handlers.forEach(handler => handler(data));
+    
+    if (callback) {
+      setTimeout(() => callback({ success: true }), 100);
+    }
+  }
+  
+  connect() {
+    this.connected = true;
+    this.emit('connect', {});
+  }
+  
+  disconnect() {
+    this.connected = false;
+    this.emit('disconnect', { reason: 'client disconnect' });
+  }
+  
+  simulateNetworkIssue() {
+    this.emit('connect_error', new Error('Network error'));
+  }
+  
+  simulateChamaContribution(chamaId: string, contribution: any) {
+    this.emit('contribution_received', {
+      chamaId,
+      contribution,
+      timestamp: new Date(),
+    });
+  }
+}
+
+// Test example
+describe('Real-time Chama Features', () => {
+  let mockServer: MockRealtimeServer;
+  let realtimeClient: AWORealtimeClient;
+  
+  beforeEach(() => {
+    mockServer = new MockRealtimeServer();
+    realtimeClient = new AWORealtimeClient();
+    // Configure client to use mock server
+  });
+  
+  test('should handle Chama contribution in real-time', async () => {
+    const onContribution = jest.fn();
+    
+    realtimeClient.onChamaContribution(onContribution);
+    mockServer.connect();
+    
+    mockServer.simulateChamaContribution('chama123', {
+      id: 'contrib123',
+      amount: 500,
+      memberName: 'Test User',
+    });
+    
+    expect(onContribution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chamaId: 'chama123',
+        contribution: expect.objectContaining({
+          amount: 500,
+          memberName: 'Test User',
+        }),
+      })
+    );
+  });
+  
+  test('should queue events when offline', async () => {
+    mockServer.disconnect();
+    
+    realtimeClient.contributeToChama('chama123', 500);
+    
+    expect(realtimeClient.getQueuedEventsCount()).toBe(1);
+    
+    mockServer.connect();
+    await realtimeClient.processQueue();
+    
+    expect(realtimeClient.getQueuedEventsCount()).toBe(0);
+  });
 });
 ```
 
-## Best Practices
+## Security Considerations
 
-Development best practices will be documented here.
+### Real-Time Security Implementation
 
-## Tools and Resources
+<Warning>
+**Authentication**: All real-time connections require valid JWT tokens and are rate-limited to prevent abuse and ensure system stability.
+</Warning>
 
-<CardGroup cols={2}>
-  <Card title="API Reference" href="/api-reference/introduction">
-    Complete API documentation
-  </Card>
-  <Card title="Testing Guide" href="/testing/testing-strategy">
-    Testing strategies and tools
-  </Card>
-</CardGroup>
+<Info>
+**Data Validation**: All incoming real-time events are validated against schemas to prevent malicious data injection and ensure data integrity.
+</Info>
+
+```typescript
+// Real-time security middleware
+class RealtimeSecurityManager {
+  validateEventData(eventType: string, data: any): boolean {
+    const schema = this.getEventSchema(eventType);
+    const result = schema.safeParse(data);
+    
+    if (!result.success) {
+      console.error(`Invalid event data for ${eventType}:`, result.error);
+      return false;
+    }
+    
+    return true;
+  }
+  
+  rateLimitCheck(userId: string, eventType: string): boolean {
+    const key = `${userId}:${eventType}`;
+    const limit = this.getEventRateLimit(eventType);
+    
+    // Implement sliding window rate limiting
+    return this.checkRateLimit(key, limit);
+  }
+  
+  private getEventSchema(eventType: string) {
+    const schemas = {
+      'chama_contribute': z.object({
+        chamaId: z.string().uuid(),
+        amount: z.number().positive().max(1000000),
+        userId: z.string().uuid(),
+      }),
+      'chama_vote': z.object({
+        chamaId: z.string().uuid(),
+        proposalId: z.string().uuid(),
+        vote: z.enum(['yes', 'no', 'abstain']),
+        userId: z.string().uuid(),
+      }),
+    };
+    
+    return schemas[eventType] || z.any();
+  }
+}
+```
+
+---
+
+*AWO's real-time infrastructure ensures that users across the SADC region stay connected to their financial communities with instant updates, reliable offline handling, and optimizations specifically designed for African connectivity patterns and mobile data costs.*
+
+*Last updated: June 2025*  
+*Next review: Sep 2025*
