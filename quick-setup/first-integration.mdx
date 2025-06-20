@@ -1,41 +1,1832 @@
----
-title: "First Integration"
-description: "Step-by-step first integration guide for AWO Platform"
----
-
 # First Integration
 
-## Prerequisites
-
-Before starting, ensure you have:
-- Node.js 18+ installed
-- Git configured
-- Access to AWO development resources
-
 <Info>
-This guide will help you set up first integration quickly and efficiently.
+Build your first end-to-end integration with AWO Platform in under 30 minutes. This guide connects Open Banking, implements basic DIVA scoring, and processes your first transaction with complete error handling.
 </Info>
 
-## Step-by-Step Instructions
+## Integration Overview
+
+This guide will help you create a complete integration that demonstrates AWO Platform's core capabilities:
+
+<CardGroup cols={2}>
+  <Card title="What You'll Build" icon="wrench">
+    **Bank Account Linking** via Stitch Open Banking API  
+    **Transaction Analysis** for DIVA score calculation  
+    **Wallet Operations** with balance management  
+    **Real-time Updates** via webhooks and Socket.io
+  </Card>
+  <Card title="Prerequisites Completed" icon="check">
+    **API Setup** with authentication working  
+    **Mobile App** running on device/simulator  
+    **Database** configured with all schemas  
+    **Environment** properly configured
+  </Card>
+</CardGroup>
+
+## Step 1: Stitch Open Banking Integration
 
 <Steps>
-  <Step title="Initial Setup">
-    Setup instructions will be added here
+  <Step title="Setup Stitch Credentials">
+    Register for Stitch sandbox and configure credentials:
+    
+    1. Visit [Stitch Developer Portal](https://stitch.money/developers) and create account
+    2. Create a new application for AWO Platform integration
+    3. Configure redirect URLs for OAuth flow
+    4. Get your sandbox credentials
+    
+    **Add to your environment:**
+    ```bash
+    # .env.local
+    STITCH_CLIENT_ID="your-stitch-client-id"
+    STITCH_CLIENT_SECRET="your-stitch-client-secret"
+    STITCH_REDIRECT_URI="https://your-app.com/auth/stitch/callback"
+    STITCH_BASE_URL="https://api.stitch.money"
+    STITCH_ENVIRONMENT="sandbox"
+    ```
   </Step>
-  <Step title="Configuration">
-    Configuration details will be provided
+  
+  <Step title="Create Stitch Integration Service">
+    Build service to handle Open Banking connections:
+    
+    ```typescript
+    // src/services/stitch-service.ts
+    import axios, { AxiosInstance } from 'axios';
+    import { db } from '../database/connection';
+    import { encrypt } from '../database/utils/encryption';
+    
+    interface StitchConfig {
+      clientId: string;
+      clientSecret: string;
+      redirectUri: string;
+      baseUrl: string;
+      environment: 'sandbox' | 'production';
+    }
+    
+    export class StitchService {
+      private api: AxiosInstance;
+      private config: StitchConfig;
+      
+      constructor() {
+        this.config = {
+          clientId: process.env.STITCH_CLIENT_ID!,
+          clientSecret: process.env.STITCH_CLIENT_SECRET!,
+          redirectUri: process.env.STITCH_REDIRECT_URI!,
+          baseUrl: process.env.STITCH_BASE_URL!,
+          environment: process.env.STITCH_ENVIRONMENT as 'sandbox' | 'production',
+        };
+        
+        this.api = axios.create({
+          baseURL: this.config.baseUrl,
+          timeout: 30000,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        this.setupInterceptors();
+      }
+      
+      private setupInterceptors() {
+        this.api.interceptors.request.use((config) => {
+          console.log(`Stitch API Request: ${config.method?.toUpperCase()} ${config.url}`);
+          return config;
+        });
+        
+        this.api.interceptors.response.use(
+          (response) => response,
+          (error) => {
+            console.error('Stitch API Error:', error.response?.data);
+            throw this.handleStitchError(error);
+          }
+        );
+      }
+      
+      async getAccessToken(): Promise<string> {
+        try {
+          const response = await this.api.post('/connect/token', {
+            grant_type: 'client_credentials',
+            client_id: this.config.clientId,
+            client_secret: this.config.clientSecret,
+            scope: 'accounts',
+          });
+          
+          return response.data.access_token;
+        } catch (error) {
+          throw new Error(`Failed to get Stitch access token: ${error.message}`);
+        }
+      }
+      
+      async initiateBankLinking(userId: string): Promise<string> {
+        try {
+          const accessToken = await this.getAccessToken();
+          
+          const response = await this.api.post('/connect/accounts', {
+            beneficiary: {
+              name: 'AWO Platform',
+              bankId: 'absa', // Default to ABSA for demo
+            },
+            successUrl: `${this.config.redirectUri}?success=true&userId=${userId}`,
+            cancelUrl: `${this.config.redirectUri}?success=false&userId=${userId}`,
+            failureUrl: `${this.config.redirectUri}?error=true&userId=${userId}`,
+          }, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+            },
+          });
+          
+          return response.data.url;
+        } catch (error) {
+          throw new Error(`Failed to initiate bank linking: ${error.message}`);
+        }
+      }
+      
+      async getAccountDetails(accountId: string): Promise<any> {
+        try {
+          const accessToken = await this.getAccessToken();
+          
+          const response = await this.api.get(`/accounts/${accountId}`, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+            },
+          });
+          
+          return response.data;
+        } catch (error) {
+          throw new Error(`Failed to get account details: ${error.message}`);
+        }
+      }
+      
+      async getTransactions(accountId: string, fromDate?: string, toDate?: string): Promise<any[]> {
+        try {
+          const accessToken = await this.getAccessToken();
+          
+          const params = new URLSearchParams();
+          if (fromDate) params.append('from', fromDate);
+          if (toDate) params.append('to', toDate);
+          
+          const response = await this.api.get(`/accounts/${accountId}/transactions?${params}`, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+            },
+          });
+          
+          return response.data.data || [];
+        } catch (error) {
+          throw new Error(`Failed to get transactions: ${error.message}`);
+        }
+      }
+      
+      async saveAccountToDatabase(userId: string, accountData: any): Promise<string> {
+        try {
+          const result = await db.query(`
+            INSERT INTO user_accounts (
+              user_id, account_number_encrypted, account_name_encrypted,
+              bank_name, account_type, provider, provider_account_id,
+              current_balance, currency_code, is_active
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id
+          `, [
+            userId,
+            encrypt(accountData.accountNumber),
+            encrypt(accountData.accountName),
+            accountData.bankName,
+            accountData.accountType,
+            'stitch',
+            accountData.id,
+            accountData.balance || 0,
+            accountData.currency || 'ZAR',
+            true,
+          ]);
+          
+          return result.rows[0].id;
+        } catch (error) {
+          throw new Error(`Failed to save account: ${error.message}`);
+        }
+      }
+      
+      private handleStitchError(error: any) {
+        const status = error.response?.status;
+        const data = error.response?.data;
+        
+        switch (status) {
+          case 400:
+            return new Error(`Invalid request: ${data?.message || 'Bad request'}`);
+          case 401:
+            return new Error('Authentication failed with Stitch');
+          case 403:
+            return new Error('Insufficient permissions for Stitch operation');
+          case 429:
+            return new Error('Rate limit exceeded for Stitch API');
+          case 500:
+            return new Error('Stitch server error - please try again later');
+          default:
+            return new Error(`Stitch API error: ${data?.message || error.message}`);
+        }
+      }
+    }
+    
+    export default new StitchService();
+    ```
   </Step>
-  <Step title="Verification">
-    Verification steps will be included
+  
+  <Step title="Create Bank Linking API Endpoint">
+    Build backend endpoint for bank account linking:
+    
+    ```typescript
+    // src/routes/banking.ts
+    import { Router, Request, Response } from 'express';
+    import { authenticateToken } from '../middleware/auth';
+    import StitchService from '../services/stitch-service';
+    import { db } from '../database/connection';
+    
+    const router = Router();
+    
+    // Initiate bank account linking
+    router.post('/link-account', authenticateToken, async (req: Request, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        
+        if (!userId) {
+          return res.status(401).json({ error: 'User not authenticated' });
+        }
+        
+        // Check if user already has linked accounts
+        const existingAccounts = await db.query(
+          'SELECT COUNT(*) as count FROM user_accounts WHERE user_id = $1 AND is_active = true',
+          [userId]
+        );
+        
+        if (parseInt(existingAccounts.rows[0].count) >= 3) {
+          return res.status(400).json({ 
+            error: 'Maximum number of linked accounts reached (3)' 
+          });
+        }
+        
+        const linkingUrl = await StitchService.initiateBankLinking(userId);
+        
+        res.json({
+          success: true,
+          linkingUrl,
+          message: 'Bank linking initiated successfully',
+        });
+        
+      } catch (error) {
+        console.error('Bank linking error:', error);
+        res.status(500).json({ 
+          error: 'Failed to initiate bank linking',
+          details: error.message 
+        });
+      }
+    });
+    
+    // Handle bank linking callback
+    router.get('/link-callback', async (req: Request, res: Response) => {
+      try {
+        const { success, userId, accountId, error } = req.query;
+        
+        if (error === 'true' || success === 'false') {
+          return res.redirect(`awo://banking/link-failed?error=${error || 'cancelled'}`);
+        }
+        
+        if (success === 'true' && accountId && userId) {
+          // Get account details from Stitch
+          const accountDetails = await StitchService.getAccountDetails(accountId as string);
+          
+          // Save account to database
+          const savedAccountId = await StitchService.saveAccountToDatabase(
+            userId as string, 
+            accountDetails
+          );
+          
+          // Trigger initial transaction sync
+          await syncAccountTransactions(userId as string, savedAccountId);
+          
+          return res.redirect(`awo://banking/link-success?accountId=${savedAccountId}`);
+        }
+        
+        res.status(400).json({ error: 'Invalid callback parameters' });
+        
+      } catch (error) {
+        console.error('Bank linking callback error:', error);
+        res.status(500).json({ error: 'Failed to process bank linking callback' });
+      }
+    });
+    
+    // Get user's linked accounts
+    router.get('/accounts', authenticateToken, async (req: Request, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        
+        const result = await db.query(`
+          SELECT 
+            id,
+            bank_name,
+            account_type,
+            current_balance,
+            currency_code,
+            is_primary,
+            last_synced,
+            created_at
+          FROM user_accounts 
+          WHERE user_id = $1 AND is_active = true
+          ORDER BY is_primary DESC, created_at DESC
+        `, [userId]);
+        
+        res.json({
+          success: true,
+          accounts: result.rows,
+        });
+        
+      } catch (error) {
+        console.error('Get accounts error:', error);
+        res.status(500).json({ error: 'Failed to retrieve accounts' });
+      }
+    });
+    
+    // Sync account transactions
+    async function syncAccountTransactions(userId: string, accountId: string) {
+      try {
+        const account = await db.query(
+          'SELECT provider_account_id FROM user_accounts WHERE id = $1',
+          [accountId]
+        );
+        
+        if (!account.rows[0]) {
+          throw new Error('Account not found');
+        }
+        
+        const providerAccountId = account.rows[0].provider_account_id;
+        
+        // Get transactions from last 90 days
+        const fromDate = new Date();
+        fromDate.setDate(fromDate.getDate() - 90);
+        
+        const transactions = await StitchService.getTransactions(
+          providerAccountId,
+          fromDate.toISOString().split('T')[0]
+        );
+        
+        // Save transactions to database
+        for (const transaction of transactions) {
+          await saveTransactionToDatabase(userId, accountId, transaction);
+        }
+        
+        // Update last synced timestamp
+        await db.query(
+          'UPDATE user_accounts SET last_synced = NOW() WHERE id = $1',
+          [accountId]
+        );
+        
+        console.log(`Synced ${transactions.length} transactions for account ${accountId}`);
+        
+      } catch (error) {
+        console.error('Transaction sync error:', error);
+        throw error;
+      }
+    }
+    
+    async function saveTransactionToDatabase(userId: string, accountId: string, transaction: any) {
+      try {
+        await db.query(`
+          INSERT INTO transactions (
+            user_id, account_id, transaction_type, amount, currency_code,
+            description_encrypted, category, status, external_transaction_id,
+            transaction_date, processed_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          ON CONFLICT (external_transaction_id) DO NOTHING
+        `, [
+          userId,
+          accountId,
+          determineTransactionType(transaction.amount),
+          Math.abs(transaction.amount),
+          transaction.currency || 'ZAR',
+          encrypt(transaction.description || ''),
+          categorizeTransaction(transaction.description || ''),
+          'completed',
+          transaction.id,
+          new Date(transaction.date),
+          new Date(),
+        ]);
+      } catch (error) {
+        console.error('Failed to save transaction:', error);
+      }
+    }
+    
+    function determineTransactionType(amount: number): string {
+      return amount > 0 ? 'deposit' : 'withdrawal';
+    }
+    
+    function categorizeTransaction(description: string): string {
+      const desc = description.toLowerCase();
+      
+      if (desc.includes('salary') || desc.includes('payroll')) return 'income';
+      if (desc.includes('grocery') || desc.includes('food')) return 'food';
+      if (desc.includes('fuel') || desc.includes('petrol')) return 'transport';
+      if (desc.includes('rent') || desc.includes('mortgage')) return 'housing';
+      if (desc.includes('shopping') || desc.includes('retail')) return 'shopping';
+      if (desc.includes('transfer') || desc.includes('payment')) return 'transfer';
+      
+      return 'other';
+    }
+    
+    export default router;
+    ```
   </Step>
 </Steps>
 
-## Troubleshooting
+## Step 2: Basic DIVA Score Calculation
 
-Common issues and solutions will be documented here.
+<Steps>
+  <Step title="Create DIVA Scoring Engine">
+    Implement rule-based DIVA score calculation:
+    
+    ```typescript
+    // src/services/diva-scoring.ts
+    import { db } from '../database/connection';
+    import { addMonths, differenceInDays, startOfMonth, endOfMonth } from 'date-fns';
+    
+    interface DivaComponents {
+      discipline: number;
+      income: number;
+      velocity: number;
+      assets: number;
+    }
+    
+    interface DivaScore {
+      totalScore: number;
+      components: DivaComponents;
+      calculatedAt: Date;
+      expiresAt: Date;
+      portfolioTier: 'bronze' | 'silver' | 'gold' | 'platinum';
+      dataQuality: 'excellent' | 'good' | 'fair' | 'poor';
+    }
+    
+    export class DivaScoreEngine {
+      async calculateDivaScore(userId: string): Promise<DivaScore> {
+        try {
+          // Get user's financial data for calculation
+          const financialData = await this.getFinancialData(userId);
+          
+          if (!financialData.hasMinimumData) {
+            throw new Error('Insufficient financial data for DIVA score calculation');
+          }
+          
+          // Calculate each component
+          const discipline = await this.calculateDisciplineScore(userId, financialData);
+          const income = await this.calculateIncomeScore(userId, financialData);
+          const velocity = await this.calculateVelocityScore(userId, financialData);
+          const assets = await this.calculateAssetsScore(userId, financialData);
+          
+          // Calculate weighted total score
+          const totalScore = Math.round(
+            (discipline * 0.30) + 
+            (income * 0.25) + 
+            (velocity * 0.25) + 
+            (assets * 0.20)
+          );
+          
+          const components = { discipline, income, velocity, assets };
+          const portfolioTier = this.determinePortfolioTier(totalScore);
+          const dataQuality = this.assessDataQuality(financialData);
+          
+          const calculatedAt = new Date();
+          const expiresAt = addMonths(calculatedAt, 3); // Expires in 3 months
+          
+          // Save score to database
+          await this.saveDivaScore(userId, {
+            totalScore,
+            components,
+            calculatedAt,
+            expiresAt,
+            portfolioTier,
+            dataQuality,
+          });
+          
+          return {
+            totalScore,
+            components,
+            calculatedAt,
+            expiresAt,
+            portfolioTier,
+            dataQuality,
+          };
+          
+        } catch (error) {
+          console.error('DIVA score calculation error:', error);
+          throw error;
+        }
+      }
+      
+      private async getFinancialData(userId: string) {
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        
+        // Get transactions from last 3 months
+        const transactions = await db.query(`
+          SELECT 
+            amount, transaction_type, transaction_date, category,
+            payment_method, status
+          FROM transactions 
+          WHERE user_id = $1 
+          AND transaction_date >= $2 
+          AND status = 'completed'
+          ORDER BY transaction_date DESC
+        `, [userId, threeMonthsAgo]);
+        
+        // Get account balances
+        const accounts = await db.query(`
+          SELECT current_balance, currency_code, account_type
+          FROM user_accounts 
+          WHERE user_id = $1 AND is_active = true
+        `, [userId]);
+        
+        // Get wallet balance
+        const wallet = await db.query(`
+          SELECT balance, currency_code
+          FROM wallets 
+          WHERE user_id = $1 AND wallet_type = 'main'
+        `, [userId]);
+        
+        const transactionData = transactions.rows;
+        const hasMinimumData = transactionData.length >= 10; // Need at least 10 transactions
+        
+        return {
+          transactions: transactionData,
+          accounts: accounts.rows,
+          wallet: wallet.rows[0],
+          hasMinimumData,
+          analysisStartDate: threeMonthsAgo,
+          analysisEndDate: new Date(),
+        };
+      }
+      
+      private async calculateDisciplineScore(userId: string, data: any): Promise<number> {
+        const transactions = data.transactions;
+        
+        // Payment punctuality (40% of discipline)
+        const punctualityScore = this.calculatePaymentPunctuality(transactions);
+        
+        // Savings regularity (35% of discipline)
+        const savingsRegularity = this.calculateSavingsConsistency(transactions);
+        
+        // Overdraft avoidance (25% of discipline)
+        const overdraftAvoidance = this.calculateOverdraftAvoidance(transactions);
+        
+        const disciplineScore = Math.round(
+          (punctualityScore * 0.40) + 
+          (savingsRegularity * 0.35) + 
+          (overdraftAvoidance * 0.25)
+        );
+        
+        return Math.min(1000, Math.max(0, disciplineScore));
+      }
+      
+      private calculatePaymentPunctuality(transactions: any[]): number {
+        // Analyze recurring payments and their timing consistency
+        const recurringPayments = transactions.filter(t => 
+          t.category === 'housing' || t.category === 'utilities' || t.category === 'insurance'
+        );
+        
+        if (recurringPayments.length < 3) return 500; // Neutral score
+        
+        // Calculate consistency of payment dates
+        const paymentDays = recurringPayments.map(t => new Date(t.transaction_date).getDate());
+        const dayVariance = this.calculateVariance(paymentDays);
+        
+        // Lower variance = higher punctuality score
+        const punctualityScore = Math.max(0, 1000 - (dayVariance * 100));
+        
+        return Math.min(1000, punctualityScore);
+      }
+      
+      private calculateSavingsConsistency(transactions: any[]): number {
+        // Look for regular savings/investment transactions
+        const savingsTransactions = transactions.filter(t => 
+          t.category === 'savings' || t.category === 'investment' || 
+          (t.transaction_type === 'deposit' && t.amount >= 100)
+        );
+        
+        if (savingsTransactions.length === 0) return 0;
+        
+        const monthlyBuckets = this.groupTransactionsByMonth(savingsTransactions);
+        const monthsWithSavings = Object.keys(monthlyBuckets).length;
+        const totalMonths = 3; // 3-month analysis period
+        
+        const consistencyRatio = monthsWithSavings / totalMonths;
+        return Math.round(consistencyRatio * 1000);
+      }
+      
+      private calculateOverdraftAvoidance(transactions: any[]): number {
+        // Look for overdraft fees or negative balances
+        const overdraftTransactions = transactions.filter(t => 
+          t.description?.toLowerCase().includes('overdraft') ||
+          t.description?.toLowerCase().includes('insufficient funds') ||
+          t.amount < -1000 // Large withdrawals that might indicate overdrafts
+        );
+        
+        if (overdraftTransactions.length === 0) return 1000; // Perfect score
+        
+        // Penalize based on frequency and amount
+        const overdraftPenalty = overdraftTransactions.length * 200;
+        return Math.max(0, 1000 - overdraftPenalty);
+      }
+      
+      private async calculateIncomeScore(userId: string, data: any): Promise<number> {
+        const transactions = data.transactions;
+        
+        // Income stability (50% of income score)
+        const stabilityScore = this.calculateIncomeStability(transactions);
+        
+        // Income growth (30% of income score)
+        const growthScore = this.calculateIncomeGrowth(transactions);
+        
+        // Income diversification (20% of income score)
+        const diversificationScore = this.calculateIncomeDiversification(transactions);
+        
+        const incomeScore = Math.round(
+          (stabilityScore * 0.50) + 
+          (growthScore * 0.30) + 
+          (diversificationScore * 0.20)
+        );
+        
+        return Math.min(1000, Math.max(0, incomeScore));
+      }
+      
+      private calculateIncomeStability(transactions: any[]): number {
+        const incomeTransactions = transactions.filter(t => 
+          t.transaction_type === 'deposit' && 
+          (t.category === 'income' || t.amount >= 1000)
+        );
+        
+        if (incomeTransactions.length < 2) return 200; // Low score for insufficient data
+        
+        const monthlyIncome = this.groupTransactionsByMonth(incomeTransactions);
+        const incomeAmounts = Object.values(monthlyIncome).map((month: any) => 
+          month.reduce((sum: number, t: any) => sum + t.amount, 0)
+        );
+        
+        const meanIncome = incomeAmounts.reduce((a, b) => a + b, 0) / incomeAmounts.length;
+        const variance = this.calculateVariance(incomeAmounts);
+        const coefficientOfVariation = variance / meanIncome;
+        
+        // Lower variation = higher stability score
+        const stabilityScore = Math.max(0, 1000 - (coefficientOfVariation * 2000));
+        return Math.min(1000, stabilityScore);
+      }
+      
+      private calculateIncomeGrowth(transactions: any[]): number {
+        const monthlyIncome = this.groupTransactionsByMonth(
+          transactions.filter(t => t.transaction_type === 'deposit' && t.amount >= 1000)
+        );
+        
+        const months = Object.keys(monthlyIncome).sort();
+        if (months.length < 2) return 500; // Neutral score
+        
+        const firstMonthIncome = monthlyIncome[months[0]].reduce((sum: number, t: any) => sum + t.amount, 0);
+        const lastMonthIncome = monthlyIncome[months[months.length - 1]].reduce((sum: number, t: any) => sum + t.amount, 0);
+        
+        const growthRate = (lastMonthIncome - firstMonthIncome) / firstMonthIncome;
+        
+        // Positive growth gets higher scores
+        if (growthRate > 0.1) return 1000; // 10%+ growth
+        if (growthRate > 0.05) return 800;  // 5-10% growth
+        if (growthRate >= 0) return 600;    // 0-5% growth
+        if (growthRate > -0.05) return 400; // Small decline
+        return 200; // Significant decline
+      }
+      
+      private calculateIncomeDiversification(transactions: any[]): number {
+        const incomeTransactions = transactions.filter(t => t.transaction_type === 'deposit');
+        const incomeSources = new Set(incomeTransactions.map(t => t.category || 'unknown'));
+        
+        // More income sources = higher diversification score
+        const sourceCount = incomeSources.size;
+        if (sourceCount >= 4) return 1000;
+        if (sourceCount === 3) return 800;
+        if (sourceCount === 2) return 600;
+        return 400; // Single income source
+      }
+      
+      private async calculateVelocityScore(userId: string, data: any): Promise<number> {
+        const transactions = data.transactions;
+        
+        // Cash flow efficiency (60% of velocity)
+        const efficiencyScore = this.calculateCashFlowEfficiency(transactions);
+        
+        // Transaction timing (40% of velocity)
+        const timingScore = this.calculateTransactionTiming(transactions);
+        
+        const velocityScore = Math.round(
+          (efficiencyScore * 0.60) + 
+          (timingScore * 0.40)
+        );
+        
+        return Math.min(1000, Math.max(0, velocityScore));
+      }
+      
+      private calculateCashFlowEfficiency(transactions: any[]): number {
+        const deposits = transactions.filter(t => t.transaction_type === 'deposit');
+        const withdrawals = transactions.filter(t => t.transaction_type === 'withdrawal');
+        
+        const totalDeposits = deposits.reduce((sum, t) => sum + t.amount, 0);
+        const totalWithdrawals = withdrawals.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        
+        if (totalDeposits === 0) return 0;
+        
+        const efficiency = (totalDeposits - totalWithdrawals) / totalDeposits;
+        
+        // Higher efficiency = better velocity score
+        return Math.round(Math.max(0, efficiency * 1000));
+      }
+      
+      private calculateTransactionTiming(transactions: any[]): number {
+        // Analyze timing patterns - prefer fewer, larger transactions over many small ones
+        const transactionFrequency = transactions.length / 90; // Transactions per day over 3 months
+        const averageTransactionSize = transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0) / transactions.length;
+        
+        // Optimal frequency is 1-2 transactions per day
+        let frequencyScore = 1000;
+        if (transactionFrequency > 3) frequencyScore = 600; // Too frequent
+        if (transactionFrequency < 0.5) frequencyScore = 400; // Too infrequent
+        
+        // Larger average transaction size gets higher score
+        let sizeScore = Math.min(1000, averageTransactionSize / 10);
+        
+        return Math.round((frequencyScore + sizeScore) / 2);
+      }
+      
+      private async calculateAssetsScore(userId: string, data: any): Promise<number> {
+        // Savings rate (50% of assets score)
+        const savingsRateScore = this.calculateSavingsRate(data.transactions);
+        
+        // Investment balance (30% of assets score)
+        const investmentScore = this.calculateInvestmentBalance(data);
+        
+        // Net worth growth (20% of assets score)
+        const netWorthScore = this.calculateNetWorthGrowth(data);
+        
+        const assetsScore = Math.round(
+          (savingsRateScore * 0.50) + 
+          (investmentScore * 0.30) + 
+          (netWorthScore * 0.20)
+        );
+        
+        return Math.min(1000, Math.max(0, assetsScore));
+      }
+      
+      private calculateSavingsRate(transactions: any[]): number {
+        const income = transactions
+          .filter(t => t.transaction_type === 'deposit')
+          .reduce((sum, t) => sum + t.amount, 0);
+        
+        const expenses = transactions
+          .filter(t => t.transaction_type === 'withdrawal')
+          .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        
+        if (income === 0) return 0;
+        
+        const savingsRate = (income - expenses) / income;
+        
+        // Higher savings rate = higher score
+        if (savingsRate > 0.3) return 1000; // 30%+ savings rate
+        if (savingsRate > 0.2) return 800;  // 20-30% savings rate
+        if (savingsRate > 0.1) return 600;  // 10-20% savings rate
+        if (savingsRate > 0) return 400;    // Positive savings
+        return 0; // No savings or negative
+      }
+      
+      private calculateInvestmentBalance(data: any): number {
+        // For now, use wallet balance as proxy for investable assets
+        const walletBalance = data.wallet?.balance || 0;
+        
+        // Score based on balance ranges (in ZAR)
+        if (walletBalance >= 100000) return 1000;
+        if (walletBalance >= 50000) return 800;
+        if (walletBalance >= 20000) return 600;
+        if (walletBalance >= 5000) return 400;
+        if (walletBalance >= 1000) return 200;
+        return 0;
+      }
+      
+      private calculateNetWorthGrowth(data: any): number {
+        // Simplified net worth growth calculation
+        // In production, this would track balance changes over time
+        const totalBalance = data.accounts.reduce((sum: number, acc: any) => sum + (acc.current_balance || 0), 0);
+        const walletBalance = data.wallet?.balance || 0;
+        const totalAssets = totalBalance + walletBalance;
+        
+        // Score based on total assets
+        if (totalAssets >= 200000) return 1000;
+        if (totalAssets >= 100000) return 800;
+        if (totalAssets >= 50000) return 600;
+        if (totalAssets >= 20000) return 400;
+        if (totalAssets >= 5000) return 200;
+        return 0;
+      }
+      
+      private determinePortfolioTier(score: number): 'bronze' | 'silver' | 'gold' | 'platinum' {
+        if (score >= 850) return 'platinum';
+        if (score >= 650) return 'gold';
+        if (score >= 400) return 'silver';
+        return 'bronze';
+      }
+      
+      private assessDataQuality(data: any): 'excellent' | 'good' | 'fair' | 'poor' {
+        const transactionCount = data.transactions.length;
+        const accountCount = data.accounts.length;
+        const hasWallet = !!data.wallet;
+        
+        if (transactionCount >= 50 && accountCount >= 2 && hasWallet) return 'excellent';
+        if (transactionCount >= 30 && accountCount >= 1 && hasWallet) return 'good';
+        if (transactionCount >= 15) return 'fair';
+        return 'poor';
+      }
+      
+      private async saveDivaScore(userId: string, scoreData: DivaScore) {
+        const client = await db.connect();
+        
+        try {
+          await client.query('BEGIN');
+          
+          // Insert DIVA score
+          const scoreResult = await client.query(`
+            INSERT INTO diva_scores (
+              user_id, total_score, discipline_score, income_score,
+              velocity_score, assets_score, calculation_version,
+              data_period_start, data_period_end, recommended_tier,
+              calculated_at, expires_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            RETURNING id
+          `, [
+            userId,
+            scoreData.totalScore,
+            scoreData.components.discipline,
+            scoreData.components.income,
+            scoreData.components.velocity,
+            scoreData.components.assets,
+            '1.0',
+            addMonths(new Date(), -3), // 3 months ago
+            new Date(),
+            scoreData.portfolioTier,
+            scoreData.calculatedAt,
+            scoreData.expiresAt,
+          ]);
+          
+          // Update user's DIVA score and portfolio tier
+          await client.query(`
+            UPDATE users 
+            SET diva_score = $1, portfolio_tier = $2, diva_last_calculated = $3, diva_next_update = $4
+            WHERE id = $5
+          `, [
+            scoreData.totalScore,
+            scoreData.portfolioTier,
+            scoreData.calculatedAt,
+            scoreData.expiresAt,
+            userId,
+          ]);
+          
+          await client.query('COMMIT');
+          
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
+        }
+      }
+      
+      // Utility functions
+      private groupTransactionsByMonth(transactions: any[]) {
+        return transactions.reduce((groups, transaction) => {
+          const month = new Date(transaction.transaction_date).toISOString().substring(0, 7);
+          if (!groups[month]) groups[month] = [];
+          groups[month].push(transaction);
+          return groups;
+        }, {});
+      }
+      
+      private calculateVariance(numbers: number[]): number {
+        const mean = numbers.reduce((a, b) => a + b, 0) / numbers.length;
+        const squaredDiffs = numbers.map(n => Math.pow(n - mean, 2));
+        return squaredDiffs.reduce((a, b) => a + b, 0) / numbers.length;
+      }
+    }
+    
+    export default new DivaScoreEngine();
+    ```
+  </Step>
+  
+  <Step title="Create DIVA Score API Endpoints">
+    Add endpoints for DIVA score calculation and retrieval:
+    
+    ```typescript
+    // src/routes/diva-score.ts
+    import { Router, Request, Response } from 'express';
+    import { authenticateToken } from '../middleware/auth';
+    import DivaScoreEngine from '../services/diva-scoring';
+    import { db } from '../database/connection';
+    
+    const router = Router();
+    
+    // Calculate or refresh DIVA score
+    router.post('/calculate', authenticateToken, async (req: Request, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        
+        if (!userId) {
+          return res.status(401).json({ error: 'User not authenticated' });
+        }
+        
+        // Check if user has sufficient data for calculation
+        const accountsResult = await db.query(
+          'SELECT COUNT(*) as count FROM user_accounts WHERE user_id = $1 AND is_active = true',
+          [userId]
+        );
+        
+        if (parseInt(accountsResult.rows[0].count) === 0) {
+          return res.status(400).json({
+            error: 'No linked bank accounts found',
+            message: 'Please link at least one bank account to calculate your DIVA score',
+            action: 'link_account',
+          });
+        }
+        
+        const transactionsResult = await db.query(
+          'SELECT COUNT(*) as count FROM transactions WHERE user_id = $1',
+          [userId]
+        );
+        
+        if (parseInt(transactionsResult.rows[0].count) < 10) {
+          return res.status(400).json({
+            error: 'Insufficient transaction data',
+            message: 'Please wait for more transaction data to be synced',
+            transactionCount: parseInt(transactionsResult.rows[0].count),
+            minimumRequired: 10,
+          });
+        }
+        
+        // Calculate DIVA score
+        const divaScore = await DivaScoreEngine.calculateDivaScore(userId);
+        
+        res.json({
+          success: true,
+          divaScore,
+          message: 'DIVA score calculated successfully',
+        });
+        
+      } catch (error) {
+        console.error('DIVA score calculation error:', error);
+        res.status(500).json({
+          error: 'Failed to calculate DIVA score',
+          details: error.message,
+        });
+      }
+    });
+    
+    // Get current DIVA score
+    router.get('/current', authenticateToken, async (req: Request, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        
+        const result = await db.query(`
+          SELECT 
+            ds.total_score,
+            ds.discipline_score,
+            ds.income_score,
+            ds.velocity_score,
+            ds.assets_score,
+            ds.recommended_tier,
+            ds.calculated_at,
+            ds.expires_at,
+            u.portfolio_tier
+          FROM diva_scores ds
+          JOIN users u ON u.id = ds.user_id
+          WHERE ds.user_id = $1
+          ORDER BY ds.calculated_at DESC
+          LIMIT 1
+        `, [userId]);
+        
+        if (result.rows.length === 0) {
+          return res.json({
+            success: true,
+            divaScore: null,
+            message: 'No DIVA score calculated yet',
+            action: 'calculate_score',
+          });
+        }
+        
+        const score = result.rows[0];
+        const isExpired = new Date(score.expires_at) < new Date();
+        
+        res.json({
+          success: true,
+          divaScore: {
+            totalScore: score.total_score,
+            components: {
+              discipline: score.discipline_score,
+              income: score.income_score,
+              velocity: score.velocity_score,
+              assets: score.assets_score,
+            },
+            portfolioTier: score.portfolio_tier,
+            calculatedAt: score.calculated_at,
+            expiresAt: score.expires_at,
+            isExpired,
+            needsUpdate: isExpired,
+          },
+        });
+        
+      } catch (error) {
+        console.error('Get DIVA score error:', error);
+        res.status(500).json({ error: 'Failed to retrieve DIVA score' });
+      }
+    });
+    
+    // Get DIVA score history
+    router.get('/history', authenticateToken, async (req: Request, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        
+        const result = await db.query(`
+          SELECT 
+            total_score,
+            discipline_score,
+            income_score,
+            velocity_score,
+            assets_score,
+            recommended_tier,
+            calculated_at
+          FROM diva_scores
+          WHERE user_id = $1
+          ORDER BY calculated_at DESC
+          LIMIT 12
+        `, [userId]);
+        
+        res.json({
+          success: true,
+          scoreHistory: result.rows,
+        });
+        
+      } catch (error) {
+        console.error('Get DIVA score history error:', error);
+        res.status(500).json({ error: 'Failed to retrieve score history' });
+      }
+    });
+    
+    export default router;
+    ```
+  </Step>
+</Steps>
 
-## Next Steps
+## Step 3: Simple Wallet Operations
 
-<Card title="Continue Setup" href="/quick-setup/api-setup">
-  Proceed to the next setup step
-</Card>
+<Steps>
+  <Step title="Create Wallet Service">
+    Implement basic wallet operations with proper transaction handling:
+    
+    ```typescript
+    // src/services/wallet-service.ts
+    import { db } from '../database/connection';
+    import { v4 as uuidv4 } from 'uuid';
+    
+    interface WalletTransaction {
+      userId: string;
+      amount: number;
+      type: 'deposit' | 'withdrawal' | 'transfer';
+      description: string;
+      metadata?: any;
+    }
+    
+    export class WalletService {
+      async getWalletBalance(userId: string): Promise<number> {
+        const result = await db.query(
+          'SELECT balance FROM wallets WHERE user_id = $1 AND wallet_type = $2',
+          [userId, 'main']
+        );
+        
+        return result.rows[0]?.balance || 0;
+      }
+      
+      async processWalletTransaction(transaction: WalletTransaction): Promise<string> {
+        const client = await db.connect();
+        
+        try {
+          await client.query('BEGIN');
+          
+          // Get current wallet balance with row lock
+          const walletResult = await client.query(
+            'SELECT id, balance FROM wallets WHERE user_id = $1 AND wallet_type = $2 FOR UPDATE',
+            [transaction.userId, 'main']
+          );
+          
+          if (walletResult.rows.length === 0) {
+            throw new Error('Wallet not found');
+          }
+          
+          const wallet = walletResult.rows[0];
+          const currentBalance = parseFloat(wallet.balance);
+          const transactionAmount = transaction.type === 'withdrawal' ? 
+            -Math.abs(transaction.amount) : Math.abs(transaction.amount);
+          
+          // Check sufficient balance for withdrawals
+          if (transaction.type === 'withdrawal' && currentBalance < Math.abs(transaction.amount)) {
+            throw new Error('Insufficient wallet balance');
+          }
+          
+          const newBalance = currentBalance + transactionAmount;
+          
+          // Update wallet balance
+          await client.query(
+            'UPDATE wallets SET balance = $1, updated_at = NOW() WHERE id = $2',
+            [newBalance, wallet.id]
+          );
+          
+          // Record transaction
+          const transactionId = uuidv4();
+          await client.query(`
+            INSERT INTO transactions (
+              id, user_id, wallet_id, transaction_type, amount, currency_code,
+              description_encrypted, status, balance_before, balance_after,
+              transaction_date, processed_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          `, [
+            transactionId,
+            transaction.userId,
+            wallet.id,
+            transaction.type,
+            Math.abs(transaction.amount),
+            'ZAR',
+            transaction.description,
+            'completed',
+            currentBalance,
+            newBalance,
+            new Date(),
+            new Date(),
+          ]);
+          
+          await client.query('COMMIT');
+          
+          return transactionId;
+          
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
+        }
+      }
+      
+      async getTransactionHistory(userId: string, limit: number = 20): Promise<any[]> {
+        const result = await db.query(`
+          SELECT 
+            id,
+            transaction_type,
+            amount,
+            currency_code,
+            description_encrypted,
+            status,
+            balance_after,
+            transaction_date
+          FROM transactions
+          WHERE user_id = $1
+          ORDER BY transaction_date DESC
+          LIMIT $2
+        `, [userId, limit]);
+        
+        return result.rows.map(transaction => ({
+          ...transaction,
+          description: transaction.description_encrypted, // In production, decrypt this
+        }));
+      }
+    }
+    
+    export default new WalletService();
+    ```
+  </Step>
+  
+  <Step title="Create Wallet API Endpoints">
+    Add wallet management endpoints:
+    
+    ```typescript
+    // src/routes/wallet.ts
+    import { Router, Request, Response } from 'express';
+    import { authenticateToken } from '../middleware/auth';
+    import WalletService from '../services/wallet-service';
+    
+    const router = Router();
+    
+    // Get wallet balance
+    router.get('/balance', authenticateToken, async (req: Request, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        const balance = await WalletService.getWalletBalance(userId);
+        
+        res.json({
+          success: true,
+          balance,
+          currency: 'ZAR',
+        });
+        
+      } catch (error) {
+        console.error('Get wallet balance error:', error);
+        res.status(500).json({ error: 'Failed to retrieve wallet balance' });
+      }
+    });
+    
+    // Deposit funds (for testing)
+    router.post('/deposit', authenticateToken, async (req: Request, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        const { amount, description } = req.body;
+        
+        if (!amount || amount <= 0) {
+          return res.status(400).json({ error: 'Invalid deposit amount' });
+        }
+        
+        const transactionId = await WalletService.processWalletTransaction({
+          userId,
+          amount: parseFloat(amount),
+          type: 'deposit',
+          description: description || 'Wallet deposit',
+        });
+        
+        const newBalance = await WalletService.getWalletBalance(userId);
+        
+        res.json({
+          success: true,
+          transactionId,
+          newBalance,
+          message: 'Deposit processed successfully',
+        });
+        
+      } catch (error) {
+        console.error('Wallet deposit error:', error);
+        res.status(500).json({
+          error: 'Failed to process deposit',
+          details: error.message,
+        });
+      }
+    });
+    
+    // Get transaction history
+    router.get('/transactions', authenticateToken, async (req: Request, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        const limit = parseInt(req.query.limit as string) || 20;
+        
+        const transactions = await WalletService.getTransactionHistory(userId, limit);
+        
+        res.json({
+          success: true,
+          transactions,
+        });
+        
+      } catch (error) {
+        console.error('Get transaction history error:', error);
+        res.status(500).json({ error: 'Failed to retrieve transaction history' });
+      }
+    });
+    
+    export default router;
+    ```
+  </Step>
+</Steps>
+
+## Step 4: Mobile App Integration
+
+<Steps>
+  <Step title="Create Integration Screen">
+    Build mobile screen to test the complete integration:
+    
+    ```typescript
+    // src/screens/IntegrationTestScreen.tsx
+    import React, { useState, useEffect } from 'react';
+    import {
+      View,
+      Text,
+      TouchableOpacity,
+      StyleSheet,
+      ScrollView,
+      Alert,
+      ActivityIndicator,
+    } from 'react-native';
+    import AWOApiClient from '../services/awo-api';
+    
+    interface DivaScore {
+      totalScore: number;
+      components: {
+        discipline: number;
+        income: number;
+        velocity: number;
+        assets: number;
+      };
+      portfolioTier: string;
+      calculatedAt: string;
+    }
+    
+    export default function IntegrationTestScreen() {
+      const [isLoading, setIsLoading] = useState(false);
+      const [accounts, setAccounts] = useState([]);
+      const [walletBalance, setWalletBalance] = useState(0);
+      const [divaScore, setDivaScore] = useState<DivaScore | null>(null);
+      const [transactions, setTransactions] = useState([]);
+      
+      useEffect(() => {
+        loadData();
+      }, []);
+      
+      const loadData = async () => {
+        try {
+          setIsLoading(true);
+          
+          // Load wallet balance
+          const balanceResponse = await AWOApiClient.api.get('/wallet/balance');
+          setWalletBalance(balanceResponse.data.balance);
+          
+          // Load linked accounts
+          const accountsResponse = await AWOApiClient.api.get('/banking/accounts');
+          setAccounts(accountsResponse.data.accounts);
+          
+          // Load DIVA score
+          const scoreResponse = await AWOApiClient.api.get('/diva-score/current');
+          setDivaScore(scoreResponse.data.divaScore);
+          
+          // Load recent transactions
+          const transactionsResponse = await AWOApiClient.api.get('/wallet/transactions?limit=5');
+          setTransactions(transactionsResponse.data.transactions);
+          
+        } catch (error) {
+          console.error('Failed to load data:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      const linkBankAccount = async () => {
+        try {
+          setIsLoading(true);
+          
+          const response = await AWOApiClient.api.post('/banking/link-account');
+          const { linkingUrl } = response.data;
+          
+          // In production, open browser or WebView
+          Alert.alert(
+            'Bank Linking',
+            'Bank linking URL generated. In production, this would open a secure browser window.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Simulate Success', onPress: () => simulateBankLinkSuccess() },
+            ]
+          );
+          
+        } catch (error) {
+          Alert.alert('Error', 'Failed to initiate bank linking');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      const simulateBankLinkSuccess = async () => {
+        // Simulate successful bank linking for demo
+        Alert.alert('Success', 'Bank account linked successfully! (Simulated)');
+        await loadData();
+      };
+      
+      const calculateDivaScore = async () => {
+        try {
+          setIsLoading(true);
+          
+          const response = await AWOApiClient.api.post('/diva-score/calculate');
+          setDivaScore(response.data.divaScore);
+          
+          Alert.alert(
+            'DIVA Score Calculated',
+            `Your score: ${response.data.divaScore.totalScore}/1000\nTier: ${response.data.divaScore.portfolioTier.toUpperCase()}`
+          );
+          
+        } catch (error) {
+          const errorMessage = error.response?.data?.message || 'Failed to calculate DIVA score';
+          Alert.alert('Error', errorMessage);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      const testWalletDeposit = async () => {
+        try {
+          setIsLoading(true);
+          
+          const response = await AWOApiClient.api.post('/wallet/deposit', {
+            amount: 100,
+            description: 'Test deposit from mobile app',
+          });
+          
+          setWalletBalance(response.data.newBalance);
+          
+          Alert.alert('Success', `Deposited R100. New balance: R${response.data.newBalance}`);
+          await loadData();
+          
+        } catch (error) {
+          Alert.alert('Error', 'Failed to process deposit');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      if (isLoading) {
+        return (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#bc9b25" />
+            <Text style={styles.loadingText}>Loading...</Text>
+          </View>
+        );
+      }
+      
+      return (
+        <ScrollView style={styles.container}>
+          <Text style={styles.title}>AWO Platform Integration Test</Text>
+          
+          {/* Wallet Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>💰 Wallet</Text>
+            <Text style={styles.balanceText}>Balance: R{walletBalance.toFixed(2)}</Text>
+            <TouchableOpacity style={styles.button} onPress={testWalletDeposit}>
+              <Text style={styles.buttonText}>Test Deposit (R100)</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {/* Banking Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🏦 Banking</Text>
+            <Text style={styles.infoText}>
+              Linked Accounts: {accounts.length}
+            </Text>
+            {accounts.length === 0 ? (
+              <TouchableOpacity style={styles.button} onPress={linkBankAccount}>
+                <Text style={styles.buttonText}>Link Bank Account</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.successText}>✅ Bank account linked</Text>
+            )}
+          </View>
+          
+          {/* DIVA Score Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📊 DIVA Score</Text>
+            {divaScore ? (
+              <View>
+                <Text style={styles.scoreText}>{divaScore.totalScore}/1000</Text>
+                <Text style={styles.tierText}>Tier: {divaScore.portfolioTier.toUpperCase()}</Text>
+                <View style={styles.componentsContainer}>
+                  <Text style={styles.componentText}>Discipline: {divaScore.components.discipline}</Text>
+                  <Text style={styles.componentText}>Income: {divaScore.components.income}</Text>
+                  <Text style={styles.componentText}>Velocity: {divaScore.components.velocity}</Text>
+                  <Text style={styles.componentText}>Assets: {divaScore.components.assets}</Text>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.button} onPress={calculateDivaScore}>
+                <Text style={styles.buttonText}>Calculate DIVA Score</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          {/* Transactions Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📋 Recent Transactions</Text>
+            {transactions.length === 0 ? (
+              <Text style={styles.infoText}>No transactions yet</Text>
+            ) : (
+              transactions.slice(0, 3).map((transaction: any, index) => (
+                <View key={index} style={styles.transactionItem}>
+                  <Text style={styles.transactionText}>
+                    {transaction.transaction_type}: R{transaction.amount}
+                  </Text>
+                  <Text style={styles.transactionDate}>
+                    {new Date(transaction.transaction_date).toLocaleDateString()}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+          
+          <TouchableOpacity style={styles.refreshButton} onPress={loadData}>
+            <Text style={styles.buttonText}>🔄 Refresh All Data</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      );
+    }
+    
+    const styles = StyleSheet.create({
+      container: {
+        flex: 1,
+        backgroundColor: '#f5f5f5',
+        padding: 16,
+      },
+      loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+      loadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#666',
+      },
+      title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#bc9b25',
+        textAlign: 'center',
+        marginBottom: 24,
+      },
+      section: {
+        backgroundColor: '#fff',
+        borderRadius: 8,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+      },
+      sectionTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 12,
+        color: '#333',
+      },
+      balanceText: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#bc9b25',
+        marginBottom: 12,
+      },
+      scoreText: {
+        fontSize: 32,
+        fontWeight: 'bold',
+        color: '#bc9b25',
+        textAlign: 'center',
+        marginBottom: 8,
+      },
+      tierText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#666',
+        textAlign: 'center',
+        marginBottom: 16,
+      },
+      componentsContainer: {
+        backgroundColor: '#f9f9f9',
+        borderRadius: 4,
+        padding: 12,
+      },
+      componentText: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 4,
+      },
+      infoText: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 12,
+      },
+      successText: {
+        fontSize: 14,
+        color: '#4CAF50',
+        fontWeight: 'bold',
+      },
+      button: {
+        backgroundColor: '#bc9b25',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        marginTop: 8,
+      },
+      refreshButton: {
+        backgroundColor: '#2196F3',
+        borderRadius: 8,
+        padding: 16,
+        alignItems: 'center',
+        marginTop: 16,
+        marginBottom: 32,
+      },
+      buttonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+      },
+      transactionItem: {
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+        paddingVertical: 8,
+      },
+      transactionText: {
+        fontSize: 14,
+        color: '#333',
+        fontWeight: '500',
+      },
+      transactionDate: {
+        fontSize: 12,
+        color: '#666',
+        marginTop: 2,
+      },
+    });
+    ```
+  </Step>
+</Steps>
+
+## Step 5: Test Your Integration
+
+<Steps>
+  <Step title="Run Complete Test Suite">
+    Test all components working together:
+    
+    ```bash
+    # Start your backend server
+    npm run dev
+    
+    # Start your mobile app
+    npx expo start
+    
+    # Test API endpoints with curl
+    curl -X GET "http://localhost:3000/health" \
+      -H "X-API-Key: ${AWO_PUBLIC_KEY}"
+    ```
+  </Step>
+  
+  <Step title="Test Integration Flow">
+    Follow this complete integration test:
+    
+    <CardGroup cols={2}>
+      <Card title="Authentication Test" icon="lock">
+        **✅ Login**: Use test credentials to authenticate  
+        **✅ Token Storage**: Verify token persistence  
+        **✅ API Access**: Confirm authenticated API calls work  
+        **✅ Refresh Flow**: Test automatic token refresh
+      </Card>
+      <Card title="Banking Integration Test" icon="shield">
+        **✅ Account Linking**: Initiate Stitch bank linking  
+        **✅ Callback Handling**: Process successful linking  
+        **✅ Transaction Sync**: Verify transaction import  
+        **✅ Data Storage**: Confirm encrypted data storage
+      </Card>
+    </CardGroup>
+    
+    <CardGroup cols={2}>
+      <Card title="DIVA Scoring Test" icon="chart-line">
+        **✅ Score Calculation**: Calculate initial DIVA score  
+        **✅ Component Breakdown**: Verify discipline, income, velocity, assets  
+        **✅ Portfolio Assignment**: Confirm tier assignment  
+        **✅ Score Storage**: Verify database persistence
+      </Card>
+      <Card title="Wallet Operations Test" icon="wallet">
+        **✅ Balance Retrieval**: Get current wallet balance  
+        **✅ Deposit Processing**: Test deposit transaction  
+        **✅ Transaction History**: Verify transaction logging  
+        **✅ Balance Updates**: Confirm real-time balance updates
+      </Card>
+    </CardGroup>
+  </Step>
+  
+  <Step title="Verify Data Flow">
+    Confirm end-to-end data flow:
+    
+    ```sql
+    -- Check user data
+    SELECT email, kyc_status, portfolio_tier, diva_score FROM users WHERE email = 'test@awo-platform.com';
+    
+    -- Check linked accounts
+    SELECT bank_name, account_type, current_balance FROM user_accounts WHERE user_id = 'your-user-id';
+    
+    -- Check DIVA score
+    SELECT total_score, discipline_score, income_score, velocity_score, assets_score 
+    FROM diva_scores WHERE user_id = 'your-user-id' ORDER BY calculated_at DESC LIMIT 1;
+    
+    -- Check wallet transactions
+    SELECT transaction_type, amount, description_encrypted, balance_after 
+    FROM transactions WHERE user_id = 'your-user-id' ORDER BY transaction_date DESC LIMIT 5;
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting Common Issues
+
+### API Integration Issues
+
+<Accordion title="Authentication failures">
+**Symptoms**: 401 Unauthorized errors, token refresh failures
+
+**Solutions**:
+1. Verify API keys are correctly configured
+2. Check token expiry and refresh logic
+3. Ensure proper header formatting
+4. Validate JWT token structure
+
+```typescript
+// Debug token issues
+console.log('Access Token:', localStorage.getItem('awo_access_token'));
+console.log('Token Valid:', await AWOApiClient.validateToken());
+```
+</Accordion>
+
+<Accordion title="Bank linking failures">
+**Symptoms**: Stitch API errors, callback failures
+
+**Solutions**:
+1. Verify Stitch credentials and environment
+2. Check redirect URL configuration
+3. Ensure webhook endpoints are accessible
+4. Validate OAuth flow implementation
+
+```bash
+# Test Stitch connectivity
+curl -X POST "https://api.stitch.money/connect/token" \
+  -d "grant_type=client_credentials&client_id=YOUR_ID&client_secret=YOUR_SECRET"
+```
+</Accordion>
+
+### Database Issues
+
+<Accordion title="Migration failures">
+**Symptoms**: Schema errors, constraint violations
+
+**Solutions**:
+1. Check database connection string
+2. Verify migration order and dependencies
+3. Ensure proper permissions
+4. Validate data types and constraints
+
+```bash
+# Check database connectivity
+psql $DATABASE_URL -c "SELECT version();"
+
+# Run migrations manually
+npm run migrate:up
+```
+</Accordion>
+
+### Mobile App Issues
+
+<Accordion title="API call failures">
+**Symptoms**: Network errors, timeout issues
+
+**Solutions**:
+1. Check network connectivity
+2. Verify API base URL configuration
+3. Ensure proper error handling
+4. Test with different network conditions
+
+```typescript
+// Debug network issues
+import NetInfo from '@react-native-community/netinfo';
+
+NetInfo.fetch().then(state => {
+  console.log('Network state:', state);
+});
+```
+</Accordion>
+
+## Next Steps & Advanced Features
+
+<CardGroup cols={3}>
+  <Card title="Core Features Deep Dive" icon="star" href="/core-features/authentication">
+    Explore advanced authentication, user management, and security features
+  </Card>
+  <Card title="Advanced Integrations" icon="puzzle" href="/integration/open-banking">
+    Implement additional banking providers, payment gateways, and real-time features
+  </Card>
+  <Card title="Production Deployment" icon="rocket" href="/deployment/overview">
+    Deploy your integration to production with monitoring and scaling
+  </Card>
+</CardGroup>
+
+## Integration Success Checklist
+
+<CardGroup cols={2}>
+  <Card title="Backend Integration" icon="server">
+    **✅ API Authentication**: JWT tokens working correctly  
+    **✅ Database Connection**: Neon PostgreSQL connected and migrated  
+    **✅ Stitch Integration**: Bank linking and transaction sync working  
+    **✅ DIVA Calculation**: Score calculation with proper component breakdown  
+    **✅ Wallet Operations**: Deposit, withdrawal, and balance management  
+    **✅ Error Handling**: Comprehensive error handling and logging
+  </Card>
+  <Card title="Mobile Integration" icon="mobile">
+    **✅ App Authentication**: Login and token management working  
+    **✅ API Client**: Authenticated requests and automatic refresh  
+    **✅ Bank Linking UI**: User-friendly bank account linking flow  
+    **✅ DIVA Display**: Score visualization and component breakdown  
+    **✅ Wallet UI**: Balance display and transaction history  
+    **✅ Error States**: Proper error handling and user feedback
+  </Card>
+</CardGroup>
+
+<Warning>
+**Production Readiness**: This integration provides a solid foundation for development and testing. Before production deployment, ensure you implement additional security measures, compliance requirements, and performance optimizations outlined in the advanced documentation sections.
+</Warning>
+
+---
+
+*Congratulations! You've successfully built your first end-to-end AWO Platform integration. You now have a working system that connects bank accounts, calculates DIVA scores, and manages wallet operations - the core foundation of the AWO financial platform.*

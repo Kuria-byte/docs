@@ -1,41 +1,977 @@
----
-title: "Mobile App Setup"
-description: "Step-by-step mobile app setup guide for AWO Platform"
----
-
 # Mobile App Setup
+
+<Info>
+Set up the AWO Platform React Native mobile application with Expo in under 20 minutes. This guide covers environment setup, project initialization, and testing on both iOS and Android devices.
+</Info>
 
 ## Prerequisites
 
-Before starting, ensure you have:
-- Node.js 18+ installed
-- Git configured
-- Access to AWO development resources
+<CardGroup cols={2}>
+  <Card title="Development Environment" icon="laptop">
+    **Node.js 18+** with npm or yarn  
+    **Git** for version control  
+    **Code editor** (VS Code recommended)  
+    **Physical device or emulator** for testing
+  </Card>
+  <Card title="Expo Requirements" icon="bolt">
+    **Expo CLI** installed globally  
+    **Expo Go app** on your mobile device  
+    **Expo account** (free signup)  
+    **AWO Platform API keys** from previous setup
+  </Card>
+</CardGroup>
 
-<Info>
-This guide will help you set up mobile app setup quickly and efficiently.
-</Info>
-
-## Step-by-Step Instructions
+## Step 1: Install Development Tools
 
 <Steps>
-  <Step title="Initial Setup">
-    Setup instructions will be added here
+  <Step title="Install Expo CLI">
+    Install Expo CLI globally and verify installation:
+    
+    ```bash
+    npm install -g @expo/cli
+    expo --version
+    
+    # Expected output: 49.0.0 or higher
+    ```
   </Step>
-  <Step title="Configuration">
-    Configuration details will be provided
+  
+  <Step title="Install Expo Go App">
+    Download Expo Go on your mobile device:
+    
+    - **iOS**: [App Store - Expo Go](https://apps.apple.com/app/expo-go/id982107779)
+    - **Android**: [Google Play - Expo Go](https://play.google.com/store/apps/details?id=host.exp.exponent)
+    
+    Create an Expo account and sign in on both your computer and mobile device.
   </Step>
-  <Step title="Verification">
-    Verification steps will be included
+  
+  <Step title="Setup Simulators (Optional)">
+    For local development without physical devices:
+    
+    <Accordion title="iOS Simulator Setup">
+    **Prerequisites**: macOS with Xcode installed
+    
+    ```bash
+    # Install Xcode from Mac App Store
+    # Open Xcode and install iOS Simulator
+    
+    # Verify simulator installation
+    xcrun simctl list devices
+    
+    # Start iOS Simulator
+    expo run:ios
+    ```
+    </Accordion>
+    
+    <Accordion title="Android Emulator Setup">
+    **Prerequisites**: Android Studio installed
+    
+    ```bash
+    # Install Android Studio
+    # Set up Android SDK and create AVD (Android Virtual Device)
+    
+    # Add Android SDK to PATH
+    export ANDROID_HOME=$HOME/Library/Android/sdk
+    export PATH=$PATH:$ANDROID_HOME/emulator
+    export PATH=$PATH:$ANDROID_HOME/tools
+    export PATH=$PATH:$ANDROID_HOME/platform-tools
+    
+    # Start Android Emulator
+    expo run:android
+    ```
+    </Accordion>
   </Step>
 </Steps>
 
-## Troubleshooting
+## Step 2: Create AWO Mobile App
 
-Common issues and solutions will be documented here.
+<Steps>
+  <Step title="Initialize Expo Project">
+    Create a new Expo project with TypeScript template:
+    
+    ```bash
+    # Create new project
+    npx create-expo-app AWOMobile --template expo-template-blank-typescript
+    
+    # Navigate to project directory
+    cd AWOMobile
+    
+    # Install additional dependencies
+    npm install
+    ```
+    
+    **Project Structure Created:**
+    ```
+    AWOMobile/
+    ├── App.tsx
+    ├── app.json
+    ├── babel.config.js
+    ├── package.json
+    ├── tsconfig.json
+    └── assets/
+        ├── adaptive-icon.png
+        ├── favicon.png
+        ├── icon.png
+        └── splash.png
+    ```
+  </Step>
+  
+  <Step title="Install AWO Dependencies">
+    Install required packages for AWO Platform integration:
+    
+    ```bash
+    # Core navigation and state management
+    npm install @react-navigation/native @react-navigation/native-stack
+    npm install react-native-screens react-native-safe-area-context
+    
+    # State management and API calls
+    npm install zustand @tanstack/react-query
+    npm install axios react-native-async-storage/async-storage
+    
+    # UI and styling
+    npm install react-native-elements react-native-vector-icons
+    npm install react-native-gesture-handler react-native-reanimated
+    
+    # AWO-specific integrations
+    npm install expo-secure-store expo-notifications
+    npm install expo-biometrics expo-device-info
+    npm install react-native-svg
+    ```
+  </Step>
+  
+  <Step title="Configure Project Settings">
+    Update `app.json` with AWO Platform configuration:
+    
+    ```json
+    {
+      "expo": {
+        "name": "AWO Platform",
+        "slug": "awo-platform",
+        "version": "1.0.0",
+        "orientation": "portrait",
+        "icon": "./assets/icon.png",
+        "userInterfaceStyle": "automatic",
+        "splash": {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#bc9b25"
+        },
+        "assetBundlePatterns": [
+          "**/*"
+        ],
+        "ios": {
+          "supportsTablet": false,
+          "bundleIdentifier": "com.awoplatform.mobile",
+          "buildNumber": "1.0.0",
+          "usesAppleSignIn": true
+        },
+        "android": {
+          "adaptiveIcon": {
+            "foregroundImage": "./assets/adaptive-icon.png",
+            "backgroundColor": "#bc9b25"
+          },
+          "package": "com.awoplatform.mobile",
+          "versionCode": 1,
+          "permissions": [
+            "USE_BIOMETRIC",
+            "USE_FINGERPRINT",
+            "CAMERA",
+            "VIBRATE"
+          ]
+        },
+        "web": {
+          "favicon": "./assets/favicon.png"
+        },
+        "plugins": [
+          "expo-secure-store",
+          "expo-notifications",
+          [
+            "expo-biometrics",
+            {
+              "faceIDPermission": "Use Face ID to authenticate with AWO Platform"
+            }
+          ]
+        ],
+        "extra": {
+          "eas": {
+            "projectId": "your-project-id-here"
+          }
+        }
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Step 3: Setup AWO Configuration
+
+<Steps>
+  <Step title="Create Configuration File">
+    Create environment configuration for AWO API integration:
+    
+    ```typescript
+    // src/config/awo-config.ts
+    interface AWOConfig {
+      apiUrl: string;
+      publicKey: string;
+      environment: 'sandbox' | 'production';
+      features: {
+        biometricAuth: boolean;
+        offlineMode: boolean;
+        pushNotifications: boolean;
+      };
+    }
+    
+    const developmentConfig: AWOConfig = {
+      apiUrl: 'https://api-sandbox.awo-platform.com',
+      publicKey: process.env.EXPO_PUBLIC_AWO_PUBLIC_KEY || '',
+      environment: 'sandbox',
+      features: {
+        biometricAuth: true,
+        offlineMode: true,
+        pushNotifications: true,
+      },
+    };
+    
+    const productionConfig: AWOConfig = {
+      apiUrl: 'https://api.awo-platform.com',
+      publicKey: process.env.EXPO_PUBLIC_AWO_PUBLIC_KEY_LIVE || '',
+      environment: 'production',
+      features: {
+        biometricAuth: true,
+        offlineMode: true,
+        pushNotifications: true,
+      },
+    };
+    
+    const config = __DEV__ ? developmentConfig : productionConfig;
+    export default config;
+    ```
+  </Step>
+  
+  <Step title="Setup Environment Variables">
+    Create `.env.local` file for environment variables:
+    
+    ```bash
+    # .env.local
+    EXPO_PUBLIC_AWO_PUBLIC_KEY=awo_pk_sandbox_your_key_here
+    EXPO_PUBLIC_AWO_PUBLIC_KEY_LIVE=awo_pk_live_your_live_key_here
+    EXPO_PUBLIC_ENVIRONMENT=development
+    
+    # Push notification configuration
+    EXPO_PUBLIC_PUSH_NOTIFICATIONS_ENABLED=true
+    
+    # Feature flags
+    EXPO_PUBLIC_BIOMETRIC_AUTH_ENABLED=true
+    EXPO_PUBLIC_OFFLINE_MODE_ENABLED=true
+    ```
+    
+    <Warning>
+    Never commit API keys to version control. Add `.env.local` to your `.gitignore` file.
+    </Warning>
+  </Step>
+  
+  <Step title="Create AWO API Client">
+    Setup API client with authentication and error handling:
+    
+    ```typescript
+    // src/services/awo-api.ts
+    import axios, { AxiosInstance, AxiosError } from 'axios';
+    import AsyncStorage from '@react-native-async-storage/async-storage';
+    import config from '../config/awo-config';
+    
+    class AWOApiClient {
+      private api: AxiosInstance;
+      private accessToken: string | null = null;
+      
+      constructor() {
+        this.api = axios.create({
+          baseURL: config.apiUrl,
+          timeout: 10000,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': config.publicKey,
+          },
+        });
+        
+        this.setupInterceptors();
+        this.initializeTokens();
+      }
+      
+      private async initializeTokens() {
+        try {
+          this.accessToken = await AsyncStorage.getItem('awo_access_token');
+          if (this.accessToken) {
+            this.api.defaults.headers.common['Authorization'] = `Bearer ${this.accessToken}`;
+          }
+        } catch (error) {
+          console.error('Failed to initialize tokens:', error);
+        }
+      }
+      
+      private setupInterceptors() {
+        // Request interceptor
+        this.api.interceptors.request.use(
+          (config) => {
+            console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+            return config;
+          },
+          (error) => Promise.reject(error)
+        );
+        
+        // Response interceptor with token refresh
+        this.api.interceptors.response.use(
+          (response) => response,
+          async (error: AxiosError) => {
+            const originalRequest = error.config;
+            
+            if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+              originalRequest._retry = true;
+              
+              try {
+                await this.refreshToken();
+                return this.api(originalRequest);
+              } catch (refreshError) {
+                await this.logout();
+                throw refreshError;
+              }
+            }
+            
+            return Promise.reject(error);
+          }
+        );
+      }
+      
+      async login(email: string, password: string) {
+        try {
+          const response = await this.api.post('/auth/login', { email, password });
+          const { accessToken, refreshToken, user } = response.data;
+          
+          await this.setTokens(accessToken, refreshToken);
+          return { user, accessToken };
+        } catch (error) {
+          throw this.handleError(error);
+        }
+      }
+      
+      async refreshToken() {
+        try {
+          const refreshToken = await AsyncStorage.getItem('awo_refresh_token');
+          if (!refreshToken) throw new Error('No refresh token available');
+          
+          const response = await this.api.post('/auth/refresh', { refreshToken });
+          const { accessToken } = response.data;
+          
+          await this.setTokens(accessToken, refreshToken);
+          return accessToken;
+        } catch (error) {
+          throw this.handleError(error);
+        }
+      }
+      
+      private async setTokens(accessToken: string, refreshToken: string) {
+        this.accessToken = accessToken;
+        this.api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+        
+        await AsyncStorage.multiSet([
+          ['awo_access_token', accessToken],
+          ['awo_refresh_token', refreshToken],
+        ]);
+      }
+      
+      async logout() {
+        this.accessToken = null;
+        delete this.api.defaults.headers.common['Authorization'];
+        
+        await AsyncStorage.multiRemove([
+          'awo_access_token',
+          'awo_refresh_token',
+          'awo_user_data',
+        ]);
+      }
+      
+      private handleError(error: any) {
+        if (error.response) {
+          return {
+            message: error.response.data?.error?.message || 'API request failed',
+            code: error.response.data?.error?.code || 'UNKNOWN_ERROR',
+            status: error.response.status,
+          };
+        } else if (error.request) {
+          return {
+            message: 'Network error - please check your connection',
+            code: 'NETWORK_ERROR',
+            status: 0,
+          };
+        } else {
+          return {
+            message: error.message || 'Unknown error occurred',
+            code: 'UNKNOWN_ERROR',
+            status: 0,
+          };
+        }
+      }
+      
+      // API methods
+      async getUserProfile() {
+        const response = await this.api.get('/users/profile');
+        return response.data;
+      }
+      
+      async getDivaScore() {
+        const response = await this.api.get('/diva-score/current');
+        return response.data;
+      }
+      
+      async getWalletBalance() {
+        const response = await this.api.get('/wallet/balance');
+        return response.data;
+      }
+    }
+    
+    export default new AWOApiClient();
+    ```
+  </Step>
+</Steps>
+
+## Step 4: Create Basic App Structure
+
+<Steps>
+  <Step title="Setup Navigation">
+    Create navigation structure with authentication flow:
+    
+    ```typescript
+    // src/navigation/AppNavigator.tsx
+    import React from 'react';
+    import { NavigationContainer } from '@react-navigation/native';
+    import { createNativeStackNavigator } from '@react-navigation/native-stack';
+    import { useAuthStore } from '../stores/authStore';
+    
+    // Screens
+    import LoginScreen from '../screens/LoginScreen';
+    import HomeScreen from '../screens/HomeScreen';
+    import LoadingScreen from '../screens/LoadingScreen';
+    
+    const Stack = createNativeStackNavigator();
+    
+    export default function AppNavigator() {
+      const { isAuthenticated, isLoading } = useAuthStore();
+      
+      if (isLoading) {
+        return <LoadingScreen />;
+      }
+      
+      return (
+        <NavigationContainer>
+          <Stack.Navigator
+            screenOptions={{
+              headerStyle: { backgroundColor: '#bc9b25' },
+              headerTintColor: '#fff',
+              headerTitleStyle: { fontWeight: 'bold' },
+            }}
+          >
+            {isAuthenticated ? (
+              <Stack.Screen 
+                name="Home" 
+                component={HomeScreen}
+                options={{ title: 'AWO Platform' }}
+              />
+            ) : (
+              <Stack.Screen 
+                name="Login" 
+                component={LoginScreen}
+                options={{ headerShown: false }}
+              />
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+      );
+    }
+    ```
+  </Step>
+  
+  <Step title="Setup State Management">
+    Create Zustand store for authentication state:
+    
+    ```typescript
+    // src/stores/authStore.ts
+    import { create } from 'zustand';
+    import { persist, createJSONStorage } from 'zustand/middleware';
+    import AsyncStorage from '@react-native-async-storage/async-storage';
+    import AWOApiClient from '../services/awo-api';
+    
+    interface User {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      kycStatus: string;
+      portfolioTier: string | null;
+    }
+    
+    interface AuthState {
+      user: User | null;
+      isAuthenticated: boolean;
+      isLoading: boolean;
+      login: (email: string, password: string) => Promise<void>;
+      logout: () => Promise<void>;
+      checkAuthStatus: () => Promise<void>;
+    }
+    
+    export const useAuthStore = create<AuthState>()(
+      persist(
+        (set, get) => ({
+          user: null,
+          isAuthenticated: false,
+          isLoading: true,
+          
+          login: async (email: string, password: string) => {
+            try {
+              set({ isLoading: true });
+              const { user } = await AWOApiClient.login(email, password);
+              set({ user, isAuthenticated: true, isLoading: false });
+            } catch (error) {
+              set({ isLoading: false });
+              throw error;
+            }
+          },
+          
+          logout: async () => {
+            try {
+              await AWOApiClient.logout();
+              set({ user: null, isAuthenticated: false });
+            } catch (error) {
+              console.error('Logout error:', error);
+            }
+          },
+          
+          checkAuthStatus: async () => {
+            try {
+              const profile = await AWOApiClient.getUserProfile();
+              set({ user: profile, isAuthenticated: true, isLoading: false });
+            } catch (error) {
+              set({ isAuthenticated: false, isLoading: false });
+            }
+          },
+        }),
+        {
+          name: 'awo-auth-storage',
+          storage: createJSONStorage(() => AsyncStorage),
+          partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
+        }
+      )
+    );
+    ```
+  </Step>
+  
+  <Step title="Create Login Screen">
+    Build authentication screen with AWO branding:
+    
+    ```typescript
+    // src/screens/LoginScreen.tsx
+    import React, { useState } from 'react';
+    import {
+      View,
+      Text,
+      TextInput,
+      TouchableOpacity,
+      StyleSheet,
+      Alert,
+      KeyboardAvoidingView,
+      Platform,
+    } from 'react-native';
+    import { useAuthStore } from '../stores/authStore';
+    
+    export default function LoginScreen() {
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [isLoading, setIsLoading] = useState(false);
+      const { login } = useAuthStore();
+      
+      const handleLogin = async () => {
+        if (!email || !password) {
+          Alert.alert('Error', 'Please enter both email and password');
+          return;
+        }
+        
+        try {
+          setIsLoading(true);
+          await login(email, password);
+        } catch (error: any) {
+          Alert.alert('Login Failed', error.message || 'Please check your credentials');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      return (
+        <KeyboardAvoidingView 
+          style={styles.container} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.content}>
+            <Text style={styles.title}>AWO Platform</Text>
+            <Text style={styles.subtitle}>Financial Empowerment for African Women</Text>
+            
+            <View style={styles.form}>
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoComplete="password"
+              />
+              
+              <TouchableOpacity
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={handleLogin}
+                disabled={isLoading}
+              >
+                <Text style={styles.buttonText}>
+                  {isLoading ? 'Signing In...' : 'Sign In'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.footer}>
+              New to AWO? Contact support for registration
+            </Text>
+          </View>
+        </KeyboardAvoidingView>
+      );
+    }
+    
+    const styles = StyleSheet.create({
+      container: {
+        flex: 1,
+        backgroundColor: '#fff',
+      },
+      content: {
+        flex: 1,
+        justifyContent: 'center',
+        paddingHorizontal: 32,
+      },
+      title: {
+        fontSize: 32,
+        fontWeight: 'bold',
+        color: '#bc9b25',
+        textAlign: 'center',
+        marginBottom: 8,
+      },
+      subtitle: {
+        fontSize: 16,
+        color: '#666',
+        textAlign: 'center',
+        marginBottom: 48,
+      },
+      form: {
+        marginBottom: 32,
+      },
+      input: {
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        padding: 16,
+        fontSize: 16,
+        marginBottom: 16,
+        backgroundColor: '#f9f9f9',
+      },
+      button: {
+        backgroundColor: '#bc9b25',
+        borderRadius: 8,
+        padding: 16,
+        alignItems: 'center',
+        marginTop: 16,
+      },
+      buttonDisabled: {
+        opacity: 0.6,
+      },
+      buttonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+      },
+      footer: {
+        textAlign: 'center',
+        color: '#666',
+        fontSize: 14,
+      },
+    });
+    ```
+  </Step>
+</Steps>
+
+## Step 5: Test Mobile App
+
+<Steps>
+  <Step title="Start Development Server">
+    Launch the Expo development server:
+    
+    ```bash
+    # Start Expo development server
+    npx expo start
+    
+    # Alternative commands:
+    npx expo start --ios      # iOS Simulator
+    npx expo start --android  # Android Emulator
+    npx expo start --web      # Web browser
+    ```
+    
+    You'll see a QR code in your terminal and a development dashboard in your browser.
+  </Step>
+  
+  <Step title="Test on Physical Device">
+    **Using Expo Go App:**
+    
+    1. Open Expo Go on your mobile device
+    2. Scan the QR code from your terminal
+    3. The app will load and you'll see the AWO login screen
+    4. Test login with sandbox credentials
+    
+    **Using Device Simulator:**
+    
+    ```bash
+    # iOS Simulator (macOS only)
+    npx expo run:ios
+    
+    # Android Emulator
+    npx expo run:android
+    ```
+  </Step>
+  
+  <Step title="Verify App Functionality">
+    Test core functionality to ensure everything works:
+    
+    <CardGroup cols={2}>
+      <Card title="Authentication Flow" icon="lock">
+        **✅ Login Screen**: Displays correctly with AWO branding  
+        **✅ API Connection**: Successfully connects to sandbox API  
+        **✅ Token Storage**: Persists authentication across app restarts  
+        **✅ Error Handling**: Shows appropriate error messages
+      </Card>
+      <Card title="Performance & UX" icon="mobile">
+        **✅ Fast Loading**: App starts in &lt;3 seconds  
+        **✅ Smooth Navigation**: No lag between screens  
+        **✅ Responsive UI**: Works on different screen sizes  
+        **✅ Offline Handling**: Graceful offline state management
+      </Card>
+    </CardGroup>
+  </Step>
+</Steps>
+
+## Troubleshooting Common Issues
+
+### Metro/Expo Issues
+
+<Accordion title="Metro bundler errors">
+**Clear Metro cache:**
+```bash
+npx expo start --clear
+# or
+npx react-native start --reset-cache
+```
+
+**Common metro.config.js fixes:**
+```javascript
+const { getDefaultConfig } = require('expo/metro-config');
+
+const config = getDefaultConfig(__dirname);
+
+// Add custom resolver for React Native modules
+config.resolver.alias = {
+  'react-native$': 'react-native-web',
+};
+
+module.exports = config;
+```
+</Accordion>
+
+### iOS Simulator Issues
+
+<Accordion title="iOS build errors">
+**Pod installation issues:**
+```bash
+cd ios && pod install && cd ..
+npx expo run:ios --clean
+```
+
+**Simulator not starting:**
+```bash
+# Reset iOS Simulator
+xcrun simctl erase all
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+```
+</Accordion>
+
+### Android Emulator Issues
+
+<Accordion title="Android build errors">
+**Gradle build failures:**
+```bash
+cd android && ./gradlew clean && cd ..
+npx expo run:android --clean
+```
+
+**Android SDK issues:**
+```bash
+# Set ANDROID_HOME environment variable
+export ANDROID_HOME=$HOME/Library/Android/sdk
+export PATH=$PATH:$ANDROID_HOME/emulator
+export PATH=$PATH:$ANDROID_HOME/tools
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+```
+</Accordion>
+
+## Performance Optimization
+
+### Bundle Size Optimization
+
+<CodeGroup>
+```javascript metro.config.js
+const { getDefaultConfig } = require('expo/metro-config');
+
+const config = getDefaultConfig(__dirname);
+
+// Optimize bundle size
+config.transformer.minifierConfig = {
+  keep_classnames: true,
+  keep_fnames: true,
+  mangle: {
+    keep_classnames: true,
+    keep_fnames: true,
+  },
+};
+
+module.exports = config;
+```
+
+```json app.json
+{
+  "expo": {
+    "optimization": {
+      "web": {
+        "bundler": "metro"
+      }
+    },
+    "assetBundlePatterns": [
+      "assets/fonts/*",
+      "assets/images/*"
+    ]
+  }
+}
+```
+</CodeGroup>
+
+### Memory Management
+
+<CodeGroup>
+```typescript Offline Storage Optimization
+// src/utils/storage.ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+class OptimizedStorage {
+  private cache = new Map<string, any>();
+  
+  async setItem(key: string, value: any) {
+    this.cache.set(key, value);
+    await AsyncStorage.setItem(key, JSON.stringify(value));
+  }
+  
+  async getItem(key: string) {
+    if (this.cache.has(key)) {
+      return this.cache.get(key);
+    }
+    
+    const stored = await AsyncStorage.getItem(key);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      this.cache.set(key, parsed);
+      return parsed;
+    }
+    
+    return null;
+  }
+  
+  clearCache() {
+    this.cache.clear();
+  }
+}
+
+export default new OptimizedStorage();
+```
+</CodeGroup>
+
+## African Market Optimizations
+
+### Data Usage Minimization
+
+<CardGroup cols={2}>
+  <Card title="Image Optimization" icon="image">
+    **WebP Format**: Use WebP images for better compression  
+    **Lazy Loading**: Load images only when needed  
+    **Caching**: Cache images locally for offline access  
+    **Compression**: Optimize image sizes for mobile data
+  </Card>
+  <Card title="API Efficiency" icon="server">
+    **Request Batching**: Combine multiple API calls  
+    **Data Compression**: Enable gzip compression  
+    **Caching Strategy**: Cache frequently accessed data  
+    **Offline Queue**: Queue requests when offline
+  </Card>
+</CardGroup>
+
+### Connectivity Handling
+
+```typescript
+// src/hooks/useNetworkStatus.ts
+import { useState, useEffect } from 'react';
+import NetInfo from '@react-native-netinfo/netinfo';
+
+export function useNetworkStatus() {
+  const [isConnected, setIsConnected] = useState(true);
+  const [connectionType, setConnectionType] = useState<string>('unknown');
+  
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsConnected(state.isConnected ?? false);
+      setConnectionType(state.type);
+    });
+    
+    return unsubscribe;
+  }, []);
+  
+  return { isConnected, connectionType };
+}
+```
 
 ## Next Steps
 
-<Card title="Continue Setup" href="/quick-setup/api-setup">
-  Proceed to the next setup step
-</Card>
+<CardGroup cols={3}>
+  <Card title="Database Configuration" icon="database" href="/quick-setup/database-configuration">
+    Set up Neon PostgreSQL and configure data models for AWO Platform
+  </Card>
+  <Card title="First Integration" icon="plug" href="/quick-setup/first-integration">
+    Connect your mobile app with bank APIs and payment services
+  </Card>
+  <Card title="Core Features" icon="star" href="/core-features/authentication">
+    Implement DIVA scoring, wallet operations, and Chama management
+  </Card>
+</CardGroup>
+
+<Warning>
+**Important**: Keep your API keys secure and never commit them to version control. Use Expo's secure storage for sensitive data and implement proper error handling for all API calls.
+</Warning>
+
+---
+
+*Your AWO Platform mobile app is now ready for development! The app includes authentication, API integration, and optimizations for African markets with variable connectivity.*

@@ -1,41 +1,1131 @@
----
-title: "Database Configuration"
-description: "Step-by-step database configuration guide for AWO Platform"
----
-
 # Database Configuration
 
-## Prerequisites
-
-Before starting, ensure you have:
-- Node.js 18+ installed
-- Git configured
-- Access to AWO development resources
-
 <Info>
-This guide will help you set up database configuration quickly and efficiently.
+Set up Neon PostgreSQL database for AWO Platform with optimized schemas for DIVA scoring, Chama management, and financial operations. This guide covers setup, migrations, and African market optimizations.
 </Info>
 
-## Step-by-Step Instructions
+## Overview
+
+AWO Platform uses **Neon PostgreSQL** as the primary database with global edge locations for optimal performance across the SADC region.
+
+<CardGroup cols={2}>
+  <Card title="Database Features" icon="database">
+    **Serverless PostgreSQL** with auto-scaling  
+    **Global edge locations** for SADC users  
+    **Point-in-time recovery** for data protection  
+    **Real-time replication** for read performance
+  </Card>
+  <Card title="AWO-Specific Requirements" icon="shield">
+    **ACID compliance** for financial transactions  
+    **Event sourcing** for audit trails  
+    **Field-level encryption** for PII data  
+    **Multi-tenant architecture** with data isolation
+  </Card>
+</CardGroup>
+
+## Step 1: Neon Database Setup
 
 <Steps>
-  <Step title="Initial Setup">
-    Setup instructions will be added here
+  <Step title="Create Neon Account">
+    Sign up for Neon PostgreSQL and create your first database:
+    
+    1. Visit [console.neon.tech](https://console.neon.tech) and sign up
+    2. Create a new project: **"AWO Platform"**
+    3. Select region: **AWS eu-west-1 (Ireland)** for SADC proximity
+    4. Choose database name: **awo_platform**
+    
+    **Connection Details:**
+    ```
+    Host: ep-xxx-xxx.eu-west-1.aws.neon.tech
+    Database: awo_platform
+    Username: your-username
+    Password: [generated-password]
+    Port: 5432
+    ```
   </Step>
-  <Step title="Configuration">
-    Configuration details will be provided
+  
+  <Step title="Configure Connection String">
+    Set up environment variables for database connection:
+    
+    ```bash
+    # .env.local
+    # Development Database (Neon)
+    DATABASE_URL="postgresql://username:password@ep-xxx.eu-west-1.aws.neon.tech:5432/awo_platform?sslmode=require"
+    
+    # Redis Cache (for development)
+    REDIS_URL="redis://localhost:6379"
+    
+    # Database Configuration
+    DB_SSL_MODE="require"
+    DB_POOL_SIZE="20"
+    DB_MAX_CONNECTIONS="100"
+    
+    # Encryption Keys (generate secure keys)
+    DB_ENCRYPTION_KEY="your-32-character-encryption-key-here"
+    DB_FIELD_ENCRYPTION_KEY="another-32-char-key-for-pii-data"
+    ```
   </Step>
-  <Step title="Verification">
-    Verification steps will be included
+  
+  <Step title="Install Database Tools">
+    Install required tools and dependencies:
+    
+    ```bash
+    # Database migration and ORM tools
+    npm install drizzle-orm drizzle-kit
+    npm install postgres pg @types/pg
+    
+    # Additional utilities
+    npm install bcryptjs jsonwebtoken
+    npm install uuid @types/uuid
+    
+    # Redis for caching
+    npm install redis @types/redis
+    
+    # Database utilities
+    npm install date-fns crypto-js
+    ```
   </Step>
 </Steps>
 
-## Troubleshooting
+## Step 2: Database Schema Design
 
-Common issues and solutions will be documented here.
+<Steps>
+  <Step title="Core Schema Structure">
+    Create the foundational database schema with proper relationships:
+    
+    ```sql
+    -- Enable UUID extension
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pg_crypto";
+    
+    -- Create custom types
+    CREATE TYPE kyc_status AS ENUM ('unverified', 'tier1_pending', 'tier1_verified', 'tier2_pending', 'tier2_verified', 'rejected');
+    CREATE TYPE portfolio_tier AS ENUM ('bronze', 'silver', 'gold', 'platinum');
+    CREATE TYPE transaction_type AS ENUM ('deposit', 'withdrawal', 'transfer', 'chama_contribution', 'investment', 'fee');
+    CREATE TYPE transaction_status AS ENUM ('pending', 'completed', 'failed', 'cancelled');
+    CREATE TYPE payment_method AS ENUM ('bank_transfer', 'mobile_money', 'card', 'cash', 'wallet');
+    
+    -- Users table with encrypted fields
+    CREATE TABLE users (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        email VARCHAR(255) UNIQUE NOT NULL,
+        phone_number VARCHAR(20) UNIQUE,
+        
+        -- Encrypted personal information
+        first_name_encrypted TEXT NOT NULL,
+        last_name_encrypted TEXT NOT NULL,
+        id_number_encrypted TEXT,
+        
+        -- Authentication
+        password_hash TEXT NOT NULL,
+        email_verified BOOLEAN DEFAULT FALSE,
+        phone_verified BOOLEAN DEFAULT FALSE,
+        
+        -- Profile information
+        country_code CHAR(2) NOT NULL,
+        preferred_language VARCHAR(10) DEFAULT 'en',
+        kyc_status kyc_status DEFAULT 'unverified',
+        
+        -- Financial profile
+        portfolio_tier portfolio_tier,
+        diva_score INTEGER CHECK (diva_score BETWEEN 0 AND 1000),
+        diva_last_calculated TIMESTAMP WITH TIME ZONE,
+        diva_next_update TIMESTAMP WITH TIME ZONE,
+        
+        -- Account status
+        is_active BOOLEAN DEFAULT TRUE,
+        last_login TIMESTAMP WITH TIME ZONE,
+        
+        -- Timestamps
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Indexes for performance
+    CREATE INDEX idx_users_email ON users(email);
+    CREATE INDEX idx_users_phone ON users(phone_number);
+    CREATE INDEX idx_users_country ON users(country_code);
+    CREATE INDEX idx_users_kyc_status ON users(kyc_status);
+    CREATE INDEX idx_users_portfolio_tier ON users(portfolio_tier);
+    CREATE INDEX idx_users_diva_score ON users(diva_score);
+    ```
+  </Step>
+  
+  <Step title="DIVA Scoring Schema">
+    Create tables for DIVA score calculation and history:
+    
+    ```sql
+    -- DIVA score components and calculations
+    CREATE TABLE diva_scores (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        
+        -- Overall score (0-1000)
+        total_score INTEGER NOT NULL CHECK (total_score BETWEEN 0 AND 1000),
+        
+        -- Component scores (0-1000 each)
+        discipline_score INTEGER NOT NULL CHECK (discipline_score BETWEEN 0 AND 1000),
+        income_score INTEGER NOT NULL CHECK (income_score BETWEEN 0 AND 1000),
+        velocity_score INTEGER NOT NULL CHECK (velocity_score BETWEEN 0 AND 1000),
+        assets_score INTEGER NOT NULL CHECK (assets_score BETWEEN 0 AND 1000),
+        
+        -- Calculation metadata
+        calculation_version VARCHAR(10) NOT NULL DEFAULT '1.0',
+        data_period_start DATE NOT NULL,
+        data_period_end DATE NOT NULL,
+        transactions_analyzed INTEGER NOT NULL DEFAULT 0,
+        
+        -- Risk tolerance (RTSM)
+        risk_tolerance_score INTEGER CHECK (risk_tolerance_score BETWEEN 0 AND 100),
+        risk_questionnaire_version VARCHAR(10),
+        
+        -- Portfolio assignment
+        recommended_tier portfolio_tier NOT NULL,
+        tier_assignment_reason TEXT,
+        
+        -- Timestamps
+        calculated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+    );
+    
+    -- DIVA calculation details (for transparency)
+    CREATE TABLE diva_calculation_details (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        diva_score_id UUID NOT NULL REFERENCES diva_scores(id) ON DELETE CASCADE,
+        
+        -- Discipline metrics
+        payment_punctuality_rate DECIMAL(5,2),
+        savings_consistency_score INTEGER,
+        overdraft_frequency INTEGER,
+        
+        -- Income metrics
+        income_stability_score INTEGER,
+        income_growth_rate DECIMAL(5,2),
+        income_diversification_score INTEGER,
+        
+        -- Velocity metrics
+        cash_flow_efficiency DECIMAL(5,2),
+        transaction_timing_score INTEGER,
+        financial_velocity DECIMAL(10,2),
+        
+        -- Assets metrics
+        savings_rate DECIMAL(5,2),
+        investment_balance DECIMAL(15,2),
+        net_worth_growth DECIMAL(10,2),
+        
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Indexes for DIVA tables
+    CREATE INDEX idx_diva_scores_user_id ON diva_scores(user_id);
+    CREATE INDEX idx_diva_scores_calculated_at ON diva_scores(calculated_at);
+    CREATE INDEX idx_diva_scores_expires_at ON diva_scores(expires_at);
+    CREATE INDEX idx_diva_scores_total_score ON diva_scores(total_score);
+    ```
+  </Step>
+  
+  <Step title="Financial Accounts and Transactions">
+    Create comprehensive financial data structures:
+    
+    ```sql
+    -- User financial accounts (bank accounts, mobile money, etc.)
+    CREATE TABLE user_accounts (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        
+        -- Account identification (encrypted)
+        account_number_encrypted TEXT,
+        account_name_encrypted TEXT,
+        bank_name VARCHAR(255),
+        account_type VARCHAR(50),
+        
+        -- Integration details
+        provider VARCHAR(50) NOT NULL, -- 'stitch', 'mono', 'manual'
+        provider_account_id VARCHAR(255),
+        
+        -- Account status
+        is_primary BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT TRUE,
+        last_synced TIMESTAMP WITH TIME ZONE,
+        
+        -- Balance tracking
+        current_balance DECIMAL(15,2) DEFAULT 0,
+        available_balance DECIMAL(15,2) DEFAULT 0,
+        currency_code CHAR(3) DEFAULT 'ZAR',
+        
+        -- Timestamps
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- AWO Platform wallets
+    CREATE TABLE wallets (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        
+        -- Wallet details
+        wallet_type VARCHAR(50) DEFAULT 'main', -- 'main', 'savings', 'investment'
+        currency_code CHAR(3) NOT NULL DEFAULT 'ZAR',
+        
+        -- Balance information
+        balance DECIMAL(15,2) DEFAULT 0 CHECK (balance >= 0),
+        pending_balance DECIMAL(15,2) DEFAULT 0,
+        locked_balance DECIMAL(15,2) DEFAULT 0,
+        
+        -- Limits and controls
+        daily_limit DECIMAL(15,2),
+        monthly_limit DECIMAL(15,2),
+        
+        -- Status
+        is_active BOOLEAN DEFAULT TRUE,
+        
+        -- Timestamps
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Financial transactions
+    CREATE TABLE transactions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        wallet_id UUID REFERENCES wallets(id),
+        account_id UUID REFERENCES user_accounts(id),
+        
+        -- Transaction details
+        transaction_type transaction_type NOT NULL,
+        amount DECIMAL(15,2) NOT NULL,
+        currency_code CHAR(3) NOT NULL DEFAULT 'ZAR',
+        
+        -- Transaction description (encrypted for privacy)
+        description_encrypted TEXT,
+        category VARCHAR(100),
+        subcategory VARCHAR(100),
+        
+        -- Status and processing
+        status transaction_status DEFAULT 'pending',
+        payment_method payment_method,
+        
+        -- External references
+        external_transaction_id VARCHAR(255),
+        provider_reference VARCHAR(255),
+        
+        -- Balance tracking
+        balance_before DECIMAL(15,2),
+        balance_after DECIMAL(15,2),
+        
+        -- Geographic and compliance
+        transaction_country CHAR(2),
+        compliance_checked BOOLEAN DEFAULT FALSE,
+        flagged_for_review BOOLEAN DEFAULT FALSE,
+        
+        -- Timestamps
+        transaction_date TIMESTAMP WITH TIME ZONE NOT NULL,
+        processed_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Indexes for financial tables
+    CREATE INDEX idx_user_accounts_user_id ON user_accounts(user_id);
+    CREATE INDEX idx_user_accounts_provider ON user_accounts(provider);
+    CREATE INDEX idx_wallets_user_id ON wallets(user_id);
+    CREATE INDEX idx_transactions_user_id ON transactions(user_id);
+    CREATE INDEX idx_transactions_type ON transactions(transaction_type);
+    CREATE INDEX idx_transactions_status ON transactions(status);
+    CREATE INDEX idx_transactions_date ON transactions(transaction_date);
+    CREATE INDEX idx_transactions_amount ON transactions(amount);
+    ```
+  </Step>
+  
+  <Step title="Chama/Stokvel Management Schema">
+    Create tables for group savings functionality:
+    
+    ```sql
+    -- Chama groups
+    CREATE TABLE chamas (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        
+        -- Group information
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        group_type VARCHAR(50) DEFAULT 'stokvel', -- 'stokvel', 'chama', 'investment_club'
+        
+        -- Financial settings
+        target_amount DECIMAL(15,2),
+        contribution_amount DECIMAL(15,2) NOT NULL,
+        contribution_frequency VARCHAR(20) NOT NULL, -- 'weekly', 'monthly', 'quarterly'
+        currency_code CHAR(3) NOT NULL DEFAULT 'ZAR',
+        
+        -- Group rules
+        max_members INTEGER DEFAULT 50,
+        min_members INTEGER DEFAULT 3,
+        late_fee_amount DECIMAL(10,2) DEFAULT 0,
+        
+        -- Status
+        is_active BOOLEAN DEFAULT TRUE,
+        start_date DATE NOT NULL,
+        end_date DATE,
+        
+        -- Governance
+        requires_unanimous_approval BOOLEAN DEFAULT FALSE,
+        voting_threshold DECIMAL(3,2) DEFAULT 0.60, -- 60% majority
+        
+        -- Timestamps
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Chama membership
+    CREATE TABLE chama_members (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        chama_id UUID NOT NULL REFERENCES chamas(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        
+        -- Membership details
+        role VARCHAR(50) DEFAULT 'member', -- 'admin', 'treasurer', 'member'
+        joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        status VARCHAR(50) DEFAULT 'active', -- 'active', 'inactive', 'suspended'
+        
+        -- Financial tracking
+        total_contributed DECIMAL(15,2) DEFAULT 0,
+        total_received DECIMAL(15,2) DEFAULT 0,
+        contributions_missed INTEGER DEFAULT 0,
+        
+        -- Order for payouts (for rotating stokvels)
+        payout_order INTEGER,
+        last_payout_date DATE,
+        
+        UNIQUE(chama_id, user_id)
+    );
+    
+    -- Chama contributions
+    CREATE TABLE chama_contributions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        chama_id UUID NOT NULL REFERENCES chamas(id) ON DELETE CASCADE,
+        member_id UUID NOT NULL REFERENCES chama_members(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        
+        -- Contribution details
+        amount DECIMAL(15,2) NOT NULL,
+        due_date DATE NOT NULL,
+        paid_date TIMESTAMP WITH TIME ZONE,
+        
+        -- Payment information
+        transaction_id UUID REFERENCES transactions(id),
+        payment_method payment_method,
+        
+        -- Status
+        status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'paid', 'late', 'missed'
+        late_fee_applied DECIMAL(10,2) DEFAULT 0,
+        
+        -- Timestamps
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Chama transactions and payouts
+    CREATE TABLE chama_transactions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        chama_id UUID NOT NULL REFERENCES chamas(id) ON DELETE CASCADE,
+        
+        -- Transaction details
+        transaction_type VARCHAR(50) NOT NULL, -- 'contribution', 'payout', 'fee', 'investment'
+        amount DECIMAL(15,2) NOT NULL,
+        
+        -- Member involvement
+        from_member_id UUID REFERENCES chama_members(id),
+        to_member_id UUID REFERENCES chama_members(id),
+        
+        -- External transaction reference
+        transaction_id UUID REFERENCES transactions(id),
+        
+        -- Approval workflow
+        approved_by UUID REFERENCES users(id),
+        approval_date TIMESTAMP WITH TIME ZONE,
+        requires_approval BOOLEAN DEFAULT TRUE,
+        
+        -- Description and metadata
+        description TEXT,
+        metadata JSONB,
+        
+        -- Timestamps
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Indexes for Chama tables
+    CREATE INDEX idx_chamas_is_active ON chamas(is_active);
+    CREATE INDEX idx_chama_members_chama_id ON chama_members(chama_id);
+    CREATE INDEX idx_chama_members_user_id ON chama_members(user_id);
+    CREATE INDEX idx_chama_contributions_chama_id ON chama_contributions(chama_id);
+    CREATE INDEX idx_chama_contributions_due_date ON chama_contributions(due_date);
+    CREATE INDEX idx_chama_transactions_chama_id ON chama_transactions(chama_id);
+    ```
+  </Step>
+</Steps>
+
+## Step 3: Database Setup and Configuration
+
+<Steps>
+  <Step title="Create Database Connection Module">
+    Set up database connection with proper configuration:
+    
+    ```typescript
+    // src/database/connection.ts
+    import { Pool, PoolConfig } from 'pg';
+    import { createClient } from 'redis';
+    
+    // Database configuration
+    const dbConfig: PoolConfig = {
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      max: parseInt(process.env.DB_POOL_SIZE || '20'),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    };
+    
+    // PostgreSQL connection pool
+    export const db = new Pool(dbConfig);
+    
+    // Redis client for caching
+    export const redis = createClient({
+      url: process.env.REDIS_URL || 'redis://localhost:6379',
+    });
+    
+    redis.on('error', (err) => console.error('Redis Client Error', err));
+    redis.on('connect', () => console.log('Redis connected'));
+    
+    // Initialize connections
+    export async function initializeDatabase() {
+      try {
+        // Test PostgreSQL connection
+        const client = await db.connect();
+        console.log('PostgreSQL connected successfully');
+        client.release();
+        
+        // Connect to Redis
+        await redis.connect();
+        console.log('Database connections initialized');
+        
+        return true;
+      } catch (error) {
+        console.error('Database connection failed:', error);
+        throw error;
+      }
+    }
+    
+    // Graceful shutdown
+    export async function closeDatabase() {
+      await db.end();
+      await redis.quit();
+      console.log('Database connections closed');
+    }
+    ```
+  </Step>
+  
+  <Step title="Database Migration System">
+    Create migration management for schema changes:
+    
+    ```typescript
+    // src/database/migrations/001_initial_schema.sql
+    -- Initial schema creation
+    -- (Use the SQL from previous steps)
+    
+    -- src/database/migrate.ts
+    import { readFileSync } from 'fs';
+    import { join } from 'path';
+    import { db } from './connection';
+    
+    interface Migration {
+      id: number;
+      name: string;
+      sql: string;
+    }
+    
+    class MigrationManager {
+      private migrationsPath = join(__dirname, 'migrations');
+      
+      async createMigrationsTable() {
+        await db.query(`
+          CREATE TABLE IF NOT EXISTS schema_migrations (
+            id SERIAL PRIMARY KEY,
+            migration_name VARCHAR(255) UNIQUE NOT NULL,
+            executed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          )
+        `);
+      }
+      
+      async getExecutedMigrations(): Promise<string[]> {
+        const result = await db.query(
+          'SELECT migration_name FROM schema_migrations ORDER BY id'
+        );
+        return result.rows.map(row => row.migration_name);
+      }
+      
+      async executeMigration(migration: Migration) {
+        const client = await db.connect();
+        
+        try {
+          await client.query('BEGIN');
+          
+          // Execute migration SQL
+          await client.query(migration.sql);
+          
+          // Record migration
+          await client.query(
+            'INSERT INTO schema_migrations (migration_name) VALUES ($1)',
+            [migration.name]
+          );
+          
+          await client.query('COMMIT');
+          console.log(`Migration ${migration.name} executed successfully`);
+          
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
+        }
+      }
+      
+      async runMigrations() {
+        await this.createMigrationsTable();
+        
+        const executedMigrations = await this.getExecutedMigrations();
+        const migrationFiles = [
+          '001_initial_schema.sql',
+          '002_add_indexes.sql',
+          '003_add_audit_triggers.sql',
+        ];
+        
+        for (const file of migrationFiles) {
+          if (!executedMigrations.includes(file)) {
+            const sql = readFileSync(join(this.migrationsPath, file), 'utf8');
+            await this.executeMigration({
+              id: parseInt(file.split('_')[0]),
+              name: file,
+              sql,
+            });
+          }
+        }
+        
+        console.log('All migrations completed');
+      }
+    }
+    
+    export default new MigrationManager();
+    ```
+  </Step>
+  
+  <Step title="Seed Development Data">
+    Create seed data for development and testing:
+    
+    ```typescript
+    // src/database/seeds/development.ts
+    import { db } from '../connection';
+    import bcrypt from 'bcryptjs';
+    import { encrypt } from '../utils/encryption';
+    
+    class DatabaseSeeder {
+      async seedUsers() {
+        const hashedPassword = await bcrypt.hash('Password123!', 12);
+        
+        const users = [
+          {
+            email: 'test@awo-platform.com',
+            firstName: 'Test',
+            lastName: 'User',
+            countryCode: 'ZA',
+            kycStatus: 'tier1_verified',
+            portfolioTier: 'silver',
+            divaScore: 650,
+          },
+          {
+            email: 'admin@awo-platform.com',
+            firstName: 'Admin',
+            lastName: 'User',
+            countryCode: 'ZA',
+            kycStatus: 'tier2_verified',
+            portfolioTier: 'gold',
+            divaScore: 750,
+          },
+        ];
+        
+        for (const user of users) {
+          const encryptedFirstName = encrypt(user.firstName);
+          const encryptedLastName = encrypt(user.lastName);
+          
+          await db.query(`
+            INSERT INTO users (
+              email, first_name_encrypted, last_name_encrypted,
+              password_hash, country_code, kyc_status,
+              portfolio_tier, diva_score, email_verified
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ON CONFLICT (email) DO NOTHING
+          `, [
+            user.email,
+            encryptedFirstName,
+            encryptedLastName,
+            hashedPassword,
+            user.countryCode,
+            user.kycStatus,
+            user.portfolioTier,
+            user.divaScore,
+            true,
+          ]);
+        }
+        
+        console.log('Users seeded successfully');
+      }
+      
+      async seedWallets() {
+        const users = await db.query('SELECT id FROM users LIMIT 10');
+        
+        for (const user of users.rows) {
+          await db.query(`
+            INSERT INTO wallets (user_id, wallet_type, balance, currency_code)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT DO NOTHING
+          `, [user.id, 'main', 1000.00, 'ZAR']);
+        }
+        
+        console.log('Wallets seeded successfully');
+      }
+      
+      async seedChamas() {
+        const chamaData = {
+          name: 'Sisterhood Savings Circle',
+          description: 'Monthly savings group for women entrepreneurs',
+          contributionAmount: 500.00,
+          contributionFrequency: 'monthly',
+          maxMembers: 12,
+          currencyCode: 'ZAR',
+          startDate: '2025-01-01',
+        };
+        
+        const result = await db.query(`
+          INSERT INTO chamas (
+            name, description, contribution_amount, 
+            contribution_frequency, max_members, currency_code, start_date
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING id
+          ON CONFLICT DO NOTHING
+        `, [
+          chamaData.name,
+          chamaData.description,
+          chamaData.contributionAmount,
+          chamaData.contributionFrequency,
+          chamaData.maxMembers,
+          chamaData.currencyCode,
+          chamaData.startDate,
+        ]);
+        
+        console.log('Chamas seeded successfully');
+      }
+      
+      async runAllSeeds() {
+        try {
+          await this.seedUsers();
+          await this.seedWallets();
+          await this.seedChamas();
+          console.log('All seeds completed successfully');
+        } catch (error) {
+          console.error('Seeding failed:', error);
+          throw error;
+        }
+      }
+    }
+    
+    export default new DatabaseSeeder();
+    ```
+  </Step>
+</Steps>
+
+## Step 4: Security and Encryption
+
+<Steps>
+  <Step title="Field-Level Encryption">
+    Implement encryption for sensitive data:
+    
+    ```typescript
+    // src/database/utils/encryption.ts
+    import crypto from 'crypto';
+    
+    const ENCRYPTION_KEY = process.env.DB_ENCRYPTION_KEY!;
+    const ALGORITHM = 'aes-256-gcm';
+    
+    export function encrypt(text: string): string {
+      if (!text) return '';
+      
+      const iv = crypto.randomBytes(16);
+      const cipher = crypto.createCipher(ALGORITHM, ENCRYPTION_KEY);
+      cipher.setAutoPadding(true);
+      
+      let encrypted = cipher.update(text, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      
+      const authTag = cipher.getAuthTag();
+      
+      // Combine IV, auth tag, and encrypted data
+      return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
+    }
+    
+    export function decrypt(encryptedText: string): string {
+      if (!encryptedText) return '';
+      
+      const parts = encryptedText.split(':');
+      if (parts.length !== 3) throw new Error('Invalid encrypted data format');
+      
+      const iv = Buffer.from(parts[0], 'hex');
+      const authTag = Buffer.from(parts[1], 'hex');
+      const encrypted = parts[2];
+      
+      const decipher = crypto.createDecipher(ALGORITHM, ENCRYPTION_KEY);
+      decipher.setAuthTag(authTag);
+      decipher.setAutoPadding(true);
+      
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      
+      return decrypted;
+    }
+    
+    // Database helpers for encrypted fields
+    export function encryptUserData(userData: any) {
+      return {
+        ...userData,
+        first_name_encrypted: encrypt(userData.firstName),
+        last_name_encrypted: encrypt(userData.lastName),
+        id_number_encrypted: userData.idNumber ? encrypt(userData.idNumber) : null,
+      };
+    }
+    
+    export function decryptUserData(dbData: any) {
+      return {
+        ...dbData,
+        firstName: decrypt(dbData.first_name_encrypted),
+        lastName: decrypt(dbData.last_name_encrypted),
+        idNumber: dbData.id_number_encrypted ? decrypt(dbData.id_number_encrypted) : null,
+      };
+    }
+    ```
+  </Step>
+  
+  <Step title="Database Audit Triggers">
+    Create audit trail for sensitive operations:
+    
+    ```sql
+    -- src/database/migrations/003_add_audit_triggers.sql
+    
+    -- Audit log table
+    CREATE TABLE audit_log (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        table_name VARCHAR(100) NOT NULL,
+        operation VARCHAR(10) NOT NULL, -- INSERT, UPDATE, DELETE
+        old_values JSONB,
+        new_values JSONB,
+        user_id UUID,
+        session_id VARCHAR(255),
+        ip_address INET,
+        user_agent TEXT,
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Audit trigger function
+    CREATE OR REPLACE FUNCTION audit_trigger_function()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        IF TG_OP = 'DELETE' THEN
+            INSERT INTO audit_log (table_name, operation, old_values)
+            VALUES (TG_TABLE_NAME, TG_OP, to_jsonb(OLD));
+            RETURN OLD;
+        ELSIF TG_OP = 'UPDATE' THEN
+            INSERT INTO audit_log (table_name, operation, old_values, new_values)
+            VALUES (TG_TABLE_NAME, TG_OP, to_jsonb(OLD), to_jsonb(NEW));
+            RETURN NEW;
+        ELSIF TG_OP = 'INSERT' THEN
+            INSERT INTO audit_log (table_name, operation, new_values)
+            VALUES (TG_TABLE_NAME, TG_OP, to_jsonb(NEW));
+            RETURN NEW;
+        END IF;
+        RETURN NULL;
+    END;
+    $$ LANGUAGE plpgsql;
+    
+    -- Add audit triggers to critical tables
+    CREATE TRIGGER users_audit_trigger
+        AFTER INSERT OR UPDATE OR DELETE ON users
+        FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
+    
+    CREATE TRIGGER transactions_audit_trigger
+        AFTER INSERT OR UPDATE OR DELETE ON transactions
+        FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
+    
+    CREATE TRIGGER chama_transactions_audit_trigger
+        AFTER INSERT OR UPDATE OR DELETE ON chama_transactions
+        FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
+    ```
+  </Step>
+</Steps>
+
+## Step 5: Performance Optimization
+
+<Steps>
+  <Step title="Query Optimization">
+    Implement performance monitoring and optimization:
+    
+    ```typescript
+    // src/database/utils/performance.ts
+    import { db } from '../connection';
+    
+    export class QueryPerformanceMonitor {
+      static async analyzeSlowQueries() {
+        const result = await db.query(`
+          SELECT 
+            query,
+            calls,
+            total_time,
+            mean_time,
+            max_time,
+            rows
+          FROM pg_stat_statements 
+          WHERE mean_time > 100 
+          ORDER BY mean_time DESC 
+          LIMIT 10
+        `);
+        
+        return result.rows;
+      }
+      
+      static async getTableSizes() {
+        const result = await db.query(`
+          SELECT 
+            schemaname,
+            tablename,
+            pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size
+          FROM pg_tables 
+          WHERE schemaname = 'public'
+          ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
+        `);
+        
+        return result.rows;
+      }
+      
+      static async optimizeIndexes() {
+        // Check for missing indexes on foreign keys
+        const result = await db.query(`
+          SELECT 
+            t.relname as table_name,
+            a.attname as column_name,
+            'CREATE INDEX idx_' || t.relname || '_' || a.attname || 
+            ' ON ' || t.relname || '(' || a.attname || ');' as suggested_index
+          FROM pg_class t
+          JOIN pg_attribute a ON a.attrelid = t.oid
+          JOIN pg_constraint c ON c.conrelid = t.oid AND a.attnum = ANY(c.conkey)
+          WHERE c.contype = 'f'
+          AND NOT EXISTS (
+            SELECT 1 FROM pg_index i 
+            WHERE i.indrelid = t.oid 
+            AND a.attnum = ANY(i.indkey)
+          )
+        `);
+        
+        return result.rows;
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Connection Pooling Configuration">
+    Optimize database connections for production:
+    
+    ```typescript
+    // src/database/pool-config.ts
+    import { PoolConfig } from 'pg';
+    
+    export function getDatabaseConfig(): PoolConfig {
+      const isProduction = process.env.NODE_ENV === 'production';
+      
+      return {
+        connectionString: process.env.DATABASE_URL,
+        ssl: isProduction ? { rejectUnauthorized: false } : false,
+        
+        // Connection pool settings
+        max: parseInt(process.env.DB_POOL_SIZE || (isProduction ? '20' : '5')),
+        min: parseInt(process.env.DB_POOL_MIN || '2'),
+        
+        // Timeout settings
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
+        statementTimeout: 60000,
+        query_timeout: 60000,
+        
+        // Keep alive settings for African connectivity
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 10000,
+        
+        // Application name for monitoring
+        application_name: 'awo-platform',
+        
+        // Connection retry for unstable networks
+        connectionString: process.env.DATABASE_URL + '&connect_timeout=10&retries=3',
+      };
+    }
+    
+    // Health check for database
+    export async function checkDatabaseHealth() {
+      try {
+        const client = await db.connect();
+        const result = await client.query('SELECT NOW()');
+        client.release();
+        
+        return {
+          status: 'healthy',
+          timestamp: result.rows[0].now,
+          connectionCount: db.totalCount,
+          idleCount: db.idleCount,
+          waitingCount: db.waitingCount,
+        };
+      } catch (error) {
+        return {
+          status: 'unhealthy',
+          error: error.message,
+        };
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## African Market Optimizations
+
+### Geographic Distribution
+
+<CardGroup cols={2}>
+  <Card title="Data Locality" icon="globe">
+    **Primary Region**: EU-West-1 (Ireland) for SADC proximity  
+    **Read Replicas**: Consider SA-specific regions when available  
+    **Edge Caching**: Redis at multiple African locations  
+    **CDN Integration**: Cloudflare with African edge presence
+  </Card>
+  <Card title="Connectivity Resilience" icon="wifi">
+    **Connection Timeout**: Extended timeouts for variable connectivity  
+    **Retry Logic**: Exponential backoff for failed connections  
+    **Query Timeout**: Longer timeouts for complex operations  
+    **Connection Pooling**: Optimized for intermittent connectivity
+  </Card>
+</CardGroup>
+
+### Currency and Localization
+
+```sql
+-- Multi-currency support for SADC region
+CREATE TABLE currencies (
+    code CHAR(3) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    symbol VARCHAR(10),
+    decimal_places INTEGER DEFAULT 2,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+-- Seed SADC currencies
+INSERT INTO currencies (code, name, symbol) VALUES
+('ZAR', 'South African Rand', 'R'),
+('BWP', 'Botswana Pula', 'P'),
+('NAD', 'Namibian Dollar', '$'),
+('ZMW', 'Zambian Kwacha', 'K'),
+('USD', 'US Dollar', '$'),
+('EUR', 'Euro', '€');
+
+-- Exchange rates table
+CREATE TABLE exchange_rates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    from_currency CHAR(3) REFERENCES currencies(code),
+    to_currency CHAR(3) REFERENCES currencies(code),
+    rate DECIMAL(18,8) NOT NULL,
+    source VARCHAR(50),
+    effective_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+## Testing and Validation
+
+<Steps>
+  <Step title="Database Testing Setup">
+    Create comprehensive database tests:
+    
+    ```typescript
+    // src/database/tests/database.test.ts
+    import { db, initializeDatabase, closeDatabase } from '../connection';
+    import MigrationManager from '../migrate';
+    import DatabaseSeeder from '../seeds/development';
+    
+    describe('Database Configuration', () => {
+      beforeAll(async () => {
+        await initializeDatabase();
+        await MigrationManager.runMigrations();
+      });
+      
+      afterAll(async () => {
+        await closeDatabase();
+      });
+      
+      it('should connect to database successfully', async () => {
+        const result = await db.query('SELECT NOW()');
+        expect(result.rows).toHaveLength(1);
+      });
+      
+      it('should have all required tables', async () => {
+        const result = await db.query(`
+          SELECT table_name 
+          FROM information_schema.tables 
+          WHERE table_schema = 'public'
+        `);
+        
+        const tables = result.rows.map(row => row.table_name);
+        const requiredTables = [
+          'users', 'wallets', 'transactions', 'diva_scores',
+          'chamas', 'chama_members', 'chama_contributions'
+        ];
+        
+        requiredTables.forEach(table => {
+          expect(tables).toContain(table);
+        });
+      });
+      
+      it('should enforce data integrity constraints', async () => {
+        // Test foreign key constraints
+        await expect(
+          db.query('INSERT INTO wallets (user_id) VALUES ($1)', ['invalid-id'])
+        ).rejects.toThrow();
+        
+        // Test check constraints
+        await expect(
+          db.query('INSERT INTO diva_scores (user_id, total_score) VALUES ($1, $2)', 
+                  ['valid-user-id', 1500])
+        ).rejects.toThrow();
+      });
+    });
+    ```
+  </Step>
+</Steps>
 
 ## Next Steps
 
-<Card title="Continue Setup" href="/quick-setup/api-setup">
-  Proceed to the next setup step
-</Card>
+<CardGroup cols={3}>
+  <Card title="First Integration" icon="plug" href="/quick-setup/first-integration">
+    Connect your database with external APIs and test data flow
+  </Card>
+  <Card title="Data Models Deep Dive" icon="database" href="/data-models/database-schema">
+    Explore detailed schema relationships and advanced querying
+  </Card>
+  <Card title="Core Features" icon="star" href="/core-features/diva-scoring">
+    Implement DIVA scoring calculations using the database
+  </Card>
+</CardGroup>
+
+<Warning>
+**Security Reminder**: Always encrypt sensitive personal data, use parameterized queries to prevent SQL injection, and implement proper access controls. Never store plain text passwords or personal identification numbers.
+</Warning>
+
+---
+
+*Your AWO Platform database is now configured with robust schemas, security measures, and optimizations for African markets. The database supports the full feature set including DIVA scoring, Chama management, and multi-currency operations.*
