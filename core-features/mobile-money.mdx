@@ -21,7 +21,7 @@ Mobile money is the backbone of African financial inclusion, with over 548 milli
 
 **Tier 1 Providers (Direct Integration):**
 <CardGroup cols={2}>
-  <Card title="M-Pesa (Kenya, Tanzania)" icon="smartphone">
+  <Card title="M-Pesa - Depraciated " icon="mobile">
     **Coverage**: 50+ million users across East Africa  
     **Integration**: Direct API with Safaricom and Vodacom  
     **Features**: Full deposit/withdrawal, bill payments, merchant payments  
@@ -79,7 +79,6 @@ Mobile money is the backbone of African financial inclusion, with over 548 milli
 - **Reliability**: 99.8% uptime with automatic failover
 
 **Direct Integrations: High-Volume Providers**
-- **M-Pesa Direct**: For Kenya and Tanzania markets with high transaction volumes
 - **MTN MoMo Direct**: For Ghana, Uganda, and Zambia where AWO has significant presence
 - **Benefits**: Lower fees, faster processing, enhanced control
 
@@ -274,7 +273,7 @@ class MobileMoneyDepositProcessor {
 
 **Transparent Fee Structure:**
 <CardGroup cols={2}>
-  <Card title="Standard Deposits" icon="banknote">
+  <Card title="Standard Deposits" icon="wallet">
     **Fee Range**: R2-R15 depending on amount and provider  
     **Calculation**: Lower of 1.5% or fixed maximum fee  
     **Display**: All fees shown before transaction confirmation  
@@ -426,7 +425,7 @@ class MobileMoneyWithdrawalProcessor {
     **Processing Time**: 1-4 hours depending on destination  
     **Fees**: 3-5% including exchange rate margins
   </Card>
-  <Card title="Kenya → East Africa" icon="arrow-right">
+  <Card title="Kenya → East Africa (reference purpose)" icon="arrow-right">
     **Destinations**: Tanzania, Uganda, Rwanda  
     **Volume**: 25% of cross-border transfers  
     **Processing Time**: 30 minutes - 2 hours  
@@ -680,13 +679,13 @@ class USSDMobileMoneyService {
 
 **Continuous Monitoring Metrics:**
 <CardGroup cols={3}>
-  <Card title="Availability" icon="uptime">
+  <Card title="Availability" icon="arrow-up">
     **Target**: 99.5% uptime  
     **Monitoring**: Real-time API health checks  
     **Alerting**: Immediate notification of outages  
     **Failover**: Automatic routing to backup providers
   </Card>
-  <Card title="Performance" icon="zap">
+  <Card title="Performance" icon="bolt">
     **Metrics**: Response time, throughput, error rates  
     **Targets**: &lt;5s response, &lt;1% error rate  
     **Optimization**: Route optimization based on performance  
@@ -798,7 +797,7 @@ const transferStatus = await awoClient.mobileMoney.trackCrossBorderTransfer(tran
     **Licensing**: Payment Service Provider license required  
     **Monitoring**: Real-time transaction monitoring for AML
   </Card>
-  <Card title="Kenya" icon="gavel">
+  <Card title="Kenya - reference purpose" icon="gavel">
     **Regulator**: Central Bank of Kenya (CBK)  
     **Requirements**: Mobile money regulations, consumer protection  
     **Interoperability**: Support for mobile money interoperability  

@@ -1,41 +1,623 @@
----
-title: "Api Setup"
-description: "Step-by-step api setup guide for AWO Platform"
----
+# API Setup
 
-# Api Setup
+<Info>
+Get up and running with AWO Platform APIs in under 15 minutes. This guide covers authentication setup, environment configuration, and your first successful API call.
+</Info>
 
 ## Prerequisites
 
-Before starting, ensure you have:
-- Node.js 18+ installed
-- Git configured
-- Access to AWO development resources
+Before you begin, ensure you have:
 
-<Info>
-This guide will help you set up api setup quickly and efficiently.
-</Info>
+<CardGroup cols={2}>
+  <Card title="Development Environment" icon="laptop">
+    **Node.js 18+** installed on your system  
+    **Git** for repository management  
+    **Code editor** (VS Code recommended)  
+    **Postman or curl** for API testing
+  </Card>
+  <Card title="AWO Platform Access" icon="key">
+    **Developer account** at awo-platform.com  
+    **API credentials** (sandbox environment)  
+    **Webhook endpoint** (optional, for real-time updates)  
+    **Test bank account** for Open Banking simulation
+  </Card>
+</CardGroup>
 
-## Step-by-Step Instructions
+## Step 1: Get Your API Credentials
 
 <Steps>
-  <Step title="Initial Setup">
-    Setup instructions will be added here
+  <Step title="Create Developer Account">
+    Visit [AWO Developer Portal](https://developers.awo-platform.com) and sign up with your business email address.
   </Step>
-  <Step title="Configuration">
-    Configuration details will be provided
+  <Step title="Generate API Keys">
+    Navigate to **Dashboard → API Keys** and generate your sandbox credentials:
+    - **Public Key**: For client-side operations (mobile app initialization)
+    - **Secret Key**: For server-side operations (never expose publicly)
+    - **Webhook Secret**: For verifying webhook authenticity
   </Step>
-  <Step title="Verification">
-    Verification steps will be included
+  <Step title="Configure Environment">
+    Save your credentials securely in environment variables:
+    ```bash
+    export AWO_PUBLIC_KEY="awo_pk_sandbox_..."
+    export AWO_SECRET_KEY="awo_sk_sandbox_..."
+    export AWO_WEBHOOK_SECRET="awo_wh_..."
+    export AWO_BASE_URL="https://api-sandbox.awo-platform.com"
+    ```
   </Step>
 </Steps>
 
-## Troubleshooting
+## Step 2: Authentication Setup
 
-Common issues and solutions will be documented here.
+AWO Platform uses **JWT tokens** with refresh token rotation for secure API access.
+
+### Basic Authentication Flow
+
+<CodeGroup>
+```javascript Node.js
+const axios = require('axios');
+
+const awoClient = axios.create({
+  baseURL: process.env.AWO_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': process.env.AWO_PUBLIC_KEY
+  }
+});
+
+// Authenticate user and get tokens
+async function authenticateUser(email, password) {
+  try {
+    const response = await awoClient.post('/auth/login', {
+      email,
+      password
+    });
+    
+    const { accessToken, refreshToken, user } = response.data;
+    
+    // Store tokens securely
+    localStorage.setItem('awo_access_token', accessToken);
+    localStorage.setItem('awo_refresh_token', refreshToken);
+    
+    return { accessToken, user };
+  } catch (error) {
+    console.error('Authentication failed:', error.response.data);
+    throw error;
+  }
+}
+```
+
+```python Python
+import requests
+import os
+from datetime import datetime, timedelta
+
+class AWOClient:
+    def __init__(self):
+        self.base_url = os.getenv('AWO_BASE_URL')
+        self.public_key = os.getenv('AWO_PUBLIC_KEY')
+        self.access_token = None
+        self.refresh_token = None
+        
+    def authenticate(self, email, password):
+        """Authenticate user and store tokens"""
+        response = requests.post(
+            f"{self.base_url}/auth/login",
+            json={"email": email, "password": password},
+            headers={
+                "Content-Type": "application/json",
+                "X-API-Key": self.public_key
+            }
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            self.access_token = data['accessToken']
+            self.refresh_token = data['refreshToken']
+            return data['user']
+        else:
+            raise Exception(f"Authentication failed: {response.text}")
+```
+
+```curl cURL
+# Login to get access token
+curl -X POST "https://api-sandbox.awo-platform.com/auth/login" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: ${AWO_PUBLIC_KEY}" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123"
+  }'
+
+# Response:
+# {
+#   "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+#   "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+#   "user": { "id": "usr_123", "email": "user@example.com" }
+# }
+```
+</CodeGroup>
+
+### Token Management
+
+<Accordion title="Access Token Usage">
+Include the access token in the `Authorization` header for all authenticated requests:
+
+```javascript
+// Add token to request headers
+awoClient.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+
+// Make authenticated API calls
+const userProfile = await awoClient.get('/users/profile');
+const divaScore = await awoClient.get('/diva-score/current');
+```
+
+**Token Lifecycle:**
+- **Access Token**: 15-minute expiry, use for all API calls
+- **Refresh Token**: 30-day expiry, use to get new access tokens
+- **Automatic Refresh**: Implement refresh logic before token expiry
+</Accordion>
+
+### Token Refresh Implementation
+
+<CodeGroup>
+```javascript Automatic Refresh
+// Axios interceptor for automatic token refresh
+awoClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        const refreshToken = localStorage.getItem('awo_refresh_token');
+        const response = await axios.post('/auth/refresh', {
+          refreshToken
+        });
+        
+        const { accessToken } = response.data;
+        localStorage.setItem('awo_access_token', accessToken);
+        
+        // Retry original request with new token
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return awoClient(originalRequest);
+        
+      } catch (refreshError) {
+        // Redirect to login
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+```
+
+```python Python Refresh
+def refresh_access_token(self):
+    """Refresh access token using refresh token"""
+    if not self.refresh_token:
+        raise Exception("No refresh token available")
+        
+    response = requests.post(
+        f"{self.base_url}/auth/refresh",
+        json={"refreshToken": self.refresh_token},
+        headers={"Content-Type": "application/json"}
+    )
+    
+    if response.status_code == 200:
+        data = response.json()
+        self.access_token = data['accessToken']
+        return self.access_token
+    else:
+        raise Exception("Token refresh failed")
+
+def make_authenticated_request(self, method, endpoint, **kwargs):
+    """Make API request with automatic token refresh"""
+    headers = kwargs.get('headers', {})
+    headers['Authorization'] = f'Bearer {self.access_token}'
+    kwargs['headers'] = headers
+    
+    response = requests.request(method, f"{self.base_url}{endpoint}", **kwargs)
+    
+    if response.status_code == 401:
+        # Try refreshing token
+        self.refresh_access_token()
+        headers['Authorization'] = f'Bearer {self.access_token}'
+        response = requests.request(method, f"{self.base_url}{endpoint}", **kwargs)
+    
+    return response
+```
+</CodeGroup>
+
+## Step 3: Environment Configuration
+
+### Sandbox vs Production
+
+<CardGroup cols={2}>
+  <Card title="Sandbox Environment" icon="flask">
+    **Base URL**: `https://api-sandbox.awo-platform.com`  
+    **Purpose**: Development and testing  
+    **Features**: Mock data, test bank accounts, simulated payments  
+    **Rate Limits**: 1000 requests/hour per API key
+  </Card>
+  <Card title="Production Environment" icon="shield">
+    **Base URL**: `https://api.awo-platform.com`  
+    **Purpose**: Live application  
+    **Features**: Real banking data, actual payments  
+    **Rate Limits**: 10,000 requests/hour (configurable)
+  </Card>
+</CardGroup>
+
+### Configuration File Setup
+
+<CodeGroup>
+```javascript config.js
+const config = {
+  development: {
+    apiUrl: 'https://api-sandbox.awo-platform.com',
+    publicKey: process.env.AWO_PUBLIC_KEY_SANDBOX,
+    secretKey: process.env.AWO_SECRET_KEY_SANDBOX,
+    webhookSecret: process.env.AWO_WEBHOOK_SECRET_SANDBOX,
+    debug: true,
+    timeout: 10000
+  },
+  production: {
+    apiUrl: 'https://api.awo-platform.com',
+    publicKey: process.env.AWO_PUBLIC_KEY_LIVE,
+    secretKey: process.env.AWO_SECRET_KEY_LIVE,
+    webhookSecret: process.env.AWO_WEBHOOK_SECRET_LIVE,
+    debug: false,
+    timeout: 5000
+  }
+};
+
+export default config[process.env.NODE_ENV || 'development'];
+```
+
+```yaml docker-compose.yml
+version: '3.8'
+services:
+  awo-app:
+    build: .
+    environment:
+      - NODE_ENV=development
+      - AWO_PUBLIC_KEY=${AWO_PUBLIC_KEY_SANDBOX}
+      - AWO_SECRET_KEY=${AWO_SECRET_KEY_SANDBOX}
+      - AWO_BASE_URL=https://api-sandbox.awo-platform.com
+      - AWO_WEBHOOK_SECRET=${AWO_WEBHOOK_SECRET}
+      - DATABASE_URL=${DATABASE_URL}
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+```
+
+```env .env.example
+# AWO Platform Configuration
+NODE_ENV=development
+
+# Sandbox API Keys (for development)
+AWO_PUBLIC_KEY_SANDBOX=awo_pk_sandbox_1234567890abcdef
+AWO_SECRET_KEY_SANDBOX=awo_sk_sandbox_1234567890abcdef
+AWO_WEBHOOK_SECRET_SANDBOX=awo_wh_sandbox_1234567890abcdef
+
+# Production API Keys (for live environment)
+AWO_PUBLIC_KEY_LIVE=awo_pk_live_1234567890abcdef
+AWO_SECRET_KEY_LIVE=awo_sk_live_1234567890abcdef
+AWO_WEBHOOK_SECRET_LIVE=awo_wh_live_1234567890abcdef
+
+# Database Configuration
+DATABASE_URL=postgresql://user:password@localhost:5432/awo_dev
+
+# Redis Configuration (for caching)
+REDIS_URL=redis://localhost:6379
+```
+</CodeGroup>
+
+## Step 4: Your First API Call
+
+Let's make your first successful API call to retrieve user information and DIVA score.
+
+<Steps>
+  <Step title="Health Check">
+    Verify API connectivity with a simple health check:
+    
+    ```bash
+    curl -X GET "https://api-sandbox.awo-platform.com/health" \
+      -H "X-API-Key: ${AWO_PUBLIC_KEY}"
+    ```
+    
+    **Expected Response:**
+    ```json
+    {
+      "status": "healthy",
+      "version": "1.0.0",
+      "environment": "sandbox",
+      "timestamp": "2025-01-20T10:30:00Z"
+    }
+    ```
+  </Step>
+  
+  <Step title="User Registration">
+    Create a test user account in sandbox:
+    
+    <CodeGroup>
+    ```javascript Node.js
+    async function createTestUser() {
+      try {
+        const response = await awoClient.post('/auth/register', {
+          email: 'test@example.com',
+          password: 'SecurePassword123!',
+          firstName: 'Test',
+          lastName: 'User',
+          phoneNumber: '+27123456789',
+          countryCode: 'ZA',
+          acceptedTerms: true
+        });
+        
+        console.log('User created:', response.data.user);
+        return response.data;
+      } catch (error) {
+        console.error('Registration failed:', error.response.data);
+        throw error;
+      }
+    }
+    ```
+    
+    ```curl cURL
+    curl -X POST "https://api-sandbox.awo-platform.com/auth/register" \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: ${AWO_PUBLIC_KEY}" \
+      -d '{
+        "email": "test@example.com",
+        "password": "SecurePassword123!",
+        "firstName": "Test",
+        "lastName": "User",
+        "phoneNumber": "+27123456789",
+        "countryCode": "ZA",
+        "acceptedTerms": true
+      }'
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Authenticate & Get Profile">
+    Login and retrieve user profile with DIVA score:
+    
+    ```javascript
+    async function getUserData() {
+      // Login first
+      const authData = await authenticateUser('test@example.com', 'SecurePassword123!');
+      
+      // Get user profile
+      const profile = await awoClient.get('/users/profile');
+      console.log('User Profile:', profile.data);
+      
+      // Get DIVA score (will be null for new users)
+      const divaScore = await awoClient.get('/diva-score/current');
+      console.log('DIVA Score:', divaScore.data);
+      
+      return { profile: profile.data, divaScore: divaScore.data };
+    }
+    ```
+    
+    **Expected Response:**
+    ```json
+    {
+      "profile": {
+        "id": "usr_1234567890",
+        "email": "test@example.com",
+        "firstName": "Test",
+        "lastName": "User",
+        "kycStatus": "tier1_verified",
+        "portfolioTier": null,
+        "createdAt": "2025-01-20T10:30:00Z"
+      },
+      "divaScore": {
+        "score": null,
+        "components": null,
+        "message": "Complete bank account linking to generate DIVA score"
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Step 5: Error Handling & Best Practices
+
+### Common Error Responses
+
+<CardGroup cols={2}>
+  <Card title="Authentication Errors" icon="lock">
+    **401 Unauthorized**: Invalid or expired token  
+    **403 Forbidden**: Insufficient permissions  
+    **429 Too Many Requests**: Rate limit exceeded  
+    
+    *Solution: Check token validity, implement refresh logic*
+  </Card>
+  <Card title="Validation Errors" icon="exclamation">
+    **400 Bad Request**: Invalid request data  
+    **422 Unprocessable Entity**: Validation failed  
+    **409 Conflict**: Resource already exists  
+    
+    *Solution: Validate input data, check error details*
+  </Card>
+</CardGroup>
+
+### Error Response Format
+
+All API errors follow a consistent format:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed",
+    "details": [
+      {
+        "field": "email",
+        "message": "Valid email address required"
+      },
+      {
+        "field": "password",
+        "message": "Password must be at least 8 characters"
+      }
+    ],
+    "requestId": "req_1234567890"
+  }
+}
+```
+
+### Best Practices
+
+<Accordion title="Security Best Practices">
+- **Never expose secret keys**: Keep secret keys server-side only
+- **Use HTTPS**: Always use encrypted connections
+- **Validate webhooks**: Verify webhook signatures using webhook secrets
+- **Implement timeouts**: Set reasonable request timeouts (5-10 seconds)
+- **Rate limiting**: Respect API rate limits and implement exponential backoff
+</Accordion>
+
+<Accordion title="Performance Optimization">
+- **Cache tokens**: Store access tokens in memory, refresh tokens in secure storage
+- **Batch requests**: Use batch endpoints where available
+- **Compression**: Enable gzip compression for API responses
+- **Connection pooling**: Reuse HTTP connections for better performance
+- **Monitoring**: Track API response times and error rates
+</Accordion>
+
+<Accordion title="Production Readiness">
+- **Environment separation**: Use different API keys for sandbox/production
+- **Logging**: Implement comprehensive logging (exclude sensitive data)
+- **Health checks**: Monitor API endpoint availability
+- **Fallback handling**: Implement graceful fallbacks for API failures
+- **Data validation**: Validate all API responses before processing
+</Accordion>
+
+## Step 6: Webhook Configuration (Optional)
+
+Set up webhooks to receive real-time notifications for events like payment updates, DIVA score changes, and Chama activities.
+
+<CodeGroup>
+```javascript Express.js Webhook Handler
+const express = require('express');
+const crypto = require('crypto');
+const app = express();
+
+// Middleware to verify webhook signature
+function verifyWebhookSignature(req, res, next) {
+  const signature = req.headers['x-awo-signature'];
+  const payload = JSON.stringify(req.body);
+  const expectedSignature = crypto
+    .createHmac('sha256', process.env.AWO_WEBHOOK_SECRET)
+    .update(payload)
+    .digest('hex');
+  
+  if (`sha256=${expectedSignature}` !== signature) {
+    return res.status(401).send('Invalid signature');
+  }
+  
+  next();
+}
+
+// Webhook endpoint
+app.post('/webhooks/awo', verifyWebhookSignature, (req, res) => {
+  const { event, data } = req.body;
+  
+  switch (event) {
+    case 'diva_score.updated':
+      console.log(`DIVA score updated for user ${data.userId}: ${data.newScore}`);
+      // Update user's portfolio tier if needed
+      updateUserPortfolioTier(data.userId, data.newScore);
+      break;
+      
+    case 'payment.completed':
+      console.log(`Payment completed: ${data.paymentId}`);
+      // Update user balance, send notification
+      handlePaymentCompletion(data);
+      break;
+      
+    case 'chama.contribution.received':
+      console.log(`Chama contribution: ${data.amount} from ${data.userId}`);
+      // Update Chama balance, notify members
+      handleChamaContribution(data);
+      break;
+      
+    default:
+      console.log(`Unknown event: ${event}`);
+  }
+  
+  res.status(200).send('OK');
+});
+```
+
+```python Flask Webhook Handler
+from flask import Flask, request, abort
+import hashlib
+import hmac
+import os
+
+app = Flask(__name__)
+
+def verify_signature(payload, signature):
+    """Verify webhook signature"""
+    expected_signature = hmac.new(
+        os.getenv('AWO_WEBHOOK_SECRET').encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+    
+    return hmac.compare_digest(f'sha256={expected_signature}', signature)
+
+@app.route('/webhooks/awo', methods=['POST'])
+def handle_webhook():
+    signature = request.headers.get('X-AWO-Signature')
+    payload = request.get_data()
+    
+    if not verify_signature(payload, signature):
+        abort(401)
+    
+    event_data = request.json
+    event = event_data.get('event')
+    data = event_data.get('data')
+    
+    if event == 'diva_score.updated':
+        print(f"DIVA score updated for user {data['userId']}: {data['newScore']}")
+        # Handle DIVA score update
+        
+    elif event == 'payment.completed':
+        print(f"Payment completed: {data['paymentId']}")
+        # Handle payment completion
+        
+    return 'OK', 200
+```
+</CodeGroup>
 
 ## Next Steps
 
-<Card title="Continue Setup" href="/quick-setup/api-setup">
-  Proceed to the next setup step
-</Card>
+<CardGroup cols={2}>
+  <Card title="Explore Core Features" icon="compass" href="/core-features/authentication">
+    Learn about user management, DIVA scoring, and wallet operations
+  </Card>
+  <Card title="Integration Guides" icon="plug" href="/integration/open-banking">
+    Connect with banks, payment providers, and other services
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/introduction">
+    Browse complete API documentation with interactive examples
+  </Card>
+  <Card title="SDKs & Libraries" icon="school" href="/sdks/overview">
+    Use our official SDKs for faster integration
+  </Card>
+</CardGroup>
+
+<Warning>
+**Security Reminder**: Always keep your secret API keys secure and never expose them in client-side code. Use environment variables and secure secret management in production.
+</Warning>
+
+---
+
+*Your API setup is complete! You're now ready to build amazing financial applications with AWO Platform. Join our [Discord community](https://discord.gg/awo-platform) for support and updates.*
