@@ -1,42 +1,1243 @@
----
-title: "Development Workflow"
-description: "AWO Platform development workflow development guide"
----
-
 # Development Workflow
 
-## Overview
-
 <Info>
-This guide covers development workflow for AWO Platform development.
+Master the AWO Platform development process from feature planning to production deployment, designed for collaborative African development teams and reliable SADC market delivery.
 </Info>
 
-## Development Setup
+## Workflow Overview
 
-Development setup instructions will be provided here.
-
-## Code Examples
-
-```typescript
-// Development example
-import { AWOPlatform } from '@awo-platform/core';
-
-const awo = new AWOPlatform({
-  apiKey: process.env.AWO_API_KEY
-});
-```
-
-## Best Practices
-
-Development best practices will be documented here.
-
-## Tools and Resources
+AWO Platform follows a **GitFlow-inspired workflow** optimized for financial services development, with additional security checkpoints and African market testing requirements.
 
 <CardGroup cols={2}>
-  <Card title="API Reference" href="/api-reference/introduction">
-    Complete API documentation
+  <Card title="Development Principles" icon="lock">
+    **Security-First**: Every change reviewed for financial security  
+    **African-Optimized**: Testing across variable network conditions  
+    **Compliance-Ready**: Automated regulatory requirement checking  
+    **Community-Driven**: Peer review and knowledge sharing culture
   </Card>
-  <Card title="Testing Guide" href="/testing/testing-strategy">
-    Testing strategies and tools
+  <Card title="Quality Gates" icon="shield">
+    **Automated Testing**: 90%+ test coverage required  
+    **Security Scanning**: Vulnerability assessment on every PR  
+    **Performance Testing**: African network condition validation  
+    **Business Logic Review**: Financial logic peer validation
   </Card>
 </CardGroup>
+
+## Git Workflow Structure
+
+### Branch Strategy
+
+<Accordion title="Branch Types and Purposes">
+```
+main (production)
+├── develop (integration)
+├── release/v1.2.0 (release preparation)
+├── feature/diva-score-enhancement (new features)
+├── bugfix/payment-timeout-fix (bug fixes)
+├── hotfix/security-patch (critical fixes)
+└── chore/dependency-updates (maintenance)
+```
+
+**Branch Naming Conventions**:
+- **feature/**: `feature/scope-description` (e.g., `feature/chama-democratic-voting`)
+- **bugfix/**: `bugfix/component-issue` (e.g., `bugfix/diva-calculation-overflow`)
+- **hotfix/**: `hotfix/critical-description` (e.g., `hotfix/auth-token-vulnerability`)
+- **release/**: `release/v1.2.0` (version number)
+- **chore/**: `chore/task-description` (e.g., `chore/update-react-native`)
+
+**Branch Lifecycle**:
+1. Create from `develop` (except hotfixes from `main`)
+2. Regular commits with atomic changes
+3. Pull request with comprehensive description
+4. Code review and testing
+5. Merge to `develop` (or `main` for hotfixes)
+6. Delete branch after successful merge
+</Accordion>
+
+### Commit Message Standards
+
+<CodeGroup>
+```bash Conventional Commits Format
+# Format: <type>(scope): <description>
+# 
+# <body>
+# 
+# <footer>
+
+# Examples of good commit messages:
+feat(diva): add income diversification scoring algorithm
+fix(auth): resolve JWT token refresh infinite loop
+docs(api): update DIVA score calculation documentation
+test(chama): add integration tests for contribution processing
+chore(deps): upgrade React Native to 0.72.6
+
+# Multi-line commit example:
+feat(chama): implement democratic voting for group investments
+
+- Add voting interface with proposal creation
+- Implement 60% majority threshold validation
+- Add real-time vote tracking via Socket.io
+- Include audit trail for all voting decisions
+
+Closes #AWO-123
+Tested-by: African QA Team
+Security-review: Passed
+```
+
+```bash Commit Types Reference
+feat:     New feature implementation
+fix:      Bug fix
+docs:     Documentation changes
+style:    Code formatting (no logic changes)
+refactor: Code refactoring (no feature changes)
+perf:     Performance improvements
+test:     Adding or updating tests
+chore:    Maintenance tasks
+security: Security-related changes
+build:    Build system or dependency changes
+ci:       CI/CD pipeline changes
+revert:   Reverting previous changes
+```
+</CodeGroup>
+
+## Feature Development Lifecycle
+
+### Phase 1: Planning and Design
+
+<Steps>
+  <Step title="Feature Requirements Analysis">
+    **Business Requirements Documentation**:
+    ```markdown
+    # Feature: Democratic Chama Voting
+    
+    ## Business Context
+    - Enable transparent group decision-making for Chamas
+    - Support SADC cultural governance patterns
+    - Ensure audit compliance for financial decisions
+    
+    ## User Stories
+    - As a Chama member, I want to vote on investment proposals
+    - As a treasurer, I want to create investment proposals
+    - As a member, I want to see real-time voting results
+    
+    ## Acceptance Criteria
+    - [ ] 60% majority threshold for proposal approval
+    - [ ] Real-time vote tracking visible to all members
+    - [ ] Complete audit trail of all voting activity
+    - [ ] Mobile-optimized voting interface
+    - [ ] Offline vote queuing with sync capability
+    
+    ## African Market Considerations
+    - [ ] Works on 3G networks with intermittent connectivity
+    - [ ] SMS notification fallback for vote alerts
+    - [ ] Multi-language support (English, Afrikaans, Portuguese)
+    - [ ] Cultural sensitivity in voting UI patterns
+    ```
+  </Step>
+  
+  <Step title="Technical Design">
+    **Architecture Decision Document**:
+    ```markdown
+    # Technical Design: Democratic Voting System
+    
+    ## Architecture Overview
+    - Real-time voting via Socket.io
+    - Event sourcing for audit trail
+    - Optimistic UI updates with conflict resolution
+    - Offline-first with sync queue
+    
+    ## Database Schema Changes
+    ```sql
+    CREATE TABLE chama_proposals (
+        id UUID PRIMARY KEY,
+        chama_id UUID REFERENCES chamas(id),
+        created_by UUID REFERENCES users(id),
+        proposal_type VARCHAR(50) NOT NULL,
+        amount DECIMAL(15,2),
+        description TEXT,
+        voting_deadline TIMESTAMP WITH TIME ZONE,
+        status VARCHAR(20) DEFAULT 'active',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    CREATE TABLE chama_votes (
+        id UUID PRIMARY KEY,
+        proposal_id UUID REFERENCES chama_proposals(id),
+        voter_id UUID REFERENCES users(id),
+        vote VARCHAR(10) CHECK (vote IN ('approve', 'reject', 'abstain')),
+        cast_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(proposal_id, voter_id)
+    );
+    ```
+    
+    ## API Endpoints
+    - POST /api/chamas/{id}/proposals - Create proposal
+    - GET /api/chamas/{id}/proposals - List proposals
+    - POST /api/chamas/{id}/proposals/{id}/vote - Cast vote
+    - GET /api/chamas/{id}/proposals/{id}/results - Get results
+    
+    ## Security Considerations
+    - Verify voter is active Chama member
+    - Prevent vote tampering with cryptographic signatures
+    - Rate limiting on vote endpoints
+    - Audit logging for all voting actions
+    ```
+  </Step>
+  
+  <Step title="Create Feature Branch">
+    ```bash
+    # Ensure you're on the latest develop branch
+    git checkout develop
+    git pull origin develop
+    
+    # Create feature branch
+    git checkout -b feature/chama-democratic-voting
+    
+    # Push empty branch to set up tracking
+    git push -u origin feature/chama-democratic-voting
+    ```
+  </Step>
+</Steps>
+
+### Phase 2: Implementation
+
+<Steps>
+  <Step title="Backend Implementation">
+    **Service Layer Development**:
+    ```typescript
+    // src/services/chama/VotingService.ts
+    import { db } from '../../database/connection';
+    import { socketManager } from '../../realtime/SocketManager';
+    import { auditLogger } from '../../utils/audit';
+    
+    export class VotingService {
+      async createProposal(chamaId: string, creatorId: string, proposalData: CreateProposalData) {
+        const client = await db.connect();
+        
+        try {
+          await client.query('BEGIN');
+          
+          // Verify creator is Chama member with proposal rights
+          const membership = await this.verifyMembershipRights(chamaId, creatorId, 'create_proposal');
+          
+          const proposal = await client.query(`
+            INSERT INTO chama_proposals (chama_id, created_by, proposal_type, amount, description, voting_deadline)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *
+          `, [chamaId, creatorId, proposalData.type, proposalData.amount, proposalData.description, proposalData.deadline]);
+          
+          // Log audit trail
+          await auditLogger.logEvent('chama_proposal_created', {
+            chamaId,
+            proposalId: proposal.rows[0].id,
+            creatorId,
+            amount: proposalData.amount
+          });
+          
+          // Notify all Chama members in real-time
+          await socketManager.notifyRoom(`chama_${chamaId}`, 'proposal_created', {
+            proposal: proposal.rows[0]
+          });
+          
+          await client.query('COMMIT');
+          return proposal.rows[0];
+          
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
+        }
+      }
+      
+      async castVote(proposalId: string, voterId: string, vote: 'approve' | 'reject' | 'abstain') {
+        // Implementation with real-time updates and audit logging
+      }
+      
+      private async verifyMembershipRights(chamaId: string, userId: string, action: string): Promise<boolean> {
+        // Verify user has rights to perform action in this Chama
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Frontend Implementation">
+    **React Native Component Development**:
+    ```typescript
+    // src/screens/chama/VotingScreen.tsx
+    import React, { useState, useEffect } from 'react';
+    import { View, Text, ScrollView, Alert } from 'react-native';
+    import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+    import { useSocket } from '../../hooks/useSocket';
+    import { VotingCard } from '../../components/chama/VotingCard';
+    import { CreateProposalModal } from '../../components/chama/CreateProposalModal';
+    
+    export const VotingScreen = ({ route }: { route: any }) => {
+      const { chamaId } = route.params;
+      const queryClient = useQueryClient();
+      const socket = useSocket();
+      const [showCreateModal, setShowCreateModal] = useState(false);
+      
+      // Fetch active proposals
+      const { data: proposals, isLoading } = useQuery({
+        queryKey: ['chama-proposals', chamaId],
+        queryFn: () => chamaApi.getProposals(chamaId),
+        refetchInterval: 30000, // Refresh every 30 seconds
+      });
+      
+      // Real-time vote updates
+      useEffect(() => {
+        if (!socket) return;
+        
+        socket.join(`chama_${chamaId}`);
+        
+        socket.on('proposal_created', (data) => {
+          queryClient.invalidateQueries(['chama-proposals', chamaId]);
+          Alert.alert('New Proposal', 'A new proposal has been created for voting');
+        });
+        
+        socket.on('vote_cast', (data) => {
+          queryClient.setQueryData(['chama-proposals', chamaId], (old: any) => {
+            return old?.map((proposal: any) => 
+              proposal.id === data.proposalId 
+                ? { ...proposal, ...data.updatedResults }
+                : proposal
+            );
+          });
+        });
+        
+        return () => {
+          socket.off('proposal_created');
+          socket.off('vote_cast');
+          socket.leave(`chama_${chamaId}`);
+        };
+      }, [socket, chamaId]);
+      
+      const voteMutation = useMutation({
+        mutationFn: ({ proposalId, vote }: { proposalId: string; vote: string }) =>
+          chamaApi.castVote(proposalId, vote),
+        onSuccess: () => {
+          queryClient.invalidateQueries(['chama-proposals', chamaId]);
+        },
+        onError: (error) => {
+          Alert.alert('Vote Failed', 'Please try again or check your connection');
+        }
+      });
+      
+      const handleVote = (proposalId: string, vote: string) => {
+        Alert.alert(
+          'Confirm Vote',
+          `Are you sure you want to ${vote} this proposal?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Confirm', onPress: () => voteMutation.mutate({ proposalId, vote }) }
+          ]
+        );
+      };
+      
+      if (isLoading) return <LoadingSpinner />;
+      
+      return (
+        <ScrollView style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Active Proposals</Text>
+            <TouchableOpacity 
+              style={styles.createButton}
+              onPress={() => setShowCreateModal(true)}
+            >
+              <Text style={styles.createButtonText}>Create Proposal</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {proposals?.map((proposal) => (
+            <VotingCard
+              key={proposal.id}
+              proposal={proposal}
+              onVote={handleVote}
+              isVoting={voteMutation.isLoading}
+            />
+          ))}
+          
+          <CreateProposalModal
+            visible={showCreateModal}
+            onClose={() => setShowCreateModal(false)}
+            chamaId={chamaId}
+          />
+        </ScrollView>
+      );
+    };
+    ```
+  </Step>
+  
+  <Step title="Testing Implementation">
+    **Comprehensive Test Suite**:
+    ```typescript
+    // __tests__/voting.integration.test.ts
+    import request from 'supertest';
+    import app from '../../../src/app';
+    import { clearDatabase, seedTestData } from '../../helpers/database';
+    import { createTestUser, createTestChama } from '../../helpers/fixtures';
+    
+    describe('Chama Voting Integration', () => {
+      let testUser: any;
+      let testChama: any;
+      let authToken: string;
+      
+      beforeEach(async () => {
+        await clearDatabase();
+        testUser = await createTestUser();
+        testChama = await createTestChama({ creatorId: testUser.id });
+        authToken = generateTestToken(testUser.id);
+      });
+      
+      describe('POST /api/chamas/:id/proposals', () => {
+        it('should create proposal with valid data', async () => {
+          const proposalData = {
+            type: 'investment',
+            amount: 10000,
+            description: 'Invest in local SME bakery',
+            deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+          };
+          
+          const response = await request(app)
+            .post(`/api/chamas/${testChama.id}/proposals`)
+            .set('Authorization', `Bearer ${authToken}`)
+            .send(proposalData);
+          
+          expect(response.status).toBe(201);
+          expect(response.body.proposal).toHaveProperty('id');
+          expect(response.body.proposal.amount).toBe(proposalData.amount);
+          expect(response.body.proposal.status).toBe('active');
+        });
+        
+        it('should reject proposal from non-member', async () => {
+          const nonMember = await createTestUser({ email: 'nonmember@test.com' });
+          const nonMemberToken = generateTestToken(nonMember.id);
+          
+          const response = await request(app)
+            .post(`/api/chamas/${testChama.id}/proposals`)
+            .set('Authorization', `Bearer ${nonMemberToken}`)
+            .send({ type: 'investment', amount: 5000 });
+          
+          expect(response.status).toBe(403);
+          expect(response.body.error).toContain('not a member');
+        });
+      });
+      
+      describe('POST /api/chamas/:id/proposals/:proposalId/vote', () => {
+        it('should cast vote and update results', async () => {
+          // Create proposal first
+          const proposal = await createTestProposal(testChama.id, testUser.id);
+          
+          const response = await request(app)
+            .post(`/api/chamas/${testChama.id}/proposals/${proposal.id}/vote`)
+            .set('Authorization', `Bearer ${authToken}`)
+            .send({ vote: 'approve' });
+          
+          expect(response.status).toBe(200);
+          expect(response.body.vote).toHaveProperty('id');
+          expect(response.body.results.approveCount).toBe(1);
+        });
+        
+        it('should prevent duplicate voting', async () => {
+          const proposal = await createTestProposal(testChama.id, testUser.id);
+          
+          // Cast first vote
+          await request(app)
+            .post(`/api/chamas/${testChama.id}/proposals/${proposal.id}/vote`)
+            .set('Authorization', `Bearer ${authToken}`)
+            .send({ vote: 'approve' });
+          
+          // Attempt second vote
+          const response = await request(app)
+            .post(`/api/chamas/${testChama.id}/proposals/${proposal.id}/vote`)
+            .set('Authorization', `Bearer ${authToken}`)
+            .send({ vote: 'reject' });
+          
+          expect(response.status).toBe(409);
+          expect(response.body.error).toContain('already voted');
+        });
+      });
+    });
+    ```
+  </Step>
+</Steps>
+
+### Phase 3: Code Review Process
+
+<Steps>
+  <Step title="Create Pull Request">
+    **Pull Request Template**:
+    ```markdown
+    ## 🎯 Feature: Democratic Chama Voting
+    
+    ### 📋 Description
+    Implements democratic voting system for Chama investment proposals with real-time updates and comprehensive audit trails.
+    
+    ### 🚀 Changes Made
+    - ✅ Added proposal creation and voting APIs
+    - ✅ Implemented real-time vote tracking via Socket.io
+    - ✅ Created mobile voting interface with offline support
+    - ✅ Added comprehensive audit logging
+    - ✅ Implemented 60% majority threshold validation
+    
+    ### 🧪 Testing
+    - ✅ Unit tests: 95% coverage
+    - ✅ Integration tests: All API endpoints covered
+    - ✅ E2E tests: Complete voting flow tested
+    - ✅ Security tests: Authorization and input validation
+    - ✅ African network tests: 3G/unstable connection simulation
+    
+    ### 🔒 Security Review
+    - ✅ Input validation and sanitization
+    - ✅ Authorization checks for all endpoints
+    - ✅ Rate limiting on voting endpoints
+    - ✅ Audit trail for all voting actions
+    - ✅ Prevention of vote tampering
+    
+    ### 📱 African Market Testing
+    - ✅ Tested on Android 8.0+ devices
+    - ✅ 3G network condition simulation
+    - ✅ Offline vote queuing functionality
+    - ✅ SMS notification fallback tested
+    - ✅ Multi-language UI validation
+    
+    ### 🗄️ Database Migration
+    ```sql
+    -- Migration included: 004_add_voting_tables.sql
+    -- Rollback tested and documented
+    ```
+    
+    ### 📖 Documentation Updated
+    - ✅ API documentation
+    - ✅ Component documentation
+    - ✅ User guide for voting feature
+    - ✅ Admin guide for Chama management
+    
+    ### 🔗 Related Issues
+    Closes #AWO-123
+    Related to #AWO-124 (Chama audit improvements)
+    
+    ### 📸 Screenshots
+    [Include mobile app screenshots]
+    
+    ### 🎥 Demo Video
+    [Link to Loom demo of voting flow]
+    
+    ---
+    
+    ### ✅ Reviewer Checklist
+    - [ ] Code follows AWO style guidelines
+    - [ ] All tests pass and coverage &gt; 90%
+    - [ ] Security review completed
+    - [ ] Performance impact assessed
+    - [ ] Documentation is complete
+    - [ ] African market considerations addressed
+    - [ ] Database migration tested
+    ```
+  </Step>
+  
+  <Step title="Code Review Process">
+    **Review Criteria and Checklist**:
+    
+    <CardGroup cols={2}>
+      <Card title="Technical Review" icon="code">
+        **Code Quality**:
+        - Follows TypeScript best practices
+        - Proper error handling and logging
+        - Efficient algorithms and data structures
+        - No hardcoded values or magic numbers
+        
+        **Architecture**:
+        - Follows established patterns
+        - Proper separation of concerns
+        - Clean interfaces and abstractions
+        - Appropriate use of design patterns
+      </Card>
+      <Card title="Security Review" icon="shield">
+        **Authentication & Authorization**:
+        - Proper access control implementation
+        - JWT token validation
+        - Role-based permission checking
+        - Input validation and sanitization
+        
+        **Financial Security**:
+        - No financial calculation errors
+        - Audit trail completeness
+        - Data encryption where required
+        - Compliance with regulations
+      </Card>
+    </CardGroup>
+    
+    **Review Process Steps**:
+    1. **Automated Checks**: CI/CD pipeline runs tests, security scans
+    2. **Technical Review**: Senior developer reviews code quality
+    3. **Security Review**: Security team reviews financial features
+    4. **Business Review**: Product team validates business logic
+    5. **African Market Review**: Local team tests network conditions
+    6. **Final Approval**: Two approvals required for merge
+  </Step>
+  
+  <Step title="Address Review Feedback">
+    ```bash
+    # Make requested changes
+    git add .
+    git commit -m "refactor(voting): optimize database queries per review feedback"
+    
+    # Push updates to PR branch
+    git push origin feature/chama-democratic-voting
+    
+    # Respond to review comments
+    # Re-request review after changes
+    ```
+  </Step>
+</Steps>
+
+## CI/CD Pipeline
+
+### Automated Quality Gates
+
+<Accordion title="GitHub Actions Workflow">
+```yaml
+# .github/workflows/feature-validation.yml
+name: Feature Validation Pipeline
+
+on:
+  pull_request:
+    branches: [develop]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run security audit
+        run: |
+          npm audit --audit-level=moderate
+          npm run security:scan
+      
+      - name: Check for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+
+  backend-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: awo_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          npm ci
+      
+      - name: Run database migrations
+        run: |
+          cd backend
+          npm run migrate:test
+          npm run seed:test
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/awo_test
+      
+      - name: Run unit tests
+        run: |
+          cd backend
+          npm run test:unit
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/awo_test
+          REDIS_URL: redis://localhost:6379
+      
+      - name: Run integration tests
+        run: |
+          cd backend
+          npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/awo_test
+          REDIS_URL: redis://localhost:6379
+      
+      - name: Check test coverage
+        run: |
+          cd backend
+          npm run test:coverage
+          npm run coverage:check # Fails if coverage < 90%
+
+  mobile-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          cd mobile
+          npm ci
+      
+      - name: Run linting
+        run: |
+          cd mobile
+          npm run lint
+      
+      - name: Run unit tests
+        run: |
+          cd mobile
+          npm run test:unit
+      
+      - name: Build app
+        run: |
+          cd mobile
+          npx expo export --platform all
+
+  african-network-simulation:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, mobile-tests]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Simulate 3G network conditions
+        run: |
+          # Install network simulation tools
+          sudo apt-get install wondershaper
+          # Simulate 3G speeds (1Mbps down, 384Kbps up, 100ms latency)
+          sudo wondershaper eth0 1024 384
+          sudo tc qdisc add dev eth0 root netem delay 100ms
+      
+      - name: Test API performance under slow conditions
+        run: |
+          cd backend
+          npm start &
+          sleep 10
+          npm run test:performance:3g
+
+  financial-logic-validation:
+    runs-on: ubuntu-latest
+    needs: [backend-tests]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Validate DIVA score calculations
+        run: |
+          cd backend
+          npm run test:diva-calculations
+      
+      - name: Test financial transaction integrity
+        run: |
+          cd backend
+          npm run test:financial-integrity
+      
+      - name: Validate compliance rules
+        run: |
+          cd backend
+          npm run test:compliance
+
+  deployment-preview:
+    runs-on: ubuntu-latest
+    needs: [security-scan, backend-tests, mobile-tests]
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy to preview environment
+        run: |
+          # Deploy to Railway/Render preview environment
+          npm run deploy:preview
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      
+      - name: Run E2E tests against preview
+        run: |
+          npm run test:e2e:preview
+```
+</Accordion>
+
+### Performance Monitoring
+
+<Accordion title="Performance Benchmarks">
+```typescript
+// scripts/performance-benchmarks.ts
+import { performance } from 'perf_hooks';
+import axios from 'axios';
+
+interface PerformanceBenchmark {
+  endpoint: string;
+  method: string;
+  expectedResponseTime: number; // milliseconds
+  africanNetworkResponseTime: number; // 3G network simulation
+}
+
+const benchmarks: PerformanceBenchmark[] = [
+  {
+    endpoint: '/api/auth/login',
+    method: 'POST',
+    expectedResponseTime: 500,
+    africanNetworkResponseTime: 2000,
+  },
+  {
+    endpoint: '/api/diva-score/calculate',
+    method: 'POST',
+    expectedResponseTime: 2000,
+    africanNetworkResponseTime: 8000,
+  },
+  {
+    endpoint: '/api/chamas/{id}/proposals',
+    method: 'GET',
+    expectedResponseTime: 300,
+    africanNetworkResponseTime: 1200,
+  },
+];
+
+export async function runPerformanceBenchmarks(baseUrl: string) {
+  console.log('🚀 Running AWO Platform Performance Benchmarks...');
+  
+  for (const benchmark of benchmarks) {
+    const start = performance.now();
+    
+    try {
+      await axios({
+        method: benchmark.method,
+        url: `${baseUrl}${benchmark.endpoint}`,
+        timeout: 10000,
+      });
+      
+      const responseTime = performance.now() - start;
+      const passed = responseTime <= benchmark.expectedResponseTime;
+      
+      console.log(`${passed ? '✅' : '❌'} ${benchmark.endpoint}: ${responseTime.toFixed(2)}ms (expected: <${benchmark.expectedResponseTime}ms)`);
+      
+      if (!passed) {
+        throw new Error(`Performance benchmark failed for ${benchmark.endpoint}`);
+      }
+      
+    } catch (error) {
+      console.error(`❌ ${benchmark.endpoint}: ${error.message}`);
+      throw error;
+    }
+  }
+  
+  console.log('🎉 All performance benchmarks passed!');
+}
+```
+</Accordion>
+
+## Deployment Process
+
+### Release Management
+
+<Steps>
+  <Step title="Prepare Release Branch">
+    ```bash
+    # Create release branch from develop
+    git checkout develop
+    git pull origin develop
+    git checkout -b release/v1.2.0
+    
+    # Update version numbers
+    npm version minor # Updates package.json version
+    
+    # Update changelog
+    vim CHANGELOG.md
+    
+    # Commit version bump
+    git add .
+    git commit -m "chore(release): prepare v1.2.0"
+    git push -u origin release/v1.2.0
+    ```
+  </Step>
+  
+  <Step title="Release Testing">
+    **Comprehensive Release Testing**:
+    
+    <CardGroup cols={2}>
+      <Card title="Automated Testing" icon="robot">
+        **Full Test Suite**: All unit, integration, and E2E tests  
+        **Performance Tests**: Load testing with African network simulation  
+        **Security Scanning**: Vulnerability assessment and penetration testing  
+        **Compatibility Tests**: Cross-platform and device testing
+      </Card>
+      <Card title="Manual Testing" icon="user">
+        **User Acceptance Testing**: Business stakeholder validation  
+        **African Market Testing**: Local team testing in SADC countries  
+        **Accessibility Testing**: Screen reader and accessibility compliance  
+        **Regulatory Testing**: Compliance with financial regulations
+      </Card>
+    </CardGroup>
+    
+    ```bash
+    # Run comprehensive test suite
+    npm run test:release
+    
+    # Run security audit
+    npm run security:audit
+    
+    # Run performance benchmarks
+    npm run performance:benchmark
+    
+    # Run African network simulation tests
+    npm run test:african-networks
+    ```
+  </Step>
+  
+  <Step title="Production Deployment">
+    ```bash
+    # Merge release to main
+    git checkout main
+    git merge release/v1.2.0
+    git tag v1.2.0
+    git push origin main --tags
+    
+    # Deploy to production
+    npm run deploy:production
+    
+    # Merge back to develop
+    git checkout develop
+    git merge main
+    git push origin develop
+    
+    # Clean up release branch
+    git branch -d release/v1.2.0
+    git push origin --delete release/v1.2.0
+    ```
+  </Step>
+</Steps>
+
+### Hotfix Process
+
+<Accordion title="Critical Issue Response">
+```bash
+# Emergency hotfix workflow
+git checkout main
+git pull origin main
+git checkout -b hotfix/auth-security-patch
+
+# Make critical fix
+# ... implement fix ...
+
+# Test hotfix
+npm run test:critical
+npm run security:verify-fix
+
+# Create emergency PR
+# Fast-track review process (30-minute SLA)
+
+# Deploy immediately after approval
+git checkout main
+git merge hotfix/auth-security-patch
+git tag v1.2.1
+git push origin main --tags
+
+# Deploy to production with monitoring
+npm run deploy:hotfix
+npm run monitor:hotfix-deployment
+
+# Merge to develop
+git checkout develop
+git merge main
+git push origin develop
+
+# Clean up
+git branch -d hotfix/auth-security-patch
+git push origin --delete hotfix/auth-security-patch
+
+# Incident post-mortem
+# Document lessons learned and process improvements
+```
+</Accordion>
+
+## Quality Assurance Standards
+
+### Test Coverage Requirements
+
+<CardGroup cols={3}>
+  <Card title="Unit Tests" icon="flask">
+    **Coverage**: 95% minimum  
+    **Focus**: Business logic, utilities, services  
+    **Tools**: Jest, React Native Testing Library  
+    **Frequency**: Every function and component
+  </Card>
+  <Card title="Integration Tests" icon="link">
+    **Coverage**: 90% of API endpoints  
+    **Focus**: API endpoints, database operations  
+    **Tools**: Supertest, Test containers  
+    **Frequency**: Every external integration
+  </Card>
+  <Card title="E2E Tests" icon="user">
+    **Coverage**: 80% of user journeys  
+    **Focus**: Critical user flows  
+    **Tools**: Detox, Appium  
+    **Frequency**: Major user scenarios
+  </Card>
+</CardGroup>
+
+### Code Quality Metrics
+
+<CodeGroup>
+```typescript Quality Gates Configuration
+// jest.config.js
+module.exports = {
+  coverageThreshold: {
+    global: {
+      branches: 95,
+      functions: 95,
+      lines: 95,
+      statements: 95
+    },
+    './src/services/': {
+      branches: 98,
+      functions: 98,
+      lines: 98,
+      statements: 98
+    },
+    './src/utils/financial/': {
+      branches: 100,
+      functions: 100,
+      lines: 100,
+      statements: 100
+    }
+  },
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/types/**/*',
+    '!src/**/*.stories.{ts,tsx}'
+  ]
+};
+```
+
+```json ESLint Quality Rules
+{
+  "rules": {
+    "complexity": ["error", { "max": 10 }],
+    "max-depth": ["error", { "max": 4 }],
+    "max-lines": ["error", { "max": 300 }],
+    "max-lines-per-function": ["error", { "max": 50 }],
+    "max-params": ["error", { "max": 4 }],
+    "@typescript-eslint/no-any": "error",
+    "@typescript-eslint/explicit-function-return-type": "error",
+    "no-console": "warn",
+    "prefer-const": "error",
+    "no-var": "error",
+    "awo-platform/financial-precision": "error",
+    "awo-platform/audit-log-required": "error"
+  }
+}
+```
+</CodeGroup>
+
+## African Development Considerations
+
+### Network Condition Testing
+
+<Accordion title="Variable Connectivity Simulation">
+```typescript
+// test-utils/network-simulation.ts
+export class NetworkSimulator {
+  // Simulate typical African network conditions
+  static readonly CONDITIONS = {
+    WIFI: { downloadSpeed: 50000, uploadSpeed: 10000, latency: 20 },
+    LTE: { downloadSpeed: 20000, uploadSpeed: 5000, latency: 50 },
+    "3G": { downloadSpeed: 1000, uploadSpeed: 384, latency: 100 },
+    "2G": { downloadSpeed: 128, uploadSpeed: 64, latency: 300 },
+    INTERMITTENT: { downloadSpeed: 5000, uploadSpeed: 1000, latency: 200, dropRate: 0.1 }
+  };
+  
+  static async testUnderCondition(testFunction: () => Promise<any>, condition: keyof typeof NetworkSimulator.CONDITIONS) {
+    // Apply network throttling
+    await this.applyNetworkThrottling(this.CONDITIONS[condition]);
+    
+    try {
+      return await testFunction();
+    } finally {
+      await this.resetNetworkConditions();
+    }
+  }
+  
+  private static async applyNetworkThrottling(condition: any) {
+    // Implementation for network simulation
+    // Uses tools like Toxiproxy or Charles Proxy
+  }
+}
+
+// Usage in tests
+describe('DIVA Score Calculation', () => {
+  it('should work under 3G conditions', async () => {
+    await NetworkSimulator.testUnderCondition(async () => {
+      const score = await divaService.calculateScore('user-123');
+      expect(score).toBeDefined();
+      expect(score.totalScore).toBeGreaterThan(0);
+    }, '3G');
+  });
+});
+```
+</Accordion>
+
+### Multi-Language Testing
+
+<Accordion title="Localization Validation">
+```typescript
+// test-utils/localization-testing.ts
+import { I18n } from '../src/localization';
+
+describe('Localization Tests', () => {
+  const supportedLanguages = ['en', 'af', 'pt', 'fr'];
+  
+  supportedLanguages.forEach(language => {
+    describe(`${language.toUpperCase()} Language`, () => {
+      beforeEach(() => {
+        I18n.locale = language;
+      });
+      
+      it('should have all required translations', () => {
+        const requiredKeys = [
+          'auth.login.title',
+          'diva.score.title',
+          'chama.create.title',
+          'wallet.balance.label'
+        ];
+        
+        requiredKeys.forEach(key => {
+          const translation = I18n.t(key);
+          expect(translation).toBeDefined();
+          expect(translation).not.toBe(key); // Ensure it's translated
+          expect(translation.length).toBeGreaterThan(0);
+        });
+      });
+      
+      it('should format currency correctly', () => {
+        const amount = 1234.56;
+        const formatted = I18n.formatCurrency(amount, 'ZAR');
+        
+        // Different expectations per language
+        if (language === 'en') {
+          expect(formatted).toBe('R 1,234.56');
+        } else if (language === 'af') {
+          expect(formatted).toBe('R 1 234,56');
+        }
+      });
+    });
+  });
+});
+```
+</Accordion>
+
+## Development Tools and Scripts
+
+### Automation Scripts
+
+<CodeGroup>
+```bash Developer Utilities
+#!/bin/bash
+# scripts/dev-setup.sh
+
+echo "🚀 Setting up AWO Platform development environment..."
+
+# Install dependencies
+echo "📦 Installing dependencies..."
+npm run install:all
+
+# Setup database
+echo "🗄️ Setting up database..."
+npm run db:setup
+
+# Generate development data
+echo "🌱 Seeding development data..."
+npm run db:seed:dev
+
+# Run migrations
+echo "🔄 Running database migrations..."
+npm run migrate:latest
+
+# Start development servers
+echo "🖥️ Starting development servers..."
+concurrently \
+  "npm run backend:dev" \
+  "npm run mobile:dev" \
+  "npm run redis:start"
+
+echo "✅ Development environment ready!"
+echo "📱 Mobile app: http://localhost:19006"
+echo "🔧 Backend API: http://localhost:3000"
+echo "📊 Redis: localhost:6379"
+```
+
+```bash Testing Utilities
+#!/bin/bash
+# scripts/test-all.sh
+
+echo "🧪 Running AWO Platform test suite..."
+
+# Backend tests
+echo "🔧 Testing backend..."
+cd backend
+npm run test:unit
+npm run test:integration
+npm run test:security
+cd ..
+
+# Mobile tests
+echo "📱 Testing mobile app..."
+cd mobile
+npm run test:unit
+npm run test:e2e
+cd ..
+
+# Shared utilities tests
+echo "📚 Testing shared utilities..."
+cd shared
+npm run test
+cd ..
+
+# Performance tests
+echo "⚡ Running performance tests..."
+npm run test:performance
+
+# African network simulation
+echo "🌍 Testing African network conditions..."
+npm run test:african-networks
+
+echo "✅ All tests completed!"
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Code Style Guide" icon="code" href="/development/code-style">
+    Learn AWO Platform coding standards, formatting rules, and best practices
+  </Card>
+  <Card title="Component Patterns" icon="puzzle" href="/development/component-patterns">
+    Master reusable component patterns and design system implementation
+  </Card>
+  <Card title="State Management" icon="database" href="/development/state-management">
+    Understand Zustand + React Query patterns for optimal performance
+  </Card>
+</CardGroup>
+
+---
+
+*This development workflow ensures high-quality, secure, and reliable code delivery while maintaining the rapid development pace needed for African fintech markets. Every commit contributes to closing the gender investment gap across the SADC region.*

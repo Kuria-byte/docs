@@ -1,42 +1,876 @@
----
-title: "State Management"
-description: "AWO Platform state management development guide"
----
-
 # State Management
 
-## Overview
+AWO Platform implements a sophisticated multi-layered state management strategy designed for the African financial services market, emphasizing offline-first capabilities, real-time synchronization, and reliable financial data handling.
+
+## State Management Architecture
 
 <Info>
-This guide covers state management for AWO Platform development.
+AWO's state management combines Zustand for local state, React Query for server state synchronization, AsyncStorage for offline persistence, and Socket.io for real-time updates to deliver a seamless user experience across variable connectivity conditions.
 </Info>
 
-## Development Setup
+### Architecture Overview
 
-Development setup instructions will be provided here.
+```
+┌─────────────────────────────────────────────────────────┐
+│                    UI COMPONENTS                        │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐ │
+│  │   Zustand   │ │ React Query │ │   AsyncStorage      │ │
+│  │Local State  │ │Server State │ │  Offline Cache      │ │
+│  └─────────────┘ └─────────────┘ └─────────────────────┘ │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              Socket.io Client                       │ │
+│  │           Real-time Updates                         │ │
+│  └─────────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │            API Client (Axios)                       │ │
+│  │         HTTP Request Layer                          │ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+                            │
+┌───────────────────────────▼─────────────────────────────┐
+│                 AWO BACKEND API                         │
+└─────────────────────────────────────────────────────────┘
+```
 
-## Code Examples
+## Core State Management Technologies
+
+### 1. Zustand for Local State
+
+**Purpose**: Lightweight local state management for UI state, user preferences, and temporary data.
+
+**Key Benefits**:
+- Minimal boilerplate compared to Redux
+- Excellent TypeScript integration
+- No providers needed
+- Perfect for React Native performance
+
+**Implementation Example**:
 
 ```typescript
-// Development example
-import { AWOPlatform } from '@awo-platform/core';
+import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
 
-const awo = new AWOPlatform({
-  apiKey: process.env.AWO_API_KEY
+interface UserInterfaceState {
+  // Navigation state
+  activeTab: 'home' | 'chama' | 'invest' | 'profile';
+  
+  // Modal state
+  modals: {
+    divaScoreDetail: boolean;
+    chamaInvitation: boolean;
+    investmentConfirmation: boolean;
+  };
+  
+  // Form state
+  forms: {
+    chamaCreation: Partial<ChamaCreationForm>;
+    investmentOrder: Partial<InvestmentOrderForm>;
+  };
+  
+  // User preferences
+  preferences: {
+    currency: 'ZAR' | 'BWP' | 'NAD' | 'ZMW';
+    language: 'en' | 'af' | 'pt' | 'fr';
+    notifications: NotificationPreferences;
+  };
+  
+  // Actions
+  setActiveTab: (tab: UserInterfaceState['activeTab']) => void;
+  toggleModal: (modal: keyof UserInterfaceState['modals']) => void;
+  updateForm: (form: keyof UserInterfaceState['forms'], data: any) => void;
+  updatePreferences: (preferences: Partial<UserInterfaceState['preferences']>) => void;
+  reset: () => void;
+}
+
+export const useUIStore = create<UserInterfaceState>()(
+  subscribeWithSelector((set, get) => ({
+    // Initial state
+    activeTab: 'home',
+    modals: {
+      divaScoreDetail: false,
+      chamaInvitation: false,
+      investmentConfirmation: false,
+    },
+    forms: {
+      chamaCreation: {},
+      investmentOrder: {},
+    },
+    preferences: {
+      currency: 'ZAR',
+      language: 'en',
+      notifications: {
+        push: true,
+        sms: true,
+        email: true,
+        chamaUpdates: true,
+        scoreChanges: true,
+      },
+    },
+    
+    // Actions
+    setActiveTab: (tab) => set({ activeTab: tab }),
+    
+    toggleModal: (modal) => set((state) => ({
+      modals: {
+        ...state.modals,
+        [modal]: !state.modals[modal],
+      },
+    })),
+    
+    updateForm: (form, data) => set((state) => ({
+      forms: {
+        ...state.forms,
+        [form]: { ...state.forms[form], ...data },
+      },
+    })),
+    
+    updatePreferences: (preferences) => set((state) => ({
+      preferences: { ...state.preferences, ...preferences },
+    })),
+    
+    reset: () => set((state) => ({
+      ...state,
+      modals: {
+        divaScoreDetail: false,
+        chamaInvitation: false,
+        investmentConfirmation: false,
+      },
+      forms: {
+        chamaCreation: {},
+        investmentOrder: {},
+      },
+    })),
+  }))
+);
+```
+
+### 2. React Query for Server State
+
+**Purpose**: Sophisticated server state management with caching, synchronization, and offline support.
+
+**Key Features**:
+- Automatic background refetching
+- Optimistic updates for financial operations
+- Error retry with exponential backoff
+- Perfect for African connectivity patterns
+
+**DIVA Score State Management**:
+
+```typescript
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { divaScoreApi } from '../api/diva-score';
+
+// Query keys for consistent cache management
+export const divaQueryKeys = {
+  all: ['diva'] as const,
+  score: (userId: string) => [...divaQueryKeys.all, 'score', userId] as const,
+  history: (userId: string) => [...divaQueryKeys.all, 'history', userId] as const,
+  insights: (userId: string) => [...divaQueryKeys.all, 'insights', userId] as const,
+};
+
+// DIVA Score hook with offline support
+export const useDivaScore = (userId: string) => {
+  return useQuery({
+    queryKey: divaQueryKeys.score(userId),
+    queryFn: () => divaScoreApi.getScore(userId),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 24 * 60 * 60 * 1000, // 24 hours for offline
+    retry: (failureCount, error) => {
+      // Custom retry logic for African connectivity
+      if (error.code === 'NETWORK_ERROR') {
+        return failureCount < 5; // More retries for network issues
+      }
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+};
+
+// DIVA Score refresh with optimistic updates
+export const useDivaScoreRefresh = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: divaScoreApi.refreshScore,
+    onMutate: async ({ userId }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ 
+        queryKey: divaQueryKeys.score(userId) 
+      });
+      
+      // Snapshot previous value
+      const previousScore = queryClient.getQueryData(
+        divaQueryKeys.score(userId)
+      );
+      
+      // Optimistically update score status
+      queryClient.setQueryData(
+        divaQueryKeys.score(userId),
+        (old: any) => old ? { ...old, isRefreshing: true } : undefined
+      );
+      
+      return { previousScore };
+    },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousScore) {
+        queryClient.setQueryData(
+          divaQueryKeys.score(variables.userId),
+          context.previousScore
+        );
+      }
+    },
+    onSettled: (data, error, variables) => {
+      // Always refetch after settle
+      queryClient.invalidateQueries({
+        queryKey: divaQueryKeys.score(variables.userId)
+      });
+    },
+  });
+};
+```
+
+### 3. AsyncStorage for Offline Persistence
+
+**Purpose**: Local data persistence for offline functionality critical in African markets.
+
+**Offline Storage Strategy**:
+
+```typescript
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MMKV } from 'react-native-mmkv';
+
+// High-performance storage for frequent access
+const mmkvStorage = new MMKV({
+  id: 'awo-cache',
+  encryptionKey: 'awo-secure-key'
 });
+
+export class OfflineStorageManager {
+  // Store critical user data for offline access
+  static async storeUserData(userId: string, userData: UserData) {
+    try {
+      const key = `user_${userId}`;
+      const encrypted = await this.encrypt(JSON.stringify(userData));
+      await AsyncStorage.setItem(key, encrypted);
+    } catch (error) {
+      console.error('Failed to store user data:', error);
+    }
+  }
+  
+  // Cache DIVA score for offline viewing
+  static async cacheDivaScore(userId: string, score: DivaScore) {
+    const key = `diva_score_${userId}`;
+    mmkvStorage.set(key, JSON.stringify({
+      ...score,
+      cachedAt: Date.now(),
+      isOffline: true,
+    }));
+  }
+  
+  // Store pending transactions for sync when online
+  static async queueTransaction(transaction: PendingTransaction) {
+    try {
+      const existingQueue = await this.getPendingTransactions();
+      const updatedQueue = [...existingQueue, {
+        ...transaction,
+        id: `temp_${Date.now()}`,
+        queuedAt: Date.now(),
+        status: 'pending',
+      }];
+      
+      await AsyncStorage.setItem(
+        'pending_transactions',
+        JSON.stringify(updatedQueue)
+      );
+    } catch (error) {
+      console.error('Failed to queue transaction:', error);
+    }
+  }
+  
+  // Sync pending transactions when connectivity restored
+  static async syncPendingTransactions() {
+    try {
+      const pendingTransactions = await this.getPendingTransactions();
+      const results = [];
+      
+      for (const transaction of pendingTransactions) {
+        try {
+          const result = await this.submitTransaction(transaction);
+          results.push({ ...transaction, result: 'success', syncedAt: Date.now() });
+        } catch (error) {
+          results.push({ ...transaction, result: 'failed', error: error.message });
+        }
+      }
+      
+      // Remove successfully synced transactions
+      const failedTransactions = results.filter(r => r.result === 'failed');
+      await AsyncStorage.setItem(
+        'pending_transactions',
+        JSON.stringify(failedTransactions)
+      );
+      
+      return results;
+    } catch (error) {
+      console.error('Sync failed:', error);
+      return [];
+    }
+  }
+  
+  private static async getPendingTransactions(): Promise<PendingTransaction[]> {
+    try {
+      const stored = await AsyncStorage.getItem('pending_transactions');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  }
+  
+  private static async encrypt(data: string): Promise<string> {
+    // Implement encryption for sensitive data
+    return btoa(data); // Simplified for example
+  }
+}
+```
+
+## Real-Time State Management
+
+### Socket.io Integration
+
+**Purpose**: Real-time updates for Chama activities, DIVA score changes, and financial notifications.
+
+```typescript
+import io, { Socket } from 'socket.io-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useUIStore } from './ui-store';
+
+class RealtimeManager {
+  private socket: Socket | null = null;
+  private queryClient: QueryClient;
+  
+  constructor(queryClient: QueryClient) {
+    this.queryClient = queryClient;
+  }
+  
+  connect(userId: string, accessToken: string) {
+    this.socket = io(process.env.EXPO_PUBLIC_WS_URL, {
+      auth: { token: accessToken, userId },
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true,
+    });
+    
+    this.setupEventHandlers();
+  }
+  
+  private setupEventHandlers() {
+    if (!this.socket) return;
+    
+    // DIVA score updates
+    this.socket.on('diva_score_updated', (data: DivaScoreUpdate) => {
+      this.queryClient.setQueryData(
+        divaQueryKeys.score(data.userId),
+        (oldData: any) => ({
+          ...oldData,
+          ...data.newScore,
+          updatedAt: new Date(data.timestamp),
+        })
+      );
+      
+      // Show notification
+      useUIStore.getState().showNotification({
+        type: 'success',
+        title: 'DIVA Score Updated',
+        message: `Your score changed to ${data.newScore.overallScore}`,
+      });
+    });
+    
+    // Chama activity updates
+    this.socket.on('chama_activity', (data: ChamaActivity) => {
+      // Update Chama data in cache
+      this.queryClient.invalidateQueries({
+        queryKey: chamaQueryKeys.details(data.chamaId)
+      });
+      
+      // Update UI state for real-time feed
+      useUIStore.getState().addChamaActivity(data);
+    });
+    
+    // Payment confirmations
+    this.socket.on('payment_confirmed', (data: PaymentConfirmation) => {
+      // Update transaction history
+      this.queryClient.invalidateQueries({
+        queryKey: transactionQueryKeys.history(data.userId)
+      });
+      
+      // Update wallet balance
+      this.queryClient.invalidateQueries({
+        queryKey: walletQueryKeys.balance(data.userId)
+      });
+      
+      // Show success notification
+      useUIStore.getState().showNotification({
+        type: 'success',
+        title: 'Payment Confirmed',
+        message: `${data.amount} ${data.currency} payment processed`,
+      });
+    });
+    
+    // Connection status handling
+    this.socket.on('connect', () => {
+      useUIStore.getState().setConnectionStatus('connected');
+    });
+    
+    this.socket.on('disconnect', () => {
+      useUIStore.getState().setConnectionStatus('disconnected');
+    });
+  }
+  
+  // Send real-time events
+  emitChamaContribution(chamaId: string, amount: number) {
+    this.socket?.emit('chama_contribution', { chamaId, amount });
+  }
+  
+  emitDivaScoreRequest(userId: string) {
+    this.socket?.emit('request_diva_refresh', { userId });
+  }
+  
+  disconnect() {
+    this.socket?.disconnect();
+    this.socket = null;
+  }
+}
+
+// React hook for real-time connection
+export const useRealtimeConnection = () => {
+  const queryClient = useQueryClient();
+  const [manager] = useState(() => new RealtimeManager(queryClient));
+  
+  useEffect(() => {
+    const { user, accessToken } = useAuthStore.getState();
+    
+    if (user && accessToken) {
+      manager.connect(user.id, accessToken);
+    }
+    
+    return () => manager.disconnect();
+  }, [manager]);
+  
+  return manager;
+};
+```
+
+## Financial State Patterns
+
+### Chama State Management
+
+<CardGroup cols={2}>
+  <Card title="Contribution Tracking" icon="plus-circle">
+    Real-time contribution updates with optimistic UI updates and offline queuing for poor connectivity scenarios
+  </Card>
+  <Card title="Member Synchronization" icon="users">
+    Automatic member state sync across all devices when Chama membership changes or governance events occur
+  </Card>
+</CardGroup>
+
+```typescript
+// Chama-specific state management
+export const useChamaState = (chamaId: string) => {
+  const queryClient = useQueryClient();
+  
+  // Chama details with real-time updates
+  const { data: chama, isLoading } = useQuery({
+    queryKey: chamaQueryKeys.details(chamaId),
+    queryFn: () => chamaApi.getDetails(chamaId),
+    staleTime: 2 * 60 * 1000, // 2 minutes for financial data
+  });
+  
+  // Optimistic contribution mutation
+  const contributeMutation = useMutation({
+    mutationFn: chamaApi.contribute,
+    onMutate: async (variables) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: chamaQueryKeys.details(chamaId)
+      });
+      
+      // Snapshot previous value
+      const previousChama = queryClient.getQueryData(
+        chamaQueryKeys.details(chamaId)
+      );
+      
+      // Optimistically update contributions
+      queryClient.setQueryData(
+        chamaQueryKeys.details(chamaId),
+        (old: any) => {
+          if (!old) return old;
+          
+          return {
+            ...old,
+            totalContributions: old.totalContributions + variables.amount,
+            userContribution: old.userContribution + variables.amount,
+            lastContribution: {
+              amount: variables.amount,
+              date: new Date().toISOString(),
+              status: 'pending',
+            },
+          };
+        }
+      );
+      
+      return { previousChama };
+    },
+    onError: (err, variables, context) => {
+      // Rollback optimistic update
+      if (context?.previousChama) {
+        queryClient.setQueryData(
+          chamaQueryKeys.details(chamaId),
+          context.previousChama
+        );
+      }
+      
+      // Queue for retry when connection restored
+      OfflineStorageManager.queueTransaction({
+        type: 'chama_contribution',
+        chamaId,
+        amount: variables.amount,
+        userId: variables.userId,
+      });
+    },
+    onSuccess: () => {
+      // Invalidate related queries
+      queryClient.invalidateQueries({
+        queryKey: chamaQueryKeys.all
+      });
+      queryClient.invalidateQueries({
+        queryKey: walletQueryKeys.balance(variables.userId)
+      });
+    },
+  });
+  
+  return {
+    chama,
+    isLoading,
+    contribute: contributeMutation.mutate,
+    isContributing: contributeMutation.isLoading,
+  };
+};
+```
+
+### Investment Portfolio State
+
+```typescript
+// Portfolio state with performance tracking
+export const usePortfolioState = (userId: string) => {
+  // Portfolio summary with 5-minute cache
+  const { data: portfolio } = useQuery({
+    queryKey: portfolioQueryKeys.summary(userId),
+    queryFn: () => portfolioApi.getSummary(userId),
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes
+  });
+  
+  // Investment orders with optimistic updates
+  const createOrderMutation = useMutation({
+    mutationFn: portfolioApi.createOrder,
+    onMutate: async (variables) => {
+      const previousPortfolio = queryClient.getQueryData(
+        portfolioQueryKeys.summary(userId)
+      );
+      
+      // Optimistically add pending order
+      queryClient.setQueryData(
+        portfolioQueryKeys.summary(userId),
+        (old: any) => {
+          if (!old) return old;
+          
+          return {
+            ...old,
+            pendingOrders: [
+              ...old.pendingOrders,
+              {
+                ...variables,
+                id: `temp_${Date.now()}`,
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+              },
+            ],
+          };
+        }
+      );
+      
+      return { previousPortfolio };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousPortfolio) {
+        queryClient.setQueryData(
+          portfolioQueryKeys.summary(userId),
+          context.previousPortfolio
+        );
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: portfolioQueryKeys.all
+      });
+    },
+  });
+  
+  return {
+    portfolio,
+    createOrder: createOrderMutation.mutate,
+    isCreatingOrder: createOrderMutation.isLoading,
+  };
+};
+```
+
+## State Synchronization Patterns
+
+### Offline-to-Online Sync
+
+```typescript
+// Network state monitoring
+export const useNetworkSync = () => {
+  const [isOnline, setIsOnline] = useState(true);
+  const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      const wasOffline = !isOnline;
+      const isNowOnline = state.isConnected && state.isInternetReachable;
+      
+      setIsOnline(isNowOnline);
+      
+      // Trigger sync when coming back online
+      if (wasOffline && isNowOnline) {
+        handleOnlineSync();
+      }
+    });
+    
+    return unsubscribe;
+  }, [isOnline]);
+  
+  const handleOnlineSync = async () => {
+    try {
+      // Sync pending transactions
+      await OfflineStorageManager.syncPendingTransactions();
+      
+      // Refresh critical data
+      await queryClient.refetchQueries({
+        queryKey: divaQueryKeys.all,
+        type: 'active',
+      });
+      
+      await queryClient.refetchQueries({
+        queryKey: walletQueryKeys.all,
+        type: 'active',
+      });
+      
+      // Show sync completion notification
+      useUIStore.getState().showNotification({
+        type: 'info',
+        title: 'Data Synchronized',
+        message: 'Your account is now up to date',
+      });
+    } catch (error) {
+      console.error('Sync failed:', error);
+    }
+  };
+  
+  return { isOnline, syncNow: handleOnlineSync };
+};
+```
+
+## Testing State Management
+
+### Unit Testing with Mock Data
+
+```typescript
+// Test utilities for state management
+export const createMockQueryClient = () => {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        cacheTime: 0,
+      },
+      mutations: {
+        retry: false,
+      },
+    },
+  });
+};
+
+// Mock Zustand store for testing
+export const createMockUIStore = (initialState = {}) => {
+  return create<UserInterfaceState>(() => ({
+    activeTab: 'home',
+    modals: {
+      divaScoreDetail: false,
+      chamaInvitation: false,
+      investmentConfirmation: false,
+    },
+    forms: {
+      chamaCreation: {},
+      investmentOrder: {},
+    },
+    preferences: {
+      currency: 'ZAR',
+      language: 'en',
+      notifications: {
+        push: true,
+        sms: true,
+        email: true,
+        chamaUpdates: true,
+        scoreChanges: true,
+      },
+    },
+    ...initialState,
+    setActiveTab: jest.fn(),
+    toggleModal: jest.fn(),
+    updateForm: jest.fn(),
+    updatePreferences: jest.fn(),
+    reset: jest.fn(),
+  }));
+};
+
+// Integration test example
+describe('DIVA Score State Integration', () => {
+  let queryClient: QueryClient;
+  
+  beforeEach(() => {
+    queryClient = createMockQueryClient();
+  });
+  
+  test('should update DIVA score optimistically', async () => {
+    const { result } = renderHook(
+      () => useDivaScoreRefresh(),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      }
+    );
+    
+    // Mock API response
+    const mockScore = { overallScore: 750, updatedAt: new Date() };
+    jest.mocked(divaScoreApi.refreshScore).mockResolvedValue(mockScore);
+    
+    // Trigger mutation
+    act(() => {
+      result.current.mutate({ userId: 'user123' });
+    });
+    
+    // Verify optimistic update
+    const cachedData = queryClient.getQueryData(
+      divaQueryKeys.score('user123')
+    );
+    expect(cachedData).toHaveProperty('isRefreshing', true);
+    
+    // Wait for resolution
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+  });
+});
+```
+
+## Performance Optimization
+
+### State Management Performance Tips
+
+<CardGroup cols={2}>
+  <Card title="Selective Subscriptions" icon="filter">
+    Use Zustand's subscribeWithSelector to prevent unnecessary re-renders when state changes don't affect specific components
+  </Card>
+  <Card title="Query Optimization" icon="zap">
+    Implement intelligent cache invalidation and use React Query's background refetching for seamless user experience
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Offline Batching" icon="layers">
+    Batch offline operations and sync efficiently when connectivity is restored to minimize API calls and improve performance
+  </Card>
+  <Card title="Memory Management" icon="cpu">
+    Clear unnecessary cached data and implement proper cleanup in useEffect hooks to prevent memory leaks
+  </Card>
+</CardGroup>
+
+### Memory Management
+
+```typescript
+// Automatic cache cleanup for memory efficiency
+export const setupCacheCleanup = (queryClient: QueryClient) => {
+  // Clean up stale queries every 10 minutes
+  setInterval(() => {
+    queryClient.clear();
+  }, 10 * 60 * 1000);
+  
+  // Remove inactive queries after 30 minutes
+  queryClient.setDefaultOptions({
+    queries: {
+      cacheTime: 30 * 60 * 1000,
+      staleTime: 5 * 60 * 1000,
+    },
+  });
+};
+
+// Component-level cleanup
+export const useCleanupEffect = (cleanup: () => void, deps: any[]) => {
+  useEffect(() => {
+    return cleanup;
+  }, deps);
+};
 ```
 
 ## Best Practices
 
-Development best practices will be documented here.
+### State Organization Guidelines
 
-## Tools and Resources
+<Steps>
+  <Step title="Separate Concerns">
+    **Local State**: UI state, form data, temporary values  
+    **Server State**: API data, user profiles, financial information  
+    **Persistent State**: User preferences, offline cache, pending transactions
+  </Step>
+  <Step title="Consistent Patterns">
+    **Naming**: Use consistent naming patterns for queries, mutations, and stores  
+    **Structure**: Organize state by feature/domain rather than by technology  
+    **Types**: Maintain strict TypeScript types for all state interfaces
+  </Step>
+  <Step title="Error Handling">
+    **Graceful Degradation**: Always provide fallback values for missing data  
+    **User Feedback**: Show appropriate loading states and error messages  
+    **Retry Logic**: Implement intelligent retry strategies for network failures
+  </Step>
+</Steps>
 
-<CardGroup cols={2}>
-  <Card title="API Reference" href="/api-reference/introduction">
-    Complete API documentation
-  </Card>
-  <Card title="Testing Guide" href="/testing/testing-strategy">
-    Testing strategies and tools
-  </Card>
-</CardGroup>
+### African Market Considerations
+
+<Warning>
+**Connectivity Patterns**: Design state management to handle frequent connectivity changes common in African markets. Always provide offline fallbacks and intelligent sync strategies.
+</Warning>
+
+<Info>
+**Data Costs**: Minimize unnecessary API calls and implement efficient caching to reduce data costs for users on expensive mobile data plans.
+</Info>
+
+**Optimization Strategies**:
+- Cache critical data locally for offline access
+- Implement delta sync to minimize data transfer
+- Use compression for large data sets
+- Batch non-critical updates for efficiency
+- Provide clear offline indicators to users
+
+---
+
+*This state management strategy provides AWO Platform with the reliability, performance, and offline capabilities essential for delivering excellent financial services across the diverse connectivity landscape of the SADC region.*
+
+*Last updated: June 2025*  
+*Next review: July 2025*

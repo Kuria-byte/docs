@@ -1,42 +1,1740 @@
----
-title: "Code Style"
-description: "AWO Platform code style development guide"
----
-
 # Code Style
 
-## Overview
-
 <Info>
-This guide covers code style for AWO Platform development.
+AWO Platform coding standards ensure consistent, maintainable, and secure code across our financial services platform, with special considerations for African market development and regulatory compliance.
 </Info>
 
-## Development Setup
+## Style Philosophy
 
-Development setup instructions will be provided here.
-
-## Code Examples
-
-```typescript
-// Development example
-import { AWOPlatform } from '@awo-platform/core';
-
-const awo = new AWOPlatform({
-  apiKey: process.env.AWO_API_KEY
-});
-```
-
-## Best Practices
-
-Development best practices will be documented here.
-
-## Tools and Resources
+Our coding standards prioritize **clarity, security, and maintainability** over brevity, reflecting the critical nature of financial software serving African women's economic empowerment.
 
 <CardGroup cols={2}>
-  <Card title="API Reference" href="/api-reference/introduction">
-    Complete API documentation
+  <Card title="Financial-First Principles" icon="shield">
+    **Precision**: Exact decimal arithmetic for financial calculations  
+    **Transparency**: Clear, auditable code for regulatory compliance  
+    **Security**: Defense in depth through secure coding practices  
+    **Reliability**: Robust error handling and input validation
   </Card>
-  <Card title="Testing Guide" href="/testing/testing-strategy">
-    Testing strategies and tools
+  <Card title="African Development Focus" icon="globe">
+    **Performance**: Optimized for mid-range Android devices  
+    **Localization**: Internationalization-ready code structure  
+    **Offline-First**: Resilient data handling patterns  
+    **Cultural Sensitivity**: Inclusive naming and terminology
   </Card>
 </CardGroup>
+
+## TypeScript Configuration
+
+### Strict TypeScript Settings
+
+<CodeGroup>
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "src/**/*",
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage"
+  ]
+}
+```
+
+```json Custom ESLint Rules
+{
+  "extends": [
+    "@typescript-eslint/recommended",
+    "@typescript-eslint/recommended-requiring-type-checking",
+    "prettier"
+  ],
+  "rules": {
+    // AWO Platform specific rules
+    "@typescript-eslint/explicit-function-return-type": "error",
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/prefer-readonly": "error",
+    "@typescript-eslint/no-non-null-assertion": "error",
+    
+    // Financial precision rules
+    "awo-platform/decimal-precision": "error",
+    "awo-platform/no-floating-point-math": "error",
+    "awo-platform/currency-validation": "error",
+    
+    // Security rules
+    "awo-platform/no-hardcoded-secrets": "error",
+    "awo-platform/sanitize-user-input": "error",
+    "awo-platform/audit-trail-required": "error",
+    
+    // Performance rules
+    "awo-platform/optimize-re-renders": "warn",
+    "awo-platform/limit-api-calls": "warn"
+  }
+}
+```
+</CodeGroup>
+
+### Type Definitions
+
+<CodeGroup>
+```typescript Financial Types
+// types/financial.ts - Strict financial type definitions
+
+/**
+ * Represents a monetary amount with currency
+ * Always use this type for financial calculations
+ */
+export interface MonetaryAmount {
+  readonly amount: string; // Use string for decimal precision
+  readonly currency: CurrencyCode;
+  readonly precision: number; // Decimal places (usually 2)
+}
+
+/**
+ * SADC region currency codes
+ */
+export type CurrencyCode = 
+  | 'ZAR' // South African Rand
+  | 'BWP' // Botswana Pula
+  | 'NAD' // Namibian Dollar
+  | 'ZMW' // Zambian Kwacha
+  | 'USD' // US Dollar (for international)
+  | 'EUR'; // Euro (for international)
+
+/**
+ * DIVA Score with strict validation
+ */
+export interface DivaScore {
+  readonly totalScore: DivaScoreValue;
+  readonly components: DivaComponents;
+  readonly calculatedAt: Date;
+  readonly expiresAt: Date;
+  readonly portfolioTier: PortfolioTier;
+  readonly dataQuality: DataQuality;
+}
+
+/**
+ * DIVA score value (0-1000, integer only)
+ */
+export type DivaScoreValue = number & { __brand: 'DivaScoreValue' };
+
+/**
+ * Portfolio tier assignment
+ */
+export type PortfolioTier = 'bronze' | 'silver' | 'gold' | 'platinum';
+
+/**
+ * Data quality assessment
+ */
+export type DataQuality = 'excellent' | 'good' | 'fair' | 'poor';
+```
+
+```typescript User Types
+// types/user.ts - User-related type definitions
+
+/**
+ * User profile with African market considerations
+ */
+export interface UserProfile {
+  readonly id: UserId;
+  readonly email: EmailAddress;
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly phoneNumber: PhoneNumber;
+  readonly countryCode: SADCCountryCode;
+  readonly preferredLanguage: SupportedLanguage;
+  readonly kycStatus: KYCStatus;
+  readonly portfolioTier: PortfolioTier | null;
+  readonly divaScore: DivaScoreValue | null;
+  readonly isActive: boolean;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
+/**
+ * SADC country codes
+ */
+export type SADCCountryCode = 
+  | 'ZA' // South Africa
+  | 'BW' // Botswana
+  | 'NA' // Namibia
+  | 'ZM' // Zambia
+  | 'KE' // Kenya
+  | 'NG' // Nigeria
+  | 'MZ' // Mozambique
+  | 'TZ'; // Tanzania
+
+/**
+ * Supported languages for AWO Platform
+ */
+export type SupportedLanguage = 'en' | 'af' | 'pt' | 'fr';
+
+/**
+ * KYC verification status
+ */
+export type KYCStatus = 
+  | 'unverified'
+  | 'tier1_pending'
+  | 'tier1_verified'
+  | 'tier2_pending'
+  | 'tier2_verified'
+  | 'rejected';
+
+/**
+ * Branded type for user IDs (prevents mixing with other IDs)
+ */
+export type UserId = string & { __brand: 'UserId' };
+
+/**
+ * Validated email address
+ */
+export type EmailAddress = string & { __brand: 'EmailAddress' };
+
+/**
+ * Validated phone number (E.164 format)
+ */
+export type PhoneNumber = string & { __brand: 'PhoneNumber' };
+```
+</CodeGroup>
+
+## Naming Conventions
+
+### File and Directory Naming
+
+<CardGroup cols={2}>
+  <Card title="File Naming Standards" icon="file">
+    **Components**: PascalCase.tsx (UserProfileCard.tsx)  
+    **Hooks**: camelCase.ts (useUserProfile.ts)  
+    **Services**: PascalCase.ts (DivaScoreService.ts)  
+    **Utils**: camelCase.ts (formatCurrency.ts)  
+    **Types**: PascalCase.ts (UserProfile.ts)  
+    **Constants**: UPPER_SNAKE_CASE.ts (API_ENDPOINTS.ts)
+  </Card>
+  <Card title="Directory Structure" icon="folder">
+    **Directories**: kebab-case (user-management/)  
+    **Components**: kebab-case (diva-score/)  
+    **Services**: kebab-case (payment-processing/)  
+    **Feature Modules**: kebab-case (chama-management/)  
+    **Test Directories**: __tests__ (mirrors structure)
+  </Card>
+</CardGroup>
+
+### Variable and Function Naming
+
+<CodeGroup>
+```typescript Naming Examples
+// ✅ Good naming practices
+
+// Variables: descriptive camelCase
+const userDivaScore = 750;
+const chamaContributionAmount = new MonetaryAmount('500.00', 'ZAR');
+const isAccountVerified = true;
+const lastTransactionDate = new Date();
+
+// Functions: verb + noun, descriptive
+const calculateUserDivaScore = (userId: UserId): Promise<DivaScore> => {
+  // Implementation
+};
+
+const validateBankAccountNumber = (accountNumber: string): boolean => {
+  // Implementation
+};
+
+const formatCurrencyForDisplay = (amount: MonetaryAmount): string => {
+  // Implementation
+};
+
+// Constants: UPPER_SNAKE_CASE with context
+const MAX_CHAMA_MEMBERS = 50;
+const DIVA_SCORE_CALCULATION_TIMEOUT_MS = 30000;
+const SADC_SUPPORTED_CURRENCIES: readonly CurrencyCode[] = ['ZAR', 'BWP', 'NAD', 'ZMW'];
+
+// Enums: PascalCase
+enum TransactionStatus {
+  Pending = 'pending',
+  Completed = 'completed',
+  Failed = 'failed',
+  Cancelled = 'cancelled'
+}
+
+// Interfaces: descriptive, no I prefix
+interface ChamaVotingProposal {
+  readonly id: string;
+  readonly chamaId: string;
+  readonly proposalType: ProposalType;
+  readonly amount: MonetaryAmount;
+  readonly description: string;
+  readonly votingDeadline: Date;
+  readonly createdBy: UserId;
+}
+```
+
+```typescript Bad Naming Examples
+// ❌ Poor naming practices - avoid these
+
+// Variables: unclear, abbreviated
+const usr = {}; // Should be: user or userProfile
+const amt = 500; // Should be: amount or contributionAmount
+const calc = () => {}; // Should be: calculateDivaScore
+const res = await api(); // Should be: apiResponse or divaScoreResult
+
+// Functions: unclear purpose
+const process = () => {}; // Should be: processPayment or processContribution
+const handle = () => {}; // Should be: handleUserLogin or handleVoteSubmission
+const get = () => {}; // Should be: getUserProfile or getChamaDetails
+
+// Constants: unclear context
+const MAX = 50; // Should be: MAX_CHAMA_MEMBERS
+const URL = 'https://api.com'; // Should be: STITCH_API_BASE_URL
+const TIMEOUT = 5000; // Should be: API_REQUEST_TIMEOUT_MS
+
+// Magic numbers and strings
+if (score > 850) {} // Should be: if (score > PLATINUM_TIER_THRESHOLD)
+if (status === 'active') {} // Should be: if (status === UserStatus.Active)
+```
+</CodeGroup>
+
+## Code Formatting
+
+### Prettier Configuration
+
+<CodeGroup>
+```json .prettierrc
+{
+  "semi": true,
+  "trailingComma": "es5",
+  "singleQuote": true,
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "quoteProps": "as-needed",
+  "bracketSpacing": true,
+  "bracketSameLine": false,
+  "arrowParens": "avoid",
+  "endOfLine": "lf",
+  "embeddedLanguageFormatting": "auto",
+  "proseWrap": "preserve"
+}
+```
+
+```typescript Formatting Examples
+// ✅ Properly formatted code
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useQuery, useMutation } from '@tanstack/react-query';
+
+import { DivaScoreCard } from '../components/financial/DivaScoreCard';
+import { WalletBalance } from '../components/financial/WalletBalance';
+import { formatCurrency } from '../utils/formatting/currency';
+import { validateDivaScore } from '../utils/validation/diva';
+
+import type { UserProfile } from '../types/user';
+import type { DivaScore } from '../types/financial';
+
+interface DashboardScreenProps {
+  readonly user: UserProfile;
+  readonly onNavigateToChama: () => void;
+}
+
+export const DashboardScreen: React.FC<DashboardScreenProps> = ({
+  user,
+  onNavigateToChama,
+}) => {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const { data: divaScore, isLoading: isDivaLoading } = useQuery({
+    queryKey: ['diva-score', user.id],
+    queryFn: () => divaScoreService.getCurrentScore(user.id),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled: user.kycStatus === 'tier2_verified',
+  });
+
+  const refreshScoreMutation = useMutation({
+    mutationFn: () => divaScoreService.refreshScore(user.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['diva-score', user.id]);
+      setRefreshing(false);
+    },
+    onError: error => {
+      console.error('Failed to refresh DIVA score:', error);
+      setRefreshing(false);
+    },
+  });
+
+  const handleRefreshScore = useCallback(() => {
+    if (!refreshing && !isDivaLoading) {
+      setRefreshing(true);
+      refreshScoreMutation.mutate();
+    }
+  }, [refreshing, isDivaLoading, refreshScoreMutation]);
+
+  const renderDivaScoreSection = (): React.ReactElement => {
+    if (isDivaLoading) {
+      return <LoadingSpinner />;
+    }
+
+    if (!divaScore) {
+      return (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>
+            Complete your banking profile to see your DIVA score
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <DivaScoreCard
+        score={divaScore}
+        onRefresh={handleRefreshScore}
+        isRefreshing={refreshing}
+      />
+    );
+  };
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.header}>
+        <Text style={styles.welcomeText}>
+          Welcome back, {user.firstName}
+        </Text>
+        <Text style={styles.subtitleText}>
+          Your financial journey continues
+        </Text>
+      </View>
+
+      <WalletBalance userId={user.id} />
+
+      {renderDivaScoreSection()}
+
+      <TouchableOpacity style={styles.chamaButton} onPress={onNavigateToChama}>
+        <Text style={styles.chamaButtonText}>Manage Your Chamas</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  content: {
+    padding: 16,
+  },
+  header: {
+    marginBottom: 24,
+  },
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  subtitleText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyState: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  chamaButton: {
+    backgroundColor: '#bc9b25',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  chamaButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});
+```
+</CodeGroup>
+
+### Import Organization
+
+<CodeGroup>
+```typescript Import Order
+// 1. React and React Native imports (sorted alphabetically)
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+} from 'react-native';
+
+// 2. Third-party library imports (sorted alphabetically)
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { z } from 'zod';
+
+// 3. Internal imports (grouped by category, sorted alphabetically)
+// Components
+import { Button } from '../components/common/Button';
+import { DivaScoreCard } from '../components/financial/DivaScoreCard';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
+
+// Hooks
+import { useAuth } from '../hooks/useAuth';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+
+// Services
+import { divaScoreService } from '../services/diva-scoring/DivaScoreService';
+import { notificationService } from '../services/notifications/NotificationService';
+
+// Utils
+import { formatCurrency } from '../utils/formatting/currency';
+import { validatePhoneNumber } from '../utils/validation/phone';
+
+// Types
+import type { DivaScore } from '../types/financial';
+import type { UserProfile } from '../types/user';
+import type { NavigationProp } from '@react-navigation/native';
+
+// Constants
+import { API_ENDPOINTS } from '../constants/api';
+import { COLORS } from '../theme/colors';
+```
+
+```typescript Export Patterns
+// ✅ Preferred export patterns
+
+// Default export for main component/service
+export default class DivaScoreService {
+  // Implementation
+}
+
+// Named exports for utilities and multiple exports
+export const formatCurrency = (amount: MonetaryAmount): string => {
+  // Implementation
+};
+
+export const validateAmount = (amount: string): boolean => {
+  // Implementation
+};
+
+export const calculateInterest = (
+  principal: MonetaryAmount,
+  rate: number,
+  period: number
+): MonetaryAmount => {
+  // Implementation
+};
+
+// Type exports
+export type { DivaScore, DivaComponents } from './types';
+
+// Re-exports for barrel files
+export { DivaScoreService } from './DivaScoreService';
+export { RTSMAssessment } from './RTSMAssessment';
+
+// ❌ Avoid mixed export patterns in same file
+// Don't mix default and named exports unless necessary
+```
+</CodeGroup>
+
+## Function and Class Design
+
+### Function Guidelines
+
+<CodeGroup>
+```typescript Pure Functions
+// ✅ Pure functions - predictable, testable
+
+/**
+ * Calculates DIVA discipline score based on transaction patterns
+ * @param transactions - Array of user transactions
+ * @param analysisStartDate - Start date for analysis period
+ * @returns Discipline score (0-1000)
+ */
+export const calculateDisciplineScore = (
+  transactions: readonly Transaction[],
+  analysisStartDate: Date
+): DivaScoreValue => {
+  if (transactions.length === 0) {
+    return 0 as DivaScoreValue;
+  }
+
+  const relevantTransactions = filterTransactionsByDate(
+    transactions,
+    analysisStartDate
+  );
+
+  const punctualityScore = calculatePaymentPunctuality(relevantTransactions);
+  const savingsConsistency = calculateSavingsConsistency(relevantTransactions);
+  const overdraftAvoidance = calculateOverdraftAvoidance(relevantTransactions);
+
+  const disciplineScore = Math.round(
+    punctualityScore * 0.4 + savingsConsistency * 0.35 + overdraftAvoidance * 0.25
+  );
+
+  return Math.min(1000, Math.max(0, disciplineScore)) as DivaScoreValue;
+};
+
+/**
+ * Formats monetary amount for display in user's locale
+ * @param amount - Monetary amount to format
+ * @param locale - User's locale (defaults to 'en-ZA')
+ * @returns Formatted currency string
+ */
+export const formatMonetaryAmount = (
+  amount: MonetaryAmount,
+  locale: string = 'en-ZA'
+): string => {
+  const numericAmount = parseFloat(amount.amount);
+  
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: amount.currency,
+    minimumFractionDigits: amount.precision,
+    maximumFractionDigits: amount.precision,
+  }).format(numericAmount);
+};
+```
+
+```typescript Async Functions
+// ✅ Proper async function patterns
+
+/**
+ * Retrieves user's current DIVA score with caching
+ * @param userId - User identifier
+ * @returns Promise resolving to DIVA score or null if not calculated
+ */
+export const getCurrentDivaScore = async (
+  userId: UserId
+): Promise<DivaScore | null> => {
+  try {
+    // Check cache first
+    const cachedScore = await scoreCache.get(userId);
+    if (cachedScore && !isScoreExpired(cachedScore)) {
+      return cachedScore;
+    }
+
+    // Fetch from database
+    const score = await divaRepository.findLatestScore(userId);
+    if (!score) {
+      return null;
+    }
+
+    // Cache the result
+    await scoreCache.set(userId, score, SCORE_CACHE_TTL);
+    
+    return score;
+  } catch (error) {
+    logger.error('Failed to retrieve DIVA score', {
+      userId,
+      error: error.message,
+    });
+    throw new DivaScoreRetrievalError(
+      'Unable to retrieve DIVA score',
+      { userId, cause: error }
+    );
+  }
+};
+
+/**
+ * Processes Chama contribution with transaction integrity
+ * @param contributionData - Contribution details
+ * @returns Promise resolving to processed contribution
+ */
+export const processContribution = async (
+  contributionData: ContributionData
+): Promise<ProcessedContribution> => {
+  const client = await db.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    // Validate contribution
+    await validateContribution(contributionData);
+    
+    // Process payment
+    const payment = await paymentService.processPayment({
+      amount: contributionData.amount,
+      paymentMethod: contributionData.paymentMethod,
+      userId: contributionData.userId,
+    });
+    
+    // Record contribution
+    const contribution = await chamaRepository.recordContribution({
+      ...contributionData,
+      paymentId: payment.id,
+      status: 'completed',
+    });
+    
+    // Update Chama balance
+    await chamaRepository.updateBalance(
+      contributionData.chamaId,
+      contributionData.amount
+    );
+    
+    // Send notifications
+    await notificationService.notifyContribution(contribution);
+    
+    await client.query('COMMIT');
+    
+    return contribution;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    
+    logger.error('Failed to process contribution', {
+      contributionData,
+      error: error.message,
+    });
+    
+    throw new ContributionProcessingError(
+      'Unable to process contribution',
+      { contributionData, cause: error }
+    );
+  } finally {
+    client.release();
+  }
+};
+```
+</CodeGroup>
+
+### Class Design Patterns
+
+<CodeGroup>
+```typescript Service Classes
+// ✅ Well-structured service class
+
+/**
+ * Service for managing DIVA score calculations and caching
+ * Handles business logic for financial scoring algorithm
+ */
+export class DivaScoreService {
+  private readonly repository: DivaScoreRepository;
+  private readonly cache: ScoreCache;
+  private readonly logger: Logger;
+  private readonly eventEmitter: EventEmitter;
+
+  constructor(
+    repository: DivaScoreRepository,
+    cache: ScoreCache,
+    logger: Logger,
+    eventEmitter: EventEmitter
+  ) {
+    this.repository = repository;
+    this.cache = cache;
+    this.logger = logger;
+    this.eventEmitter = eventEmitter;
+  }
+
+  /**
+   * Calculates new DIVA score for user
+   * @param userId - User identifier
+   * @returns Promise resolving to calculated DIVA score
+   */
+  public async calculateScore(userId: UserId): Promise<DivaScore> {
+    this.logger.info('Starting DIVA score calculation', { userId });
+
+    try {
+      // Get user's financial data
+      const financialData = await this.getFinancialData(userId);
+      
+      // Validate data quality
+      this.validateDataQuality(financialData);
+
+      // Calculate score components
+      const components = await this.calculateComponents(financialData);
+      
+      // Calculate total score
+      const totalScore = this.calculateTotalScore(components);
+      
+      // Determine portfolio tier
+      const portfolioTier = this.determinePortfolioTier(totalScore);
+      
+      // Create score object
+      const divaScore: DivaScore = {
+        totalScore,
+        components,
+        calculatedAt: new Date(),
+        expiresAt: this.calculateExpiryDate(),
+        portfolioTier,
+        dataQuality: this.assessDataQuality(financialData),
+      };
+
+      // Persist score
+      await this.repository.saveScore(userId, divaScore);
+      
+      // Update cache
+      await this.cache.set(userId, divaScore);
+      
+      // Emit score calculated event
+      this.eventEmitter.emit('diva-score-calculated', {
+        userId,
+        score: divaScore,
+      });
+
+      this.logger.info('DIVA score calculation completed', {
+        userId,
+        totalScore,
+        portfolioTier,
+      });
+
+      return divaScore;
+    } catch (error) {
+      this.logger.error('DIVA score calculation failed', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves current DIVA score for user
+   * @param userId - User identifier
+   * @returns Promise resolving to current score or null
+   */
+  public async getCurrentScore(userId: UserId): Promise<DivaScore | null> {
+    // Check cache first
+    const cachedScore = await this.cache.get(userId);
+    if (cachedScore && !this.isScoreExpired(cachedScore)) {
+      return cachedScore;
+    }
+
+    // Fetch from repository
+    const score = await this.repository.getLatestScore(userId);
+    if (!score) {
+      return null;
+    }
+
+    // Update cache
+    await this.cache.set(userId, score);
+    
+    return score;
+  }
+
+  // Private helper methods
+  private async getFinancialData(userId: UserId): Promise<FinancialData> {
+    // Implementation
+  }
+
+  private validateDataQuality(data: FinancialData): void {
+    // Implementation
+  }
+
+  private async calculateComponents(data: FinancialData): Promise<DivaComponents> {
+    // Implementation
+  }
+
+  private calculateTotalScore(components: DivaComponents): DivaScoreValue {
+    // Implementation
+  }
+
+  private determinePortfolioTier(score: DivaScoreValue): PortfolioTier {
+    // Implementation
+  }
+
+  private calculateExpiryDate(): Date {
+    // Implementation
+  }
+
+  private assessDataQuality(data: FinancialData): DataQuality {
+    // Implementation
+  }
+
+  private isScoreExpired(score: DivaScore): boolean {
+    return score.expiresAt < new Date();
+  }
+}
+```
+
+```typescript React Component Classes
+// ✅ Well-structured React component
+
+interface DivaScoreCardProps {
+  readonly score: DivaScore;
+  readonly onRefresh?: () => void;
+  readonly isRefreshing?: boolean;
+  readonly showDetails?: boolean;
+}
+
+/**
+ * Displays user's DIVA score with interactive elements
+ * Optimized for African mobile networks with offline support
+ */
+export const DivaScoreCard: React.FC<DivaScoreCardProps> = ({
+  score,
+  onRefresh,
+  isRefreshing = false,
+  showDetails = false,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(showDetails);
+  const { t } = useTranslation();
+  const theme = useTheme();
+
+  // Memoized calculations
+  const scoreColor = useMemo(() => {
+    return getScoreColor(score.totalScore, theme);
+  }, [score.totalScore, theme]);
+
+  const tierDescription = useMemo(() => {
+    return getTierDescription(score.portfolioTier, t);
+  }, [score.portfolioTier, t]);
+
+  const handleToggleExpanded = useCallback(() => {
+    setIsExpanded(prev => !prev);
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    if (onRefresh && !isRefreshing) {
+      onRefresh();
+    }
+  }, [onRefresh, isRefreshing]);
+
+  const renderScoreBreakdown = (): React.ReactElement => {
+    if (!isExpanded) {
+      return <></>;
+    }
+
+    return (
+      <View style={styles.breakdown}>
+        <ComponentScoreBar
+          label={t('diva.discipline')}
+          score={score.components.discipline}
+          maxScore={1000}
+        />
+        <ComponentScoreBar
+          label={t('diva.income')}
+          score={score.components.income}
+          maxScore={1000}
+        />
+        <ComponentScoreBar
+          label={t('diva.velocity')}
+          score={score.components.velocity}
+          maxScore={1000}
+        />
+        <ComponentScoreBar
+          label={t('diva.assets')}
+          score={score.components.assets}
+          maxScore={1000}
+        />
+      </View>
+    );
+  };
+
+  return (
+    <Card style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.scoreSection}>
+          <Text style={[styles.scoreText, { color: scoreColor }]}>
+            {score.totalScore}
+          </Text>
+          <Text style={styles.maxScoreText}>/1000</Text>
+        </View>
+        
+        <View style={styles.tierSection}>
+          <Text style={styles.tierText}>
+            {score.portfolioTier.toUpperCase()}
+          </Text>
+          <Text style={styles.tierDescription}>
+            {tierDescription}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={handleRefresh}
+          disabled={isRefreshing}
+        >
+          {isRefreshing ? (
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+          ) : (
+            <RefreshIcon size={20} color={theme.colors.primary} />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        style={styles.expandButton}
+        onPress={handleToggleExpanded}
+      >
+        <Text style={styles.expandText}>
+          {isExpanded ? t('common.showLess') : t('common.showDetails')}
+        </Text>
+        <ChevronIcon
+          size={16}
+          color={theme.colors.text}
+          direction={isExpanded ? 'up' : 'down'}
+        />
+      </TouchableOpacity>
+
+      {renderScoreBreakdown()}
+
+      <View style={styles.footer}>
+        <Text style={styles.lastUpdated}>
+          {t('diva.lastUpdated')}: {formatDate(score.calculatedAt)}
+        </Text>
+        <Text style={styles.nextUpdate}>
+          {t('diva.nextUpdate')}: {formatDate(score.expiresAt)}
+        </Text>
+      </View>
+    </Card>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  scoreSection: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  scoreText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  maxScoreText: {
+    fontSize: 16,
+    color: '#666',
+    marginLeft: 4,
+  },
+  tierSection: {
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 16,
+  },
+  tierText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  tierDescription: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  refreshButton: {
+    padding: 8,
+  },
+  expandButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    marginTop: 8,
+  },
+  expandText: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 4,
+  },
+  breakdown: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  footer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  lastUpdated: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  nextUpdate: {
+    fontSize: 12,
+    color: '#666',
+  },
+});
+```
+</CodeGroup>
+
+## Error Handling Patterns
+
+### Error Types and Handling
+
+<CodeGroup>
+```typescript Custom Error Classes
+// errors/DivaScoreErrors.ts
+
+/**
+ * Base error class for DIVA score related errors
+ */
+export abstract class DivaScoreError extends Error {
+  public readonly code: string;
+  public readonly context: Record<string, unknown>;
+  public readonly timestamp: Date;
+
+  constructor(
+    message: string,
+    code: string,
+    context: Record<string, unknown> = {}
+  ) {
+    super(message);
+    this.name = this.constructor.name;
+    this.code = code;
+    this.context = context;
+    this.timestamp = new Date();
+
+    // Maintains proper stack trace for V8
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
+  }
+}
+
+/**
+ * Thrown when insufficient data is available for DIVA calculation
+ */
+export class InsufficientDataError extends DivaScoreError {
+  constructor(message: string, context: Record<string, unknown> = {}) {
+    super(message, 'INSUFFICIENT_DATA', context);
+  }
+}
+
+/**
+ * Thrown when DIVA score calculation fails
+ */
+export class CalculationError extends DivaScoreError {
+  constructor(message: string, context: Record<string, unknown> = {}) {
+    super(message, 'CALCULATION_FAILED', context);
+  }
+}
+
+/**
+ * Thrown when financial data validation fails
+ */
+export class DataValidationError extends DivaScoreError {
+  constructor(message: string, context: Record<string, unknown> = {}) {
+    super(message, 'DATA_VALIDATION_FAILED', context);
+  }
+}
+```
+
+```typescript Error Handling Patterns
+// ✅ Proper error handling in services
+
+/**
+ * Calculates DIVA score with comprehensive error handling
+ */
+export const calculateDivaScore = async (
+  userId: UserId
+): Promise<DivaScore> => {
+  try {
+    // Validate user exists
+    const user = await userRepository.findById(userId);
+    if (!user) {
+      throw new UserNotFoundError(`User not found: ${userId}`, { userId });
+    }
+
+    // Get financial data
+    const financialData = await getFinancialData(userId);
+    if (!financialData || financialData.transactions.length < MIN_TRANSACTIONS) {
+      throw new InsufficientDataError(
+        'Insufficient transaction data for DIVA calculation',
+        {
+          userId,
+          transactionCount: financialData?.transactions.length || 0,
+          minimumRequired: MIN_TRANSACTIONS,
+        }
+      );
+    }
+
+    // Validate data quality
+    const dataQuality = assessDataQuality(financialData);
+    if (dataQuality === 'poor') {
+      throw new DataValidationError(
+        'Financial data quality is too poor for accurate scoring',
+        { userId, dataQuality }
+      );
+    }
+
+    // Perform calculation
+    const score = performDivaCalculation(financialData);
+    
+    // Validate result
+    if (!isValidDivaScore(score)) {
+      throw new CalculationError(
+        'DIVA score calculation produced invalid result',
+        { userId, score }
+      );
+    }
+
+    logger.info('DIVA score calculated successfully', {
+      userId,
+      totalScore: score.totalScore,
+      portfolioTier: score.portfolioTier,
+    });
+
+    return score;
+
+  } catch (error) {
+    // Log error with context
+    logger.error('DIVA score calculation failed', {
+      userId,
+      error: error.message,
+      errorCode: error.code,
+      context: error.context,
+      stack: error.stack,
+    });
+
+    // Re-throw known errors
+    if (error instanceof DivaScoreError) {
+      throw error;
+    }
+
+    // Wrap unknown errors
+    throw new CalculationError(
+      'Unexpected error during DIVA score calculation',
+      { userId, originalError: error.message }
+    );
+  }
+};
+
+/**
+ * API error handler with proper status codes
+ */
+export const handleApiError = (
+  error: Error,
+  req: Request,
+  res: Response
+): void => {
+  if (error instanceof InsufficientDataError) {
+    res.status(400).json({
+      error: 'INSUFFICIENT_DATA',
+      message: error.message,
+      context: error.context,
+      suggestion: 'Link more bank accounts or wait for more transaction data',
+    });
+    return;
+  }
+
+  if (error instanceof DataValidationError) {
+    res.status(422).json({
+      error: 'DATA_VALIDATION_FAILED',
+      message: error.message,
+      context: error.context,
+      suggestion: 'Check data format and try again',
+    });
+    return;
+  }
+
+  if (error instanceof CalculationError) {
+    res.status(500).json({
+      error: 'CALCULATION_FAILED',
+      message: 'Unable to calculate DIVA score at this time',
+      suggestion: 'Please try again later or contact support',
+    });
+    return;
+  }
+
+  // Unknown error
+  logger.error('Unhandled API error', {
+    error: error.message,
+    stack: error.stack,
+    requestId: req.headers['x-request-id'],
+  });
+
+  res.status(500).json({
+    error: 'INTERNAL_ERROR',
+    message: 'An unexpected error occurred',
+    suggestion: 'Please try again later or contact support',
+  });
+};
+```
+</CodeGroup>
+
+## Financial Code Standards
+
+### Decimal Precision and Currency Handling
+
+<CodeGroup>
+```typescript Financial Calculations
+// ✅ Proper financial calculation patterns
+
+import { Decimal } from 'decimal.js';
+
+/**
+ * Configuration for decimal precision in financial calculations
+ */
+Decimal.config({
+  precision: 28, // High precision for financial calculations
+  rounding: Decimal.ROUND_HALF_UP,
+  toExpNeg: -7,
+  toExpPos: 21,
+});
+
+/**
+ * Monetary amount class with precise decimal arithmetic
+ */
+export class MonetaryAmount {
+  private readonly _amount: Decimal;
+  private readonly _currency: CurrencyCode;
+  private readonly _precision: number;
+
+  constructor(amount: string | number, currency: CurrencyCode, precision: number = 2) {
+    this._amount = new Decimal(amount);
+    this._currency = currency;
+    this._precision = precision;
+  }
+
+  public get amount(): string {
+    return this._amount.toFixed(this._precision);
+  }
+
+  public get currency(): CurrencyCode {
+    return this._currency;
+  }
+
+  public get precision(): number {
+    return this._precision;
+  }
+
+  /**
+   * Adds another monetary amount (must be same currency)
+   */
+  public add(other: MonetaryAmount): MonetaryAmount {
+    this.validateSameCurrency(other);
+    const sum = this._amount.add(other._amount);
+    return new MonetaryAmount(sum.toString(), this._currency, this._precision);
+  }
+
+  /**
+   * Subtracts another monetary amount (must be same currency)
+   */
+  public subtract(other: MonetaryAmount): MonetaryAmount {
+    this.validateSameCurrency(other);
+    const difference = this._amount.minus(other._amount);
+    return new MonetaryAmount(difference.toString(), this._currency, this._precision);
+  }
+
+  /**
+   * Multiplies by a rate (for interest calculations, etc.)
+   */
+  public multiply(rate: number | string): MonetaryAmount {
+    const product = this._amount.mul(new Decimal(rate));
+    return new MonetaryAmount(product.toString(), this._currency, this._precision);
+  }
+
+  /**
+   * Divides by a number
+   */
+  public divide(divisor: number | string): MonetaryAmount {
+    const quotient = this._amount.div(new Decimal(divisor));
+    return new MonetaryAmount(quotient.toString(), this._currency, this._precision);
+  }
+
+  /**
+   * Checks if this amount is greater than another
+   */
+  public isGreaterThan(other: MonetaryAmount): boolean {
+    this.validateSameCurrency(other);
+    return this._amount.greaterThan(other._amount);
+  }
+
+  /**
+   * Checks if this amount equals another
+   */
+  public equals(other: MonetaryAmount): boolean {
+    return this._currency === other._currency && this._amount.equals(other._amount);
+  }
+
+  /**
+   * Converts to number (use with caution, only for display)
+   */
+  public toNumber(): number {
+    return this._amount.toNumber();
+  }
+
+  /**
+   * Formats for display in user's locale
+   */
+  public format(locale: string = 'en-ZA'): string {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: this._currency,
+      minimumFractionDigits: this._precision,
+      maximumFractionDigits: this._precision,
+    }).format(this.toNumber());
+  }
+
+  private validateSameCurrency(other: MonetaryAmount): void {
+    if (this._currency !== other._currency) {
+      throw new CurrencyMismatchError(
+        `Cannot operate on different currencies: ${this._currency} vs ${other._currency}`
+      );
+    }
+  }
+}
+
+/**
+ * Calculates compound interest with precise arithmetic
+ */
+export const calculateCompoundInterest = (
+  principal: MonetaryAmount,
+  annualRate: number,
+  compoundingPeriods: number,
+  years: number
+): MonetaryAmount => {
+  const rate = new Decimal(annualRate).div(compoundingPeriods);
+  const exponent = new Decimal(compoundingPeriods).mul(years);
+  const base = new Decimal(1).add(rate);
+  const compound = base.pow(exponent);
+  
+  const principalDecimal = new Decimal(principal.amount);
+  const finalAmount = principalDecimal.mul(compound);
+  
+  return new MonetaryAmount(finalAmount.toString(), principal.currency, principal.precision);
+};
+
+/**
+ * Calculates percentage with proper rounding
+ */
+export const calculatePercentage = (
+  value: MonetaryAmount,
+  percentage: number
+): MonetaryAmount => {
+  const percentageDecimal = new Decimal(percentage).div(100);
+  return value.multiply(percentageDecimal.toString());
+};
+```
+
+```typescript DIVA Score Calculations
+// ✅ Financial scoring with proper validation
+
+/**
+ * Calculates savings rate with precise arithmetic
+ */
+export const calculateSavingsRate = (
+  totalIncome: MonetaryAmount,
+  totalExpenses: MonetaryAmount
+): number => {
+  if (totalIncome.equals(new MonetaryAmount('0', totalIncome.currency))) {
+    return 0;
+  }
+
+  const savings = totalIncome.subtract(totalExpenses);
+  const savingsRate = new Decimal(savings.amount)
+    .div(new Decimal(totalIncome.amount))
+    .mul(100);
+
+  // Ensure rate is between 0 and 100
+  return Math.max(0, Math.min(100, savingsRate.toNumber()));
+};
+
+/**
+ * Calculates debt-to-income ratio
+ */
+export const calculateDebtToIncomeRatio = (
+  monthlyDebtPayments: MonetaryAmount,
+  monthlyIncome: MonetaryAmount
+): number => {
+  if (monthlyIncome.equals(new MonetaryAmount('0', monthlyIncome.currency))) {
+    return 100; // Maximum ratio if no income
+  }
+
+  const ratio = new Decimal(monthlyDebtPayments.amount)
+    .div(new Decimal(monthlyIncome.amount))
+    .mul(100);
+
+  return Math.max(0, ratio.toNumber());
+};
+
+/**
+ * Validates financial amount meets business rules
+ */
+export const validateFinancialAmount = (amount: MonetaryAmount): ValidationResult => {
+  const errors: string[] = [];
+
+  // Check for negative amounts where not allowed
+  if (amount.toNumber() < 0) {
+    errors.push('Amount cannot be negative');
+  }
+
+  // Check for reasonable limits (adjust based on context)
+  const maxAmount = new MonetaryAmount('1000000', amount.currency); // 1M limit
+  if (amount.isGreaterThan(maxAmount)) {
+    errors.push(`Amount exceeds maximum limit of ${maxAmount.format()}`);
+  }
+
+  // Check precision
+  const decimals = amount.amount.split('.')[1];
+  if (decimals && decimals.length > amount.precision) {
+    errors.push(`Amount has too many decimal places (max: ${amount.precision})`);
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+};
+```
+</CodeGroup>
+
+## Performance Optimization Patterns
+
+### React Performance Best Practices
+
+<CodeGroup>
+```typescript Memoization Patterns
+// ✅ Proper memoization for African mobile networks
+
+import React, { useMemo, useCallback, memo } from 'react';
+
+interface ExpensiveComponentProps {
+  readonly transactions: Transaction[];
+  readonly userId: UserId;
+  readonly onTransactionSelect: (transactionId: string) => void;
+}
+
+/**
+ * Component optimized for large transaction lists
+ * Memoized to prevent unnecessary re-renders on slow devices
+ */
+export const TransactionList = memo<ExpensiveComponentProps>(({
+  transactions,
+  userId,
+  onTransactionSelect,
+}) => {
+  // Memoize expensive calculations
+  const categorizedTransactions = useMemo(() => {
+    return categorizeTransactions(transactions);
+  }, [transactions]);
+
+  const totalAmount = useMemo(() => {
+    return transactions.reduce((sum, transaction) => {
+      return sum.add(new MonetaryAmount(transaction.amount, transaction.currency));
+    }, new MonetaryAmount('0', 'ZAR'));
+  }, [transactions]);
+
+  // Memoize callbacks to prevent child re-renders
+  const handleTransactionPress = useCallback((transactionId: string) => {
+    onTransactionSelect(transactionId);
+  }, [onTransactionSelect]);
+
+  // Render function for individual transaction
+  const renderTransaction = useCallback((transaction: Transaction) => {
+    return (
+      <TransactionItem
+        key={transaction.id}
+        transaction={transaction}
+        onPress={handleTransactionPress}
+      />
+    );
+  }, [handleTransactionPress]);
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.summary}>
+        <Text style={styles.totalText}>
+          Total: {totalAmount.format()}
+        </Text>
+      </View>
+      
+      <FlatList
+        data={transactions}
+        renderItem={({ item }) => renderTransaction(item)}
+        keyExtractor={item => item.id}
+        getItemLayout={(data, index) => ({
+          length: TRANSACTION_ITEM_HEIGHT,
+          offset: TRANSACTION_ITEM_HEIGHT * index,
+          index,
+        })}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        initialNumToRender={15}
+      />
+    </View>
+  );
+});
+
+TransactionList.displayName = 'TransactionList';
+```
+
+```typescript Efficient Data Loading
+// ✅ Optimized data loading for African networks
+
+/**
+ * Custom hook for loading transaction data with pagination
+ * Optimized for slow network conditions
+ */
+export const useTransactionData = (userId: UserId) => {
+  const [page, setPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(true);
+
+  const {
+    data: transactions,
+    isLoading,
+    isError,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['transactions', userId],
+    queryFn: ({ pageParam = 1 }) => 
+      transactionService.getTransactions(userId, {
+        page: pageParam,
+        limit: 20, // Small page size for slow networks
+      }),
+    getNextPageParam: (lastPage, pages) => {
+      return lastPage.hasNextPage ? pages.length + 1 : undefined;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 30 * 60 * 1000, // 30 minutes
+    networkMode: 'offlineFirst', // Support offline-first
+    retry: (failureCount, error) => {
+      // Retry strategy for African networks
+      if (failureCount < 3 && isNetworkError(error)) {
+        return true;
+      }
+      return false;
+    },
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const flatTransactions = useMemo(() => {
+    return transactions?.pages.flatMap(page => page.data) ?? [];
+  }, [transactions]);
+
+  return {
+    transactions: flatTransactions,
+    isLoading,
+    isError,
+    loadMore,
+    isFetchingNextPage,
+    hasNextPage,
+  };
+};
+
+/**
+ * Batch API calls to reduce network requests
+ */
+export const useBatchedRequests = () => {
+  const requestQueue = useRef<Array<{ key: string; resolver: any }>>([]);
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  const batchRequest = useCallback(async (key: string, request: () => Promise<any>) => {
+    return new Promise((resolve, reject) => {
+      requestQueue.current.push({ key, resolver: { resolve, reject, request } });
+
+      // Clear existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      // Batch requests within 100ms window
+      timeoutRef.current = setTimeout(async () => {
+        const batch = [...requestQueue.current];
+        requestQueue.current = [];
+
+        try {
+          const results = await Promise.allSettled(
+            batch.map(item => item.resolver.request())
+          );
+
+          results.forEach((result, index) => {
+            const { resolver } = batch[index];
+            if (result.status === 'fulfilled') {
+              resolver.resolve(result.value);
+            } else {
+              resolver.reject(result.reason);
+            }
+          });
+        } catch (error) {
+          batch.forEach(({ resolver }) => {
+            resolver.reject(error);
+          });
+        }
+      }, 100);
+    });
+  }, []);
+
+  return { batchRequest };
+};
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Component Patterns" icon="puzzle" href="/development/component-patterns">
+    Learn reusable component patterns and design system implementation
+  </Card>
+  <Card title="State Management" icon="database" href="/development/state-management">
+    Master Zustand + React Query patterns for optimal performance
+  </Card>
+  <Card title="Real Time Features" icon="zap" href="/development/real-time-features">
+    Implement Socket.io and real-time updates for Chama collaboration
+  </Card>
+</CardGroup>
+
+---
+
+*These code style guidelines ensure that AWO Platform maintains high-quality, secure, and maintainable code across our development team. Consistent style accelerates development and reduces bugs in our mission-critical financial software.*

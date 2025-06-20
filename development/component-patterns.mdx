@@ -1,42 +1,1943 @@
----
-title: "Component Patterns"
-description: "AWO Platform component patterns development guide"
----
-
 # Component Patterns
 
-## Overview
-
 <Info>
-This guide covers component patterns for AWO Platform development.
+Master reusable component patterns for AWO Platform, designed for financial services, African market optimization, and scalable React Native development with cultural sensitivity and performance focus.
 </Info>
 
-## Development Setup
+## Design System Foundation
 
-Development setup instructions will be provided here.
+AWO Platform's component library prioritizes **accessibility, performance, and cultural relevance** for African women's financial empowerment, with special attention to variable network conditions and diverse device capabilities.
 
-## Code Examples
+<CardGroup cols={2}>
+  <Card title="Financial UI Principles" icon="calculator">
+    **Precision**: Clear monetary displays with proper formatting  
+    **Trust**: Transparent data presentation for user confidence  
+    **Accessibility**: Screen reader support and high contrast  
+    **Security**: Visual cues for secure vs. public information
+  </Card>
+  <Card title="African Market Focus" icon="globe">
+    **Performance**: Optimized for mid-range Android devices  
+    **Connectivity**: Offline-first with sync indicators  
+    **Localization**: Multi-language and cultural adaptation  
+    **Data Efficiency**: Minimal data usage patterns
+  </Card>
+</CardGroup>
 
-```typescript
-// Development example
-import { AWOPlatform } from '@awo-platform/core';
+## Core Component Architecture
 
-const awo = new AWOPlatform({
-  apiKey: process.env.AWO_API_KEY
+### Base Component Structure
+
+<CodeGroup>
+```typescript Component Foundation
+// components/common/BaseComponent.tsx
+
+interface BaseComponentProps {
+  readonly testID?: string;
+  readonly style?: StyleProp<ViewStyle>;
+  readonly children?: React.ReactNode;
+  readonly accessibilityLabel?: string;
+  readonly accessibilityHint?: string;
+}
+
+/**
+ * Base component with AWO Platform standards
+ * Provides consistent accessibility, theming, and performance patterns
+ */
+export const BaseComponent: React.FC<BaseComponentProps> = ({
+  testID,
+  style,
+  children,
+  accessibilityLabel,
+  accessibilityHint,
+  ...props
+}) => {
+  const theme = useTheme();
+  const { t } = useTranslation();
+
+  return (
+    <View
+      testID={testID}
+      style={[styles.base, style]}
+      accessible={!!accessibilityLabel}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      {...props}
+    >
+      {children}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  base: {
+    // Base styles that respect theme and accessibility
+  },
 });
 ```
 
-## Best Practices
+```typescript Theme Integration
+// theme/index.ts
 
-Development best practices will be documented here.
+export interface AWOTheme {
+  colors: {
+    // Brand colors
+    primary: string;
+    primaryDark: string;
+    secondary: string;
+    
+    // Semantic colors
+    success: string;
+    warning: string;
+    error: string;
+    info: string;
+    
+    // UI colors
+    background: string;
+    surface: string;
+    text: string;
+    textSecondary: string;
+    border: string;
+    
+    // Financial colors
+    income: string;
+    expense: string;
+    savings: string;
+    investment: string;
+  };
+  typography: {
+    h1: TextStyle;
+    h2: TextStyle;
+    h3: TextStyle;
+    body: TextStyle;
+    caption: TextStyle;
+    financial: TextStyle; // For monetary amounts
+  };
+  spacing: {
+    xs: number;
+    sm: number;
+    md: number;
+    lg: number;
+    xl: number;
+  };
+  borderRadius: {
+    sm: number;
+    md: number;
+    lg: number;
+  };
+}
 
-## Tools and Resources
+export const defaultTheme: AWOTheme = {
+  colors: {
+    primary: '#bc9b25',
+    primaryDark: '#9a7d1e',
+    secondary: '#2196F3',
+    
+    success: '#4CAF50',
+    warning: '#FF9800',
+    error: '#F44336',
+    info: '#2196F3',
+    
+    background: '#f5f5f5',
+    surface: '#ffffff',
+    text: '#333333',
+    textSecondary: '#666666',
+    border: '#e0e0e0',
+    
+    income: '#4CAF50',
+    expense: '#F44336',
+    savings: '#2196F3',
+    investment: '#9C27B0',
+  },
+  typography: {
+    h1: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      lineHeight: 34,
+    },
+    h2: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      lineHeight: 30,
+    },
+    h3: {
+      fontSize: 20,
+      fontWeight: '600',
+      lineHeight: 26,
+    },
+    body: {
+      fontSize: 16,
+      fontWeight: 'normal',
+      lineHeight: 22,
+    },
+    caption: {
+      fontSize: 12,
+      fontWeight: 'normal',
+      lineHeight: 16,
+    },
+    financial: {
+      fontSize: 18,
+      fontWeight: '600',
+      lineHeight: 24,
+      fontFamily: 'monospace', // For number alignment
+    },
+  },
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+  },
+  borderRadius: {
+    sm: 4,
+    md: 8,
+    lg: 12,
+  },
+};
+```
+</CodeGroup>
 
-<CardGroup cols={2}>
-  <Card title="API Reference" href="/api-reference/introduction">
-    Complete API documentation
+## Financial Component Patterns
+
+### Monetary Display Components
+
+<CodeGroup>
+```typescript Currency Display
+// components/financial/CurrencyDisplay.tsx
+
+interface CurrencyDisplayProps {
+  readonly amount: MonetaryAmount;
+  readonly showCurrency?: boolean;
+  readonly showSign?: boolean;
+  readonly size?: 'small' | 'medium' | 'large';
+  readonly colorScheme?: 'default' | 'positive' | 'negative' | 'neutral';
+  readonly testID?: string;
+}
+
+/**
+ * Displays monetary amounts with proper formatting and accessibility
+ * Handles different currencies, locales, and visual emphasis
+ */
+export const CurrencyDisplay: React.FC<CurrencyDisplayProps> = ({
+  amount,
+  showCurrency = true,
+  showSign = false,
+  size = 'medium',
+  colorScheme = 'default',
+  testID,
+}) => {
+  const theme = useTheme();
+  const { locale } = useLocalization();
+
+  const formattedAmount = useMemo(() => {
+    return formatMonetaryAmount(amount, locale, {
+      showCurrency,
+      showSign,
+    });
+  }, [amount, locale, showCurrency, showSign]);
+
+  const textStyle = useMemo(() => {
+    const sizeStyle = getSizeStyle(size, theme);
+    const colorStyle = getColorStyle(colorScheme, theme, amount);
+    
+    return [
+      theme.typography.financial,
+      sizeStyle,
+      colorStyle,
+    ];
+  }, [size, colorScheme, theme, amount]);
+
+  const accessibilityLabel = useMemo(() => {
+    return formatAmountForScreenReader(amount, locale);
+  }, [amount, locale]);
+
+  return (
+    <Text
+      style={textStyle}
+      testID={testID}
+      accessible={true}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="text"
+    >
+      {formattedAmount}
+    </Text>
+  );
+};
+
+const getSizeStyle = (size: string, theme: AWOTheme) => {
+  switch (size) {
+    case 'small':
+      return { fontSize: 14, lineHeight: 18 };
+    case 'large':
+      return { fontSize: 24, lineHeight: 30 };
+    default:
+      return { fontSize: 18, lineHeight: 24 };
+  }
+};
+
+const getColorStyle = (colorScheme: string, theme: AWOTheme, amount: MonetaryAmount) => {
+  switch (colorScheme) {
+    case 'positive':
+      return { color: theme.colors.income };
+    case 'negative':
+      return { color: theme.colors.expense };
+    case 'neutral':
+      return { color: theme.colors.textSecondary };
+    default:
+      // Automatic color based on amount
+      const numericAmount = parseFloat(amount.amount);
+      if (numericAmount > 0) {
+        return { color: theme.colors.income };
+      } else if (numericAmount < 0) {
+        return { color: theme.colors.expense };
+      }
+      return { color: theme.colors.text };
+  }
+};
+
+const formatAmountForScreenReader = (amount: MonetaryAmount, locale: string): string => {
+  const numericAmount = parseFloat(amount.amount);
+  const isNegative = numericAmount < 0;
+  const absoluteAmount = Math.abs(numericAmount);
+  
+  const currencyName = getCurrencyName(amount.currency, locale);
+  const formattedNumber = absoluteAmount.toLocaleString(locale);
+  
+  if (isNegative) {
+    return `Negative ${formattedNumber} ${currencyName}`;
+  }
+  return `${formattedNumber} ${currencyName}`;
+};
+```
+
+```typescript DIVA Score Display
+// components/financial/DivaScoreDisplay.tsx
+
+interface DivaScoreDisplayProps {
+  readonly score: DivaScore;
+  readonly variant?: 'compact' | 'detailed' | 'dashboard';
+  readonly showTrend?: boolean;
+  readonly onScorePress?: () => void;
+  readonly testID?: string;
+}
+
+/**
+ * Displays DIVA score with visual indicators and accessibility
+ * Supports multiple variants for different UI contexts
+ */
+export const DivaScoreDisplay: React.FC<DivaScoreDisplayProps> = ({
+  score,
+  variant = 'compact',
+  showTrend = false,
+  onScorePress,
+  testID,
+}) => {
+  const theme = useTheme();
+  const { t } = useTranslation();
+
+  const scoreColor = useMemo(() => {
+    return getScoreColor(score.totalScore, theme);
+  }, [score.totalScore, theme]);
+
+  const tierInfo = useMemo(() => {
+    return getTierInfo(score.portfolioTier, t);
+  }, [score.portfolioTier, t]);
+
+  const progressPercentage = useMemo(() => {
+    return (score.totalScore / 1000) * 100;
+  }, [score.totalScore]);
+
+  const accessibilityLabel = useMemo(() => {
+    return t('accessibility.divaScore', {
+      score: score.totalScore,
+      tier: score.portfolioTier,
+      maxScore: 1000,
+    });
+  }, [score, t]);
+
+  const renderCompactVariant = (): React.ReactElement => (
+    <TouchableOpacity
+      style={styles.compactContainer}
+      onPress={onScorePress}
+      disabled={!onScorePress}
+      accessible={true}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      testID={testID}
+    >
+      <View style={styles.scoreSection}>
+        <Text style={[styles.scoreText, { color: scoreColor }]}>
+          {score.totalScore}
+        </Text>
+        <Text style={styles.maxScoreText}>/1000</Text>
+      </View>
+      
+      <View style={styles.tierSection}>
+        <Text style={[styles.tierText, { color: tierInfo.color }]}>
+          {tierInfo.label}
+        </Text>
+        {showTrend && (
+          <TrendIndicator 
+            score={score.totalScore} 
+            previousScore={score.previousScore} 
+          />
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderDetailedVariant = (): React.ReactElement => (
+    <View style={styles.detailedContainer} testID={testID}>
+      <View style={styles.header}>
+        <Text style={styles.title}>{t('diva.yourScore')}</Text>
+        <Text style={styles.subtitle}>
+          {t('diva.lastUpdated', { date: formatDate(score.calculatedAt) })}
+        </Text>
+      </View>
+
+      <View style={styles.scoreDisplay}>
+        <Text style={[styles.largeScoreText, { color: scoreColor }]}>
+          {score.totalScore}
+        </Text>
+        <Text style={styles.maxScoreText}>/1000</Text>
+      </View>
+
+      <ProgressBar 
+        progress={progressPercentage}
+        color={scoreColor}
+        height={8}
+        style={styles.progressBar}
+      />
+
+      <View style={styles.tierDisplay}>
+        <View style={[styles.tierBadge, { backgroundColor: tierInfo.color }]}>
+          <Text style={styles.tierBadgeText}>{tierInfo.label}</Text>
+        </View>
+        <Text style={styles.tierDescription}>{tierInfo.description}</Text>
+      </View>
+
+      <ComponentBreakdown components={score.components} />
+    </View>
+  );
+
+  const renderDashboardVariant = (): React.ReactElement => (
+    <Card style={styles.dashboardCard} testID={testID}>
+      <View style={styles.dashboardHeader}>
+        <Text style={styles.cardTitle}>{t('diva.score')}</Text>
+        <StatusIndicator status={score.status} />
+      </View>
+
+      <View style={styles.dashboardContent}>
+        <CircularProgress
+          size={80}
+          progress={progressPercentage}
+          color={scoreColor}
+          strokeWidth={8}
+        >
+          <Text style={[styles.circularScoreText, { color: scoreColor }]}>
+            {score.totalScore}
+          </Text>
+        </CircularProgress>
+
+        <View style={styles.dashboardInfo}>
+          <Text style={styles.tierLabel}>{tierInfo.label}</Text>
+          <Text style={styles.nextUpdate}>
+            {t('diva.nextUpdate', { date: formatDate(score.expiresAt) })}
+          </Text>
+        </View>
+      </View>
+
+      {onScorePress && (
+        <TouchableOpacity style={styles.viewDetailsButton} onPress={onScorePress}>
+          <Text style={styles.viewDetailsText}>{t('common.viewDetails')}</Text>
+        </TouchableOpacity>
+      )}
+    </Card>
+  );
+
+  switch (variant) {
+    case 'detailed':
+      return renderDetailedVariant();
+    case 'dashboard':
+      return renderDashboardVariant();
+    default:
+      return renderCompactVariant();
+  }
+};
+
+const getScoreColor = (score: number, theme: AWOTheme): string => {
+  if (score >= 850) return '#4CAF50'; // Excellent - Green
+  if (score >= 650) return '#FF9800'; // Good - Orange
+  if (score >= 400) return '#2196F3'; // Fair - Blue
+  return '#F44336'; // Poor - Red
+};
+
+const getTierInfo = (tier: PortfolioTier, t: any) => {
+  const tierConfig = {
+    bronze: { color: '#CD7F32', label: t('tier.bronze'), description: t('tier.bronze.description') },
+    silver: { color: '#C0C0C0', label: t('tier.silver'), description: t('tier.silver.description') },
+    gold: { color: '#FFD700', label: t('tier.gold'), description: t('tier.gold.description') },
+    platinum: { color: '#E5E4E2', label: t('tier.platinum'), description: t('tier.platinum.description') },
+  };
+  return tierConfig[tier] || tierConfig.bronze;
+};
+```
+</CodeGroup>
+
+### Input Component Patterns
+
+<CodeGroup>
+```typescript Financial Input
+// components/forms/FinancialInput.tsx
+
+interface FinancialInputProps {
+  readonly value: string;
+  readonly onChangeValue: (value: string) => void;
+  readonly currency: CurrencyCode;
+  readonly placeholder?: string;
+  readonly maxAmount?: MonetaryAmount;
+  readonly minAmount?: MonetaryAmount;
+  readonly error?: string;
+  readonly disabled?: boolean;
+  readonly autoFocus?: boolean;
+  readonly testID?: string;
+}
+
+/**
+ * Specialized input for monetary amounts
+ * Handles formatting, validation, and accessibility for financial data
+ */
+export const FinancialInput: React.FC<FinancialInputProps> = ({
+  value,
+  onChangeValue,
+  currency,
+  placeholder,
+  maxAmount,
+  minAmount,
+  error,
+  disabled = false,
+  autoFocus = false,
+  testID,
+}) => {
+  const theme = useTheme();
+  const { t } = useTranslation();
+  const [isFocused, setIsFocused] = useState(false);
+  const [displayValue, setDisplayValue] = useState(value);
+
+  const currencySymbol = getCurrencySymbol(currency);
+  const decimalSeparator = getDecimalSeparator(currency);
+
+  // Format input value in real-time
+  const handleChangeText = useCallback((text: string) => {
+    // Remove non-numeric characters except decimal separator
+    const cleanText = text.replace(/[^\d.,]/g, '');
+    
+    // Handle decimal separator
+    const formattedText = formatInputValue(cleanText, currency);
+    
+    setDisplayValue(formattedText);
+    onChangeValue(formattedText);
+  }, [currency, onChangeValue]);
+
+  const handleFocus = useCallback(() => {
+    setIsFocused(true);
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    setIsFocused(false);
+    
+    // Format for display when not focused
+    if (displayValue) {
+      const formatted = formatCurrencyInput(displayValue, currency);
+      setDisplayValue(formatted);
+    }
+  }, [displayValue, currency]);
+
+  const validationMessage = useMemo(() => {
+    if (error) return error;
+    
+    if (value) {
+      const amount = new MonetaryAmount(value, currency);
+      
+      if (maxAmount && amount.isGreaterThan(maxAmount)) {
+        return t('validation.amountTooLarge', { max: maxAmount.format() });
+      }
+      
+      if (minAmount && minAmount.isGreaterThan(amount)) {
+        return t('validation.amountTooSmall', { min: minAmount.format() });
+      }
+    }
+    
+    return null;
+  }, [value, currency, maxAmount, minAmount, error, t]);
+
+  const inputStyle = useMemo(() => [
+    styles.input,
+    {
+      borderColor: error ? theme.colors.error : 
+                  isFocused ? theme.colors.primary : theme.colors.border,
+      color: disabled ? theme.colors.textSecondary : theme.colors.text,
+    }
+  ], [error, isFocused, disabled, theme]);
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.inputContainer}>
+        <Text style={[styles.currencySymbol, { color: theme.colors.textSecondary }]}>
+          {currencySymbol}
+        </Text>
+        
+        <TextInput
+          style={inputStyle}
+          value={displayValue}
+          onChangeText={handleChangeText}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          placeholder={placeholder || t('financial.enterAmount')}
+          placeholderTextColor={theme.colors.textSecondary}
+          keyboardType="decimal-pad"
+          editable={!disabled}
+          autoFocus={autoFocus}
+          testID={testID}
+          accessible={true}
+          accessibilityLabel={t('accessibility.amountInput', { currency })}
+          accessibilityHint={t('accessibility.enterAmount')}
+        />
+      </View>
+      
+      {validationMessage && (
+        <Text style={[styles.errorText, { color: theme.colors.error }]}>
+          {validationMessage}
+        </Text>
+      )}
+      
+      {maxAmount && (
+        <Text style={[styles.helperText, { color: theme.colors.textSecondary }]}>
+          {t('financial.maxAmount', { amount: maxAmount.format() })}
+        </Text>
+      )}
+    </View>
+  );
+};
+
+const formatInputValue = (value: string, currency: CurrencyCode): string => {
+  // Remove extra decimal separators
+  const parts = value.split('.');
+  if (parts.length > 2) {
+    value = parts[0] + '.' + parts.slice(1).join('');
+  }
+  
+  // Limit decimal places based on currency
+  const decimalPlaces = getCurrencyDecimalPlaces(currency);
+  if (parts.length === 2 && parts[1].length > decimalPlaces) {
+    value = parts[0] + '.' + parts[1].substring(0, decimalPlaces);
+  }
+  
+  return value;
+};
+
+const styles = StyleSheet.create({
+  container: {
+    marginBottom: 16,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+  },
+  currencySymbol: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    fontSize: 18,
+    fontFamily: 'monospace',
+    paddingVertical: 12,
+    textAlign: 'right',
+  },
+  errorText: {
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  helperText: {
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+  },
+});
+```
+
+```typescript Form Validation Patterns
+// components/forms/FormField.tsx
+
+interface FormFieldProps<T> {
+  readonly name: string;
+  readonly value: T;
+  readonly onChangeValue: (value: T) => void;
+  readonly validation?: ValidationRule<T>[];
+  readonly label?: string;
+  readonly required?: boolean;
+  readonly disabled?: boolean;
+  readonly children: React.ReactElement;
+}
+
+/**
+ * Generic form field wrapper with validation and accessibility
+ * Provides consistent validation and error display patterns
+ */
+export function FormField<T>({
+  name,
+  value,
+  onChangeValue,
+  validation = [],
+  label,
+  required = false,
+  disabled = false,
+  children,
+}: FormFieldProps<T>): React.ReactElement {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const [error, setError] = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
+
+  const validateValue = useCallback((val: T): string | null => {
+    for (const rule of validation) {
+      const result = rule.validate(val);
+      if (!result.isValid) {
+        return result.message;
+      }
+    }
+    return null;
+  }, [validation]);
+
+  const handleValueChange = useCallback((newValue: T) => {
+    onChangeValue(newValue);
+    
+    if (touched) {
+      const validationError = validateValue(newValue);
+      setError(validationError);
+    }
+  }, [onChangeValue, touched, validateValue]);
+
+  const handleBlur = useCallback(() => {
+    if (!touched) {
+      setTouched(true);
+      const validationError = validateValue(value);
+      setError(validationError);
+    }
+  }, [touched, validateValue, value]);
+
+  const fieldId = `field_${name}`;
+  const errorId = `error_${name}`;
+
+  return (
+    <View style={styles.fieldContainer}>
+      {label && (
+        <Text
+          style={[
+            styles.label,
+            { color: theme.colors.text },
+            required && styles.requiredLabel
+          ]}
+          nativeID={`${fieldId}_label`}
+        >
+          {label}
+          {required && <Text style={{ color: theme.colors.error }}> *</Text>}
+        </Text>
+      )}
+      
+      <View
+        accessible={false}
+        accessibilityRole="none"
+      >
+        {React.cloneElement(children, {
+          value,
+          onChangeValue: handleValueChange,
+          onBlur: handleBlur,
+          error: error,
+          disabled,
+          accessibilityLabelledBy: label ? `${fieldId}_label` : undefined,
+          accessibilityDescribedBy: error ? errorId : undefined,
+        })}
+      </View>
+      
+      {error && touched && (
+        <Text
+          style={[styles.errorText, { color: theme.colors.error }]}
+          nativeID={errorId}
+          accessible={true}
+          accessibilityRole="text"
+          accessibilityLiveRegion="polite"
+        >
+          {error}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+// Validation rules for financial inputs
+export const financialValidationRules = {
+  required: <T>(message?: string): ValidationRule<T> => ({
+    validate: (value: T) => ({
+      isValid: value !== null && value !== undefined && value !== '',
+      message: message || 'This field is required',
+    }),
+  }),
+  
+  minimumAmount: (minAmount: MonetaryAmount, message?: string): ValidationRule<string> => ({
+    validate: (value: string) => {
+      if (!value) return { isValid: true, message: '' };
+      
+      try {
+        const amount = new MonetaryAmount(value, minAmount.currency);
+        return {
+          isValid: !minAmount.isGreaterThan(amount),
+          message: message || `Amount must be at least ${minAmount.format()}`,
+        };
+      } catch {
+        return { isValid: false, message: 'Invalid amount format' };
+      }
+    },
+  }),
+  
+  maximumAmount: (maxAmount: MonetaryAmount, message?: string): ValidationRule<string> => ({
+    validate: (value: string) => {
+      if (!value) return { isValid: true, message: '' };
+      
+      try {
+        const amount = new MonetaryAmount(value, maxAmount.currency);
+        return {
+          isValid: !amount.isGreaterThan(maxAmount),
+          message: message || `Amount cannot exceed ${maxAmount.format()}`,
+        };
+      } catch {
+        return { isValid: false, message: 'Invalid amount format' };
+      }
+    },
+  }),
+};
+```
+</CodeGroup>
+
+## Chama Component Patterns
+
+### Group Management Components
+
+<CodeGroup>
+```typescript Chama Card Component
+// components/chama/ChamaCard.tsx
+
+interface ChamaCardProps {
+  readonly chama: ChamaGroup;
+  readonly userRole: ChamaMemberRole;
+  readonly onPress?: () => void;
+  readonly onJoin?: () => void;
+  readonly onLeave?: () => void;
+  readonly variant?: 'default' | 'compact' | 'detailed';
+}
+
+/**
+ * Displays Chama information with role-appropriate actions
+ * Supports different variants for various UI contexts
+ */
+export const ChamaCard: React.FC<ChamaCardProps> = ({
+  chama,
+  userRole,
+  onPress,
+  onJoin,
+  onLeave,
+  variant = 'default',
+}) => {
+  const theme = useTheme();
+  const { t } = useTranslation();
+
+  const membershipStatus = useMemo(() => {
+    return getMembershipStatus(chama, userRole);
+  }, [chama, userRole]);
+
+  const contributionInfo = useMemo(() => {
+    return {
+      nextDue: getNextContributionDate(chama),
+      amount: chama.contributionAmount,
+      frequency: chama.contributionFrequency,
+    };
+  }, [chama]);
+
+  const progressInfo = useMemo(() => {
+    if (!chama.targetAmount) return null;
+    
+    const progressPercentage = (chama.currentBalance.toNumber() / chama.targetAmount.toNumber()) * 100;
+    return {
+      percentage: Math.min(100, progressPercentage),
+      current: chama.currentBalance,
+      target: chama.targetAmount,
+    };
+  }, [chama.currentBalance, chama.targetAmount]);
+
+  const renderMemberAvatars = (): React.ReactElement => (
+    <View style={styles.memberAvatars}>
+      {chama.members.slice(0, 4).map((member, index) => (
+        <Avatar
+          key={member.id}
+          size="small"
+          source={{ uri: member.avatarUrl }}
+          style={[styles.avatar, { marginLeft: index > 0 ? -8 : 0 }]}
+        />
+      ))}
+      {chama.members.length > 4 && (
+        <View style={[styles.avatar, styles.moreAvatar]}>
+          <Text style={styles.moreAvatarText}>+{chama.members.length - 4}</Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderActionButtons = (): React.ReactElement => {
+    if (userRole === 'non_member') {
+      return (
+        <TouchableOpacity
+          style={[styles.actionButton, styles.joinButton]}
+          onPress={onJoin}
+        >
+          <Text style={styles.joinButtonText}>{t('chama.join')}</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    return (
+      <View style={styles.actionButtonsContainer}>
+        {userRole === 'admin' && (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.manageButton]}
+            onPress={onPress}
+          >
+            <Text style={styles.manageButtonText}>{t('chama.manage')}</Text>
+          </TouchableOpacity>
+        )}
+        
+        <TouchableOpacity
+          style={[styles.actionButton, styles.leaveButton]}
+          onPress={onLeave}
+        >
+          <Text style={styles.leaveButtonText}>{t('chama.leave')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderCompactVariant = (): React.ReactElement => (
+    <TouchableOpacity
+      style={styles.compactCard}
+      onPress={onPress}
+      disabled={!onPress}
+    >
+      <View style={styles.compactHeader}>
+        <Text style={styles.chamaName} numberOfLines={1}>
+          {chama.name}
+        </Text>
+        <CurrencyDisplay
+          amount={chama.currentBalance}
+          size="small"
+          colorScheme="neutral"
+        />
+      </View>
+      
+      <View style={styles.compactFooter}>
+        <Text style={styles.memberCount}>
+          {t('chama.memberCount', { count: chama.members.length })}
+        </Text>
+        <Text style={styles.nextContribution}>
+          {t('chama.nextContribution', { date: formatDate(contributionInfo.nextDue) })}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderDefaultVariant = (): React.ReactElement => (
+    <Card style={styles.defaultCard}>
+      <TouchableOpacity onPress={onPress} disabled={!onPress}>
+        <View style={styles.cardHeader}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.chamaName}>{chama.name}</Text>
+            <Text style={styles.chamaDescription} numberOfLines={2}>
+              {chama.description}
+            </Text>
+          </View>
+          
+          <View style={styles.headerRight}>
+            <CurrencyDisplay
+              amount={chama.currentBalance}
+              size="medium"
+              colorScheme="positive"
+            />
+            <Text style={styles.balanceLabel}>{t('chama.currentBalance')}</Text>
+          </View>
+        </View>
+
+        <View style={styles.cardContent}>
+          <View style={styles.contributionInfo}>
+            <Text style={styles.contributionLabel}>{t('chama.contribution')}</Text>
+            <Text style={styles.contributionDetails}>
+              {contributionInfo.amount.format()} {t(`frequency.${contributionInfo.frequency}`)}
+            </Text>
+            <Text style={styles.nextDue}>
+              {t('chama.nextDue')}: {formatDate(contributionInfo.nextDue)}
+            </Text>
+          </View>
+
+          {progressInfo && (
+            <View style={styles.progressSection}>
+              <View style={styles.progressHeader}>
+                <Text style={styles.progressLabel}>{t('chama.progress')}</Text>
+                <Text style={styles.progressPercentage}>
+                  {progressInfo.percentage.toFixed(0)}%
+                </Text>
+              </View>
+              <ProgressBar
+                progress={progressInfo.percentage}
+                color={theme.colors.primary}
+                height={6}
+                style={styles.progressBar}
+              />
+              <Text style={styles.progressTarget}>
+                {t('chama.target')}: {progressInfo.target.format()}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.membersSection}>
+            <Text style={styles.membersLabel}>
+              {t('chama.members')} ({chama.members.length}/{chama.maxMembers})
+            </Text>
+            {renderMemberAvatars()}
+          </View>
+        </View>
+      </TouchableOpacity>
+
+      <View style={styles.cardActions}>
+        {renderActionButtons()}
+      </View>
+    </Card>
+  );
+
+  switch (variant) {
+    case 'compact':
+      return renderCompactVariant();
+    case 'detailed':
+      // Implementation for detailed variant
+      return renderDefaultVariant();
+    default:
+      return renderDefaultVariant();
+  }
+};
+
+const getMembershipStatus = (chama: ChamaGroup, userRole: ChamaMemberRole) => {
+  switch (userRole) {
+    case 'admin':
+      return { label: 'Administrator', color: '#4CAF50' };
+    case 'treasurer':
+      return { label: 'Treasurer', color: '#FF9800' };
+    case 'member':
+      return { label: 'Member', color: '#2196F3' };
+    default:
+      return { label: 'Not a member', color: '#666' };
+  }
+};
+
+const getNextContributionDate = (chama: ChamaGroup): Date => {
+  // Calculate next contribution date based on frequency
+  const now = new Date();
+  const lastContribution = chama.lastContributionDate || chama.createdAt;
+  
+  switch (chama.contributionFrequency) {
+    case 'weekly':
+      return addDays(lastContribution, 7);
+    case 'monthly':
+      return addMonths(lastContribution, 1);
+    case 'quarterly':
+      return addMonths(lastContribution, 3);
+    default:
+      return addMonths(lastContribution, 1);
+  }
+};
+```
+
+```typescript Voting Component
+// components/chama/VotingProposal.tsx
+
+interface VotingProposalProps {
+  readonly proposal: ChamaProposal;
+  readonly userVote?: Vote | null;
+  readonly canVote: boolean;
+  readonly onVote: (vote: VoteType) => void;
+  readonly onViewDetails?: () => void;
+}
+
+/**
+ * Displays voting proposal with real-time results
+ * Handles democratic decision-making with proper accessibility
+ */
+export const VotingProposal: React.FC<VotingProposalProps> = ({
+  proposal,
+  userVote,
+  canVote,
+  onVote,
+  onViewDetails,
+}) => {
+  const theme = useTheme();
+  const { t } = useTranslation();
+  const [isVoting, setIsVoting] = useState(false);
+
+  const votingResults = useMemo(() => {
+    return calculateVotingResults(proposal.votes);
+  }, [proposal.votes]);
+
+  const timeRemaining = useMemo(() => {
+    return getTimeRemaining(proposal.votingDeadline);
+  }, [proposal.votingDeadline]);
+
+  const handleVote = useCallback(async (voteType: VoteType) => {
+    if (!canVote || isVoting) return;
+
+    setIsVoting(true);
+    try {
+      await onVote(voteType);
+    } finally {
+      setIsVoting(false);
+    }
+  }, [canVote, isVoting, onVote]);
+
+  const renderVotingButtons = (): React.ReactElement => {
+    if (!canVote) {
+      return (
+        <View style={styles.votingDisabled}>
+          <Text style={styles.votingDisabledText}>
+            {userVote ? t('voting.alreadyVoted') : t('voting.cannotVote')}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.votingButtons}>
+        <TouchableOpacity
+          style={[
+            styles.voteButton,
+            styles.approveButton,
+            userVote?.vote === 'approve' && styles.selectedVote,
+          ]}
+          onPress={() => handleVote('approve')}
+          disabled={isVoting}
+        >
+          <Text style={styles.voteButtonText}>
+            {t('voting.approve')}
+          </Text>
+          <Text style={styles.voteCount}>
+            {votingResults.approve}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.voteButton,
+            styles.rejectButton,
+            userVote?.vote === 'reject' && styles.selectedVote,
+          ]}
+          onPress={() => handleVote('reject')}
+          disabled={isVoting}
+        >
+          <Text style={styles.voteButtonText}>
+            {t('voting.reject')}
+          </Text>
+          <Text style={styles.voteCount}>
+            {votingResults.reject}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.voteButton,
+            styles.abstainButton,
+            userVote?.vote === 'abstain' && styles.selectedVote,
+          ]}
+          onPress={() => handleVote('abstain')}
+          disabled={isVoting}
+        >
+          <Text style={styles.voteButtonText}>
+            {t('voting.abstain')}
+          </Text>
+          <Text style={styles.voteCount}>
+            {votingResults.abstain}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderVotingProgress = (): React.ReactElement => (
+    <View style={styles.votingProgress}>
+      <View style={styles.progressHeader}>
+        <Text style={styles.progressLabel}>{t('voting.progress')}</Text>
+        <Text style={styles.totalVotes}>
+          {votingResults.total} / {proposal.eligibleVoters} {t('voting.votes')}
+        </Text>
+      </View>
+
+      <View style={styles.progressBars}>
+        <View style={styles.progressBarContainer}>
+          <Text style={styles.progressBarLabel}>{t('voting.approve')}</Text>
+          <ProgressBar
+            progress={votingResults.approvePercentage}
+            color="#4CAF50"
+            height={8}
+            style={styles.progressBar}
+          />
+          <Text style={styles.progressBarPercentage}>
+            {votingResults.approvePercentage.toFixed(1)}%
+          </Text>
+        </View>
+
+        <View style={styles.progressBarContainer}>
+          <Text style={styles.progressBarLabel}>{t('voting.reject')}</Text>
+          <ProgressBar
+            progress={votingResults.rejectPercentage}
+            color="#F44336"
+            height={8}
+            style={styles.progressBar}
+          />
+          <Text style={styles.progressBarPercentage}>
+            {votingResults.rejectPercentage.toFixed(1)}%
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.quorumInfo}>
+        <Text style={styles.quorumLabel}>
+          {t('voting.quorum')}: {proposal.quorumThreshold}%
+        </Text>
+        <Text style={[
+          styles.quorumStatus,
+          { color: votingResults.hasQuorum ? theme.colors.success : theme.colors.error }
+        ]}>
+          {votingResults.hasQuorum ? t('voting.quorumMet') : t('voting.quorumNotMet')}
+        </Text>
+      </View>
+    </View>
+  );
+
+  return (
+    <Card style={styles.proposalCard}>
+      <View style={styles.proposalHeader}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.proposalTitle}>{proposal.title}</Text>
+          <Text style={styles.proposalType}>
+            {t(`proposalType.${proposal.type}`)}
+          </Text>
+        </View>
+
+        <View style={styles.headerRight}>
+          {proposal.amount && (
+            <CurrencyDisplay
+              amount={proposal.amount}
+              size="medium"
+              colorScheme="neutral"
+            />
+          )}
+          <Text style={styles.timeRemaining}>
+            {timeRemaining.label}: {timeRemaining.value}
+          </Text>
+        </View>
+      </View>
+
+      <Text style={styles.proposalDescription} numberOfLines={3}>
+        {proposal.description}
+      </Text>
+
+      {renderVotingProgress()}
+      {renderVotingButtons()}
+
+      {onViewDetails && (
+        <TouchableOpacity style={styles.viewDetailsButton} onPress={onViewDetails}>
+          <Text style={styles.viewDetailsText}>{t('common.viewDetails')}</Text>
+        </TouchableOpacity>
+      )}
+    </Card>
+  );
+};
+
+const calculateVotingResults = (votes: Vote[]) => {
+  const approve = votes.filter(v => v.vote === 'approve').length;
+  const reject = votes.filter(v => v.vote === 'reject').length;
+  const abstain = votes.filter(v => v.vote === 'abstain').length;
+  const total = votes.length;
+
+  return {
+    approve,
+    reject,
+    abstain,
+    total,
+    approvePercentage: total > 0 ? (approve / total) * 100 : 0,
+    rejectPercentage: total > 0 ? (reject / total) * 100 : 0,
+    abstainPercentage: total > 0 ? (abstain / total) * 100 : 0,
+    hasQuorum: total >= Math.ceil(proposal.eligibleVoters * (proposal.quorumThreshold / 100)),
+  };
+};
+```
+</CodeGroup>
+
+## Performance Optimization Patterns
+
+### List Optimization
+
+<CodeGroup>
+```typescript Optimized FlatList
+// components/common/OptimizedList.tsx
+
+interface OptimizedListProps<T> {
+  readonly data: T[];
+  readonly renderItem: (item: T, index: number) => React.ReactElement;
+  readonly keyExtractor: (item: T, index: number) => string;
+  readonly onEndReached?: () => void;
+  readonly onRefresh?: () => void;
+  readonly refreshing?: boolean;
+  readonly ListEmptyComponent?: React.ComponentType;
+  readonly estimatedItemSize?: number;
+  readonly numColumns?: number;
+  readonly testID?: string;
+}
+
+/**
+ * Optimized list component for African mobile networks
+ * Implements virtual scrolling and efficient rendering patterns
+ */
+export function OptimizedList<T>({
+  data,
+  renderItem,
+  keyExtractor,
+  onEndReached,
+  onRefresh,
+  refreshing = false,
+  ListEmptyComponent,
+  estimatedItemSize = 80,
+  numColumns = 1,
+  testID,
+}: OptimizedListProps<T>): React.ReactElement {
+  const [viewabilityConfig] = useState({
+    itemVisiblePercentThreshold: 50,
+    minimumViewTime: 300,
+  });
+
+  const getItemLayout = useCallback((data: any, index: number) => ({
+    length: estimatedItemSize,
+    offset: estimatedItemSize * index,
+    index,
+  }), [estimatedItemSize]);
+
+  const renderItemMemoized = useCallback(({ item, index }: { item: T; index: number }) => {
+    return renderItem(item, index);
+  }, [renderItem]);
+
+  const handleEndReached = useMemo(() => {
+    if (!onEndReached) return undefined;
+    
+    return debounce(onEndReached, 200);
+  }, [onEndReached]);
+
+  return (
+    <FlatList
+      data={data}
+      renderItem={renderItemMemoized}
+      keyExtractor={keyExtractor}
+      onEndReached={handleEndReached}
+      onEndReachedThreshold={0.5}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+      ListEmptyComponent={ListEmptyComponent}
+      getItemLayout={estimatedItemSize ? getItemLayout : undefined}
+      viewabilityConfig={viewabilityConfig}
+      numColumns={numColumns}
+      testID={testID}
+      // Performance optimizations for African networks
+      removeClippedSubviews={true}
+      maxToRenderPerBatch={10}
+      windowSize={10}
+      initialNumToRender={15}
+      updateCellsBatchingPeriod={50}
+      // Memory optimizations
+      disableVirtualization={false}
+      legacyImplementation={false}
+    />
+  );
+}
+
+// Debounce utility for performance
+const debounce = <T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): ((...args: Parameters<T>) => void) => {
+  let timeout: NodeJS.Timeout;
+  
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+};
+```
+
+```typescript Image Optimization
+// components/common/OptimizedImage.tsx
+
+interface OptimizedImageProps {
+  readonly source: ImageSourcePropType;
+  readonly style?: StyleProp<ImageStyle>;
+  readonly placeholder?: ImageSourcePropType;
+  readonly fallback?: ImageSourcePropType;
+  readonly resizeMode?: 'cover' | 'contain' | 'stretch' | 'repeat' | 'center';
+  readonly priority?: 'low' | 'normal' | 'high';
+  readonly cachePolicy?: 'memory' | 'disk' | 'memory-disk';
+  readonly onLoad?: () => void;
+  readonly onError?: () => void;
+  readonly testID?: string;
+}
+
+/**
+ * Optimized image component for African mobile networks
+ * Handles progressive loading, caching, and bandwidth optimization
+ */
+export const OptimizedImage: React.FC<OptimizedImageProps> = ({
+  source,
+  style,
+  placeholder,
+  fallback,
+  resizeMode = 'cover',
+  priority = 'normal',
+  cachePolicy = 'memory-disk',
+  onLoad,
+  onError,
+  testID,
+}) => {
+  const [imageState, setImageState] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [currentSource, setCurrentSource] = useState(placeholder || source);
+  const networkStatus = useNetworkStatus();
+
+  const handleLoad = useCallback(() => {
+    setImageState('loaded');
+    onLoad?.();
+  }, [onLoad]);
+
+  const handleError = useCallback(() => {
+    setImageState('error');
+    if (fallback) {
+      setCurrentSource(fallback);
+    }
+    onError?.();
+  }, [fallback, onError]);
+
+  const handleLoadStart = useCallback(() => {
+    setImageState('loading');
+  }, []);
+
+  // Progressive loading based on network conditions
+  useEffect(() => {
+    if (imageState === 'loading' && networkStatus) {
+      const shouldLoadHighQuality = networkStatus.type === 'wifi' || 
+                                   networkStatus.type === 'cellular' && 
+                                   networkStatus.details?.cellularGeneration === '4g';
+      
+      if (!shouldLoadHighQuality && typeof source === 'object' && 'uri' in source) {
+        // Load lower quality version for slow networks
+        const lowQualityUri = source.uri?.replace(/\.(jpg|jpeg|png)$/i, '_low.$1');
+        setCurrentSource({ uri: lowQualityUri });
+      } else {
+        setCurrentSource(source);
+      }
+    }
+  }, [source, networkStatus, imageState]);
+
+  return (
+    <View style={style}>
+      <Image
+        source={currentSource}
+        style={StyleSheet.absoluteFillObject}
+        resizeMode={resizeMode}
+        onLoad={handleLoad}
+        onError={handleError}
+        onLoadStart={handleLoadStart}
+        testID={testID}
+        // Expo Image optimizations
+        cachePolicy={cachePolicy}
+        priority={priority}
+        placeholder={placeholder}
+        transition={200}
+      />
+      
+      {imageState === 'loading' && (
+        <View style={[StyleSheet.absoluteFillObject, styles.loadingContainer]}>
+          <ActivityIndicator size="small" color="#bc9b25" />
+        </View>
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    backgroundColor: 'rgba(245, 245, 245, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
+```
+</CodeGroup>
+
+## Accessibility Patterns
+
+### Screen Reader Support
+
+<CodeGroup>
+```typescript Accessible Components
+// components/accessibility/AccessibleText.tsx
+
+interface AccessibleTextProps {
+  readonly children: string;
+  readonly style?: StyleProp<TextStyle>;
+  readonly accessibilityRole?: 'text' | 'header' | 'summary';
+  readonly accessibilityLevel?: 1 | 2 | 3 | 4 | 5 | 6;
+  readonly accessibilityLiveRegion?: 'none' | 'polite' | 'assertive';
+  readonly isImportant?: boolean;
+  readonly testID?: string;
+}
+
+/**
+ * Accessible text component with proper screen reader support
+ * Follows WCAG guidelines for African users with disabilities
+ */
+export const AccessibleText: React.FC<AccessibleTextProps> = ({
+  children,
+  style,
+  accessibilityRole = 'text',
+  accessibilityLevel,
+  accessibilityLiveRegion = 'none',
+  isImportant = false,
+  testID,
+}) => {
+  const accessibilityProps = useMemo(() => {
+    const props: any = {
+      accessible: true,
+      accessibilityRole,
+      accessibilityLiveRegion: isImportant ? 'polite' : accessibilityLiveRegion,
+    };
+
+    if (accessibilityRole === 'header' && accessibilityLevel) {
+      props.accessibilityLevel = accessibilityLevel;
+    }
+
+    return props;
+  }, [accessibilityRole, accessibilityLevel, accessibilityLiveRegion, isImportant]);
+
+  return (
+    <Text
+      style={style}
+      testID={testID}
+      {...accessibilityProps}
+    >
+      {children}
+    </Text>
+  );
+};
+
+// Screen reader announcement utility
+export const announceToScreenReader = (message: string, priority: 'low' | 'high' = 'low') => {
+  if (Platform.OS === 'ios') {
+    AccessibilityInfo.announceForAccessibility(message);
+  } else {
+    // Android implementation
+    AccessibilityInfo.setAccessibilityFocus(
+      findNodeHandle(/* appropriate ref */) || 0
+    );
+  }
+};
+
+// DIVA score accessibility
+export const formatDivaScoreForScreenReader = (score: DivaScore, t: any): string => {
+  return t('accessibility.divaScoreAnnouncement', {
+    score: score.totalScore,
+    maxScore: 1000,
+    tier: score.portfolioTier,
+    discipline: score.components.discipline,
+    income: score.components.income,
+    velocity: score.components.velocity,
+    assets: score.components.assets,
+  });
+};
+```
+
+```typescript Accessible Navigation
+// components/navigation/AccessibleTabBar.tsx
+
+interface AccessibleTabBarProps {
+  readonly state: NavigationState;
+  readonly descriptors: any;
+  readonly navigation: any;
+}
+
+/**
+ * Accessible tab bar with proper focus management
+ * Optimized for African users with accessibility needs
+ */
+export const AccessibleTabBar: React.FC<AccessibleTabBarProps> = ({
+  state,
+  descriptors,
+  navigation,
+}) => {
+  const theme = useTheme();
+  const { t } = useTranslation();
+  const focusedOptions = descriptors[state.routes[state.index].key].options;
+
+  const handleTabPress = useCallback((route: any, index: number) => {
+    const event = navigation.emit({
+      type: 'tabPress',
+      target: route.key,
+      canPreventDefault: true,
+    });
+
+    if (!event.defaultPrevented) {
+      navigation.navigate(route.name);
+      
+      // Announce navigation change to screen reader
+      announceToScreenReader(
+        t('accessibility.navigatedTo', { screen: route.name }),
+        'high'
+      );
+    }
+  }, [navigation, t]);
+
+  return (
+    <View style={[styles.tabBar, { backgroundColor: theme.colors.surface }]}>
+      {state.routes.map((route, index) => {
+        const { options } = descriptors[route.key];
+        const isFocused = state.index === index;
+
+        const label = options.tabBarLabel !== undefined
+          ? options.tabBarLabel
+          : options.title !== undefined
+          ? options.title
+          : route.name;
+
+        const accessibilityLabel = options.tabBarAccessibilityLabel !== undefined
+          ? options.tabBarAccessibilityLabel
+          : t('accessibility.tab', { label });
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            style={[
+              styles.tab,
+              isFocused && [styles.tabFocused, { borderTopColor: theme.colors.primary }]
+            ]}
+            onPress={() => handleTabPress(route, index)}
+            accessible={true}
+            accessibilityRole="tab"
+            accessibilityState={{
+              selected: isFocused,
+            }}
+            accessibilityLabel={accessibilityLabel}
+            accessibilityHint={t('accessibility.tabHint', { label })}
+            testID={`tab-${route.name}`}
+          >
+            {options.tabBarIcon && (
+              <View style={styles.tabIcon}>
+                {options.tabBarIcon({
+                  focused: isFocused,
+                  color: isFocused ? theme.colors.primary : theme.colors.textSecondary,
+                  size: 24,
+                })}
+              </View>
+            )}
+            
+            <AccessibleText
+              accessibilityRole="text"
+              style={[
+                styles.tabLabel,
+                {
+                  color: isFocused ? theme.colors.primary : theme.colors.textSecondary,
+                }
+              ]}
+            >
+              {label}
+            </AccessibleText>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  tabBar: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderTopWidth: 2,
+    borderTopColor: 'transparent',
+  },
+  tabFocused: {
+    borderTopWidth: 2,
+  },
+  tabIcon: {
+    marginBottom: 4,
+  },
+  tabLabel: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+});
+```
+</CodeGroup>
+
+## Testing Patterns
+
+### Component Testing
+
+<CodeGroup>
+```typescript Component Tests
+// __tests__/components/DivaScoreDisplay.test.tsx
+
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { DivaScoreDisplay } from '../../src/components/financial/DivaScoreDisplay';
+import { mockDivaScore, mockTheme } from '../__mocks__';
+
+// Mock theme provider
+const renderWithTheme = (component: React.ReactElement) => {
+  return render(
+    <ThemeProvider theme={mockTheme}>
+      {component}
+    </ThemeProvider>
+  );
+};
+
+describe('DivaScoreDisplay', () => {
+  const mockScore = mockDivaScore({
+    totalScore: 750,
+    portfolioTier: 'gold',
+    components: {
+      discipline: 800,
+      income: 700,
+      velocity: 750,
+      assets: 700,
+    },
+  });
+
+  it('renders score correctly', () => {
+    const { getByText } = renderWithTheme(
+      <DivaScoreDisplay score={mockScore} />
+    );
+
+    expect(getByText('750')).toBeTruthy();
+    expect(getByText('/1000')).toBeTruthy();
+    expect(getByText('GOLD')).toBeTruthy();
+  });
+
+  it('handles refresh action', () => {
+    const mockOnRefresh = jest.fn();
+    const { getByRole } = renderWithTheme(
+      <DivaScoreDisplay
+        score={mockScore}
+        onScorePress={mockOnRefresh}
+      />
+    );
+
+    const refreshButton = getByRole('button');
+    fireEvent.press(refreshButton);
+
+    expect(mockOnRefresh).toHaveBeenCalled();
+  });
+
+  it('provides proper accessibility labels', () => {
+    const { getByLabelText } = renderWithTheme(
+      <DivaScoreDisplay score={mockScore} />
+    );
+
+    expect(getByLabelText(/diva score.*750.*gold/i)).toBeTruthy();
+  });
+
+  it('renders detailed variant correctly', () => {
+    const { getByText } = renderWithTheme(
+      <DivaScoreDisplay
+        score={mockScore}
+        variant="detailed"
+      />
+    );
+
+    expect(getByText('Discipline')).toBeTruthy();
+    expect(getByText('Income')).toBeTruthy();
+    expect(getByText('Velocity')).toBeTruthy();
+    expect(getByText('Assets')).toBeTruthy();
+  });
+
+  it('handles different score ranges with appropriate colors', () => {
+    const platinumScore = mockDivaScore({ totalScore: 900 });
+    const { rerender, getByText } = renderWithTheme(
+      <DivaScoreDisplay score={platinumScore} />
+    );
+
+    // Check platinum tier color
+    const scoreText = getByText('900');
+    expect(scoreText.props.style).toContainEqual(
+      expect.objectContaining({ color: '#4CAF50' })
+    );
+
+    // Test bronze tier
+    const bronzeScore = mockDivaScore({ totalScore: 300 });
+    rerender(
+      <DivaScoreDisplay score={bronzeScore} />
+    );
+
+    const bronzeScoreText = getByText('300');
+    expect(bronzeScoreText.props.style).toContainEqual(
+      expect.objectContaining({ color: '#F44336' })
+    );
+  });
+});
+```
+
+```typescript Integration Tests
+// __tests__/integration/ChamaVoting.test.tsx
+
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { VotingProposal } from '../../src/components/chama/VotingProposal';
+import { mockChamaProposal, mockVotes } from '../__mocks__/chama';
+import * as chamaService from '../../src/services/chama/ChamaService';
+
+// Mock the chama service
+jest.mock('../../src/services/chama/ChamaService');
+const mockedChamaService = chamaService as jest.Mocked<typeof chamaService>;
+
+describe('VotingProposal Integration', () => {
+  const mockProposal = mockChamaProposal({
+    id: 'proposal-123',
+    title: 'Invest in Local Bakery',
+    description: 'Investment opportunity in community bakery',
+    amount: new MonetaryAmount('10000', 'ZAR'),
+    votes: mockVotes({
+      approve: 3,
+      reject: 1,
+      abstain: 0,
+    }),
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('submits vote and updates UI', async () => {
+    mockedChamaService.castVote.mockResolvedValue({
+      success: true,
+      vote: { id: 'vote-123', vote: 'approve' },
+    });
+
+    const mockOnVote = jest.fn();
+    const { getByText } = render(
+      <VotingProposal
+        proposal={mockProposal}
+        canVote={true}
+        onVote={mockOnVote}
+      />
+    );
+
+    const approveButton = getByText('Approve');
+    fireEvent.press(approveButton);
+
+    await waitFor(() => {
+      expect(mockOnVote).toHaveBeenCalledWith('approve');
+    });
+  });
+
+  it('handles voting errors gracefully', async () => {
+    mockedChamaService.castVote.mockRejectedValue(
+      new Error('Network error')
+    );
+
+    const mockOnVote = jest.fn().mockRejectedValue(new Error('Network error'));
+    const { getByText } = render(
+      <VotingProposal
+        proposal={mockProposal}
+        canVote={true}
+        onVote={mockOnVote}
+      />
+    );
+
+    const approveButton = getByText('Approve');
+    fireEvent.press(approveButton);
+
+    // Should handle error without crashing
+    await waitFor(() => {
+      expect(mockOnVote).toHaveBeenCalled();
+    });
+  });
+
+  it('disables voting for users who already voted', () => {
+    const userVote = { id: 'vote-123', vote: 'approve' as const };
+    const { getByText } = render(
+      <VotingProposal
+        proposal={mockProposal}
+        userVote={userVote}
+        canVote={false}
+        onVote={jest.fn()}
+      />
+    );
+
+    expect(getByText('Already voted')).toBeTruthy();
+  });
+
+  it('calculates voting percentages correctly', () => {
+    const { getByText } = render(
+      <VotingProposal
+        proposal={mockProposal}
+        canVote={true}
+        onVote={jest.fn()}
+      />
+    );
+
+    // With 3 approve, 1 reject, 0 abstain = 4 total votes
+    // 3/4 = 75% approve, 1/4 = 25% reject
+    expect(getByText('75.0%')).toBeTruthy(); // Approve percentage
+    expect(getByText('25.0%')).toBeTruthy(); // Reject percentage
+  });
+});
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="State Management" icon="database" href="/development/state-management">
+    Learn Zustand + React Query patterns for optimal African mobile performance
   </Card>
-  <Card title="Testing Guide" href="/testing/testing-strategy">
-    Testing strategies and tools
+  <Card title="Real Time Features" icon="zap" href="/development/real-time-features">
+    Implement Socket.io for live Chama updates and collaborative features
+  </Card>
+  <Card title="Performance Optimization" icon="rocket" href="/development/performance-optimization">
+    Master performance patterns for African network conditions and devices
   </Card>
 </CardGroup>
+
+---
+
+*These component patterns form the foundation of AWO Platform's user interface, ensuring consistent, accessible, and performant experiences for African women across diverse devices and network conditions. Every component contributes to our mission of financial empowerment and inclusion.*
