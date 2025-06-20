@@ -1,52 +1,609 @@
----
-title: "Rtsm Assessment"
-description: "AWO Platform rtsm assessment core functionality"
----
+# RTSM Assessment
 
-# Rtsm Assessment
+The Risk Tolerance Scoring Model (RTSM) is AWO's comprehensive risk assessment engine that evaluates user investment preferences, risk capacity, and behavioral patterns to complement DIVA scoring for optimal portfolio assignment and investment recommendations.
 
 ## Overview
 
 <Info>
-Rtsm Assessment is a core feature of the AWO Platform, designed to support financial inclusion for African women.
+RTSM bridges the gap between financial capacity (DIVA Score) and investment suitability by assessing risk tolerance, investment objectives, and behavioral preferences to ensure portfolio recommendations align with both financial capability and personal comfort levels.
 </Info>
 
-## Key Features
+**Core Functions:**
+- **Risk Tolerance Assessment**: Comprehensive evaluation of risk appetite
+- **Behavioral Analysis**: Investment behavior pattern recognition
+- **Timeline Evaluation**: Investment horizon and goal alignment
+- **Portfolio Matching**: Risk-appropriate investment recommendations
+- **Ongoing Monitoring**: Behavioral changes and risk tolerance evolution
 
-Core functionality will be documented here.
+## RTSM Framework Structure
 
-## Implementation
+### Risk Assessment Dimensions
 
+The RTSM evaluates risk tolerance across multiple interconnected dimensions:
+
+<CardGroup cols={2}>
+  <Card title="Risk Capacity (40%)" icon="wallet">
+    **Financial Ability**: Objective capacity to absorb losses  
+    **Income Stability**: Job security and income predictability  
+    **Emergency Reserves**: Financial cushion for unexpected events  
+    **Debt Obligations**: Fixed financial commitments
+  </Card>
+  <Card title="Risk Willingness (35%)" icon="heart">
+    **Emotional Comfort**: Psychological ability to handle volatility  
+    **Experience Level**: Investment knowledge and past experiences  
+    **Loss Tolerance**: Comfort with potential portfolio declines  
+    **Market Outlook**: Confidence in investment markets
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Investment Timeline (15%)" icon="calendar">
+    **Goal Timeframes**: Short, medium, and long-term objectives  
+    **Liquidity Needs**: Expected cash flow requirements  
+    **Life Stage**: Age and career stage considerations  
+    **Flexibility**: Ability to adjust timelines if needed
+  </Card>
+  <Card title="Behavioral Factors (10%)" icon="brain">
+    **Decision Making**: Rational vs. emotional investment decisions  
+    **Market Response**: Historical behavior during volatility  
+    **Information Processing**: How user consumes financial information  
+    **Social Influence**: Impact of peer and family opinions
+  </Card>
+</CardGroup>
+
+### RTSM Score Structure
+
+```typescript
+interface RTSMAssessment {
+  userId: string;
+  overallRiskScore: number; // 0-100
+  riskProfile: 'conservative' | 'moderate' | 'balanced' | 'growth' | 'aggressive';
+  components: {
+    riskCapacity: RTSMComponent;
+    riskWillingness: RTSMComponent;
+    investmentTimeline: RTSMComponent;
+    behavioralFactors: RTSMComponent;
+  };
+  portfolioRecommendations: PortfolioRecommendation[];
+  assessmentDate: Date;
+  validUntil: Date;
+  confidenceLevel: number; // 0-100
+  reassessmentTriggers: string[];
+}
+
+interface RTSMComponent {
+  score: number;
+  weight: number;
+  factors: RTSMFactor[];
+  insights: string[];
+  recommendations: string[];
+}
+```
+
+## Risk Capacity Assessment (40% Weight)
+
+### Financial Ability Analysis
+
+**Objective Metrics:**
+- **Net Worth Calculation**: Total assets minus liabilities
+- **Liquid Assets Ratio**: Easily accessible funds vs. total investments
+- **Income Stability Index**: Consistency and predictability of income
+- **Debt-to-Income Ratio**: Monthly debt obligations vs. monthly income
+
+**Capacity Calculation:**
+```typescript
+function calculateRiskCapacity(userFinancials: FinancialProfile): number {
+  const netWorth = userFinancials.assets - userFinancials.liabilities;
+  const liquidityRatio = userFinancials.liquidAssets / userFinancials.totalAssets;
+  const incomeStability = calculateIncomeStability(userFinancials.incomeHistory);
+  const debtRatio = userFinancials.monthlyDebtPayments / userFinancials.monthlyIncome;
+  
+  // Higher capacity = ability to take more risk
+  let capacityScore = 0;
+  
+  // Net worth scoring (30% of capacity)
+  if (netWorth > 500000) capacityScore += 30;
+  else if (netWorth > 100000) capacityScore += 25;
+  else if (netWorth > 50000) capacityScore += 20;
+  else capacityScore += Math.max(0, netWorth / 5000);
+  
+  // Liquidity scoring (25% of capacity)
+  capacityScore += Math.min(25, liquidityRatio * 50);
+  
+  // Income stability (25% of capacity)
+  capacityScore += incomeStability * 0.25;
+  
+  // Debt burden (20% of capacity) - lower debt = higher capacity
+  capacityScore += Math.max(0, 20 - (debtRatio * 100));
+  
+  return Math.min(100, capacityScore);
+}
+```
+
+### Emergency Fund Assessment
+
+**Emergency Fund Adequacy:**
+| Emergency Fund Coverage | Risk Capacity Impact | Recommendation |
+|------------------------|---------------------|----------------|
+| 6+ months expenses | High capacity (+15 points) | Can afford higher risk |
+| 3-6 months expenses | Moderate capacity (+10 points) | Balanced approach suitable |
+| 1-3 months expenses | Lower capacity (+5 points) | Conservative recommended |
+| &lt;1 month expenses | Restricted capacity (0 points) | Focus on emergency fund first |
+
+### Age and Life Stage Considerations
+
+**Life Stage Risk Mapping:**
+<CardGroup cols={3}>
+  <Card title="Young Professional (25-35)" icon="briefcase">
+    **High Risk Capacity**: Long investment horizon  
+    **Growth Focus**: Career and income building phase  
+    **Flexibility**: Can recover from market downturns  
+    **Recommendation**: Aggressive to growth portfolios
+  </Card>
+  <Card title="Established Career (35-50)" icon="chart-line">
+    **Moderate-High Capacity**: Peak earning years  
+    **Balanced Goals**: Growth with some stability  
+    **Family Considerations**: Education and housing needs  
+    **Recommendation**: Balanced to growth portfolios
+  </Card>
+  <Card title="Pre-Retirement (50+)" icon="clock">
+    **Moderate-Low Capacity**: Approaching retirement  
+    **Stability Focus**: Capital preservation important  
+    **Limited Recovery Time**: Less time for market recovery  
+    **Recommendation**: Conservative to moderate portfolios
+  </Card>
+</CardGroup>
+
+## Risk Willingness Assessment (35% Weight)
+
+### Psychological Risk Questionnaire
+
+**Key Assessment Questions:**
+
+<Accordion title="Market Volatility Tolerance">
+**Question**: "If your investment portfolio lost 20% of its value in one month due to market conditions, what would be your most likely response?"
+
+**Response Options:**
+- **A**: Sell immediately to prevent further losses (Conservative - 0 points)
+- **B**: Reduce risk but keep some investments (Moderate - 25 points)  
+- **C**: Hold current investments and wait for recovery (Balanced - 50 points)
+- **D**: Buy more investments at lower prices (Growth - 75 points)
+- **E**: Significantly increase investments to maximize opportunity (Aggressive - 100 points)
+</Accordion>
+
+<Accordion title="Investment Experience and Knowledge">
+**Question**: "How would you describe your investment experience and knowledge?"
+
+**Scoring Matrix:**
+- **Beginner** (0-20 points): Basic savings accounts only
+- **Novice** (21-40 points): Some unit trusts or retirement funds
+- **Intermediate** (41-60 points): Diversified portfolio with stocks/bonds
+- **Advanced** (61-80 points): Complex instruments, options, alternatives
+- **Expert** (81-100 points): Professional-level knowledge and experience
+</Accordion>
+
+<Accordion title="Loss Tolerance Scenarios">
+**Scenario-Based Questions:**
+1. **1-Year Loss**: Comfortable with 5%, 10%, 15%, 20%, or 30%+ portfolio decline
+2. **Recovery Time**: Acceptable recovery period after major loss
+3. **Sleep Test**: Can you sleep well during market turbulence?
+4. **Regret Analysis**: Would you regret missing gains or experiencing losses more?
+</Accordion>
+
+### Behavioral Pattern Recognition
+
+**Investment Behavior Analysis:**
+```typescript
+function analyzeBehaviorPatterns(userHistory: InvestmentHistory): BehaviorProfile {
+  const patterns = {
+    marketTimingAttempts: countMarketTimingBehavior(userHistory),
+    panicSelling: identifyPanicSellingEvents(userHistory),
+    consistentInvesting: measureInvestmentConsistency(userHistory),
+    herdingBehavior: detectHerdingTendencies(userHistory),
+    lossAversion: calculateLossAversionIndex(userHistory)
+  };
+  
+  // Score behavioral risk tolerance
+  let behaviorScore = 50; // Start at neutral
+  
+  // Adjust based on observed behaviors
+  if (patterns.panicSelling > 2) behaviorScore -= 20;
+  if (patterns.consistentInvesting > 0.8) behaviorScore += 15;
+  if (patterns.marketTimingAttempts > 5) behaviorScore -= 10;
+  if (patterns.lossAversion < 0.5) behaviorScore += 10;
+  
+  return {
+    score: Math.max(0, Math.min(100, behaviorScore)),
+    patterns,
+    recommendations: generateBehaviorRecommendations(patterns)
+  };
+}
+```
+
+### Cultural and Social Risk Factors
+
+**African Market Considerations:**
+- **Community Influence**: Family and community investment expectations
+- **Cultural Risk Perception**: Traditional vs. modern investment views
+- **Economic Environment**: Local economic stability and inflation concerns
+- **Currency Risk**: Comfort with foreign currency exposure
+- **Regulatory Confidence**: Trust in local financial regulations
+
+## Investment Timeline Assessment (15% Weight)
+
+### Goal-Based Timeline Analysis
+
+**Timeline Categories:**
+<CardGroup cols={2}>
+  <Card title="Short-Term Goals (1-3 years)" icon="calendar-days">
+    **Examples**: Emergency fund, vacation, appliance purchase  
+    **Risk Level**: Very low (capital preservation)  
+    **Liquidity**: High (immediate access needed)  
+    **Volatility Tolerance**: Minimal (stability crucial)
+  </Card>
+  <Card title="Medium-Term Goals (3-10 years)" icon="calendar">
+    **Examples**: Home deposit, business capital, education  
+    **Risk Level**: Low to moderate (some growth acceptable)  
+    **Liquidity**: Medium (planned access dates)  
+    **Volatility Tolerance**: Moderate (some fluctuation acceptable)
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Long-Term Goals (10-20 years)" icon="calendar-check">
+    **Examples**: Retirement planning, children's education  
+    **Risk Level**: Moderate to high (growth focus)  
+    **Liquidity**: Low (delayed access acceptable)  
+    **Volatility Tolerance**: High (time for recovery)
+  </Card>
+  <Card title="Legacy Goals (20+ years)" icon="infinity">
+    **Examples**: Wealth transfer, generational planning  
+    **Risk Level**: High (maximum growth potential)  
+    **Liquidity**: Very low (long-term commitment)  
+    **Volatility Tolerance**: Very high (long recovery time)
+  </Card>
+</CardGroup>
+
+### Timeline Flexibility Assessment
+
+**Flexibility Factors:**
+```typescript
+interface TimelineFlexibility {
+  goalAdjustability: number; // Can goals be delayed if needed?
+  incomeStability: number; // Predictable income for goal funding?
+  alternativeFunding: number; // Other ways to fund goals?
+  priorityFlexibility: number; // Can goal priorities be reordered?
+  
+  flexibilityScore: number; // 0-100 (higher = more flexible = more risk capacity)
+}
+
+function assessTimelineFlexibility(goals: FinancialGoal[]): TimelineFlexibility {
+  let flexibilityScore = 0;
+  
+  goals.forEach(goal => {
+    // Goals with longer timelines add flexibility
+    const timelinePoints = Math.min(25, goal.yearsToTarget * 2);
+    
+    // Multiple funding sources add flexibility
+    const fundingPoints = goal.alternativeFundingSources * 5;
+    
+    // Non-critical goals add flexibility
+    const priorityPoints = goal.priority === 'nice-to-have' ? 10 : 0;
+    
+    flexibilityScore += timelinePoints + fundingPoints + priorityPoints;
+  });
+  
+  return Math.min(100, flexibilityScore / goals.length);
+}
+```
+
+## Behavioral Factors Assessment (10% Weight)
+
+### Decision-Making Style Analysis
+
+**Cognitive Bias Assessment:**
+<CardGroup cols={2}>
+  <Card title="Loss Aversion" icon="shield">
+    **Measurement**: Response to potential losses vs. equivalent gains  
+    **Impact**: High loss aversion = lower risk tolerance  
+    **Questions**: "Would you accept a 50/50 chance of losing R1000 or gaining R1500?"  
+    **Adjustment**: Reduce recommended risk for high loss aversion
+  </Card>
+  <Card title="Overconfidence Bias" icon="arrow-up">
+    **Measurement**: Self-assessment vs. actual investment knowledge  
+    **Impact**: Overconfidence = inappropriate risk taking  
+    **Detection**: Comparing self-rated knowledge to objective tests  
+    **Adjustment**: Moderate risk recommendations for overconfident investors
+  </Card>
+</CardGroup>
+
+### Information Processing Preferences
+
+**Learning and Decision Styles:**
+- **Analytical**: Prefers detailed data and research before decisions
+- **Intuitive**: Makes decisions based on gut feelings and patterns
+- **Social**: Heavily influenced by family, friends, and advisors
+- **Independent**: Makes autonomous decisions with minimal external input
+
+**Information Source Preferences:**
+```typescript
+interface InformationPreferences {
+  sources: {
+    financialNews: number; // Reliance on financial media
+    socialMedia: number; // Investment advice from social platforms
+    professionalAdvice: number; // Preference for expert guidance
+    peerOpinions: number; // Influence of friends and family
+    ownResearch: number; // Independent analysis and research
+  };
+  
+  processingStyle: 'analytical' | 'intuitive' | 'social' | 'independent';
+  decisionSpeed: 'impulsive' | 'quick' | 'deliberate' | 'slow';
+  riskCommunication: 'numbers' | 'scenarios' | 'analogies' | 'visuals';
+}
+```
+
+## RTSM Integration with DIVA
+
+### Dual-Score Portfolio Assignment
+
+**Combined Scoring Matrix:**
+
+| DIVA Score | RTSM Risk Profile | Recommended Portfolio | Allocation Example |
+|------------|------------------|----------------------|-------------------|
+| Bronze (0-399) | Conservative | **Conservative Bronze** | 80% Money Market, 20% Bonds |
+| Bronze (0-399) | Moderate | **Moderate Bronze** | 60% Money Market, 40% Bonds |
+| Silver (400-649) | Conservative | **Conservative Silver** | 50% Bonds, 30% Index Funds, 20% Money Market |
+| Silver (400-649) | Balanced | **Balanced Silver** | 40% Bonds, 50% Index Funds, 10% Individual Stocks |
+| Gold (650-849) | Growth | **Growth Gold** | 20% Bonds, 60% Equity Funds, 20% Alternatives |
+| Platinum (850-1000) | Aggressive | **Aggressive Platinum** | 10% Bonds, 70% Equity, 20% Alternatives/SME |
+
+### Dynamic Recommendation Engine
+
+```typescript
+class PortfolioRecommendationEngine {
+  generateRecommendations(
+    divaScore: DivaScore, 
+    rtsmAssessment: RTSMAssessment
+  ): PortfolioRecommendation {
+    
+    // Determine base tier from DIVA score
+    const baseTier = this.determineTier(divaScore.overallScore);
+    
+    // Adjust based on RTSM risk profile
+    const riskAdjustment = this.calculateRiskAdjustment(
+      rtsmAssessment.riskProfile,
+      rtsmAssessment.components.riskCapacity.score
+    );
+    
+    // Consider timeline and behavioral factors
+    const timelineAdjustment = this.adjustForTimeline(
+      rtsmAssessment.components.investmentTimeline
+    );
+    
+    const behavioralAdjustment = this.adjustForBehavior(
+      rtsmAssessment.components.behavioralFactors
+    );
+    
+    // Generate final portfolio recommendation
+    return this.buildPortfolioRecommendation({
+      baseTier,
+      riskAdjustment,
+      timelineAdjustment,
+      behavioralAdjustment,
+      userPreferences: rtsmAssessment.portfolioRecommendations
+    });
+  }
+}
+```
+
+## RTSM Questionnaire Implementation
+
+### Adaptive Questionnaire System
+
+**Dynamic Question Flow:**
 <Steps>
-  <Step title="Setup">
-    Initial setup and configuration
+  <Step title="Core Assessment">
+    Essential questions covering all four RTSM dimensions (15-20 questions)
   </Step>
-  <Step title="Integration">
-    Integration with other AWO services
+  <Step title="Clarification Questions">
+    Follow-up questions based on initial responses for accuracy
   </Step>
-  <Step title="Testing">
-    Testing and validation procedures
+  <Step title="Scenario Testing">
+    Situational questions to validate stated risk tolerance
+  </Step>
+  <Step title="Consistency Check">
+    Cross-reference responses for internal consistency
   </Step>
 </Steps>
 
-## API Integration
+### Sample Question Implementation
 
 ```typescript
-// Example API integration
-const response = await awo.rtsmassessment.method();
+interface RTSMQuestion {
+  id: string;
+  category: 'risk_capacity' | 'risk_willingness' | 'timeline' | 'behavioral';
+  question: string;
+  type: 'multiple_choice' | 'scale' | 'scenario' | 'ranking';
+  options?: QuestionOption[];
+  weight: number;
+  followUpTriggers?: string[];
+}
+
+const sampleQuestions: RTSMQuestion[] = [
+  {
+    id: 'volatility_comfort',
+    category: 'risk_willingness',
+    question: 'In a typical year, how much volatility are you comfortable with in your investment portfolio?',
+    type: 'multiple_choice',
+    options: [
+      { value: 'minimal', text: 'Minimal - I prefer stable, predictable returns', score: 20 },
+      { value: 'low', text: 'Low - Small fluctuations are acceptable (up to 5%)', score: 40 },
+      { value: 'moderate', text: 'Moderate - I can handle some ups and downs (5-15%)', score: 60 },
+      { value: 'high', text: 'High - Significant volatility is fine for better returns (15-25%)', score: 80 },
+      { value: 'very_high', text: 'Very High - I embrace volatility for maximum returns (25%+)', score: 100 }
+    ],
+    weight: 15
+  }
+];
 ```
 
-## Best Practices
+### Questionnaire Validation
 
-Implementation best practices will be provided here.
+**Response Consistency Checks:**
+- **Stated vs. Revealed Preferences**: Compare questionnaire responses to actual behavior
+- **Risk Capacity vs. Willingness**: Flag large discrepancies for review
+- **Timeline Consistency**: Ensure risk tolerance aligns with investment timeframes
+- **Knowledge vs. Experience**: Validate claimed experience with demonstrated knowledge
 
-## Related Features
+## Ongoing RTSM Monitoring
 
+### Behavioral Change Detection
+
+**Trigger Events for Reassessment:**
 <CardGroup cols={2}>
-  <Card title="DIVA Scoring" href="/core-features/diva-scoring">
-    Financial health assessment system
+  <Card title="Life Events" icon="life-ring">
+    **Major Changes**: Marriage, divorce, job change, inheritance  
+    **Timeline**: Immediate reassessment recommended  
+    **Scope**: Full RTSM evaluation with updated circumstances  
+    **Validation**: Cross-reference with DIVA score changes
   </Card>
-  <Card title="Chama Management" href="/core-features/basic-chama">
-    Digital savings group platform
+  <Card title="Market Events" icon="chart-line">
+    **Market Stress**: Major market downturns or volatility periods  
+    **Behavior Monitoring**: Track actual vs. stated risk tolerance  
+    **Learning Opportunity**: Educational content on maintaining discipline  
+    **Adjustment**: Temporary risk reduction if severe anxiety detected
   </Card>
 </CardGroup>
+
+### Continuous Learning Algorithm
+
+```typescript
+class RTSMContinuousLearning {
+  updateRiskProfile(
+    userId: string, 
+    observedBehavior: InvestmentBehavior,
+    marketConditions: MarketConditions
+  ): RTSMUpdate {
+    
+    const currentRTSM = this.getCurrentRTSM(userId);
+    const behaviorDeviation = this.calculateDeviation(
+      currentRTSM,
+      observedBehavior
+    );
+    
+    // Significant deviation triggers reassessment
+    if (behaviorDeviation > 20) {
+      return {
+        action: 'trigger_reassessment',
+        reason: 'Behavior significantly different from stated preferences',
+        urgency: 'high'
+      };
+    }
+    
+    // Minor adjustments based on observed patterns
+    if (behaviorDeviation > 10) {
+      return {
+        action: 'minor_adjustment',
+        adjustments: this.calculateMinorAdjustments(behaviorDeviation),
+        urgency: 'medium'
+      };
+    }
+    
+    return { action: 'no_change', urgency: 'low' };
+  }
+}
+```
+
+## Cultural Adaptation for SADC Markets
+
+### Regional Risk Perception Differences
+
+**Country-Specific Considerations:**
+
+<CardGroup cols={2}>
+  <Card title="South Africa" icon="flag">
+    **Risk Factors**: Currency volatility, political uncertainty  
+    **Cultural Factors**: Ubuntu philosophy, community decision-making  
+    **Investment Preferences**: Property, offshore diversification  
+    **Regulatory**: Well-developed financial markets, sophisticated investors
+  </Card>
+  <Card title="Botswana" icon="flag">
+    **Risk Factors**: Diamond dependency, small market size  
+    **Cultural Factors**: Conservative, long-term planning culture  
+    **Investment Preferences**: Stable, government-backed instruments  
+    **Regulatory**: Growing financial sector, increasing sophistication
+  </Card>
+</CardGroup>
+
+### Culturally Adapted Questions
+
+**Ubuntu-Influenced Risk Assessment:**
+- "How important is it that your investment decisions align with your community's values?"
+- "Would you prefer investments that benefit your local community, even if returns were slightly lower?"
+- "How much weight do you give to family and elder opinions in financial decisions?"
+
+## API Integration
+
+### RTSM Assessment APIs
+
+```typescript
+// Initialize RTSM assessment
+const assessment = await awoClient.rtsm.initializeAssessment(userId);
+
+// Submit questionnaire responses
+const responses = await awoClient.rtsm.submitResponses(userId, {
+  assessmentId: assessment.id,
+  responses: [
+    { questionId: 'volatility_comfort', answer: 'moderate' },
+    { questionId: 'investment_experience', answer: 'intermediate' }
+  ]
+});
+
+// Get RTSM results
+const rtsmResults = await awoClient.rtsm.getResults(userId);
+
+// Update risk profile based on behavior
+await awoClient.rtsm.updateBehavioralProfile(userId, {
+  observedBehavior: 'panic_selling',
+  marketCondition: 'high_volatility',
+  date: new Date()
+});
+```
+
+### Integration with Portfolio Management
+
+```typescript
+// Get combined DIVA + RTSM recommendations
+const portfolioRecommendation = await awoClient.portfolio.getRecommendation(userId);
+
+// Apply RTSM-based portfolio adjustments
+const adjustedPortfolio = await awoClient.portfolio.adjustForRiskProfile(
+  userId, 
+  portfolioRecommendation.id
+);
+```
+
+## Privacy and Ethical Considerations
+
+### Data Sensitivity
+
+**Sensitive Information Handling:**
+- **Psychological Profiles**: Encrypted storage of risk tolerance assessments
+- **Behavioral Data**: Anonymized behavioral pattern analysis
+- **Cultural Information**: Respectful handling of cultural and social factors
+- **Consent Management**: Clear consent for psychological profiling
+
+### Ethical Investment Matching
+
+**Responsible Recommendation Principles:**
+- **Suitability First**: Never recommend unsuitable risk levels for fees
+- **Transparent Methodology**: Clear explanation of how recommendations are generated
+- **Ongoing Monitoring**: Continuous validation that recommendations remain suitable
+- **User Control**: Easy ability to override or modify risk preferences
+
+---
+
+*The RTSM Assessment ensures that AWO's investment recommendations consider not just financial capacity but also individual risk tolerance, behavioral patterns, and cultural context, creating truly personalized portfolio solutions for African investors.*
+
+*Last updated: June 2025*  
+*Next review: July 2025*

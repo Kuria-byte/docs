@@ -1,52 +1,625 @@
----
-title: "User Management"
-description: "AWO Platform user management core functionality"
----
-
 # User Management
+
+AWO Platform implements a comprehensive user management system designed specifically for African markets, featuring multi-tier KYC verification, flexible profile management, and robust security controls that comply with SADC regional regulations.
 
 ## Overview
 
 <Info>
-User Management is a core feature of the AWO Platform, designed to support financial inclusion for African women.
+AWO's user management system balances accessibility with security, enabling users to start with basic features and progressively unlock advanced functionality through enhanced verification levels.
 </Info>
 
-## Key Features
+The user management system supports:
+- **Progressive KYC**: Tier-based verification unlocking features gradually
+- **Regional Compliance**: POPIA, GDPR, and SADC-specific requirements
+- **Mobile-First Design**: Optimized for African mobile usage patterns
+- **Offline Capabilities**: Core profile functions work without internet
 
-Core functionality will be documented here.
+## User Profile Structure
 
-## Implementation
+### Basic User Model
 
+```typescript
+interface UserProfile {
+  id: string;
+  email: string;
+  phoneNumber: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: Date;
+  nationality: string;
+  kycTier: 'tier1' | 'tier2';
+  kycStatus: 'pending' | 'verified' | 'rejected' | 'expired';
+  profileCompleteness: number; // 0-100%
+  divaScore?: DivaScore;
+  createdAt: Date;
+  updatedAt: Date;
+  lastActiveAt: Date;
+}
+```
+
+### Extended Profile Information
+
+<CardGroup cols={2}>
+  <Card title="Personal Information" icon="user">
+    - Full name and preferred name
+    - Date of birth and age verification
+    - Nationality and country of residence
+    - Gender identity (optional)
+    - Languages and communication preferences
+  </Card>
+  <Card title="Contact Information" icon="phone">
+    - Primary phone number (required)
+    - Email address (required)
+    - Alternative contact methods
+    - Emergency contact details
+    - Communication preferences
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Financial Profile" icon="wallet">
+    - Income level and employment status
+    - Financial goals and objectives
+    - Risk tolerance assessment (RTSM)
+    - Investment experience level
+    - Banking relationships
+  </Card>
+  <Card title="Platform Preferences" icon="mobile">
+    - Language and locale settings
+    - Notification preferences
+    - Privacy settings
+    - Security preferences
+    - App theme and accessibility options
+  </Card>
+</CardGroup>
+
+## Multi-Tier KYC System
+
+AWO implements a progressive KYC system that allows users to access basic features immediately while unlocking advanced functionality through enhanced verification.
+
+### Tier 1 KYC (Basic Verification)
+
+**Requirements:**
+- Valid phone number with SMS verification
+- Basic personal information (name, date of birth)
+- Nationality and country of residence
+- Email address verification
+
+**Features Unlocked:**
+<CardGroup cols={2}>
+  <Card title="AWO Wallet" icon="wallet">
+    - Deposit and withdrawal up to R5,000 monthly
+    - P2P transfers within AWO network
+    - Basic transaction history
+    - Auto-savings goals up to R1,000
+  </Card>
+  <Card title="Educational Access" icon="graduation-cap">
+    - Complete financial education hub
+    - Basic financial literacy courses
+    - Community forums participation
+    - Goal-setting tools
+  </Card>
+</CardGroup>
+
+**Verification Process:**
 <Steps>
-  <Step title="Setup">
-    Initial setup and configuration
+  <Step title="Phone Verification">
+    User provides phone number and receives SMS OTP for verification
   </Step>
-  <Step title="Integration">
-    Integration with other AWO services
+  <Step title="Basic Information">
+    Complete profile with name, date of birth, and nationality
   </Step>
-  <Step title="Testing">
-    Testing and validation procedures
+  <Step title="Email Verification">
+    Email address verification with confirmation link
+  </Step>
+  <Step title="Terms Acceptance">
+    Accept AWO terms of service and privacy policy
   </Step>
 </Steps>
 
-## API Integration
+### Tier 2 KYC (Enhanced Verification)
 
-```typescript
-// Example API integration
-const response = await awo.usermanagement.method();
-```
+**Requirements:**
+- Government-issued ID document (passport, national ID, driver's license)
+- Selfie with liveness detection
+- Proof of address (utility bill, bank statement)
+- Bank account linking via Open Banking
 
-## Best Practices
-
-Implementation best practices will be provided here.
-
-## Related Features
-
+**Features Unlocked:**
 <CardGroup cols={2}>
-  <Card title="DIVA Scoring" href="/core-features/diva-scoring">
-    Financial health assessment system
+  <Card title="Full AWO Wallet" icon="credit-card">
+    - Unlimited wallet transactions
+    - Cross-border payments and remittances
+    - Mobile money integration
+    - Advanced transaction analytics
   </Card>
-  <Card title="Chama Management" href="/core-features/basic-chama">
-    Digital savings group platform
+  <Card title="Investment Platform" icon="chart-line">
+    - Portfolio assignment based on DIVA score
+    - Investment in ETFs, bonds, and funds
+    - SME debt investment opportunities
+    - Wealth coaching access
   </Card>
 </CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Chama Leadership" icon="users">
+    - Create and manage Chama groups
+    - Group investment decision making
+    - Treasurer and admin roles
+    - Advanced group analytics
+  </Card>
+  <Card title="Premium Features" icon="star">
+    - Personalized financial coaching
+    - Advanced DIVA insights
+    - Priority customer support
+    - Beta feature access
+  </Card>
+</CardGroup>
+
+**Verification Process:**
+<Steps>
+  <Step title="Document Upload">
+    Upload clear photos of government-issued ID and proof of address
+  </Step>
+  <Step title="Biometric Verification">
+    Complete selfie with liveness detection using Smile ID
+  </Step>
+  <Step title="Bank Account Linking">
+    Link bank account through Stitch or Mono Open Banking integration
+  </Step>
+  <Step title="Review Process">
+    AWO compliance team reviews and approves within 24-48 hours
+  </Step>
+</Steps>
+
+## KYC Integration with Smile ID
+
+### Document Verification
+
+**Supported Documents:**
+<CardGroup cols={3}>
+  <Card title="South Africa" icon="flag">
+    - National ID (Smart ID Card)
+    - Passport
+    - Driver's License
+    - Temporary Identity Certificate
+  </Card>
+  <Card title="Botswana" icon="flag">
+    - National ID (Omang)
+    - Passport
+    - Driver's License
+  </Card>
+  <Card title="Other SADC" icon="globe">
+    - National ID cards
+    - Passports
+    - Regional identity documents
+  </Card>
+</CardGroup>
+
+**Verification Process:**
+```typescript
+// Example KYC verification flow
+async function initiateKYCVerification(userId: string, documents: KYCDocuments) {
+  try {
+    // Upload documents to Smile ID
+    const documentResult = await smileID.uploadDocuments({
+      userId,
+      documents: documents.governmentId,
+      proofOfAddress: documents.proofOfAddress
+    });
+    
+    // Initiate biometric verification
+    const biometricResult = await smileID.initiateBiometric({
+      userId,
+      documentPhoto: documentResult.extractedPhoto
+    });
+    
+    // Update user KYC status
+    await updateUserKYCStatus(userId, {
+      tier: 'tier2',
+      status: 'pending',
+      submittedAt: new Date(),
+      documentIds: [documentResult.id, biometricResult.id]
+    });
+    
+    return {
+      success: true,
+      sessionId: biometricResult.sessionId,
+      estimatedCompletionTime: '24-48 hours'
+    };
+  } catch (error) {
+    console.error('KYC verification failed:', error);
+    throw new Error('KYC verification failed');
+  }
+}
+```
+
+### Biometric Verification Features
+
+**Liveness Detection:**
+- Real-time facial recognition
+- Liveness proofs (blink, smile, turn head)
+- Anti-spoofing measures
+- Photo comparison with ID documents
+
+**Quality Checks:**
+- Image quality validation
+- Lighting and blur detection
+- Face positioning requirements
+- Document authenticity verification
+
+## Profile Management Features
+
+### Personal Information Management
+
+**Editable Fields:**
+- Preferred name and display preferences
+- Contact information updates
+- Communication language preferences
+- Notification settings
+- Emergency contact information
+
+**Protected Fields (Require Re-verification):**
+- Legal name changes
+- Date of birth corrections
+- Nationality changes
+- Gender identity updates
+
+### Privacy Controls
+
+<CardGroup cols={2}>
+  <Card title="Data Visibility" icon="eye">
+    **Public Profile**: Name, profile picture (optional)  
+    **Chama Members**: Basic contact info, contribution history  
+    **Platform Only**: Financial data, full transaction history  
+    **Private**: Sensitive documents, banking details
+  </Card>
+  <Card title="Communication Preferences" icon="bell">
+    **Push Notifications**: Transaction alerts, DIVA updates  
+    **SMS**: Security alerts, Chama notifications  
+    **Email**: Monthly statements, educational content  
+    **WhatsApp**: Optional banking alerts and support
+  </Card>
+</CardGroup>
+
+### Device Management
+
+**Multi-Device Support:**
+- Primary device registration (smartphone)
+- Secondary device authorization (tablet, web)
+- Device-specific security settings
+- Remote device logout capabilities
+
+**Security Features:**
+```typescript
+interface DeviceRegistration {
+  deviceId: string;
+  deviceType: 'ios' | 'android' | 'web';
+  deviceName: string;
+  registeredAt: Date;
+  lastActiveAt: Date;
+  isPrimary: boolean;
+  notificationTokens: string[];
+  securityLevel: 'basic' | 'enhanced';
+}
+```
+
+## Account Security Features
+
+### Multi-Factor Authentication (MFA)
+
+**Available Methods:**
+<Steps>
+  <Step title="SMS OTP">
+    Primary method using user's registered phone number for time-based codes
+  </Step>
+  <Step title="Email Verification">
+    Backup method for account recovery and sensitive operations
+  </Step>
+  <Step title="Biometric Authentication">
+    Fingerprint and facial recognition for device-level security
+  </Step>
+  <Step title="Security Questions">
+    Fallback method for account recovery when other methods unavailable
+  </Step>
+</Steps>
+
+### Password and Security Policies
+
+**Password Requirements:**
+- Minimum 8 characters with complexity requirements
+- Regular password change prompts (every 180 -300 days)
+- Password history to prevent reuse
+- Account lockout after failed attempts
+
+**Session Management:**
+- JWT tokens with 15-minute expiry
+- Refresh tokens with 30-day expiry
+- Automatic logout on suspicious activity
+- Session monitoring and alerts
+
+## Account Settings and Preferences
+
+### Financial Preferences
+
+<CardGroup cols={2}>
+  <Card title="Transaction Limits" icon="shield">
+    **Daily Limits**: Customizable spending and transfer limits  
+    **Monthly Limits**: Investment and savings contribution caps  
+    **Emergency Override**: Temporary limit increases with additional verification  
+    **Auto-Save Rules**: Percentage-based or fixed-amount auto-savings
+  </Card>
+  <Card title="Investment Preferences" icon="arrow-up">
+    **Risk Tolerance**: Conservative, moderate, or aggressive portfolios  
+    **Investment Goals**: Retirement, education, emergency fund, wealth building  
+    **Auto-Rebalancing**: Automatic portfolio rebalancing preferences  
+    **ESG Preferences**: Environmental and social impact investment options
+  </Card>
+</CardGroup>
+
+### Communication and Notifications
+
+**Notification Categories:**
+<CardGroup cols={3}>
+  <Card title="Security Alerts" icon="shield">
+    - Login attempts
+    - Password changes
+    - Device registrations
+    - Suspicious activity
+  </Card>
+  <Card title="Financial Updates" icon="chart-line">
+    - Transaction confirmations
+    - DIVA score changes
+    - Investment performance
+    - Goal achievements
+  </Card>
+  <Card title="Community Activity" icon="users">
+    - Chama invitations
+    - Group contributions
+    - Voting notifications
+    - Member updates
+  </Card>
+</CardGroup>
+
+### Language and Accessibility
+
+**Supported Languages:**
+- English (primary)
+- Afrikaans (future)
+
+
+**Accessibility Features:**
+- Large text options
+- High contrast themes
+- Voice-over support
+- Screen reader compatibility
+- Simplified navigation mode
+
+## Data Management and Compliance
+
+### Data Retention Policies
+
+| Data Category | Retention Period | Purpose |
+|---------------|------------------|---------|
+| Profile Information | Active + 7 years | Regulatory compliance |
+| Transaction Records | Active + 10 years | Financial audit requirements |
+| KYC Documents | Active + 5 years | Identity verification compliance |
+| Communication Logs | Active + 2 years | Customer support and disputes |
+| Device Information | Active + 1 year | Security monitoring |
+
+### User Rights (POPIA/GDPR Compliance)
+
+<CardGroup cols={2}>
+  <Card title="Access Rights" icon="download">
+    **Data Export**: Complete profile and transaction data export  
+    **Access Requests**: View all data AWO holds about the user  
+    **Audit Logs**: Access to account activity and security events  
+    **Processing History**: Details of how data has been used
+  </Card>
+  <Card title="Control Rights" icon="server">
+    **Data Correction**: Update incorrect personal information  
+    **Data Deletion**: Account closure and data removal (with exceptions)  
+    **Processing Restrictions**: Limit how data is used  
+    **Portability**: Transfer data to other financial service providers
+  </Card>
+</CardGroup>
+
+### Consent Management
+
+**Consent Categories:**
+- **Required**: Essential platform functionality and regulatory compliance
+- **Marketing**: Educational content, product updates, promotional offers
+- **Analytics**: Usage analytics for platform improvement
+- **Third-Party Sharing**: Data sharing with coaches, investment partners
+
+**Consent Features:**
+- Granular consent controls
+- Easy opt-out mechanisms
+- Consent history tracking
+- Regular consent renewal prompts
+
+## Profile Completeness and Scoring
+
+### Completeness Metrics
+
+AWO tracks profile completeness to encourage users to unlock platform features:
+
+**Scoring System:**
+```typescript
+interface ProfileCompleteness {
+  basicInfo: number;      // 30% - Name, contact, basic details
+  kycVerification: number; // 25% - Identity and address verification
+  financialProfile: number; // 20% - Income, goals, risk assessment
+  bankLinking: number;    // 15% - Connected bank accounts
+  preferences: number;    // 10% - Settings and customization
+  
+  totalScore: number;     // 0-100% overall completeness
+}
+```
+
+**Completion Incentives:**
+<CardGroup cols={2}>
+  <Card title="Feature Unlocks" icon="unlock">
+    - 25%: Basic wallet functionality
+    - 50%: Chama participation
+    - 75%: Investment platform access
+    - 90%: Premium coaching features
+  </Card>
+  <Card title="Benefits" icon="gift">
+    - Profile completion bonuses
+    - Reduced transaction fees
+    - Priority customer support
+    - Beta feature access
+  </Card>
+</CardGroup>
+
+## API Integration Examples
+
+### User Profile Management
+
+```typescript
+// Get user profile
+const userProfile = await awoClient.users.getProfile(userId);
+
+// Update profile information
+const updatedProfile = await awoClient.users.updateProfile(userId, {
+  firstName: 'Updated Name',
+  communicationPreferences: {
+    pushNotifications: true,
+    smsAlerts: false,
+    emailUpdates: true
+  }
+});
+
+// Initiate KYC verification
+const kycSession = await awoClient.users.initiateKYC(userId, {
+  tier: 'tier2',
+  documents: {
+    governmentId: documentFile,
+    proofOfAddress: addressFile
+  }
+});
+```
+
+### Device Management
+
+```typescript
+// Register new device
+const deviceRegistration = await awoClient.users.registerDevice(userId, {
+  deviceId: 'unique-device-identifier',
+  deviceType: 'android',
+  deviceName: 'Samsung Galaxy S21',
+  notificationToken: 'fcm-token',
+  isPrimary: false
+});
+
+// List user devices
+const devices = await awoClient.users.getDevices(userId);
+
+// Logout from specific device
+await awoClient.users.logoutDevice(userId, deviceId);
+```
+
+## Security Best Practices
+
+### For Developers
+
+<CardGroup cols={2}>
+  <Card title="Data Handling" icon="shield">
+    **Encryption**: All PII encrypted at field level  
+    **Access Control**: Role-based access to user data  
+    **Audit Logging**: All data access logged  
+    **Data Minimization**: Collect only necessary information
+  </Card>
+  <Card title="Authentication" icon="key">
+    **Token Security**: Secure JWT implementation  
+    **Session Management**: Proper session lifecycle  
+    **Rate Limiting**: Prevent brute force attacks  
+    **MFA Enforcement**: Require MFA for sensitive operations
+  </Card>
+</CardGroup>
+
+### For Users
+
+**Security Recommendations:**
+- Use strong, unique passwords
+- Enable biometric authentication
+- Review device registrations monthly
+- Monitor account activity regularly
+- Report suspicious activity immediately
+- Keep contact information updated
+
+## Troubleshooting Common Issues
+
+### KYC Verification Problems
+
+<Accordion title="Document Rejection Issues">
+**Common Causes:**
+- Poor image quality or lighting
+- Expired documents
+- Mismatched information
+- Unsupported document types
+
+**Solutions:**
+- Retake photos in good lighting
+- Ensure documents are current
+- Verify information accuracy
+- Use supported document types
+</Accordion>
+
+<Accordion title="Biometric Verification Failures">
+**Common Causes:**
+- Poor lighting conditions
+- Camera quality issues
+- Face not properly positioned
+- Network connectivity problems
+
+**Solutions:**
+- Use bright, even lighting
+- Clean camera lens
+- Follow positioning guidelines
+- Ensure stable internet connection
+</Accordion>
+
+### Profile Management Issues
+
+<Accordion title="Unable to Update Profile Information">
+**Possible Causes:**
+- Fields requiring re-verification
+- Validation errors
+- Network connectivity issues
+- Insufficient permissions
+
+**Resolution Steps:**
+1. Check field validation requirements
+2. Verify network connectivity
+3. Complete additional verification if required
+4. Contact support if issues persist
+</Accordion>
+
+## Monitoring and Analytics
+
+### User Engagement Metrics
+
+**Key Performance Indicators:**
+- Profile completion rates by tier
+- KYC verification success rates
+- Feature adoption by tier level
+- User retention by verification status
+- Support ticket volume by category
+
+### Compliance Monitoring
+
+**Regulatory Tracking:**
+- KYC completion rates by country
+- Data retention compliance
+- Consent management effectiveness
+- Cross-border data transfer compliance
+- Audit trail completeness
+
+---
+
+*AWO's user management system provides a robust foundation for secure, compliant, and user-friendly financial services across the SADC region, balancing accessibility with regulatory requirements while prioritizing user privacy and security.*
+
+*Last updated: June 2025*  
+*Next review: July 2025*

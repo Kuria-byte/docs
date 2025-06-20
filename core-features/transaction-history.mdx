@@ -1,52 +1,904 @@
----
-title: "Transaction History"
-description: "AWO Platform transaction history core functionality"
----
-
 # Transaction History
+
+AWO's Transaction History system provides comprehensive tracking, categorization, and analysis of all financial activities, enabling users to understand their spending patterns, monitor financial goals, and maintain complete transparency across all platform interactions.
 
 ## Overview
 
 <Info>
-Transaction History is a core feature of the AWO Platform, designed to support financial inclusion for African women.
+Transaction History serves as the financial memory of the AWO platform, capturing every financial interaction with detailed metadata, intelligent categorization, and powerful analytics to help users make informed financial decisions and track their progress toward financial wellness.
 </Info>
 
-## Key Features
+**Core Capabilities:**
+- **Complete Transaction Capture**: Every financial activity recorded with full details
+- **Intelligent Categorization**: AI-powered transaction categorization and insights
+- **Advanced Search and Filtering**: Find any transaction quickly with multiple criteria
+- **Visual Analytics**: Charts, trends, and patterns to understand spending behavior
+- **Export and Reporting**: Comprehensive reporting for personal and tax purposes
+- **Real-Time Updates**: Instant transaction recording and balance synchronization
 
-Core functionality will be documented here.
+## Transaction Data Model
 
-## Implementation
+### Comprehensive Transaction Structure
 
+```typescript
+interface AWOTransaction {
+  transactionId: string;
+  userId: string;
+  type: TransactionType;
+  category: TransactionCategory;
+  subCategory?: string;
+  amount: number;
+  currency: string;
+  direction: 'inbound' | 'outbound' | 'internal';
+  status: TransactionStatus;
+  
+  // Source and destination information
+  source: TransactionParty;
+  destination: TransactionParty;
+  
+  // Financial details
+  balanceAfter: number;
+  fees: TransactionFees;
+  exchangeRate?: ExchangeRateInfo;
+  
+  // Descriptive information
+  description: string;
+  originalDescription?: string; // Raw description from provider
+  merchantInfo?: MerchantInfo;
+  location?: TransactionLocation;
+  
+  // Temporal information
+  initiatedAt: Date;
+  processedAt: Date;
+  completedAt?: Date;
+  valueDate: Date;
+  
+  // References and metadata
+  providerReference?: string;
+  internalReference: string;
+  relatedTransactions: string[]; // For multi-part transactions
+  tags: string[];
+  notes?: string;
+  
+  // Integration and audit
+  source: 'awo_wallet' | 'mobile_money' | 'bank_transfer' | 'chama' | 'investment' | 'manual';
+  integrationDetails?: IntegrationDetails;
+  auditTrail: AuditTrailEntry[];
+  
+  // User interaction
+  isRecurring?: boolean;
+  recurringGroupId?: string;
+  userModifications?: UserModification[];
+  disputeStatus?: DisputeStatus;
+}
+
+enum TransactionType {
+  DEPOSIT = 'deposit',
+  WITHDRAWAL = 'withdrawal',
+  TRANSFER = 'transfer',
+  PAYMENT = 'payment',
+  REFUND = 'refund',
+  FEE = 'fee',
+  INTEREST = 'interest',
+  CHAMA_CONTRIBUTION = 'chama_contribution',
+  CHAMA_PAYOUT = 'chama_payout',
+  INVESTMENT = 'investment',
+  INVESTMENT_RETURN = 'investment_return',
+  GOAL_CONTRIBUTION = 'goal_contribution',
+  CURRENCY_EXCHANGE = 'currency_exchange'
+}
+
+enum TransactionStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELLED = 'cancelled',
+  DISPUTED = 'disputed',
+  REFUNDED = 'refunded'
+}
+```
+
+### Transaction Categorization System
+
+**Primary Categories:**
+<CardGroup cols={2}>
+  <Card title="Income" icon="trending-up">
+    **Salary & Wages**: Regular employment income  
+    **Business Income**: Self-employment and business revenue  
+    **Investment Returns**: Dividends, interest, capital gains  
+    **Transfers Received**: P2P transfers, family support  
+    **Other Income**: Gifts, bonuses, side hustles
+  </Card>
+  <Card title="Essential Expenses" icon="home">
+    **Housing**: Rent, mortgage, utilities, maintenance  
+    **Food & Groceries**: Supermarkets, food delivery  
+    **Transportation**: Fuel, public transport, vehicle maintenance  
+    **Insurance**: Life, health, vehicle, property insurance  
+    **Debt Payments**: Loan repayments, credit card payments
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Lifestyle Expenses" icon="shopping-cart">
+    **Shopping**: Clothing, electronics, household items  
+    **Entertainment**: Movies, restaurants, recreation  
+    **Health & Wellness**: Medical, fitness, personal care  
+    **Education**: Courses, books, training, children's education  
+    **Travel**: Vacations, business travel, accommodation
+  </Card>
+  <Card title="Financial Activities" icon="piggy-bank">
+    **Savings**: Goal contributions, emergency fund deposits  
+    **Investments**: Portfolio contributions, SME investments  
+    **Chama Activities**: Group contributions and payouts  
+    **Banking**: ATM withdrawals, bank charges, fees  
+    **Transfers**: P2P transfers, cross-border remittances
+  </Card>
+</CardGroup>
+
+### Intelligent Categorization Engine
+
+```typescript
+class TransactionCategorizationEngine {
+  async categorizeTransaction(transaction: AWOTransaction): Promise<CategoryAssignment> {
+    // Multi-stage categorization process
+    const strategies = [
+      this.ruleBased,
+      this.merchantBased,
+      this.machineLearning,
+      this.userPatternBased,
+      this.communityBased
+    ];
+
+    let bestCategory: CategoryAssignment | null = null;
+    let highestConfidence = 0;
+
+    for (const strategy of strategies) {
+      const result = await strategy.categorize(transaction);
+      
+      if (result.confidence > highestConfidence) {
+        bestCategory = result;
+        highestConfidence = result.confidence;
+      }
+
+      // If we're highly confident, no need to continue
+      if (result.confidence > 0.9) {
+        break;
+      }
+    }
+
+    // Always provide a fallback category
+    return bestCategory || this.getDefaultCategory(transaction);
+  }
+
+  private ruleBased = {
+    async categorize(transaction: AWOTransaction): Promise<CategoryAssignment> {
+      // Predefined rules based on keywords, amounts, and patterns
+      const rules = await this.getRulesForUser(transaction.userId);
+      
+      for (const rule of rules) {
+        if (this.matchesRule(transaction, rule)) {
+          return {
+            category: rule.category,
+            subCategory: rule.subCategory,
+            confidence: rule.confidence,
+            method: 'rule_based',
+            reasoning: rule.reasoning
+          };
+        }
+      }
+
+      return { category: 'uncategorized', confidence: 0, method: 'rule_based' };
+    }
+  };
+
+  private merchantBased = {
+    async categorize(transaction: AWOTransaction): Promise<CategoryAssignment> {
+      if (!transaction.merchantInfo) {
+        return { category: 'uncategorized', confidence: 0, method: 'merchant_based' };
+      }
+
+      const merchantCategory = await this.lookupMerchantCategory(transaction.merchantInfo);
+      
+      if (merchantCategory) {
+        return {
+          category: merchantCategory.primaryCategory,
+          subCategory: merchantCategory.subCategory,
+          confidence: merchantCategory.confidence,
+          method: 'merchant_based',
+          reasoning: `Merchant ${transaction.merchantInfo.name} typically categorized as ${merchantCategory.primaryCategory}`
+        };
+      }
+
+      return { category: 'uncategorized', confidence: 0, method: 'merchant_based' };
+    }
+  };
+}
+```
+
+## Transaction Capture and Processing
+
+### Real-Time Transaction Recording
+
+**Transaction Capture Flow:**
 <Steps>
-  <Step title="Setup">
-    Initial setup and configuration
+  <Step title="Transaction Initiation">
+    **Trigger**: User initiates any financial activity on AWO platform  
+    **Immediate Action**: Create preliminary transaction record with 'pending' status  
+    **Data Capture**: Record all available transaction details and metadata  
+    **User Feedback**: Immediate confirmation to user with transaction reference
   </Step>
-  <Step title="Integration">
-    Integration with other AWO services
+  <Step title="Processing and Validation">
+    **Provider Integration**: Forward transaction to relevant payment provider  
+    **Status Monitoring**: Continuous monitoring of transaction progress  
+    **Validation**: Verify transaction details and resolve any discrepancies  
+    **Categorization**: Apply intelligent categorization algorithms
   </Step>
-  <Step title="Testing">
-    Testing and validation procedures
+  <Step title="Completion and Recording">
+    **Final Status**: Update transaction status based on provider confirmation  
+    **Balance Update**: Update all relevant account balances immediately  
+    **Notification**: Send completion notification to user across chosen channels  
+    **Analytics Update**: Update spending analytics and budgeting calculations
+  </Step>
+  <Step title="Post-Processing">
+    **Receipt Generation**: Create detailed transaction receipt  
+    **Goal Impact**: Update progress on relevant savings and investment goals  
+    **DIVA Impact**: Assess impact on DIVA score components  
+    **Reporting**: Include in relevant financial reports and summaries
   </Step>
 </Steps>
 
-## API Integration
+### Multi-Source Transaction Aggregation
 
 ```typescript
-// Example API integration
-const response = await awo.transactionhistory.method();
+class TransactionAggregationService {
+  private sources: TransactionSource[] = [
+    new AWOWalletSource(),
+    new MobileMoneySource(),
+    new OpenBankingSource(),
+    new ChamaSource(),
+    new InvestmentSource(),
+    new ManualEntrySource()
+  ];
+
+  async aggregateTransactions(userId: string, dateRange: DateRange): Promise<TransactionCollection> {
+    const aggregatedTransactions: AWOTransaction[] = [];
+    const processingErrors: ProcessingError[] = [];
+
+    // Parallel processing of all sources
+    const sourcePromises = this.sources.map(async (source) => {
+      try {
+        const transactions = await source.fetchTransactions(userId, dateRange);
+        return transactions.map(t => this.normalizeTransaction(t, source));
+      } catch (error) {
+        processingErrors.push({
+          source: source.name,
+          error: error.message,
+          timestamp: new Date()
+        });
+        return [];
+      }
+    });
+
+    const sourceResults = await Promise.all(sourcePromises);
+    
+    // Combine and deduplicate transactions
+    const allTransactions = sourceResults.flat();
+    const deduplicatedTransactions = await this.deduplicateTransactions(allTransactions);
+    
+    // Apply categorization and enrichment
+    const enrichedTransactions = await this.enrichTransactions(deduplicatedTransactions);
+    
+    return {
+      transactions: enrichedTransactions,
+      totalCount: enrichedTransactions.length,
+      dateRange,
+      processingErrors,
+      lastUpdated: new Date()
+    };
+  }
+
+  private async deduplicateTransactions(transactions: AWOTransaction[]): Promise<AWOTransaction[]> {
+    const duplicateGroups = new Map<string, AWOTransaction[]>();
+    
+    // Group potentially duplicate transactions
+    for (const transaction of transactions) {
+      const fingerprint = this.generateTransactionFingerprint(transaction);
+      
+      if (!duplicateGroups.has(fingerprint)) {
+        duplicateGroups.set(fingerprint, []);
+      }
+      
+      duplicateGroups.get(fingerprint)!.push(transaction);
+    }
+
+    const deduplicatedTransactions: AWOTransaction[] = [];
+    
+    // Resolve duplicates by selecting the most complete record
+    for (const [fingerprint, group] of duplicateGroups) {
+      if (group.length === 1) {
+        deduplicatedTransactions.push(group[0]);
+      } else {
+        const bestTransaction = this.selectBestTransaction(group);
+        deduplicatedTransactions.push(bestTransaction);
+      }
+    }
+
+    return deduplicatedTransactions;
+  }
+}
 ```
 
-## Best Practices
+## Advanced Search and Filtering
 
-Implementation best practices will be provided here.
+### Comprehensive Search Interface
 
-## Related Features
-
+**Search Capabilities:**
 <CardGroup cols={2}>
-  <Card title="DIVA Scoring" href="/core-features/diva-scoring">
-    Financial health assessment system
+  <Card title="Text Search" icon="search">
+    **Description Search**: Find transactions by description, merchant, or notes  
+    **Reference Search**: Search by transaction ID, provider reference  
+    **Fuzzy Matching**: Handle typos and partial matches intelligently  
+    **Multi-language**: Search in English, Afrikaans, local languages
   </Card>
-  <Card title="Chama Management" href="/core-features/basic-chama">
-    Digital savings group platform
+  <Card title="Advanced Filters" icon="filter">
+    **Date Ranges**: Custom date ranges, presets (last month, quarter, year)  
+    **Amount Ranges**: Filter by amount brackets and comparisons  
+    **Categories**: Single or multiple category selection  
+    **Transaction Types**: Filter by specific transaction types
   </Card>
 </CardGroup>
+
+### Filter Implementation
+
+```typescript
+interface TransactionSearchQuery {
+  userId: string;
+  textSearch?: string;
+  dateRange?: DateRange;
+  amountRange?: AmountRange;
+  categories?: string[];
+  types?: TransactionType[];
+  statuses?: TransactionStatus[];
+  sources?: string[];
+  tags?: string[];
+  merchants?: string[];
+  locations?: LocationFilter;
+  customFilters?: CustomFilter[];
+  sortBy?: SortOption;
+  pagination?: PaginationOptions;
+}
+
+class TransactionSearchService {
+  async searchTransactions(query: TransactionSearchQuery): Promise<TransactionSearchResult> {
+    // Build dynamic query based on filters
+    const searchBuilder = new TransactionQueryBuilder()
+      .forUser(query.userId)
+      .withTextSearch(query.textSearch)
+      .inDateRange(query.dateRange)
+      .withAmountRange(query.amountRange)
+      .inCategories(query.categories)
+      .ofTypes(query.types)
+      .withStatuses(query.statuses)
+      .fromSources(query.sources)
+      .withTags(query.tags)
+      .atMerchants(query.merchants)
+      .inLocations(query.locations)
+      .sortBy(query.sortBy)
+      .paginate(query.pagination);
+
+    // Execute search with performance optimization
+    const searchResult = await this.executeOptimizedSearch(searchBuilder.build());
+    
+    // Enhance results with additional metadata
+    const enhancedResults = await this.enhanceSearchResults(searchResult, query);
+    
+    return {
+      transactions: enhancedResults.transactions,
+      totalCount: enhancedResults.totalCount,
+      aggregations: enhancedResults.aggregations,
+      facets: enhancedResults.facets,
+      executionTime: enhancedResults.executionTime,
+      query: query
+    };
+  }
+
+  private async executeOptimizedSearch(query: OptimizedQuery): Promise<RawSearchResult> {
+    // Use appropriate indexes and query optimization
+    if (query.hasComplexFilters()) {
+      return await this.executeComplexSearch(query);
+    } else {
+      return await this.executeSimpleSearch(query);
+    }
+  }
+}
+```
+
+### Saved Searches and Quick Filters
+
+**Common Quick Filters:**
+<CardGroup cols={3}>
+  <Card title="Recent Activity" icon="clock">
+    **Last 7 Days**: All transactions in the past week  
+    **Last 30 Days**: Monthly transaction overview  
+    **Today**: All transactions from today  
+    **Yesterday**: Previous day's activity
+  </Card>
+  <Card title="Financial Categories" icon="tag">
+    **Income Only**: All income transactions  
+    **Essential Expenses**: Housing, food, transport  
+    **Discretionary Spending**: Entertainment, shopping  
+    **Savings & Investments**: Financial goal activities
+  </Card>
+  <Card title="Activity Types" icon="activity">
+    **Chama Activities**: All group savings activities  
+    **Investment Transactions**: Portfolio and SME investments  
+    **Mobile Money**: All mobile money transactions  
+    **Large Transactions**: Transactions over R1,000
+  </Card>
+</CardGroup>
+
+## Visual Analytics and Insights
+
+### Transaction Analytics Dashboard
+
+**Key Analytical Views:**
+<CardGroup cols={2}>
+  <Card title="Spending Trends" icon="line-chart">
+    **Monthly Trends**: Spending patterns over time  
+    **Category Breakdown**: Percentage by category with pie charts  
+    **Daily Patterns**: When you typically spend money  
+    **Comparison**: Month-over-month and year-over-year comparisons
+  </Card>
+  <Card title="Income Analysis" icon="bar-chart">
+    **Income Stability**: Consistency and predictability analysis  
+    **Income Sources**: Breakdown by source (salary, business, investments)  
+    **Growth Tracking**: Income growth over time  
+    **Seasonal Patterns**: Income variations throughout the year
+  </Card>
+</CardGroup>
+
+### Advanced Analytics Implementation
+
+```typescript
+class TransactionAnalyticsEngine {
+  async generateSpendingInsights(userId: string, period: AnalyticsPeriod): Promise<SpendingInsights> {
+    const transactions = await this.getTransactionsForPeriod(userId, period);
+    
+    return {
+      totalSpending: this.calculateTotalSpending(transactions),
+      categoryBreakdown: this.analyzeCategoryBreakdown(transactions),
+      trendAnalysis: this.analyzeTrends(transactions, period),
+      unusualSpending: await this.detectUnusualSpending(transactions),
+      spendingVelocity: this.calculateSpendingVelocity(transactions),
+      merchantAnalysis: this.analyzeMerchantPatterns(transactions),
+      recommendations: await this.generateSpendingRecommendations(transactions),
+      comparisons: await this.generateComparisons(userId, transactions, period)
+    };
+  }
+
+  private analyzeCategoryBreakdown(transactions: AWOTransaction[]): CategoryBreakdown {
+    const categoryTotals = new Map<string, number>();
+    let totalAmount = 0;
+
+    transactions
+      .filter(t => t.direction === 'outbound' && t.amount > 0)
+      .forEach(transaction => {
+        const category = transaction.category;
+        const currentTotal = categoryTotals.get(category) || 0;
+        categoryTotals.set(category, currentTotal + transaction.amount);
+        totalAmount += transaction.amount;
+      });
+
+    const breakdown: CategoryBreakdownItem[] = [];
+    
+    for (const [category, amount] of categoryTotals) {
+      breakdown.push({
+        category,
+        amount,
+        percentage: (amount / totalAmount) * 100,
+        transactionCount: transactions.filter(t => t.category === category).length,
+        averageTransaction: amount / transactions.filter(t => t.category === category).length
+      });
+    }
+
+    return {
+      items: breakdown.sort((a, b) => b.amount - a.amount),
+      totalSpending: totalAmount,
+      categoryCount: categoryTotals.size
+    };
+  }
+
+  private async detectUnusualSpending(transactions: AWOTransaction[]): Promise<UnusualSpendingAlert[]> {
+    const alerts: UnusualSpendingAlert[] = [];
+    
+    // Analyze for various anomalies
+    const anomalies = [
+      await this.detectAmountAnomalies(transactions),
+      await this.detectFrequencyAnomalies(transactions),
+      await this.detectCategoryAnomalies(transactions),
+      await this.detectMerchantAnomalies(transactions)
+    ].flat();
+
+    return anomalies.filter(anomaly => anomaly.severity >= 0.7);
+  }
+}
+```
+
+### Predictive Analytics
+
+**Spending Predictions:**
+- **Monthly Budget Forecasts**: Predict monthly spending based on current patterns
+- **Category Predictions**: Forecast spending by category
+- **Goal Achievement Probability**: Likelihood of reaching savings goals
+- **Cash Flow Projections**: Predict future cash flow based on income and expense patterns
+
+```typescript
+class TransactionPredictiveAnalytics {
+  async predictMonthlySpending(userId: string): Promise<SpendingPrediction> {
+    const historicalData = await this.getHistoricalSpending(userId, { months: 12 });
+    const currentMonthData = await this.getCurrentMonthSpending(userId);
+    
+    // Apply time series forecasting
+    const seasonalFactors = this.calculateSeasonalFactors(historicalData);
+    const trendFactor = this.calculateTrendFactor(historicalData);
+    const categoryPredictions = this.predictCategorySpending(historicalData, currentMonthData);
+    
+    const basePrediction = this.calculateBasePrediction(historicalData);
+    const adjustedPrediction = this.applyAdjustments(basePrediction, {
+      seasonal: seasonalFactors,
+      trend: trendFactor,
+      currentPace: currentMonthData
+    });
+
+    return {
+      predictedTotal: adjustedPrediction.total,
+      categoryPredictions,
+      confidenceInterval: adjustedPrediction.confidenceInterval,
+      factorsConsidered: adjustedPrediction.factors,
+      lastUpdated: new Date(),
+      nextUpdateIn: '24 hours'
+    };
+  }
+}
+```
+
+## Export and Reporting
+
+### Comprehensive Export Options
+
+**Export Formats:**
+<CardGroup cols={2}>
+  <Card title="Standard Formats" icon="download">
+    **CSV**: Spreadsheet-compatible format for analysis  
+    **PDF**: Formatted reports for printing and sharing  
+    **JSON**: Machine-readable format for developers  
+    **Excel**: Advanced formatting with charts and pivot tables
+  </Card>
+  <Card title="Specialized Reports" icon="file-text">
+    **Tax Reports**: Pre-formatted for tax preparation  
+    **Bank Statements**: Traditional bank statement format  
+    **Category Summaries**: Spending by category with totals  
+    **Investment Reports**: Portfolio and investment-specific reports
+  </Card>
+</CardGroup>
+
+### Report Generation Implementation
+
+```typescript
+class TransactionReportGenerator {
+  async generateReport(request: ReportGenerationRequest): Promise<GeneratedReport> {
+    const transactions = await this.getTransactionsForReport(request);
+    const analytics = await this.generateReportAnalytics(transactions, request);
+    
+    switch (request.format) {
+      case 'pdf':
+        return await this.generatePDFReport(transactions, analytics, request);
+      case 'excel':
+        return await this.generateExcelReport(transactions, analytics, request);
+      case 'csv':
+        return await this.generateCSVReport(transactions, request);
+      case 'json':
+        return await this.generateJSONReport(transactions, analytics, request);
+      default:
+        throw new Error(`Unsupported report format: ${request.format}`);
+    }
+  }
+
+  private async generatePDFReport(
+    transactions: AWOTransaction[], 
+    analytics: ReportAnalytics, 
+    request: ReportGenerationRequest
+  ): Promise<PDFReport> {
+    const pdfBuilder = new PDFReportBuilder()
+      .withHeader(this.generateReportHeader(request))
+      .withSummary(analytics.summary)
+      .withCategoryBreakdown(analytics.categoryBreakdown)
+      .withSpendingTrends(analytics.trends)
+      .withTransactionList(transactions, request.includeFullTransactionList)
+      .withFooter(this.generateReportFooter());
+
+    if (request.includeCharts) {
+      pdfBuilder.withCharts(analytics.chartData);
+    }
+
+    const pdfBuffer = await pdfBuilder.build();
+    
+    return {
+      format: 'pdf',
+      buffer: pdfBuffer,
+      filename: this.generateFilename(request, 'pdf'),
+      size: pdfBuffer.length,
+      generatedAt: new Date(),
+      metadata: {
+        transactionCount: transactions.length,
+        dateRange: request.dateRange,
+        categories: analytics.categoriesIncluded
+      }
+    };
+  }
+}
+```
+
+### Automated Reporting
+
+**Scheduled Reports:**
+- **Monthly Statements**: Automatically generated and emailed monthly financial statements
+- **Quarterly Reviews**: Comprehensive quarterly financial health reports
+- **Annual Summaries**: Year-end financial summaries for tax and planning purposes
+- **Goal Progress Reports**: Weekly or monthly reports on savings goal progress
+
+```typescript
+class AutomatedReportingService {
+  async scheduleMonthlyStatement(userId: string, preferences: ReportPreferences): Promise<void> {
+    const schedule = {
+      userId,
+      reportType: 'monthly_statement',
+      frequency: 'monthly',
+      dayOfMonth: preferences.dayOfMonth || 1,
+      format: preferences.format || 'pdf',
+      deliveryMethod: preferences.deliveryMethod || 'email',
+      includeAnalytics: preferences.includeAnalytics || true,
+      categories: preferences.categories || 'all'
+    };
+
+    await this.scheduler.scheduleRecurringReport(schedule);
+    
+    // Send confirmation to user
+    await this.notificationService.sendReportScheduleConfirmation(userId, schedule);
+  }
+
+  async generateScheduledReport(scheduleId: string): Promise<void> {
+    const schedule = await this.getReportSchedule(scheduleId);
+    const reportRequest = this.convertScheduleToRequest(schedule);
+    
+    try {
+      const report = await this.reportGenerator.generateReport(reportRequest);
+      await this.deliverReport(report, schedule);
+      
+      await this.updateScheduleLastRun(scheduleId, new Date(), 'success');
+    } catch (error) {
+      await this.handleReportGenerationError(scheduleId, error);
+    }
+  }
+}
+```
+
+## Transaction Dispute and Correction
+
+### Dispute Management System
+
+**Dispute Types:**
+<CardGroup cols={2}>
+  <Card title="Incorrect Categorization" icon="tag">
+    **User Correction**: User disagrees with automatic categorization  
+    **Process**: Simple category change with learning feedback  
+    **Impact**: Improves future categorization accuracy  
+    **Timeline**: Immediate resolution
+  </Card>
+  <Card title="Transaction Errors" icon="alert-triangle">
+    **Data Errors**: Incorrect amounts, dates, or descriptions  
+    **Provider Issues**: Mobile money or bank integration errors  
+    **Process**: Investigation and correction workflow  
+    **Timeline**: 1-5 business days depending on complexity
+  </Card>
+</CardGroup>
+
+### Dispute Resolution Workflow
+
+```typescript
+interface TransactionDispute {
+  disputeId: string;
+  transactionId: string;
+  userId: string;
+  disputeType: DisputeType;
+  description: string;
+  proposedCorrection?: ProposedCorrection;
+  evidence?: DisputeEvidence[];
+  status: DisputeStatus;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  createdAt: Date;
+  resolvedAt?: Date;
+  resolution?: DisputeResolution;
+  assignedTo?: string;
+}
+
+class TransactionDisputeService {
+  async createDispute(request: CreateDisputeRequest): Promise<TransactionDispute> {
+    // Validate dispute request
+    await this.validateDisputeRequest(request);
+    
+    // Check for duplicate disputes
+    const existingDispute = await this.checkExistingDispute(request.transactionId);
+    if (existingDispute) {
+      throw new Error('Dispute already exists for this transaction');
+    }
+
+    // Create dispute record
+    const dispute = await this.createDisputeRecord(request);
+    
+    // Determine priority and assignment
+    const priority = this.calculateDisputePriority(request);
+    const assignee = await this.assignDispute(dispute, priority);
+    
+    // Notify relevant parties
+    await this.notifyDisputeCreated(dispute);
+    
+    return dispute;
+  }
+
+  async resolveDispute(disputeId: string, resolution: DisputeResolution): Promise<void> {
+    const dispute = await this.getDispute(disputeId);
+    
+    // Apply resolution changes
+    switch (resolution.type) {
+      case 'correct_transaction':
+        await this.correctTransaction(dispute.transactionId, resolution.corrections);
+        break;
+      case 'correct_categorization':
+        await this.correctCategorization(dispute.transactionId, resolution.newCategory);
+        break;
+      case 'refund_transaction':
+        await this.processRefund(dispute.transactionId, resolution.refundAmount);
+        break;
+      case 'no_action_required':
+        // Just close the dispute
+        break;
+    }
+
+    // Update dispute status
+    await this.closeDispute(disputeId, resolution);
+    
+    // Learn from resolution
+    await this.updateLearningModel(dispute, resolution);
+    
+    // Notify user of resolution
+    await this.notifyDisputeResolved(dispute, resolution);
+  }
+}
+```
+
+## Privacy and Data Protection
+
+### Transaction Data Privacy
+
+**Data Protection Measures:**
+<CardGroup cols={2}>
+  <Card title="Data Encryption" icon="shield">
+    **Field-Level Encryption**: Sensitive transaction details encrypted  
+    **Transport Security**: All data encrypted in transit  
+    **Key Management**: Proper encryption key rotation and management  
+    **Access Controls**: Role-based access to transaction data
+  </Card>
+  <Card title="User Privacy Controls" icon="eye-off">
+    **Data Visibility**: Users control who can see transaction details  
+    **Selective Sharing**: Choose what to share with Chama members  
+    **Anonymization**: Option to anonymize data for analytics  
+    **Deletion Rights**: Right to delete transaction history (with legal exceptions)
+  </Card>
+</CardGroup>
+
+### Compliance and Audit
+
+**Regulatory Compliance:**
+- **Data Retention**: Transaction records retained per financial regulations
+- **Audit Trails**: Complete audit trails for all transaction modifications
+- **Regulatory Reporting**: Automated compliance reporting where required
+- **Cross-Border Data**: Proper handling of cross-border transaction data
+
+## API Integration Examples
+
+### Transaction History APIs
+
+```typescript
+// Get transaction history with filters
+const transactions = await awoClient.transactions.getHistory({
+  dateRange: {
+    startDate: '2025-01-01',
+    endDate: '2025-01-31'
+  },
+  categories: ['food_dining', 'transportation'],
+  minAmount: 100,
+  maxAmount: 5000,
+  limit: 50,
+  offset: 0
+});
+
+// Search transactions
+const searchResults = await awoClient.transactions.search({
+  query: 'shoprite',
+  filters: {
+    dateRange: { startDate: '2024-12-01', endDate: '2025-01-31' },
+    categories: ['shopping', 'food_dining']
+  }
+});
+
+// Get transaction analytics
+const analytics = await awoClient.transactions.getAnalytics({
+  period: 'last_6_months',
+  groupBy: 'category',
+  includeComparisons: true
+});
+
+// Update transaction category
+await awoClient.transactions.updateCategory(transactionId, {
+  category: 'food_dining',
+  subCategory: 'groceries',
+  reason: 'user_correction'
+});
+```
+
+### Export and Reporting APIs
+
+```typescript
+// Generate transaction report
+const report = await awoClient.transactions.generateReport({
+  format: 'pdf',
+  dateRange: {
+    startDate: '2024-01-01',
+    endDate: '2024-12-31'
+  },
+  includeCharts: true,
+  includeAnalytics: true,
+  categories: ['all']
+});
+
+// Schedule automated report
+await awoClient.transactions.scheduleReport({
+  frequency: 'monthly',
+  format: 'pdf',
+  deliveryMethod: 'email',
+  dayOfMonth: 1,
+  includeAnalytics: true
+});
+
+// Export transaction data
+const exportData = await awoClient.transactions.export({
+  format: 'csv',
+  dateRange: { startDate: '2024-01-01', endDate: '2024-12-31' },
+  columns: ['date', 'description', 'amount', 'category', 'balance']
+});
+```
+
+## Performance Optimization
+
+### Query Optimization
+
+**Database Optimization:**
+- **Indexing Strategy**: Optimized indexes for common query patterns
+- **Partitioning**: Time-based partitioning for large transaction volumes
+- **Caching**: Intelligent caching of frequently accessed transaction data
+- **Aggregation**: Pre-computed aggregations for common analytics queries
+
+**Search Performance:**
+- **Full-Text Search**: Elasticsearch integration for complex text searches
+- **Faceted Search**: Pre-computed facets for instant filtering
+- **Result Caching**: Cache popular search results and analytics
+- **Progressive Loading**: Load basic results immediately, enhance with details
+
+---
+
+*AWO's Transaction History system provides users with comprehensive visibility into their financial activities, intelligent insights to improve financial behavior, and powerful tools to track progress toward their financial goals across the SADC region.*
+
+*Last updated: June 2025*  
+*Next review: July 2025*

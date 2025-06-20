@@ -1,52 +1,653 @@
----
-title: "Awo Wallet"
-description: "AWO Platform awo wallet core functionality"
----
+# AWO Wallet
 
-# Awo Wallet
+The AWO Digital Wallet serves as the financial hub for all user activities on the platform, providing secure, fast, and accessible financial services optimized for African markets and usage patterns.
 
 ## Overview
 
 <Info>
-Awo Wallet is a core feature of the AWO Platform, designed to support financial inclusion for African women.
+AWO Wallet is designed as a comprehensive digital financial service that bridges traditional African financial behaviors with modern fintech capabilities, supporting everything from daily transactions to long-term savings goals.
 </Info>
 
-## Key Features
+**Core Capabilities:**
+- Multi-currency digital wallet for SADC region
+- Real-time balance tracking and transaction processing
+- Goal-based savings buckets with auto-savings
+- Instant P2P transfers within AWO ecosystem
+- Mobile money and banking integration
+- Offline transaction queuing for variable connectivity
 
-Core functionality will be documented here.
+## Wallet Architecture
 
-## Implementation
+### Multi-Currency Support
 
+AWO Wallet supports major SADC currencies with real-time exchange rate management:
+
+<CardGroup cols={2}>
+  <Card title="Primary Currencies" icon="wallet">
+    **ZAR** (South African Rand) - Primary market  
+    **BWP** (Botswana Pula) - Regional expansion  
+    **USD** (US Dollar) - Investment integration  
+   
+  </Card>
+  <Card title="Cross-Border Features" icon="globe">
+    **Real-time Rates** - Live exchange rate feeds  
+    **Multi-wallet Management** - Separate balances per currency  
+    **Auto-conversion** - Optional currency conversion  
+    **Rate Alerts** - Favorable exchange rate notifications
+  </Card>
+</CardGroup>
+
+### Wallet Structure
+
+```typescript
+interface AWOWallet {
+  userId: string;
+  walletId: string;
+  balances: CurrencyBalance[];
+  savingsGoals: SavingsGoal[];
+  autoSavingsRules: AutoSavingsRule[];
+  transactionLimits: TransactionLimits;
+  status: 'active' | 'restricted' | 'suspended';
+  createdAt: Date;
+  lastTransactionAt: Date;
+}
+
+interface CurrencyBalance {
+  currency: 'ZAR' | 'BWP' | 'USD' | 'ZMW';
+  availableBalance: number;
+  pendingBalance: number;
+  reservedBalance: number; // For pending goals/investments
+  totalBalance: number;
+  lastUpdated: Date;
+}
+```
+
+## Core Wallet Features
+
+### Balance Management
+
+**Real-Time Balance Tracking:**
+- Instant balance updates for all transactions
+- Separate tracking of available, pending, and reserved funds
+- Historical balance trends and analytics
+- Low balance alerts and notifications
+
+**Balance Categories:**
+<CardGroup cols={3}>
+  <Card title="Available Balance" icon="wallet">
+    Funds immediately available for spending, transfers, and withdrawals
+  </Card>
+  <Card title="Pending Balance" icon="clock">
+    Incoming transfers and deposits awaiting confirmation or processing
+  </Card>
+  <Card title="Reserved Balance" icon="lock">
+    Funds allocated to savings goals, pending investments, or Chama contributions
+  </Card>
+</CardGroup>
+
+### Transaction Processing
+
+**Transaction Types:**
 <Steps>
-  <Step title="Setup">
-    Initial setup and configuration
+  <Step title="Deposits">
+    **Bank Transfers**: Via Open Banking (Stitch/Mono)  
+    **Mobile Money**: M-Pesa, MTN MoMo, Flutterwave  
+    **Cash Deposits**: Through agent network locations  
+    **P2P Transfers**: From other AWO users
   </Step>
-  <Step title="Integration">
-    Integration with other AWO services
+  <Step title="Withdrawals">
+    **Bank Transfers**: Direct to linked bank accounts  
+    **Mobile Money**: To registered mobile money accounts  
+    **Cash Withdrawals**: Via agent network locations  
+    **ATM Access**: Through partner ATM networks (future)
   </Step>
-  <Step title="Testing">
-    Testing and validation procedures
+  <Step title="Internal Transfers">
+    **P2P Transfers**: Instant transfers between AWO users  
+    **Chama Contributions**: Automated group savings deposits  
+    **Investment Funding**: Portfolio and SME investment transfers  
+    **Goal Transfers**: Automatic savings goal contributions
   </Step>
 </Steps>
 
-## API Integration
+### Transaction Limits by KYC Tier
 
-```typescript
-// Example API integration
-const response = await awo.awowallet.method();
-```
+| Limit Type | Tier 1 KYC | Tier 2 KYC |
+|------------|------------|------------|
+| **Daily Deposit** | R5,000 | Unlimited |
+| **Daily Withdrawal** | R2,500 | R50,000 |
+| **Monthly Volume** | R25,000 | Unlimited |
+| **P2P Transfer** | R1,000 per transaction | R10,000 per transaction |
+| **Cross-Border** | Not available | R25,000 per transaction |
 
-## Best Practices
+## Goal-Based Savings System
 
-Implementation best practices will be provided here.
+### Savings Goals Structure
 
-## Related Features
-
+**Goal Categories:**
 <CardGroup cols={2}>
-  <Card title="DIVA Scoring" href="/core-features/diva-scoring">
-    Financial health assessment system
+  <Card title="Emergency Fund" icon="shield">
+    **Target**: 3-6 months of expenses  
+    **Priority**: High (auto-funded first)  
+    **Liquidity**: Instant access  
+    **Interest**: Money market rates
   </Card>
-  <Card title="Chama Management" href="/core-features/basic-chama">
-    Digital savings group platform
+  <Card title="Short-term Goals" icon="calendar">
+    **Timeline**: 3 months to 2 years  
+    **Examples**: Vacation, appliances, education  
+    **Liquidity**: 48-hour notice  
+    **Interest**: Savings account rates
   </Card>
 </CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Medium-term Goals" icon="arrow-up">
+    **Timeline**: 2-10 years  
+    **Examples**: Home deposit, business capital  
+    **Liquidity**: 7-day notice  
+    **Interest**: Conservative investment returns
+  </Card>
+  <Card title="Long-term Goals" icon="bolt">
+    **Timeline**: 10+ years  
+    **Examples**: Retirement, children's education  
+    **Liquidity**: 30-day notice  
+    **Interest**: Diversified investment returns
+  </Card>
+</CardGroup>
+
+### Goal Management Features
+
+```typescript
+interface SavingsGoal {
+  goalId: string;
+  userId: string;
+  name: string;
+  description?: string;
+  category: 'emergency' | 'short_term' | 'medium_term' | 'long_term';
+  targetAmount: number;
+  currentAmount: number;
+  currency: string;
+  targetDate: Date;
+  autoSavingsEnabled: boolean;
+  autoSavingsAmount?: number;
+  autoSavingsFrequency?: 'daily' | 'weekly' | 'monthly';
+  priority: number; // 1-10, higher number = higher priority
+  status: 'active' | 'paused' | 'completed' | 'cancelled';
+  createdAt: Date;
+  completedAt?: Date;
+}
+```
+
+**Goal Creation Process:**
+<Steps>
+  <Step title="Goal Definition">
+    User sets goal name, target amount, target date, and category
+  </Step>
+  <Step title="Auto-Savings Setup">
+    Configure automatic contributions based on income and spending patterns
+  </Step>
+  <Step title="Priority Assignment">
+    System suggests priority order, user can customize based on personal needs
+  </Step>
+  <Step title="Progress Tracking">
+    Real-time progress updates with milestone celebrations and encouragement
+  </Step>
+</Steps>
+
+## Auto-Savings Engine
+
+### Intelligent Auto-Savings Rules
+
+**Rule-Based Savings:**
+<CardGroup cols={2}>
+  <Card title="Percentage-Based" icon="percent">
+    **Income Percentage**: Save 10-30% of incoming deposits  
+    **Roundup Savings**: Round up transactions to nearest R5/R10  
+    **Surplus Savings**: Save unexpected income or windfalls  
+    **Payroll Deduction**: Automatic salary-based savings
+  </Card>
+  <Card title="Behavioral Triggers" icon="bolt">
+    **Spending Insights**: Save when spending less than budgeted  
+    **Goal Milestones**: Bonus savings when reaching milestones  
+    **Challenge Participation**: Save through community challenges  
+    **Seasonal Adjustments**: Increased savings during high-income periods
+  </Card>
+</CardGroup>
+
+### Smart Savings Algorithms
+
+```typescript
+class AutoSavingsEngine {
+  async calculateOptimalSavings(userId: string): Promise<SavingsRecommendation> {
+    const user = await this.getUserProfile(userId);
+    const transactions = await this.getTransactionHistory(userId, { months: 3 });
+    const goals = await this.getUserGoals(userId);
+    
+    // Analyze spending patterns
+    const spendingAnalysis = this.analyzeSpendingPatterns(transactions);
+    const disposableIncome = this.calculateDisposableIncome(spendingAnalysis);
+    
+    // Calculate safe savings amount (never exceed 20% of 3-month average)
+    const maxSafeSavings = Math.min(
+      disposableIncome * 0.4, // 40% of disposable income
+      spendingAnalysis.averageMonthlyIncome * 0.2 // 20% of total income
+    );
+    
+    // Distribute across goals by priority
+    const goalAllocations = this.distributeAcrossGoals(goals, maxSafeSavings);
+    
+    return {
+      recommendedAmount: maxSafeSavings,
+      goalAllocations,
+      frequency: this.determineOptimalFrequency(transactions),
+      reasoning: this.generateExplanation(spendingAnalysis, goalAllocations)
+    };
+  }
+}
+```
+
+### Savings Safety Features
+
+**Protective Mechanisms:**
+- **Maximum Cap**: Never exceed 20% of 3-month average balance
+- **Emergency Override**: Pause auto-savings during financial stress
+- **Income Verification**: Adjust savings based on actual income patterns
+- **Manual Override**: Users can always modify or pause rules
+- **Insufficient Funds Protection**: Skip savings when balance too low
+
+## P2P Transfer System
+
+### Instant Transfer Features
+
+**Transfer Methods:**
+<CardGroup cols={3}>
+  <Card title="Phone Number" icon="phone">
+    Transfer using recipient's registered phone number with AWO
+  </Card>
+  <Card title="Email Address" icon="message">
+    Send money using email address, recipient gets notification to claim
+  </Card>
+  <Card title="QR Code" icon="square">
+    Scan QR code for in-person transfers and merchant payments
+  </Card>
+</CardGroup>
+
+**Transfer Process:**
+<Steps>
+  <Step title="Recipient Selection">
+    Choose recipient from contacts, phone number, or QR code scan
+  </Step>
+  <Step title="Amount & Currency">
+    Enter amount and select currency (auto-conversion if needed)
+  </Step>
+  <Step title="Transfer Purpose">
+    Optional categorization for tracking (personal, business, Chama, etc.)
+  </Step>
+  <Step title="Confirmation">
+    Review details, authenticate with PIN/biometric, and confirm transfer
+  </Step>
+</Steps>
+
+### Social Features
+
+**Enhanced Future P2P Experience:**
+- **Contact Integration**: Send money to phone contacts seamlessly
+- **Transfer History**: Complete history with contact details and purposes
+- **Split Bills**: Divide expenses among multiple people easily 
+- **Request Money**: Send payment requests with optional descriptions
+- **Group Transfers**: Send to multiple recipients simultaneously
+
+```typescript
+interface P2PTransfer {
+  transferId: string;
+  senderId: string;
+  recipientId?: string; // null if recipient not yet registered
+  recipientPhone?: string;
+  recipientEmail?: string;
+  amount: number;
+  currency: string;
+  purpose?: string;
+  message?: string;
+  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  fees: TransferFees;
+  exchangeRate?: number;
+  createdAt: Date;
+  completedAt?: Date;
+}
+```
+
+## Mobile Money Integration
+
+### Supported Providers
+
+<CardGroup cols={2}>
+  <Card title="South Africa" icon="flag">
+    **Primary**: Flutterwave gateway  
+    **Direct**: FNB eWallet, Standard Bank Instant Money  
+    **Future**: Capitec Pay, TymeBank
+  </Card>
+  <Card title="Regional SADC" icon="globe">
+    **Botswana**: Orange Money, Mascom MyZaka  
+    **Zambia**: MTN MoMo, Airtel Money  
+    **Namibia**: MTC Mobile Money, Telecom Mobile Money
+  </Card>
+</CardGroup>
+
+### Mobile Money Operations
+
+**Deposit Process:**
+<Steps>
+  <Step title="Provider Selection">
+    Choose mobile money provider and enter mobile number
+  </Step>
+  <Step title="Amount Entry">
+    Enter deposit amount and confirm fees
+  </Step>
+  <Step title="Authorization">
+    Complete mobile money PIN/USSD authorization
+  </Step>
+  <Step title="Confirmation">
+    Receive confirmation and instant AWO wallet credit
+  </Step>
+</Steps>
+
+**Withdrawal Process:**
+<Steps>
+  <Step title="Withdrawal Request">
+    Enter amount and select mobile money account
+  </Step>
+  <Step title="Verification">
+    Confirm identity with AWO PIN or biometric
+  </Step>
+  <Step title="Processing">
+    AWO initiates mobile money transfer
+  </Step>
+  <Step title="Completion">
+    Receive mobile money notification and AWO confirmation
+  </Step>
+</Steps>
+
+## Banking Integration
+
+### Open Banking Connectivity
+
+**Supported Banks (via Stitch & Mono):**
+
+| Country | Primary Banks | Coverage |
+|---------|---------------|----------|
+| **South Africa** | FNB, Standard Bank, ABSA, Nedbank | 95% of market |
+| **Botswana** | First National Bank Botswana, Standard Bank | 80% of market |
+| **Namibia** | FNB Namibia, Standard Bank Namibia | 75% of market |
+| **Zambia** | Stanbic Bank, FNB Zambia | 70% of market |
+
+### Bank Account Linking
+
+**Linking Process:**
+<Steps>
+  <Step title="Bank Selection">
+    Choose bank from supported list and confirm account ownership
+  </Step>
+  <Step title="OAuth Authentication">
+    Redirect to bank's secure authentication system
+  </Step>
+  <Step title="Consent Confirmation">
+    Approve data sharing and transaction permissions
+  </Step>
+  <Step title="Verification">
+    Small deposit verification or account verification process
+  </Step>
+</Steps>
+
+**Available Operations:**
+- **Balance Inquiries**: Real-time account balance checking
+- **Transaction Sync**: Automatic transaction categorization and import
+- **Direct Deposits**: Instant transfers from bank to AWO wallet
+- **Direct Withdrawals**: Instant transfers from AWO wallet to bank
+- **Payment Initiation**: Direct payments to merchants and bills
+
+## Transaction History & Analytics
+
+### Comprehensive Transaction Tracking
+
+**Transaction Categories:**
+<CardGroup cols={3}>
+  <Card title="Income" icon="arrow-up">
+    - Salary deposits
+    - Business income
+    - Investment returns
+    - P2P receipts
+    - Chama payouts
+  </Card>
+  <Card title="Expenses" icon="arrow-down">
+    - Shopping & retail
+    - Food & dining
+    - Transport & fuel
+    - Utilities & bills
+    - Entertainment
+  </Card>
+  <Card title="Savings & Investments" icon="piggy-bank">
+    - Goal contributions
+    - Investment deposits
+    - Chama contributions
+    - Emergency fund
+    - Long-term savings
+  </Card>
+</CardGroup>
+
+### Smart Categorization Engine
+
+```typescript
+class TransactionCategorizer {
+  async categorizeTransaction(transaction: Transaction): Promise<TransactionCategory> {
+    // Rule-based categorization
+    const ruleCategory = this.applyRules(transaction);
+    if (ruleCategory.confidence > 0.8) {
+      return ruleCategory;
+    }
+    
+    // Merchant name analysis
+    const merchantCategory = this.analyzeMerchantName(transaction.description);
+    if (merchantCategory.confidence > 0.7) {
+      return merchantCategory;
+    }
+    
+    // Pattern matching based on user history
+    const patternCategory = await this.matchUserPatterns(
+      transaction.userId,
+      transaction
+    );
+    
+    // Return best match or prompt user for confirmation
+    return this.selectBestCategory([ruleCategory, merchantCategory, patternCategory]);
+  }
+}
+```
+
+### Financial Insights Dashboard
+
+**Available Analytics:**
+- **Spending Trends**: Monthly and weekly spending patterns
+- **Income Stability**: Income consistency and growth analysis
+- **Savings Rate**: Percentage of income saved over time
+- **Goal Progress**: Visual progress tracking for all savings goals
+- **Category Breakdown**: Detailed spending by category with trends
+- **Cash Flow**: Income vs. expenses with future projections
+
+## Security Features
+
+### Transaction Security
+
+**Multi-Layer Protection:**
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key">
+    **Transaction PIN**: 4-6 digit PIN for all transactions  
+    **Biometric Auth**: Fingerprint/facial recognition  
+    **MFA**: SMS OTP for high-value transactions  
+    **Device Binding**: Transactions limited to registered devices
+  </Card>
+  <Card title="Monitoring" icon="shield">
+    **Fraud Detection**: Real-time transaction monitoring  
+    **Velocity Limits**: Automatic blocks for unusual activity  
+    **Geolocation**: Location-based security alerts  
+    **Device Analytics**: Behavioral pattern analysis
+  </Card>
+</CardGroup>
+
+### Emergency Features
+
+**Account Protection:**
+- **Instant Account Lock**: Immediate account freeze via app or USSD
+- **Emergency Contact**: Automatic notifications to trusted contacts
+- **Transaction Reversal**: Limited-time reversal for fraudulent transactions
+- **Customer Support**: 24/7 support for security incidents
+
+## API Integration Examples
+
+### Wallet Management
+
+```typescript
+// Get wallet balance
+const balance = await awoClient.wallet.getBalance(userId, currency);
+
+// Create savings goal
+const savingsGoal = await awoClient.wallet.createSavingsGoal(userId, {
+  name: "Emergency Fund",
+  targetAmount: 15000,
+  targetDate: "2025-12-31",
+  category: "emergency",
+  autoSavingsAmount: 500,
+  autoSavingsFrequency: "monthly"
+});
+
+// Execute P2P transfer
+const transfer = await awoClient.wallet.transferP2P(userId, {
+  recipientPhone: "+27821234567",
+  amount: 500,
+  currency: "ZAR",
+  purpose: "lunch_split",
+  message: "Thanks for lunch!"
+});
+```
+
+### Transaction Operations
+
+```typescript
+// Deposit from mobile money
+const deposit = await awoClient.wallet.depositMobileMoney(userId, {
+  provider: "flutterwave",
+  amount: 1000,
+  currency: "ZAR",
+  mobileNumber: "+27821234567"
+});
+
+// Withdraw to bank account
+const withdrawal = await awoClient.wallet.withdrawToBank(userId, {
+  bankAccountId: "linked-account-id",
+  amount: 2500,
+  currency: "ZAR"
+});
+
+// Get transaction history
+const transactions = await awoClient.wallet.getTransactions(userId, {
+  startDate: "2025-01-01",
+  endDate: "2025-01-31",
+  category: "expenses",
+  limit: 50
+});
+```
+
+## Offline Capabilities
+
+### Offline Transaction Queuing
+
+**Supported Offline Operations:**
+- **P2P Transfers**: Queue transfers for when connectivity returns
+- **Savings Contributions**: Offline goal contributions
+- **Transaction Recording**: Manual expense tracking
+- **Balance Inquiries**: Cached balance information
+
+**Synchronization Process:**
+<Steps>
+  <Step title="Offline Detection">
+    App detects poor/no connectivity and switches to offline mode
+  </Step>
+  <Step title="Local Storage">
+    Transactions stored locally with encryption and timestamps
+  </Step>
+  <Step title="Queue Management">
+    Priority queue ensures critical transactions process first
+  </Step>
+  <Step title="Sync on Reconnect">
+    Automatic synchronization when connectivity restored
+  </Step>
+</Steps>
+
+## Performance & Reliability
+
+### System Performance Targets
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| **Balance Inquiry** | &lt;200ms | 95th percentile |
+| **P2P Transfer** | &lt;3 seconds | End-to-end completion |
+| **Transaction Sync** | &lt;10 seconds | Bank to wallet |
+| **Mobile Money** | &lt;30 seconds | Provider dependent |
+| **Offline Sync** | &lt;5 seconds | On reconnection |
+
+### Reliability Features
+
+**High Availability Design:**
+- **Database Replication**: Multi-region PostgreSQL replicas
+- **Caching Strategy**: Redis clusters for balance and transaction caching
+- **Failover Systems**: Automatic failover for critical operations
+- **Circuit Breakers**: Protection against external service failures
+
+## Troubleshooting Common Issues
+
+<Accordion title="Transaction Failures">
+**Common Causes:**
+- Insufficient balance
+- Network connectivity issues
+- External provider downtime
+- Exceeded transaction limits
+
+**Resolution Steps:**
+1. Verify account balance and limits
+2. Check network connectivity
+3. Retry after a few minutes
+4. Contact support if issue persists
+</Accordion>
+
+<Accordion title="Mobile Money Integration Issues">
+**Common Problems:**
+- Provider maintenance windows
+- Mobile number mismatches
+- PIN/authentication failures
+- Currency conversion errors
+
+**Troubleshooting:**
+1. Verify mobile number is correct
+2. Ensure mobile money account is active
+3. Check provider status page
+4. Try alternative payment method
+</Accordion>
+
+<Accordion title="Auto-Savings Not Working">
+**Possible Issues:**
+- Insufficient balance for rule execution
+- Rules paused due to low balance alerts
+- Bank account synchronization delays
+- Changed income patterns affecting algorithms
+
+**Resolution:**
+1. Check auto-savings rule status
+2. Verify sufficient balance for execution
+3. Review and update rules if needed
+4. Ensure bank account is properly linked
+</Accordion>
+
+---
+
+*The AWO Wallet provides a comprehensive financial management platform that bridges traditional African financial behaviors with modern digital capabilities, enabling users to save, spend, and manage money efficiently across the SADC region.*
+
+*Last updated: June 2025*  
+*Next review: July 2025*

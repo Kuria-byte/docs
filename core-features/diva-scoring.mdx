@@ -1,52 +1,629 @@
----
-title: "Diva Scoring"
-description: "AWO Platform diva scoring core functionality"
----
+# DIVA Scoring System
 
-# Diva Scoring
+The DIVA (Discipline, Income, Velocity, Assets) Scoring System is AWO's proprietary financial health assessment engine that evaluates user financial behavior across four key dimensions to provide personalized insights and portfolio recommendations.
 
 ## Overview
 
 <Info>
-Diva Scoring is a core feature of the AWO Platform, designed to support financial inclusion for African women.
+DIVA Scoring transforms complex financial behavior patterns into an actionable 0-1000 point score that drives portfolio assignment, investment recommendations, and personalized financial guidance across the AWO platform.
 </Info>
 
-## Key Features
+**Core Purpose:**
+- **Financial Health Assessment**: Comprehensive evaluation of financial behavior
+- **Portfolio Matching**: Automatic assignment to Bronze/Silver/Gold/Platinum tiers
+- **Improvement Guidance**: Actionable insights to enhance financial wellbeing
+- **Risk Assessment**: Foundation for investment and lending decisions
+- **Progress Tracking**: Quarterly updates showing financial growth
 
-Core functionality will be documented here.
+## DIVA Score Components
 
-## Implementation
+### Component Breakdown
+
+The DIVA Score combines four weighted components to create a comprehensive financial health metric:
+
+<CardGroup cols={2}>
+  <Card title="Discipline (30%)" icon="shield">
+    **Focus**: Financial consistency and control  
+    **Metrics**: Payment punctuality, overdraft avoidance, savings regularity  
+    **Range**: 0-300 points  
+    **Update**: Real-time with transaction data
+  </Card>
+  <Card title="Income (25%)" icon="coins">
+    **Focus**: Income stability and growth  
+    **Metrics**: Income consistency, diversification, growth trends  
+    **Range**: 0-250 points  
+    **Update**: Monthly with new income data
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Velocity (25%)" icon="bolt">
+    **Focus**: Cash flow timing and efficiency  
+    **Metrics**: Payment timing, cash flow optimization  
+    **Range**: 0-250 points  
+    **Update**: Real-time with transaction patterns
+  </Card>
+  <Card title="Assets (20%)" icon="wallet">
+    **Focus**: Wealth accumulation and management  
+    **Metrics**: Savings rate, investment balance, net worth growth  
+    **Range**: 0-200 points  
+    **Update**: Monthly with balance updates
+  </Card>
+</CardGroup>
+
+### Score Structure
+
+```typescript
+interface DivaScore {
+  userId: string;
+  overallScore: number; // 0-1000
+  components: {
+    discipline: DivaComponent;
+    income: DivaComponent;
+    velocity: DivaComponent;
+    assets: DivaComponent;
+  };
+  portfolioTier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  calculatedAt: Date;
+  nextUpdateDue: Date;
+  historicalScores: DivaHistoricalRecord[];
+  insights: DivaInsight[];
+}
+
+interface DivaComponent {
+  score: number;
+  maxScore: number;
+  percentile: number; // 0-100
+  trend: 'improving' | 'stable' | 'declining';
+  factors: DivaScoringFactor[];
+  improvementTips: string[];
+}
+```
+
+## Discipline Component (30% Weight)
+
+### Payment Punctuality (40% of Discipline)
+
+**Measurement Criteria:**
+- **On-time Payments**: Bills, loans, and subscriptions paid before due date
+- **Late Payment Frequency**: Number of late payments in rolling 12-month period
+- **Payment Consistency**: Regular payment patterns vs. sporadic behavior
+- **Payment Method Reliability**: Consistent use of preferred payment methods
+
+**Calculation Logic:**
+```typescript
+function calculatePaymentPunctuality(transactions: Transaction[]): number {
+  const paymentTransactions = transactions.filter(t => t.type === 'bill_payment');
+  
+  const onTimePayments = paymentTransactions.filter(t => 
+    t.paymentDate <= t.dueDate
+  ).length;
+  
+  const latePayments = paymentTransactions.filter(t => 
+    t.paymentDate > t.dueDate
+  ).length;
+  
+  const punctualityRate = onTimePayments / (onTimePayments + latePayments);
+  
+  // Scoring: 95%+ = 100 points, 90%+ = 85 points, etc.
+  if (punctualityRate >= 0.95) return 100;
+  if (punctualityRate >= 0.90) return 85;
+  if (punctualityRate >= 0.80) return 70;
+  if (punctualityRate >= 0.70) return 55;
+  return Math.max(0, punctualityRate * 40);
+}
+```
+
+### Overdraft Avoidance (35% of Discipline)
+
+**Key Metrics:**
+- **Overdraft Frequency**: Number of overdraft incidents per quarter
+- **Overdraft Duration**: Average time spent in overdraft
+- **Overdraft Amount**: Average overdraft amount vs. account balance
+- **Recovery Time**: Speed of returning to positive balance
+
+**Scoring Bands:**
+| Overdraft History | Score | Description |
+|------------------|-------|-------------|
+| No overdrafts (6+ months) | 90-100 | Excellent financial control |
+| 1-2 overdrafts per year | 70-89 | Good with occasional slips |
+| 3-6 overdrafts per year | 50-69 | Needs improvement |
+| Monthly overdrafts | 20-49 | Poor financial control |
+| Frequent overdrafts | 0-19 | Critical financial stress |
+
+### Savings Regularity (25% of Discipline)
+
+**Assessment Factors:**
+- **Consistent Contributions**: Regular savings regardless of amount
+- **Goal Achievement**: Meeting savings targets and timelines
+- **Emergency Fund**: Building and maintaining emergency reserves
+- **Automated Savings**: Use of auto-savings rules and consistency
+
+```typescript
+function calculateSavingsRegularity(savingsHistory: SavingsTransaction[]): number {
+  const monthlyContributions = groupByMonth(savingsHistory);
+  const consistentMonths = monthlyContributions.filter(month => 
+    month.totalContributions > 0
+  ).length;
+  
+  const totalMonths = monthlyContributions.length;
+  const consistencyRate = consistentMonths / totalMonths;
+  
+  // Bonus for automated savings and goal achievement
+  const automationBonus = calculateAutomationBonus(savingsHistory);
+  const goalAchievementBonus = calculateGoalAchievementBonus(savingsHistory);
+  
+  return Math.min(100, 
+    (consistencyRate * 70) + automationBonus + goalAchievementBonus
+  );
+}
+```
+
+## Income Component (25% Weight)
+
+### Income Stability (50% of Income)
+
+**Stability Metrics:**
+- **Income Consistency**: Coefficient of variation in monthly income
+- **Income Frequency**: Regular vs. irregular income patterns
+- **Source Reliability**: Stability of primary income sources
+- **Seasonal Adjustments**: Accounting for predictable income variations
+
+**Calculation Method:**
+```typescript
+function calculateIncomeStability(incomeHistory: IncomeRecord[]): number {
+  const monthlyIncomes = groupIncomeByMonth(incomeHistory);
+  const mean = calculateMean(monthlyIncomes);
+  const standardDeviation = calculateStandardDeviation(monthlyIncomes);
+  
+  // Coefficient of variation (lower = more stable)
+  const coefficientOfVariation = standardDeviation / mean;
+  
+  // Scoring: CV < 0.1 = 100, CV < 0.2 = 80, etc.
+  if (coefficientOfVariation < 0.1) return 100;
+  if (coefficientOfVariation < 0.2) return 80;
+  if (coefficientOfVariation < 0.3) return 60;
+  if (coefficientOfVariation < 0.5) return 40;
+  return Math.max(0, 100 - (coefficientOfVariation * 100));
+}
+```
+
+### Income Growth (30% of Income)
+
+**Growth Assessment:**
+- **Year-over-Year Growth**: Income increase compared to previous year
+- **Career Progression**: Evidence of career advancement and skill development
+- **Income Diversification**: Multiple income streams vs. single source dependency
+- **Inflation Adjustment**: Real income growth accounting for inflation
+
+### Income Diversification (20% of Income)
+
+**Diversification Metrics:**
+<CardGroup cols={2}>
+  <Card title="Single Source Risk" icon="arrow-down">
+    **&gt;90% from one source**: High risk (0-20 points)  
+    **70-90% from primary**: Medium risk (21-50 points)  
+    **&lt;70% from primary**: Lower risk (51-80 points)  
+    **Multiple equal sources**: Lowest risk (81-100 points)
+  </Card>
+  <Card title="Income Types" icon="briefcase">
+    **Salary Only**: Limited diversification  
+    **Salary + Side Business**: Good diversification  
+    **Multiple Businesses**: Excellent diversification  
+    **Investment Income**: Premium diversification
+  </Card>
+</CardGroup>
+
+## Velocity Component (25% Weight)
+
+### Cash Flow Timing (60% of Velocity)
+
+**Timing Analysis:**
+- **Payment Optimization**: Paying bills at optimal times for cash flow
+- **Income to Expense Lag**: Time between income receipt and expense payments
+- **Float Management**: Efficient use of payment processing delays
+- **Liquidity Management**: Maintaining optimal cash balances
+
+**Velocity Calculation:**
+```typescript
+function calculateCashFlowVelocity(transactions: Transaction[]): number {
+  const monthlyFlows = analyzeMonthlyFlows(transactions);
+  
+  let velocityScore = 0;
+  
+  monthlyFlows.forEach(month => {
+    // Analyze payment timing relative to income
+    const paymentTiming = analyzePaymentTiming(month);
+    
+    // Score based on optimal timing (pay bills after income, before interest)
+    const timingScore = scorePaymentTiming(paymentTiming);
+    
+    // Analyze cash buffer management
+    const bufferScore = analyzeCashBuffer(month);
+    
+    velocityScore += (timingScore * 0.7) + (bufferScore * 0.3);
+  });
+  
+  return velocityScore / monthlyFlows.length;
+}
+```
+
+### Payment Efficiency (40% of Velocity)
+
+**Efficiency Metrics:**
+- **Payment Method Optimization**: Using most cost-effective payment methods
+- **Batch Processing**: Grouping related payments for efficiency
+- **Automated Payments**: Setting up recurring payments for bills
+- **Fee Minimization**: Avoiding unnecessary transaction fees
+
+## Assets Component (20% Weight)
+
+### Savings Rate (50% of Assets)
+
+**Savings Rate Calculation:**
+```typescript
+function calculateSavingsRate(income: number, expenses: number): number {
+  const disposableIncome = income - expenses;
+  const savingsRate = disposableIncome / income;
+  
+  // AWO scoring targets for African context
+  if (savingsRate >= 0.20) return 100; // 20%+ excellent
+  if (savingsRate >= 0.15) return 85;  // 15%+ very good
+  if (savingsRate >= 0.10) return 70;  // 10%+ good
+  if (savingsRate >= 0.05) return 50;  // 5%+ fair
+  return Math.max(0, savingsRate * 500); // Below 5%
+}
+```
+
+**Savings Rate Benchmarks for SADC Context:**
+| Savings Rate | Score Range | Assessment |
+|-------------|-------------|------------|
+| 20%+ | 90-100 | Excellent financial discipline |
+| 15-19% | 80-89 | Very good savings habit |
+| 10-14% | 65-79 | Good progress |
+| 5-9% | 40-64 | Needs improvement |
+| &lt;5% | 0-39 | Critical - focus needed |
+
+### Investment Balance (30% of Assets)
+
+**Investment Assessment:**
+- **Portfolio Allocation**: Percentage of assets in investments vs. cash
+- **Investment Diversification**: Spread across different asset classes
+- **Investment Consistency**: Regular investment contributions
+- **Risk-Adjusted Returns**: Performance relative to benchmark and risk level
+
+### Net Worth Growth (20% of Assets)
+
+**Growth Tracking:**
+- **Asset Accumulation**: Total asset growth over time
+- **Debt Reduction**: Progress in reducing liabilities
+- **Net Worth Trends**: 12-month rolling net worth changes
+- **Wealth Building Velocity**: Rate of net worth accumulation
+
+## Score Calculation Engine
+
+### Real-Time Calculation Process
 
 <Steps>
-  <Step title="Setup">
-    Initial setup and configuration
+  <Step title="Data Collection">
+    Gather transaction data, account balances, and linked bank information
   </Step>
-  <Step title="Integration">
-    Integration with other AWO services
+  <Step title="Component Analysis">
+    Calculate each of the four DIVA components using latest data
   </Step>
-  <Step title="Testing">
-    Testing and validation procedures
+  <Step title="Weighted Scoring">
+    Apply component weights and normalize to 1000-point scale
+  </Step>
+  <Step title="Trend Analysis">
+    Compare with historical scores to identify improvement or decline trends
+  </Step>
+  <Step title="Insight Generation">
+    Generate personalized recommendations based on scoring factors
   </Step>
 </Steps>
 
-## API Integration
+### Calculation Implementation
 
 ```typescript
-// Example API integration
-const response = await awo.divascoring.method();
+class DivaScoreEngine {
+  async calculateDivaScore(userId: string): Promise<DivaScore> {
+    // Gather required data
+    const userData = await this.getUserFinancialData(userId);
+    const transactions = await this.getTransactionHistory(userId, { months: 12 });
+    const accounts = await this.getLinkedAccounts(userId);
+    const goals = await this.getSavingsGoals(userId);
+    
+    // Calculate component scores
+    const discipline = await this.calculateDisciplineScore(
+      transactions, 
+      accounts, 
+      goals
+    );
+    
+    const income = await this.calculateIncomeScore(
+      transactions,
+      userData.employmentHistory
+    );
+    
+    const velocity = await this.calculateVelocityScore(
+      transactions,
+      accounts
+    );
+    
+    const assets = await this.calculateAssetsScore(
+      accounts,
+      userData.investments,
+      transactions
+    );
+    
+    // Calculate weighted overall score
+    const overallScore = 
+      (discipline.score * 0.30) +
+      (income.score * 0.25) +
+      (velocity.score * 0.25) +
+      (assets.score * 0.20);
+    
+    // Determine portfolio tier
+    const portfolioTier = this.determinePortfolioTier(overallScore);
+    
+    // Generate insights and recommendations
+    const insights = await this.generateInsights(
+      { discipline, income, velocity, assets },
+      userData
+    );
+    
+    return {
+      userId,
+      overallScore: Math.round(overallScore),
+      components: { discipline, income, velocity, assets },
+      portfolioTier,
+      calculatedAt: new Date(),
+      nextUpdateDue: addMonths(new Date(), 3),
+      insights
+    };
+  }
+}
 ```
 
-## Best Practices
+## Portfolio Tier Assignment
 
-Implementation best practices will be provided here.
+### Tier Determination Logic
 
-## Related Features
+The DIVA Score directly maps to investment portfolio tiers:
 
 <CardGroup cols={2}>
-  <Card title="DIVA Scoring" href="/core-features/diva-scoring">
-    Financial health assessment system
+  <Card title="Bronze Tier" icon="award" style="border-color: #cd7f32;">
+    **Score Range**: 0-399  
+    **Target Market**: Financial newcomers, building foundation  
+    **Investment Access**: Savings products, money market, T-Bills  
+    **Risk Profile**: Very conservative, capital preservation focus
   </Card>
-  <Card title="Chama Management" href="/core-features/basic-chama">
-    Digital savings group platform
+  <Card title="Silver Tier" icon="award" style="border-color: #c0c0c0;">
+    **Score Range**: 400-649  
+    **Target Market**: Established savers, moderate experience  
+    **Investment Access**: Index funds, bonds, conservative ETFs  
+    **Risk Profile**: Conservative to moderate, steady growth
   </Card>
 </CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Gold Tier" icon="award" style="border-color: #ffd700;">
+    **Score Range**: 650-849  
+    **Target Market**: Experienced investors, strong financial base  
+    **Investment Access**: Diversified portfolios, SME debt, alternatives  
+    **Risk Profile**: Moderate to aggressive, growth-focused
+  </Card>
+  <Card title="Platinum Tier" icon="award" style="border-color: #e5e4e2;">
+    **Score Range**: 850-1000  
+    **Target Market**: Sophisticated investors, optimal financial health  
+    **Investment Access**: Full platform access, premium opportunities  
+    **Risk Profile**: All risk levels, maximum diversification
+  </Card>
+</CardGroup>
+
+### Dynamic Tier Movement
+
+**Tier Progression:**
+- **Automatic Upgrades**: When score consistently exceeds threshold for 2+ quarters
+- **Downgrade Protection**: 6-month grace period before tier downgrades
+- **Emergency Override**: Temporary downgrades for financial stress periods
+- **Appeal Process**: Manual review for disputed tier assignments
+
+## DIVA Insights and Recommendations
+
+### Personalized Insights Engine
+
+**Insight Categories:**
+<CardGroup cols={2}>
+  <Card title="Improvement Opportunities" icon="award">
+    **Specific Actions**: "Set up auto-savings for R200/month"  
+    **Impact Projections**: "This could improve your score by 15 points"  
+    **Timeline**: "See improvements within 3 months"  
+    **Difficulty**: Easy, Medium, or Hard implementation
+  </Card>
+  <Card title="Strength Recognition" icon="star">
+    **Positive Reinforcement**: "Excellent payment consistency!"  
+    **Peer Comparison**: "Top 15% in your age group"  
+    **Milestone Celebrations**: "Achievement unlocked: 6 months on-time payments"  
+    **Social Sharing**: Optional achievements for Chama groups
+  </Card>
+</CardGroup>
+
+### Recommendation Engine
+
+```typescript
+class DivaInsightEngine {
+  generateRecommendations(score: DivaScore): DivaInsight[] {
+    const recommendations: DivaInsight[] = [];
+    
+    // Analyze weakest component for primary recommendation
+    const weakestComponent = this.findWeakestComponent(score.components);
+    
+    switch (weakestComponent.name) {
+      case 'discipline':
+        recommendations.push(...this.generateDisciplineRecommendations(weakestComponent));
+        break;
+      case 'income':
+        recommendations.push(...this.generateIncomeRecommendations(weakestComponent));
+        break;
+      case 'velocity':
+        recommendations.push(...this.generateVelocityRecommendations(weakestComponent));
+        break;
+      case 'assets':
+        recommendations.push(...this.generateAssetsRecommendations(weakestComponent));
+        break;
+    }
+    
+    // Add tier-specific recommendations
+    recommendations.push(...this.generateTierRecommendations(score.portfolioTier));
+    
+    // Priority ranking based on impact and ease
+    return this.prioritizeRecommendations(recommendations);
+  }
+}
+```
+
+## Quarterly Update Process
+
+### Mandatory Refresh Cycle
+
+**Update Requirements:**
+- **Frequency**: Every 3 months (quarterly)
+- **Data Refresh**: Latest 12 months of transaction data
+- **Bank Synchronization**: Updated account balances and transactions
+- **Goal Review**: Savings goals progress and adjustments
+- **Risk Assessment**: Updated RTSM questionnaire if significant changes
+
+**Update Process:**
+<Steps>
+  <Step title="Data Synchronization">
+    Refresh all connected bank accounts and transaction data
+  </Step>
+  <Step title="Score Recalculation">
+    Recalculate all DIVA components with latest data
+  </Step>
+  <Step title="Trend Analysis">
+    Compare with previous quarters to identify trends
+  </Step>
+  <Step title="Insight Update">
+    Generate new recommendations based on score changes
+  </Step>
+  <Step title="User Notification">
+    Notify user of score changes and new recommendations
+  </Step>
+</Steps>
+
+### Update Triggers
+
+**Automatic Updates:**
+- **Quarterly Schedule**: Automatic update every 3 months
+- **Significant Events**: Major financial changes (new job, large purchases)
+- **Bank Account Changes**: New accounts linked or accounts closed
+- **Goal Completion**: When major savings goals are achieved
+
+**Manual Updates:**
+- **User Request**: Users can request early updates (limited to once per month)
+- **Life Events**: Marriage, job change, home purchase
+- **Financial Stress**: During difficult financial periods for support
+
+## Historical Tracking and Analytics
+
+### Score History Analysis
+
+**Tracking Metrics:**
+- **Monthly Score Snapshots**: End-of-month DIVA scores
+- **Component Trends**: Individual component performance over time
+- **Improvement Velocity**: Rate of score improvement or decline
+- **Milestone Tracking**: Achievement of score thresholds and tier changes
+
+### Predictive Analytics
+
+```typescript
+interface DivaTrendAnalysis {
+  currentTrajectory: 'improving' | 'stable' | 'declining';
+  projectedScore: {
+    nextQuarter: number;
+    nextYear: number;
+    confidence: number;
+  };
+  riskFactors: string[];
+  opportunities: string[];
+  recommendedActions: DivaActionPlan[];
+}
+```
+
+## API Integration
+
+### Score Retrieval
+
+```typescript
+// Get current DIVA score
+const divaScore = await awoClient.diva.getScore(userId);
+
+// Get score history
+const scoreHistory = await awoClient.diva.getScoreHistory(userId, {
+  startDate: '2024-01-01',
+  endDate: '2025-01-01',
+  granularity: 'monthly'
+});
+
+// Force score refresh (limited usage)
+const refreshedScore = await awoClient.diva.refreshScore(userId);
+```
+
+### Component Analysis
+
+```typescript
+// Get detailed component breakdown
+const componentAnalysis = await awoClient.diva.getComponentAnalysis(userId, 'discipline');
+
+// Get improvement recommendations
+const recommendations = await awoClient.diva.getRecommendations(userId);
+
+// Track recommendation implementation
+await awoClient.diva.trackRecommendationProgress(userId, recommendationId, {
+  status: 'completed',
+  notes: 'Set up auto-savings as suggested'
+});
+```
+
+## Privacy and Data Protection
+
+### Data Usage Transparency
+
+**Data Sources:**
+- **Transaction Data**: With explicit user consent for Open Banking
+- **Account Balances**: Real-time balance information from linked accounts
+- **Goal Progress**: User-defined savings goals and contributions
+- **Payment Behavior**: Timing and consistency of bill payments
+
+**Data Protection:**
+- **Anonymization**: Score calculations don't store raw transaction details
+- **Encryption**: All personal financial data encrypted at field level
+- **Retention**: DIVA scores retained for 7 years, raw data per regulation
+- **User Control**: Users can view and export their DIVA calculation data
+
+## Regulatory Compliance
+
+### Financial Assessment Standards
+
+**Compliance Framework:**
+- **Consumer Protection**: Transparent scoring methodology
+- **Fair Lending**: Non-discriminatory scoring factors
+- **Data Privacy**: POPIA and GDPR compliant data handling
+- **Audit Trail**: Complete calculation audit logs maintained
+
+### Score Explanation Rights
+
+**User Rights:**
+- **Score Explanation**: Detailed breakdown of how score was calculated
+- **Data Correction**: Process for correcting inaccurate data
+- **Appeal Process**: Dispute resolution for score disagreements
+- **Impact Disclosure**: Clear explanation of how score affects platform access
+
+---
+
+*The DIVA Scoring System provides AWO users with comprehensive financial health assessment while maintaining transparency, fairness, and regulatory compliance across SADC markets.*
+
+*Last updated: June 2025*  
+*Next review: July 2025*
