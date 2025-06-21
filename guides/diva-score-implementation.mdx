@@ -1,1886 +1,1396 @@
----
-title: "DIVA Score Implementation Guide"
-description: "Complete guide to implementing and integrating the DIVA scoring system in your application"
----
-
 # DIVA Score Implementation Guide
 
-This comprehensive guide covers everything you need to know about implementing the DIVA (Discipline, Income, Velocity, Assets) scoring system in your application, from basic integration to advanced customization.
+This guide provides comprehensive instructions for implementing AWO Platform's proprietary DIVA scoring system with RTSM (Risk Tolerance Scoring Model) integration for intelligent portfolio assignment.
 
 <Info>
-The DIVA Score is AWO's proprietary financial health assessment algorithm that analyzes real bank transaction data to provide personalized insights and recommendations.
+DIVA scoring combines Discipline, Income, Velocity, and Assets analysis to create a 0-1000 point financial health score that automatically assigns users to Bronze, Silver, Gold, or Platinum investment portfolios.
 </Info>
 
-## Overview
+## Understanding DIVA Scoring
 
-The DIVA scoring system evaluates financial health across four key dimensions:
+### Core Components
+
+The DIVA scoring system evaluates four key financial health dimensions:
 
 <CardGroup cols={2}>
-  <Card title="Discipline (D)" icon="clock">
-    **Payment Punctuality & Consistency**
-    - Bill payment timing
-    - Credit utilization patterns
-    - Recurring payment reliability
-    - Financial commitment adherence
+  <Card title="Discipline (30%)" icon="shield-check">
+    **Payment Consistency**: On-time bill payments, loan repayments  
+    **Overdraft Avoidance**: Frequency and severity of overdrafts  
+    **Savings Regularity**: Consistent savings behavior patterns  
+    **Budget Adherence**: Spending within planned categories
   </Card>
-  <Card title="Income (I)" icon="trending-up">
-    **Stability & Growth**
-    - Income consistency
-    - Growth trajectory
-    - Source diversification
-    - Employment stability
+  <Card title="Income (25%)" icon="wallet">
+    **Stability**: Consistency of income over time  
+    **Growth**: Income trajectory and improvement  
+    **Diversification**: Multiple income sources  
+    **Reliability**: Predictability of income streams
   </Card>
-  <Card title="Velocity (V)" icon="zap">
-    **Cash Flow Efficiency**
-    - Spending patterns
-    - Money movement speed
-    - Transaction frequency
-    - Cash flow optimization
+  <Card title="Velocity (25%)" icon="bolt">
+    **Cash Flow Timing**: Efficiency of money movement  
+    **Transaction Patterns**: Optimal spending timing  
+    **Liquidity Management**: Available cash vs obligations  
+    **Payment Efficiency**: Speed of financial transactions
   </Card>
-  <Card title="Assets (A)" icon="shield">
-    **Accumulation & Protection**
-    - Savings growth
-    - Asset building
-    - Emergency fund adequacy
-    - Investment behavior
+  <Card title="Assets (20%)" icon="building">
+    **Savings Rate**: Percentage of income saved monthly  
+    **Investment Balance**: Diversified investment holdings  
+    **Net Worth Growth**: Increasing asset value over time  
+    **Debt-to-Asset Ratio**: Healthy debt management
   </Card>
 </CardGroup>
 
-## Quick Start
+### Portfolio Tier Assignment
 
-### 1. Installation
+Based on combined DIVA + RTSM scores:
 
-<CodeGroup>
-```bash npm
-npm install @awo/api-sdk
+| Tier | DIVA Score Range | Portfolio Access | Investment Limit | SME Access |
+|------|------------------|------------------|------------------|------------|
+| Bronze | 0-399 | Money market, T-Bills | R10,000 | None |
+| Silver | 400-649 | Index funds, T-Bonds, ETFs | R50,000 | Limited |
+| Gold | 650-849 | Diversified ETFs, higher yield | R200,000 | Yes |
+| Platinum | 850-1000 | Full access, premium SME | Unlimited | Premium |
+
+## Implementation Architecture
+
+### Database Schema
+
+Set up the required database tables for DIVA scoring:
+
+```sql
+-- diva_scores table
+CREATE TABLE diva_scores (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    overall_score INTEGER NOT NULL CHECK (overall_score >= 0 AND overall_score <= 1000),
+    discipline_score INTEGER NOT NULL CHECK (discipline_score >= 0 AND discipline_score <= 1000),
+    income_score INTEGER NOT NULL CHECK (income_score >= 0 AND income_score <= 1000),
+    velocity_score INTEGER NOT NULL CHECK (velocity_score >= 0 AND velocity_score <= 1000),
+    assets_score INTEGER NOT NULL CHECK (assets_score >= 0 AND assets_score <= 1000),
+    portfolio_tier VARCHAR(20) NOT NULL CHECK (portfolio_tier IN ('bronze', 'silver', 'gold', 'platinum')),
+    calculation_version VARCHAR(10) NOT NULL DEFAULT 'v1.0',
+    data_period_start DATE NOT NULL,
+    data_period_end DATE NOT NULL,
+    calculated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    next_update_due TIMESTAMP NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'recalculating')),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- diva_score_history for tracking changes
+CREATE TABLE diva_score_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    diva_score_id UUID NOT NULL REFERENCES diva_scores(id),
+    overall_score INTEGER NOT NULL,
+    discipline_score INTEGER NOT NULL,
+    income_score INTEGER NOT NULL,
+    velocity_score INTEGER NOT NULL,
+    assets_score INTEGER NOT NULL,
+    portfolio_tier VARCHAR(20) NOT NULL,
+    tier_change VARCHAR(20), -- 'upgraded', 'downgraded', 'maintained'
+    calculated_at TIMESTAMP NOT NULL,
+    archived_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- diva_insights for actionable recommendations
+CREATE TABLE diva_insights (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    diva_score_id UUID NOT NULL REFERENCES diva_scores(id),
+    category VARCHAR(20) NOT NULL CHECK (category IN ('discipline', 'income', 'velocity', 'assets')),
+    insight_type VARCHAR(30) NOT NULL, -- 'improvement_opportunity', 'strength', 'warning'
+    title VARCHAR(200) NOT NULL,
+    description TEXT NOT NULL,
+    recommendation TEXT NOT NULL,
+    impact_level VARCHAR(10) NOT NULL CHECK (impact_level IN ('low', 'medium', 'high')),
+    actionable BOOLEAN NOT NULL DEFAULT true,
+    priority INTEGER NOT NULL DEFAULT 50,
+    expires_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- rtsm_assessments for Risk Tolerance Scoring
+CREATE TABLE rtsm_assessments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    assessment_version VARCHAR(10) NOT NULL DEFAULT 'v1.0',
+    overall_risk_score INTEGER NOT NULL CHECK (overall_risk_score >= 0 AND overall_risk_score <= 100),
+    risk_profile VARCHAR(20) NOT NULL CHECK (risk_profile IN ('conservative', 'moderate', 'balanced', 'growth', 'aggressive')),
+    time_horizon INTEGER NOT NULL, -- months
+    risk_capacity_score INTEGER NOT NULL,
+    risk_tolerance_score INTEGER NOT NULL,
+    investment_experience_score INTEGER NOT NULL,
+    recommended_allocation JSONB NOT NULL,
+    responses JSONB NOT NULL,
+    completed_at TIMESTAMP NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired')),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX idx_diva_scores_user_id ON diva_scores(user_id);
+CREATE INDEX idx_diva_scores_calculated_at ON diva_scores(calculated_at DESC);
+CREATE INDEX idx_diva_scores_tier ON diva_scores(portfolio_tier);
+CREATE INDEX idx_diva_score_history_user_id ON diva_score_history(user_id);
+CREATE INDEX idx_rtsm_assessments_user_id ON rtsm_assessments(user_id);
 ```
 
-```bash yarn
-yarn add @awo/api-sdk
-```
+### Core Calculation Engine
 
-```bash pnpm
-pnpm add @awo/api-sdk
-```
-</CodeGroup>
-
-### 2. Basic Setup
-
-<CodeGroup>
-```typescript TypeScript
-import { AWOClient } from '@awo/api-sdk';
-
-const client = new AWOClient({
-  apiKey: process.env.AWO_API_KEY!,
-  baseURL: 'https://api.awo-platform.com/v1',
-  timeout: 10000
-});
-
-// Get current DIVA score
-async function getDivaScore(userId: string) {
-  try {
-    const score = await client.diva.getScore(userId);
-    console.log(`Overall DIVA Score: ${score.overallScore}/100`);
-    return score;
-  } catch (error) {
-    console.error('Failed to get DIVA score:', error);
-    throw error;
-  }
-}
-```
-
-```javascript JavaScript
-const { AWOClient } = require('@awo/api-sdk');
-
-const client = new AWOClient({
-  apiKey: process.env.AWO_API_KEY,
-  baseURL: 'https://api.awo-platform.com/v1'
-});
-
-async function getDivaScore(userId) {
-  try {
-    const score = await client.diva.getScore(userId);
-    console.log(`Overall DIVA Score: ${score.overallScore}/100`);
-    return score;
-  } catch (error) {
-    console.error('Failed to get DIVA score:', error);
-    throw error;
-  }
-}
-```
-
-```python Python
-from awo_sdk import AWOClient
-import os
-
-client = AWOClient(
-    api_key=os.environ['AWO_API_KEY'],
-    base_url='https://api.awo-platform.com/v1'
-)
-
-def get_diva_score(user_id: str):
-    try:
-        score = client.diva.get_score(user_id)
-        print(f"Overall DIVA Score: {score.overall_score}/100")
-        return score
-    except Exception as error:
-        print(f"Failed to get DIVA score: {error}")
-        raise
-```
-</CodeGroup>
-
-### 3. Basic Implementation
+Implement the DIVA scoring calculation engine:
 
 ```typescript
-// Complete DIVA score workflow
-class DivaScoreService {
-  private client: AWOClient;
+// diva-calculator.ts
+import { DatabaseService } from './database-service';
+import { BankingService } from './banking-service';
 
-  constructor(apiKey: string) {
-    this.client = new AWOClient({ apiKey });
+export interface DivaCalculationInput {
+  user_id: string;
+  analysis_period_months: number; // Default: 12 months
+  force_recalculation?: boolean;
+}
+
+export interface DivaScoreComponents {
+  discipline: number;
+  income: number;
+  velocity: number;
+  assets: number;
+}
+
+export interface DivaScoreResult {
+  user_id: string;
+  overall_score: number;
+  components: DivaScoreComponents;
+  portfolio_tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  insights: DivaInsight[];
+  calculation_metadata: {
+    data_period_start: Date;
+    data_period_end: Date;
+    transactions_analyzed: number;
+    accounts_analyzed: number;
+    calculation_version: string;
+  };
+}
+
+export interface DivaInsight {
+  category: 'discipline' | 'income' | 'velocity' | 'assets';
+  insight_type: 'improvement_opportunity' | 'strength' | 'warning';
+  title: string;
+  description: string;
+  recommendation: string;
+  impact_level: 'low' | 'medium' | 'high';
+  actionable: boolean;
+  priority: number;
+}
+
+export class DivaCalculator {
+  constructor(
+    private db: DatabaseService,
+    private bankingService: BankingService
+  ) {}
+
+  async calculateDivaScore(input: DivaCalculationInput): Promise<DivaScoreResult> {
+    const { user_id, analysis_period_months = 12 } = input;
+
+    // Check if recent calculation exists (unless forced)
+    if (!input.force_recalculation) {
+      const existingScore = await this.getRecentScore(user_id);
+      if (existingScore && this.isScoreRecent(existingScore, 7)) { // 7 days threshold
+        return existingScore;
+      }
+    }
+
+    // Gather financial data
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - analysis_period_months);
+
+    const financialData = await this.gatherFinancialData(user_id, startDate, endDate);
+
+    // Calculate component scores
+    const components = {
+      discipline: await this.calculateDisciplineScore(financialData),
+      income: await this.calculateIncomeScore(financialData),
+      velocity: await this.calculateVelocityScore(financialData),
+      assets: await this.calculateAssetsScore(financialData)
+    };
+
+    // Calculate overall score
+    const overall_score = Math.round(
+      (components.discipline * 0.30) +
+      (components.income * 0.25) +
+      (components.velocity * 0.25) +
+      (components.assets * 0.20)
+    );
+
+    // Determine portfolio tier
+    const portfolio_tier = this.determinePortfolioTier(overall_score);
+
+    // Generate insights
+    const insights = await this.generateInsights(components, financialData);
+
+    const result: DivaScoreResult = {
+      user_id,
+      overall_score,
+      components,
+      portfolio_tier,
+      insights,
+      calculation_metadata: {
+        data_period_start: startDate,
+        data_period_end: endDate,
+        transactions_analyzed: financialData.transactions.length,
+        accounts_analyzed: financialData.accounts.length,
+        calculation_version: 'v1.0'
+      }
+    };
+
+    // Save to database
+    await this.saveScoreResult(result);
+
+    return result;
   }
 
-  async getCompleteScoreData(userId: string) {
-    try {
-      // Get current score with insights
-      const currentScore = await this.client.diva.getScore(userId, {
-        includeInsights: true,
-        includeRecommendations: true
-      });
+  private async calculateDisciplineScore(data: FinancialData): Promise<number> {
+    let disciplineScore = 0;
+    let maxScore = 1000;
 
-      // Get historical data for trends
-      const history = await this.client.diva.getHistory(userId, {
-        period: '6months',
-        granularity: 'monthly'
-      });
+    // Payment punctuality (40% of discipline score)
+    const paymentPunctuality = this.analyzePunctuality(data.transactions);
+    disciplineScore += paymentPunctuality * 0.40;
 
-      // Get actionable insights
-      const insights = await this.client.diva.getInsights(userId, {
-        priority: 'high',
-        limit: 5
+    // Overdraft avoidance (25% of discipline score)
+    const overdraftScore = this.analyzeOverdraftBehavior(data.transactions);
+    disciplineScore += overdraftScore * 0.25;
+
+    // Savings consistency (35% of discipline score)
+    const savingsConsistency = this.analyzeSavingsRegularity(data.transactions);
+    disciplineScore += savingsConsistency * 0.35;
+
+    return Math.min(Math.round(disciplineScore), maxScore);
+  }
+
+  private analyzePunctuality(transactions: Transaction[]): number {
+    // Analyze recurring payments (bills, loans, subscriptions)
+    const recurringPayments = this.identifyRecurringPayments(transactions);
+    
+    if (recurringPayments.length === 0) return 500; // Neutral score for no data
+
+    let totalPunctuality = 0;
+    let paymentGroups = 0;
+
+    for (const paymentGroup of recurringPayments) {
+      const onTimePayments = paymentGroup.payments.filter(p => p.days_late <= 0).length;
+      const punctualityRate = onTimePayments / paymentGroup.payments.length;
+      
+      // Score: 1000 for 100% on-time, decreasing exponentially
+      const groupScore = Math.max(0, 1000 * Math.pow(punctualityRate, 2));
+      totalPunctuality += groupScore;
+      paymentGroups++;
+    }
+
+    return paymentGroups > 0 ? totalPunctuality / paymentGroups : 500;
+  }
+
+  private analyzeOverdraftBehavior(transactions: Transaction[]): number {
+    const overdrafts = transactions.filter(t => 
+      t.amount < 0 && t.balance_after < 0
+    );
+
+    if (overdrafts.length === 0) return 1000; // Perfect score for no overdrafts
+
+    // Calculate overdraft severity
+    const totalOverdraftAmount = overdrafts.reduce((sum, t) => sum + Math.abs(t.balance_after), 0);
+    const avgMonthlyIncome = this.calculateAverageMonthlyIncome(transactions);
+    
+    if (avgMonthlyIncome === 0) return 300; // Low score for no income data
+
+    const overdraftRatio = totalOverdraftAmount / (avgMonthlyIncome * 12);
+    
+    // Score decreases exponentially with overdraft ratio
+    // No overdrafts = 1000, 1% of annual income = ~800, 5% = ~400, 10%+ = 0
+    return Math.max(0, Math.round(1000 * Math.exp(-overdraftRatio * 10)));
+  }
+
+  private analyzeSavingsRegularity(transactions: Transaction[]): number {
+    // Group transactions by month
+    const monthlyData = this.groupTransactionsByMonth(transactions);
+    
+    if (monthlyData.length < 3) return 400; // Need at least 3 months of data
+
+    let savingsConsistency = 0;
+    let monthsWithSavings = 0;
+
+    for (const month of monthlyData) {
+      const income = month.transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+      const expenses = month.transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      
+      if (income > expenses) {
+        monthsWithSavings++;
+      }
+    }
+
+    const savingsRate = monthsWithSavings / monthlyData.length;
+    
+    // Calculate consistency bonus
+    const savingsAmounts = monthlyData.map(m => {
+      const income = m.transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+      const expenses = m.transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      return Math.max(0, income - expenses);
+    });
+
+    const avgSavings = savingsAmounts.reduce((sum, amt) => sum + amt, 0) / savingsAmounts.length;
+    const savingsVariance = this.calculateVariance(savingsAmounts, avgSavings);
+    const consistencyScore = avgSavings > 0 ? Math.max(0, 1 - (savingsVariance / Math.pow(avgSavings, 2))) : 0;
+
+    return Math.round(1000 * savingsRate * (0.7 + 0.3 * consistencyScore));
+  }
+
+  private async calculateIncomeScore(data: FinancialData): Promise<number> {
+    const monthlyIncomes = this.calculateMonthlyIncomes(data.transactions);
+    
+    if (monthlyIncomes.length < 3) return 300; // Insufficient data
+
+    // Income stability (40% of income score)
+    const stabilityScore = this.calculateIncomeStability(monthlyIncomes);
+    
+    // Income growth (30% of income score)
+    const growthScore = this.calculateIncomeGrowth(monthlyIncomes);
+    
+    // Income diversification (30% of income score)
+    const diversificationScore = this.calculateIncomeDiversification(data.transactions);
+
+    const incomeScore = Math.round(
+      (stabilityScore * 0.40) +
+      (growthScore * 0.30) +
+      (diversificationScore * 0.30)
+    );
+
+    return Math.min(incomeScore, 1000);
+  }
+
+  private calculateIncomeStability(monthlyIncomes: number[]): number {
+    if (monthlyIncomes.length < 2) return 200;
+
+    const avgIncome = monthlyIncomes.reduce((sum, income) => sum + income, 0) / monthlyIncomes.length;
+    const variance = this.calculateVariance(monthlyIncomes, avgIncome);
+    const coefficientOfVariation = avgIncome > 0 ? Math.sqrt(variance) / avgIncome : 1;
+
+    // Lower coefficient of variation = higher stability score
+    // CV < 0.1 = 1000, CV = 0.5 = 500, CV > 1.0 = 100
+    return Math.max(100, Math.round(1000 * Math.exp(-coefficientOfVariation * 2)));
+  }
+
+  private calculateIncomeGrowth(monthlyIncomes: number[]): number {
+    if (monthlyIncomes.length < 6) return 500; // Need at least 6 months for trend analysis
+
+    // Calculate linear regression slope
+    const n = monthlyIncomes.length;
+    const xValues = Array.from({ length: n }, (_, i) => i + 1);
+    const slope = this.calculateLinearRegression(xValues, monthlyIncomes).slope;
+    
+    const avgIncome = monthlyIncomes.reduce((sum, income) => sum + income, 0) / monthlyIncomes.length;
+    const monthlyGrowthRate = avgIncome > 0 ? slope / avgIncome : 0;
+    
+    // Convert to annual growth rate
+    const annualGrowthRate = monthlyGrowthRate * 12;
+    
+    // Score based on growth rate
+    // 10%+ annual growth = 1000, 0% growth = 500, -10% decline = 0
+    return Math.max(0, Math.min(1000, Math.round(500 + (annualGrowthRate * 5000))));
+  }
+
+  private calculateIncomeDiversification(transactions: Transaction[]): number {
+    const incomeTransactions = transactions.filter(t => t.amount > 0);
+    
+    if (incomeTransactions.length === 0) return 0;
+
+    // Group income by source (merchant/description similarity)
+    const incomeSources = this.groupIncomeBySource(incomeTransactions);
+    
+    if (incomeSources.length === 1) return 300; // Single income source
+    
+    // Calculate Herfindahl-Hirschman Index for income concentration
+    const totalIncome = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const sourceShares = incomeSources.map(source => 
+      source.total_amount / totalIncome
+    );
+    
+    const hhi = sourceShares.reduce((sum, share) => sum + Math.pow(share, 2), 0);
+    
+    // Convert HHI to diversification score
+    // HHI = 1 (monopoly) = 300, HHI = 0.5 = 600, HHI = 0.25 = 1000
+    return Math.max(300, Math.round(1000 * (1 - hhi) * 1.33));
+  }
+
+  private async calculateVelocityScore(data: FinancialData): Promise<number> {
+    // Cash flow timing (50% of velocity score)
+    const timingScore = this.analyzeCashFlowTiming(data.transactions);
+    
+    // Liquidity management (30% of velocity score)
+    const liquidityScore = this.analyzeLiquidityManagement(data.transactions, data.accounts);
+    
+    // Payment efficiency (20% of velocity score)
+    const efficiencyScore = this.analyzePaymentEfficiency(data.transactions);
+
+    const velocityScore = Math.round(
+      (timingScore * 0.50) +
+      (liquidityScore * 0.30) +
+      (efficiencyScore * 0.20)
+    );
+
+    return Math.min(velocityScore, 1000);
+  }
+
+  private async calculateAssetsScore(data: FinancialData): Promise<number> {
+    // Savings rate (40% of assets score)
+    const savingsRateScore = this.calculateSavingsRateScore(data.transactions);
+    
+    // Investment balance (35% of assets score) 
+    const investmentScore = await this.calculateInvestmentScore(data.user_id);
+    
+    // Net worth growth (25% of assets score)
+    const netWorthScore = this.calculateNetWorthGrowth(data.accounts, data.transactions);
+
+    const assetsScore = Math.round(
+      (savingsRateScore * 0.40) +
+      (investmentScore * 0.35) +
+      (netWorthScore * 0.25)
+    );
+
+    return Math.min(assetsScore, 1000);
+  }
+
+  private determinePortfolioTier(score: number): 'bronze' | 'silver' | 'gold' | 'platinum' {
+    if (score >= 850) return 'platinum';
+    if (score >= 650) return 'gold';
+    if (score >= 400) return 'silver';
+    return 'bronze';
+  }
+
+  private async generateInsights(components: DivaScoreComponents, data: FinancialData): Promise<DivaInsight[]> {
+    const insights: DivaInsight[] = [];
+
+    // Discipline insights
+    if (components.discipline < 500) {
+      insights.push({
+        category: 'discipline',
+        insight_type: 'improvement_opportunity',
+        title: 'Improve Payment Consistency',
+        description: 'Your payment discipline score indicates room for improvement in on-time payments.',
+        recommendation: 'Set up automatic payments for recurring bills and loans to improve your discipline score.',
+        impact_level: 'high',
+        actionable: true,
+        priority: 80
       });
+    }
+
+    // Income insights
+    if (components.income < 600) {
+      insights.push({
+        category: 'income',
+        insight_type: 'improvement_opportunity',
+        title: 'Diversify Income Sources',
+        description: 'Having multiple income sources can improve your financial stability.',
+        recommendation: 'Consider developing additional income streams through side projects or investments.',
+        impact_level: 'medium',
+        actionable: true,
+        priority: 60
+      });
+    }
+
+    // Velocity insights
+    if (components.velocity < 550) {
+      insights.push({
+        category: 'velocity',
+        insight_type: 'improvement_opportunity',
+        title: 'Optimize Cash Flow Timing',
+        description: 'Your money velocity could be improved through better cash flow management.',
+        recommendation: 'Align your income and expense timing to maintain better liquidity.',
+        impact_level: 'medium',
+        actionable: true,
+        priority: 50
+      });
+    }
+
+    // Assets insights
+    if (components.assets < 400) {
+      insights.push({
+        category: 'assets',
+        insight_type: 'improvement_opportunity',
+        title: 'Increase Savings Rate',
+        description: 'Your savings rate is below the recommended level for financial health.',
+        recommendation: 'Try to save at least 20% of your income each month. Start with automated savings.',
+        impact_level: 'high',
+        actionable: true,
+        priority: 90
+      });
+    }
+
+    // Strength insights
+    if (components.discipline >= 800) {
+      insights.push({
+        category: 'discipline',
+        insight_type: 'strength',
+        title: 'Excellent Payment Discipline',
+        description: 'You consistently make payments on time and avoid overdrafts.',
+        recommendation: 'Maintain this excellent discipline to access better investment opportunities.',
+        impact_level: 'low',
+        actionable: false,
+        priority: 20
+      });
+    }
+
+    return insights.sort((a, b) => b.priority - a.priority);
+  }
+
+  // Helper methods
+  private calculateVariance(values: number[], mean: number): number {
+    const squaredDiffs = values.map(value => Math.pow(value - mean, 2));
+    return squaredDiffs.reduce((sum, diff) => sum + diff, 0) / values.length;
+  }
+
+  private calculateLinearRegression(x: number[], y: number[]): { slope: number; intercept: number } {
+    const n = x.length;
+    const sumX = x.reduce((sum, val) => sum + val, 0);
+    const sumY = y.reduce((sum, val) => sum + val, 0);
+    const sumXY = x.reduce((sum, val, i) => sum + val * y[i], 0);
+    const sumXX = x.reduce((sum, val) => sum + val * val, 0);
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    return { slope, intercept };
+  }
+
+  private async saveScoreResult(result: DivaScoreResult): Promise<void> {
+    await this.db.transaction(async (trx) => {
+      // Archive existing active score
+      await trx('diva_scores')
+        .where({ user_id: result.user_id, status: 'active' })
+        .update({ status: 'expired' });
+
+      // Insert new score
+      const scoreId = await trx('diva_scores').insert({
+        user_id: result.user_id,
+        overall_score: result.overall_score,
+        discipline_score: result.components.discipline,
+        income_score: result.components.income,
+        velocity_score: result.components.velocity,
+        assets_score: result.components.assets,
+        portfolio_tier: result.portfolio_tier,
+        calculation_version: result.calculation_metadata.calculation_version,
+        data_period_start: result.calculation_metadata.data_period_start,
+        data_period_end: result.calculation_metadata.data_period_end,
+        calculated_at: new Date(),
+        next_update_due: new Date(Date.now() + (90 * 24 * 60 * 60 * 1000)), // 90 days
+        status: 'active'
+      }).returning('id');
+
+      // Insert insights
+      if (result.insights.length > 0) {
+        await trx('diva_insights').insert(
+          result.insights.map(insight => ({
+            user_id: result.user_id,
+            diva_score_id: scoreId[0].id,
+            category: insight.category,
+            insight_type: insight.insight_type,
+            title: insight.title,
+            description: insight.description,
+            recommendation: insight.recommendation,
+            impact_level: insight.impact_level,
+            actionable: insight.actionable,
+            priority: insight.priority
+          }))
+        );
+      }
+    });
+  }
+}
+```
+
+### RTSM Integration
+
+Implement Risk Tolerance Scoring Model:
+
+```typescript
+// rtsm-calculator.ts
+export interface RTSMQuestion {
+  id: string;
+  category: 'risk_capacity' | 'risk_tolerance' | 'investment_experience' | 'time_horizon';
+  question_text: string;
+  question_type: 'multiple_choice' | 'scale' | 'yes_no';
+  options?: { value: number; label: string }[];
+  weight: number;
+  required: boolean;
+}
+
+export interface RTSMResponse {
+  question_id: string;
+  answer: number | string;
+  normalized_score: number; // 0-100
+}
+
+export interface RTSMResult {
+  user_id: string;
+  overall_risk_score: number; // 0-100
+  risk_profile: 'conservative' | 'moderate' | 'balanced' | 'growth' | 'aggressive';
+  category_scores: {
+    risk_capacity: number;
+    risk_tolerance: number;
+    investment_experience: number;
+    time_horizon: number;
+  };
+  recommended_allocation: {
+    cash: number;
+    bonds: number;
+    equities: number;
+    alternatives: number;
+  };
+  responses: RTSMResponse[];
+}
+
+export class RTSMCalculator {
+  private questions: RTSMQuestion[] = [
+    // Risk Capacity Questions
+    {
+      id: 'rc_001',
+      category: 'risk_capacity',
+      question_text: 'What is your current age?',
+      question_type: 'multiple_choice',
+      options: [
+        { value: 20, label: 'Under 25' },
+        { value: 40, label: '25-35' },
+        { value: 60, label: '36-45' },
+        { value: 80, label: '46-55' },
+        { value: 100, label: 'Over 55' }
+      ],
+      weight: 0.25,
+      required: true
+    },
+    {
+      id: 'rc_002',
+      category: 'risk_capacity',
+      question_text: 'How stable is your current income?',
+      question_type: 'multiple_choice',
+      options: [
+        { value: 100, label: 'Very stable with regular increases' },
+        { value: 80, label: 'Stable with occasional fluctuations' },
+        { value: 60, label: 'Somewhat variable but predictable' },
+        { value: 40, label: 'Variable and unpredictable' },
+        { value: 20, label: 'Very unstable or no regular income' }
+      ],
+      weight: 0.30,
+      required: true
+    },
+    {
+      id: 'rc_003',
+      category: 'risk_capacity',
+      question_text: 'How much emergency savings do you have?',
+      question_type: 'multiple_choice',
+      options: [
+        { value: 100, label: 'More than 6 months of expenses' },
+        { value: 80, label: '3-6 months of expenses' },
+        { value: 60, label: '1-3 months of expenses' },
+        { value: 40, label: 'Less than 1 month of expenses' },
+        { value: 20, label: 'No emergency savings' }
+      ],
+      weight: 0.25,
+      required: true
+    },
+
+    // Risk Tolerance Questions
+    {
+      id: 'rt_001',
+      category: 'risk_tolerance',
+      question_text: 'If your investment lost 20% of its value in one month, what would you do?',
+      question_type: 'multiple_choice',
+      options: [
+        { value: 100, label: 'Buy more at the lower price' },
+        { value: 80, label: 'Hold and wait for recovery' },
+        { value: 60, label: 'Feel concerned but take no action' },
+        { value: 40, label: 'Sell some to reduce losses' },
+        { value: 20, label: 'Sell everything immediately' }
+      ],
+      weight: 0.35,
+      required: true
+    },
+    {
+      id: 'rt_002',
+      category: 'risk_tolerance',
+      question_text: 'How do you feel about investment volatility?',
+      question_type: 'scale',
+      options: [
+        { value: 20, label: 'Very uncomfortable with any fluctuations' },
+        { value: 40, label: 'Uncomfortable with large fluctuations' },
+        { value: 60, label: 'Comfortable with moderate fluctuations' },
+        { value: 80, label: 'Comfortable with significant fluctuations' },
+        { value: 100, label: 'Very comfortable with all fluctuations' }
+      ],
+      weight: 0.30,
+      required: true
+    },
+
+    // Investment Experience Questions
+    {
+      id: 'ie_001',
+      category: 'investment_experience',
+      question_text: 'How many years of investment experience do you have?',
+      question_type: 'multiple_choice',
+      options: [
+        { value: 20, label: 'No investment experience' },
+        { value: 40, label: 'Less than 2 years' },
+        { value: 60, label: '2-5 years' },
+        { value: 80, label: '5-10 years' },
+        { value: 100, label: 'More than 10 years' }
+      ],
+      weight: 0.40,
+      required: true
+    },
+    {
+      id: 'ie_002',
+      category: 'investment_experience',
+      question_text: 'Which investment products have you used?',
+      question_type: 'multiple_choice',
+      options: [
+        { value: 20, label: 'Only savings accounts' },
+        { value: 40, label: 'Savings and fixed deposits' },
+        { value: 60, label: 'Mutual funds and ETFs' },
+        { value: 80, label: 'Individual stocks and bonds' },
+        { value: 100, label: 'Complex derivatives and alternatives' }
+      ],
+      weight: 0.35,
+      required: true
+    },
+
+    // Time Horizon Questions
+    {
+      id: 'th_001',
+      category: 'time_horizon',
+      question_text: 'When do you expect to need this money?',
+      question_type: 'multiple_choice',
+      options: [
+        { value: 20, label: 'Within 1 year' },
+        { value: 40, label: '1-3 years' },
+        { value: 60, label: '3-7 years' },
+        { value: 80, label: '7-15 years' },
+        { value: 100, label: 'More than 15 years' }
+      ],
+      weight: 0.50,
+      required: true
+    }
+  ];
+
+  async calculateRTSMScore(userId: string, responses: Array<{ question_id: string; answer: number }>): Promise<RTSMResult> {
+    // Validate responses
+    const normalizedResponses = this.normalizeResponses(responses);
+
+    // Calculate category scores
+    const categoryScores = this.calculateCategoryScores(normalizedResponses);
+
+    // Calculate overall risk score
+    const overallRiskScore = this.calculateOverallScore(categoryScores);
+
+    // Determine risk profile
+    const riskProfile = this.determineRiskProfile(overallRiskScore);
+
+    // Generate recommended allocation
+    const recommendedAllocation = this.generateAllocation(riskProfile, categoryScores);
+
+    const result: RTSMResult = {
+      user_id: userId,
+      overall_risk_score: overallRiskScore,
+      risk_profile: riskProfile,
+      category_scores: categoryScores,
+      recommended_allocation: recommendedAllocation,
+      responses: normalizedResponses
+    };
+
+    // Save to database
+    await this.saveRTSMResult(result);
+
+    return result;
+  }
+
+  private normalizeResponses(responses: Array<{ question_id: string; answer: number }>): RTSMResponse[] {
+    return responses.map(response => {
+      const question = this.questions.find(q => q.id === response.question_id);
+      if (!question) {
+        throw new Error(`Question not found: ${response.question_id}`);
+      }
 
       return {
-        current: currentScore,
-        trend: history.trends.overall,
-        insights: insights.insights,
-        potentialImprovement: insights.summary.potentialScoreIncrease
+        question_id: response.question_id,
+        answer: response.answer,
+        normalized_score: response.answer // Already normalized to 0-100 in question options
       };
-    } catch (error) {
-      throw new Error(`Failed to get complete DIVA data: ${error.message}`);
-    }
-  }
-}
-```
-
-## Core Implementation Patterns
-
-### 1. Score Calculation Flow
-
-```mermaid
-graph TD
-    A[User Connects Bank Account] --> B[Transaction Data Sync]
-    B --> C[Data Validation & Cleaning]
-    C --> D[Calculate Individual Components]
-    D --> E[Discipline Score Calculation]
-    D --> F[Income Score Calculation]  
-    D --> G[Velocity Score Calculation]
-    D --> H[Assets Score Calculation]
-    E --> I[Aggregate Overall Score]
-    F --> I
-    G --> I
-    H --> I
-    I --> J[Generate Insights]
-    J --> K[Create Recommendations]
-    K --> L[Store Score & Metadata]
-    L --> M[Trigger Webhooks]
-```
-
-### 2. Data Requirements
-
-<Tabs>
-  <Tab title="Minimum Data Requirements">
-    **For Basic DIVA Score:**
-    
-    - **Time Period**: 3+ months of transaction history
-    - **Transaction Count**: 50+ transactions minimum
-    - **Data Quality**: 90%+ properly categorized transactions
-    - **Account Types**: At least 1 primary checking/savings account
-    
-    ```typescript
-    interface MinimumDataRequirements {
-      transactionPeriod: {
-        minimum: '3 months';
-        recommended: '12 months';
-      };
-      transactionCount: {
-        minimum: 50;
-        recommended: 200;
-      };
-      accountTypes: {
-        required: ['checking' | 'savings'];
-        optional: ['credit', 'investment', 'loan'];
-      };
-      dataQuality: {
-        categorizedTransactions: 0.9; // 90%
-        duplicateTransactions: 0.05; // <5%
-      };
-    }
-    ```
-  </Tab>
-  
-  <Tab title="Optimal Data Requirements">
-    **For Comprehensive Analysis:**
-    
-    - **Time Period**: 12+ months of transaction history
-    - **Transaction Count**: 200+ transactions
-    - **Account Coverage**: Multiple account types
-    - **Data Richness**: Merchant details, location data
-    
-    ```typescript
-    interface OptimalDataRequirements {
-      transactionPeriod: '12+ months';
-      transactionCount: '200+ transactions';
-      accountTypes: [
-        'checking',
-        'savings', 
-        'credit',
-        'investment',
-        'loan'
-      ];
-      dataRichness: {
-        merchantDetails: true;
-        locationData: true;
-        transactionDescriptions: true;
-        recurringPatterns: true;
-      };
-    }
-    ```
-  </Tab>
-  
-  <Tab title="Data Quality Checks">
-    **Validation & Quality Assurance:**
-    
-    ```typescript
-    class DataQualityValidator {
-      async validateTransactionData(userId: string): Promise<ValidationResult> {
-        const transactions = await this.getTransactions(userId);
-        
-        const validation = {
-          isValid: true,
-          issues: [] as string[],
-          recommendations: [] as string[],
-          confidence: 100
-        };
-
-        // Check transaction count
-        if (transactions.length < 50) {
-          validation.isValid = false;
-          validation.issues.push('Insufficient transaction history');
-          validation.recommendations.push('Connect additional bank accounts');
-        }
-
-        // Check time period coverage
-        const timeSpan = this.calculateTimeSpan(transactions);
-        if (timeSpan < 90) { // Less than 3 months
-          validation.confidence -= 30;
-          validation.recommendations.push('Wait for more transaction history');
-        }
-
-        // Check categorization rate
-        const categorizationRate = this.calculateCategorizationRate(transactions);
-        if (categorizationRate < 0.8) {
-          validation.confidence -= 20;
-          validation.recommendations.push('Improve transaction categorization');
-        }
-
-        // Check for duplicate transactions
-        const duplicateRate = this.calculateDuplicateRate(transactions);
-        if (duplicateRate > 0.1) {
-          validation.confidence -= 15;
-          validation.issues.push('High duplicate transaction rate detected');
-        }
-
-        return validation;
-      }
-
-      private calculateTimeSpan(transactions: Transaction[]): number {
-        if (transactions.length === 0) return 0;
-        
-        const sorted = transactions.sort((a, b) => 
-          new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-        
-        const start = new Date(sorted[0].date);
-        const end = new Date(sorted[sorted.length - 1].date);
-        
-        return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-      }
-    }
-    ```
-  </Tab>
-</Tabs>
-
-### 3. Component Calculation Logic
-
-<Tabs>
-  <Tab title="Discipline Score">
-    **Payment Punctuality & Consistency**
-    
-    ```typescript
-    class DisciplineCalculator {
-      calculateDisciplineScore(transactions: Transaction[]): DisciplineScore {
-        const billPayments = this.extractBillPayments(transactions);
-        const creditUtilization = this.calculateCreditUtilization(transactions);
-        const recurringPayments = this.analyzeRecurringPayments(transactions);
-        
-        const components = {
-          paymentPunctuality: this.calculatePaymentPunctuality(billPayments),
-          creditManagement: this.calculateCreditManagement(creditUtilization),
-          recurringConsistency: this.calculateRecurringConsistency(recurringPayments),
-          financialCommitments: this.calculateCommitmentAdherence(transactions)
-        };
-        
-        // Weighted average
-        const weights = {
-          paymentPunctuality: 0.35,
-          creditManagement: 0.30,
-          recurringConsistency: 0.25,
-          financialCommitments: 0.10
-        };
-        
-        const score = Object.entries(components).reduce((total, [key, value]) => {
-          return total + (value * weights[key as keyof typeof weights]);
-        }, 0);
-        
-        return {
-          score: Math.round(score * 100) / 100,
-          components,
-          insights: this.generateDisciplineInsights(components),
-          confidence: this.calculateConfidence(billPayments.length)
-        };
-      }
-
-      private calculatePaymentPunctuality(billPayments: BillPayment[]): number {
-        if (billPayments.length === 0) return 0.5; // Neutral score for no data
-        
-        const onTimePayments = billPayments.filter(payment => 
-          payment.daysFromDueDate <= 0
-        ).length;
-        
-        const latePayments = billPayments.filter(payment => 
-          payment.daysFromDueDate > 0
-        ).length;
-        
-        const earlyPayments = billPayments.filter(payment => 
-          payment.daysFromDueDate < -5
-        ).length;
-        
-        // Scoring: on-time = 1.0, early = 0.9, late = penalty based on days
-        let totalScore = 0;
-        billPayments.forEach(payment => {
-          if (payment.daysFromDueDate <= 0) {
-            totalScore += payment.daysFromDueDate < -5 ? 0.9 : 1.0;
-          } else {
-            // Penalty for late payments
-            const penalty = Math.min(payment.daysFromDueDate * 0.1, 0.8);
-            totalScore += Math.max(0.2, 1.0 - penalty);
-          }
-        });
-        
-        return totalScore / billPayments.length;
-      }
-
-      private calculateCreditManagement(utilization: CreditUtilization[]): number {
-        if (utilization.length === 0) return 0.7; // Default for no credit data
-        
-        // Optimal utilization is < 30%, excellent is < 10%
-        const averageUtilization = utilization.reduce((sum, u) => sum + u.ratio, 0) / utilization.length;
-        
-        if (averageUtilization <= 0.1) return 1.0;      // Excellent
-        if (averageUtilization <= 0.3) return 0.8;      // Good
-        if (averageUtilization <= 0.5) return 0.6;      // Fair
-        if (averageUtilization <= 0.7) return 0.4;      // Poor
-        return 0.2; // High utilization
-      }
-    }
-    ```
-  </Tab>
-  
-  <Tab title="Income Score">
-    **Stability & Growth Analysis**
-    
-    ```typescript
-    class IncomeCalculator {
-      calculateIncomeScore(transactions: Transaction[]): IncomeScore {
-        const incomeTransactions = this.extractIncomeTransactions(transactions);
-        const incomeAnalysis = this.analyzeIncomePatterns(incomeTransactions);
-        
-        const components = {
-          stability: this.calculateIncomeStability(incomeAnalysis),
-          growth: this.calculateIncomeGrowth(incomeAnalysis),
-          diversification: this.calculateIncomeDiversification(incomeAnalysis),
-          predictability: this.calculateIncomePredictability(incomeAnalysis)
-        };
-        
-        const weights = {
-          stability: 0.40,
-          growth: 0.25,
-          diversification: 0.20,
-          predictability: 0.15
-        };
-        
-        const score = Object.entries(components).reduce((total, [key, value]) => {
-          return total + (value * weights[key as keyof typeof weights]);
-        }, 0);
-        
-        return {
-          score: Math.round(score * 100) / 100,
-          components,
-          monthlyIncome: incomeAnalysis.averageMonthlyIncome,
-          trends: incomeAnalysis.trends,
-          insights: this.generateIncomeInsights(incomeAnalysis),
-          confidence: this.calculateConfidence(incomeTransactions.length)
-        };
-      }
-
-      private calculateIncomeStability(analysis: IncomeAnalysis): number {
-        const monthlyIncomes = analysis.monthlyBreakdown;
-        if (monthlyIncomes.length < 3) return 0.5;
-        
-        const average = monthlyIncomes.reduce((sum, income) => sum + income.amount, 0) / monthlyIncomes.length;
-        const variance = monthlyIncomes.reduce((sum, income) => {
-          return sum + Math.pow(income.amount - average, 2);
-        }, 0) / monthlyIncomes.length;
-        
-        const coefficientOfVariation = Math.sqrt(variance) / average;
-        
-        // Lower CoV = higher stability
-        if (coefficientOfVariation <= 0.1) return 1.0;      // Very stable
-        if (coefficientOfVariation <= 0.2) return 0.8;      // Stable
-        if (coefficientOfVariation <= 0.3) return 0.6;      // Moderate
-        if (coefficientOfVariation <= 0.5) return 0.4;      // Unstable
-        return 0.2; // Very unstable
-      }
-
-      private calculateIncomeGrowth(analysis: IncomeAnalysis): number {
-        const monthlyIncomes = analysis.monthlyBreakdown;
-        if (monthlyIncomes.length < 6) return 0.5; // Need at least 6 months
-        
-        // Calculate trend using linear regression
-        const xValues = monthlyIncomes.map((_, index) => index);
-        const yValues = monthlyIncomes.map(income => income.amount);
-        
-        const slope = this.calculateLinearRegressionSlope(xValues, yValues);
-        const averageIncome = yValues.reduce((a, b) => a + b) / yValues.length;
-        
-        // Growth rate as percentage per month
-        const monthlyGrowthRate = (slope / averageIncome) * 100;
-        
-        if (monthlyGrowthRate >= 2) return 1.0;       // Excellent growth
-        if (monthlyGrowthRate >= 1) return 0.8;       // Good growth
-        if (monthlyGrowthRate >= 0) return 0.6;       // Stable
-        if (monthlyGrowthRate >= -1) return 0.4;      // Slight decline
-        return 0.2; // Declining income
-      }
-
-      private calculateIncomeDiversification(analysis: IncomeAnalysis): number {
-        const sources = analysis.incomeSources;
-        const totalIncome = sources.reduce((sum, source) => sum + source.amount, 0);
-        
-        if (sources.length === 1) return 0.3; // Single source
-        
-        // Calculate Herfindahl-Hirschman Index for diversification
-        const hhi = sources.reduce((sum, source) => {
-          const marketShare = source.amount / totalIncome;
-          return sum + Math.pow(marketShare, 2);
-        }, 0);
-        
-        // Convert HHI to score (lower HHI = more diversified = higher score)
-        if (hhi <= 0.4) return 1.0;      // Well diversified
-        if (hhi <= 0.6) return 0.8;      // Moderately diversified
-        if (hhi <= 0.8) return 0.6;      // Some diversification
-        return 0.4; // Poorly diversified
-      }
-    }
-    ```
-  </Tab>
-  
-  <Tab title="Velocity Score">
-    **Cash Flow Efficiency**
-    
-    ```typescript
-    class VelocityCalculator {
-      calculateVelocityScore(transactions: Transaction[]): VelocityScore {
-        const cashFlowAnalysis = this.analyzeCashFlow(transactions);
-        const spendingPatterns = this.analyzeSpendingPatterns(transactions);
-        
-        const components = {
-          cashFlowEfficiency: this.calculateCashFlowEfficiency(cashFlowAnalysis),
-          spendingOptimization: this.calculateSpendingOptimization(spendingPatterns),
-          transactionVelocity: this.calculateTransactionVelocity(transactions),
-          moneyMovementSpeed: this.calculateMoneyMovementSpeed(transactions)
-        };
-        
-        const weights = {
-          cashFlowEfficiency: 0.35,
-          spendingOptimization: 0.30,
-          transactionVelocity: 0.20,
-          moneyMovementSpeed: 0.15
-        };
-        
-        const score = Object.entries(components).reduce((total, [key, value]) => {
-          return total + (value * weights[key as keyof typeof weights]);
-        }, 0);
-        
-        return {
-          score: Math.round(score * 100) / 100,
-          components,
-          cashFlowSummary: cashFlowAnalysis,
-          spendingBreakdown: spendingPatterns,
-          insights: this.generateVelocityInsights(cashFlowAnalysis, spendingPatterns),
-          confidence: this.calculateConfidence(transactions.length)
-        };
-      }
-
-      private calculateCashFlowEfficiency(analysis: CashFlowAnalysis): number {
-        const { monthlyNetFlow, averageBalance, flowConsistency } = analysis;
-        
-        // Positive net flow is good
-        const netFlowScore = monthlyNetFlow > 0 ? 
-          Math.min(monthlyNetFlow / 5000, 1.0) : // Scale to R5000 monthly net positive
-          Math.max(monthlyNetFlow / 2000 + 1, 0); // Penalty for negative flow
-        
-        // Consistent positive flow is better than volatile
-        const consistencyScore = flowConsistency; // 0-1 scale
-        
-        // Balance efficiency (not too high, not too low)
-        const balanceScore = this.calculateOptimalBalanceScore(averageBalance, analysis.monthlyExpenses);
-        
-        return (netFlowScore * 0.4) + (consistencyScore * 0.3) + (balanceScore * 0.3);
-      }
-
-      private calculateSpendingOptimization(patterns: SpendingPatterns): number {
-        const { categoryBreakdown, seasonality, impulseSpending, budgetAdherence } = patterns;
-        
-        // Score based on spending distribution
-        const distributionScore = this.scoreSpendingDistribution(categoryBreakdown);
-        
-        // Seasonal consistency (less volatility = better)
-        const seasonalityScore = 1 - (seasonality.volatilityIndex / 100);
-        
-        // Lower impulse spending is better
-        const impulseScore = 1 - Math.min(impulseSpending.percentage / 20, 1); // 20% or less is good
-        
-        // Budget adherence if available
-        const adherenceScore = budgetAdherence?.score || 0.5;
-        
-        return (distributionScore * 0.3) + (seasonalityScore * 0.25) + 
-               (impulseScore * 0.25) + (adherenceScore * 0.2);
-      }
-
-      private scoreSpendingDistribution(breakdown: CategoryBreakdown[]): number {
-        // Optimal spending distribution (as percentages)
-        const optimalDistribution = {
-          housing: 0.30,      // 25-35%
-          food: 0.15,         // 10-20%
-          transportation: 0.15, // 10-20%
-          utilities: 0.10,    // 5-15%
-          healthcare: 0.05,   // 3-8%
-          entertainment: 0.10, // 5-15%
-          savings: 0.15       // 10-20%
-        };
-        
-        let totalScore = 0;
-        let totalWeight = 0;
-        
-        Object.entries(optimalDistribution).forEach(([category, optimal]) => {
-          const actual = breakdown.find(b => b.category === category)?.percentage || 0;
-          const deviation = Math.abs(actual - optimal);
-          const categoryScore = Math.max(0, 1 - (deviation / optimal));
-          
-          totalScore += categoryScore * optimal; // Weight by optimal percentage
-          totalWeight += optimal;
-        });
-        
-        return totalScore / totalWeight;
-      }
-    }
-    ```
-  </Tab>
-  
-  <Tab title="Assets Score">
-    **Accumulation & Protection**
-    
-    ```typescript
-    class AssetsCalculator {
-      calculateAssetsScore(transactions: Transaction[]): AssetsScore {
-        const savingsAnalysis = this.analyzeSavingsPattern(transactions);
-        const assetBuilding = this.analyzeAssetBuilding(transactions);
-        const emergencyFund = this.analyzeEmergencyFund(transactions);
-        
-        const components = {
-          savingsGrowth: this.calculateSavingsGrowth(savingsAnalysis),
-          assetAccumulation: this.calculateAssetAccumulation(assetBuilding),
-          emergencyPreparedness: this.calculateEmergencyPreparedness(emergencyFund),
-          investmentBehavior: this.calculateInvestmentBehavior(transactions)
-        };
-        
-        const weights = {
-          savingsGrowth: 0.35,
-          assetAccumulation: 0.25,
-          emergencyPreparedness: 0.25,
-          investmentBehavior: 0.15
-        };
-        
-        const score = Object.entries(components).reduce((total, [key, value]) => {
-          return total + (value * weights[key as keyof typeof weights]);
-        }, 0);
-        
-        return {
-          score: Math.round(score * 100) / 100,
-          components,
-          savingsRate: savingsAnalysis.monthlySavingsRate,
-          assetGrowth: assetBuilding.growthRate,
-          emergencyFundRatio: emergencyFund.monthsCovered,
-          insights: this.generateAssetsInsights(savingsAnalysis, assetBuilding, emergencyFund),
-          confidence: this.calculateConfidence(transactions.length)
-        };
-      }
-
-      private calculateSavingsGrowth(analysis: SavingsAnalysis): number {
-        const { monthlySavingsRate, consistency, trend } = analysis;
-        
-        // Savings rate scoring (target: 20% of income)
-        const rateScore = Math.min(monthlySavingsRate / 0.20, 1.0);
-        
-        // Consistency scoring (regular savings vs sporadic)
-        const consistencyScore = consistency; // 0-1 scale
-        
-        // Trend scoring (improving vs declining)
-        const trendScore = trend > 0 ? Math.min(trend / 0.05, 1.0) : Math.max(trend / 0.05 + 1, 0);
-        
-        return (rateScore * 0.5) + (consistencyScore * 0.3) + (trendScore * 0.2);
-      }
-
-      private calculateAssetAccumulation(building: AssetBuilding): number {
-        const { netWorthGrowth, diversification, liquidityRatio } = building;
-        
-        // Net worth growth (target: 10% annually)
-        const growthScore = Math.min(netWorthGrowth / 0.10, 1.0);
-        
-        // Asset diversification (not all in one type)
-        const diversificationScore = diversification; // 0-1 scale
-        
-        // Optimal liquidity (not too liquid, not too illiquid)
-        const liquidityScore = this.calculateOptimalLiquidity(liquidityRatio);
-        
-        return (growthScore * 0.5) + (diversificationScore * 0.3) + (liquidityScore * 0.2);
-      }
-
-      private calculateEmergencyPreparedness(fund: EmergencyFund): number {
-        const { monthsCovered, accessibility, growth } = fund;
-        
-        // Target: 3-6 months of expenses
-        let coverageScore = 0;
-        if (monthsCovered >= 6) coverageScore = 1.0;
-        else if (monthsCovered >= 3) coverageScore = 0.8;
-        else if (monthsCovered >= 1) coverageScore = 0.5;
-        else coverageScore = monthsCovered / 3; // Partial credit
-        
-        // Accessibility (should be easily accessible)
-        const accessibilityScore = accessibility; // 0-1 scale
-        
-        // Growth (emergency fund should grow with expenses)
-        const growthScore = growth > 0 ? Math.min(growth / 0.05, 1.0) : 0.5;
-        
-        return (coverageScore * 0.6) + (accessibilityScore * 0.3) + (growthScore * 0.1);
-      }
-    }
-    ```
-  </Tab>
-</Tabs>
-
-## Advanced Implementation
-
-### 1. Real-time Score Updates
-
-```typescript
-class RealTimeDivaService {
-  private wsConnection: WebSocket;
-  private eventEmitter: EventEmitter;
-
-  constructor(private client: AWOClient) {
-    this.eventEmitter = new EventEmitter();
-    this.setupWebSocketConnection();
-  }
-
-  // Subscribe to real-time score updates
-  subscribeToScoreUpdates(userId: string): void {
-    this.wsConnection.send(JSON.stringify({
-      type: 'subscribe',
-      channel: `diva.scores.${userId}`,
-      events: ['score_updated', 'component_changed', 'insights_generated']
-    }));
-  }
-
-  // Handle real-time events
-  private setupWebSocketConnection(): void {
-    this.wsConnection = new WebSocket('wss://api.awo-platform.com/v1/ws');
-    
-    this.wsConnection.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      
-      switch (data.type) {
-        case 'diva.score.updated':
-          this.handleScoreUpdate(data);
-          break;
-        case 'diva.component.changed':
-          this.handleComponentChange(data);
-          break;
-        case 'diva.insights.generated':
-          this.handleNewInsights(data);
-          break;
-      }
-    };
-  }
-
-  private handleScoreUpdate(data: any): void {
-    this.eventEmitter.emit('scoreUpdated', {
-      userId: data.userId,
-      newScore: data.newScore,
-      previousScore: data.previousScore,
-      change: data.change,
-      timestamp: data.timestamp
     });
   }
 
-  // Public event subscription methods
-  onScoreUpdated(callback: (data: ScoreUpdateEvent) => void): void {
-    this.eventEmitter.on('scoreUpdated', callback);
-  }
+  private calculateCategoryScores(responses: RTSMResponse[]): {
+    risk_capacity: number;
+    risk_tolerance: number;
+    investment_experience: number;
+    time_horizon: number;
+  } {
+    const categories = ['risk_capacity', 'risk_tolerance', 'investment_experience', 'time_horizon'] as const;
+    const scores: any = {};
 
-  onComponentChanged(callback: (data: ComponentChangeEvent) => void): void {
-    this.eventEmitter.on('componentChanged', callback);
-  }
+    for (const category of categories) {
+      const categoryQuestions = this.questions.filter(q => q.category === category);
+      const categoryResponses = responses.filter(r => 
+        categoryQuestions.some(q => q.id === r.question_id)
+      );
 
-  onNewInsights(callback: (data: InsightsEvent) => void): void {
-    this.eventEmitter.on('newInsights', callback);
-  }
-}
+      let weightedSum = 0;
+      let totalWeight = 0;
 
-// Usage
-const realtimeService = new RealTimeDivaService(client);
-
-realtimeService.onScoreUpdated((data) => {
-  console.log(`Score updated for user ${data.userId}: ${data.newScore} (${data.change > 0 ? '+' : ''}${data.change})`);
-  
-  // Update UI
-  updateScoreDisplay(data.userId, data.newScore);
-  
-  // Show notification if significant change
-  if (Math.abs(data.change) > 5) {
-    showScoreChangeNotification(data);
-  }
-});
-
-realtimeService.subscribeToScoreUpdates('user-123');
-```
-
-### 2. Batch Processing
-
-```typescript
-class BatchDivaProcessor {
-  private queue: Array<{ userId: string; priority: 'high' | 'normal' | 'low' }> = [];
-  private processing = false;
-  private maxBatchSize = 50;
-  private processingInterval = 30000; // 30 seconds
-
-  constructor(private client: AWOClient) {
-    this.startBatchProcessor();
-  }
-
-  // Add user to processing queue
-  queueUserForProcessing(userId: string, priority: 'high' | 'normal' | 'low' = 'normal'): void {
-    // Remove existing entry if present
-    this.queue = this.queue.filter(item => item.userId !== userId);
-    
-    // Add to queue based on priority
-    if (priority === 'high') {
-      this.queue.unshift({ userId, priority });
-    } else {
-      this.queue.push({ userId, priority });
-    }
-  }
-
-  private startBatchProcessor(): void {
-    setInterval(async () => {
-      if (!this.processing && this.queue.length > 0) {
-        await this.processBatch();
+      for (const response of categoryResponses) {
+        const question = categoryQuestions.find(q => q.id === response.question_id)!;
+        weightedSum += response.normalized_score * question.weight;
+        totalWeight += question.weight;
       }
-    }, this.processingInterval);
-  }
 
-  private async processBatch(): Promise<void> {
-    this.processing = true;
-    
-    try {
-      const batch = this.queue.splice(0, this.maxBatchSize);
-      const userIds = batch.map(item => item.userId);
-      
-      console.log(`Processing batch of ${userIds.length} DIVA scores`);
-      
-      // Process in parallel with concurrency limit
-      const concurrency = 10;
-      const results = await this.processConcurrent(userIds, concurrency);
-      
-      // Handle results
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          console.log(`Successfully updated DIVA score for user ${userIds[index]}`);
-          this.handleSuccessfulUpdate(userIds[index], result.value);
-        } else {
-          console.error(`Failed to update DIVA score for user ${userIds[index]}:`, result.reason);
-          this.handleFailedUpdate(userIds[index], result.reason);
-        }
-      });
-      
-    } catch (error) {
-      console.error('Batch processing error:', error);
-    } finally {
-      this.processing = false;
+      scores[category] = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 50;
     }
+
+    return scores;
   }
 
-  private async processConcurrent(userIds: string[], concurrency: number): Promise<PromiseSettledResult<any>[]> {
-    const results: PromiseSettledResult<any>[] = [];
-    
-    for (let i = 0; i < userIds.length; i += concurrency) {
-      const batch = userIds.slice(i, i + concurrency);
-      const promises = batch.map(userId => this.refreshUserScore(userId));
-      const batchResults = await Promise.allSettled(promises);
-      results.push(...batchResults);
+  private calculateOverallScore(categoryScores: {
+    risk_capacity: number;
+    risk_tolerance: number;
+    investment_experience: number;
+    time_horizon: number;
+  }): number {
+    // Weighted average of category scores
+    const weights = {
+      risk_capacity: 0.25,
+      risk_tolerance: 0.35,
+      investment_experience: 0.20,
+      time_horizon: 0.20
+    };
+
+    const weightedScore = (
+      categoryScores.risk_capacity * weights.risk_capacity +
+      categoryScores.risk_tolerance * weights.risk_tolerance +
+      categoryScores.investment_experience * weights.investment_experience +
+      categoryScores.time_horizon * weights.time_horizon
+    );
+
+    return Math.round(weightedScore);
+  }
+
+  private determineRiskProfile(score: number): 'conservative' | 'moderate' | 'balanced' | 'growth' | 'aggressive' {
+    if (score >= 80) return 'aggressive';
+    if (score >= 65) return 'growth';
+    if (score >= 50) return 'balanced';
+    if (score >= 35) return 'moderate';
+    return 'conservative';
+  }
+
+  private generateAllocation(riskProfile: string, categoryScores: any): {
+    cash: number;
+    bonds: number;
+    equities: number;
+    alternatives: number;
+  } {
+    const baseAllocations: Record<string, any> = {
+      conservative: { cash: 30, bonds: 50, equities: 20, alternatives: 0 },
+      moderate: { cash: 20, bonds: 40, equities: 35, alternatives: 5 },
+      balanced: { cash: 15, bonds: 35, equities: 45, alternatives: 5 },
+      growth: { cash: 10, bonds: 25, equities: 60, alternatives: 5 },
+      aggressive: { cash: 5, bonds: 15, equities: 70, alternatives: 10 }
+    };
+
+    let allocation = { ...baseAllocations[riskProfile] };
+
+    // Adjust based on specific factors
+    if (categoryScores.time_horizon < 40) {
+      // Short time horizon - increase cash/bonds
+      allocation.cash += 10;
+      allocation.bonds += 5;
+      allocation.equities -= 15;
     }
-    
-    return results;
-  }
 
-  private async refreshUserScore(userId: string): Promise<any> {
-    try {
-      const score = await this.client.diva.refreshScore(userId, {
-        includeInsights: true,
-        includeRecommendations: true
-      });
-      
-      return { userId, score };
-    } catch (error) {
-      throw new Error(`Failed to refresh score for ${userId}: ${error.message}`);
+    if (categoryScores.investment_experience < 40) {
+      // Low experience - reduce alternatives
+      allocation.alternatives = Math.min(allocation.alternatives, 2);
+      allocation.bonds += allocation.alternatives - 2;
     }
-  }
 
-  private handleSuccessfulUpdate(userId: string, result: any): void {
-    // Store result in cache
-    this.cacheScore(userId, result.score);
-    
-    // Trigger webhooks
-    this.triggerWebhooks(userId, result);
-    
-    // Update analytics
-    this.updateAnalytics(userId, result);
-  }
+    // Ensure allocation sums to 100%
+    const total = Object.values(allocation).reduce((sum: number, val: number) => sum + val, 0);
+    if (total !== 100) {
+      const adjustment = (100 - total) / 4;
+      allocation.cash += adjustment;
+      allocation.bonds += adjustment;
+      allocation.equities += adjustment;
+      allocation.alternatives += adjustment;
+    }
 
-  private handleFailedUpdate(userId: string, error: any): void {
-    // Add back to queue with lower priority for retry
-    this.queueUserForProcessing(userId, 'low');
-    
-    // Log error for monitoring
-    this.logError(userId, error);
-  }
-}
-```
-
-### 3. Custom Scoring Models
-
-```typescript
-interface CustomScoringConfig {
-  weights: {
-    discipline: number;
-    income: number;
-    velocity: number;
-    assets: number;
-  };
-  componentConfigs: {
-    discipline: DisciplineConfig;
-    income: IncomeConfig;
-    velocity: VelocityConfig;
-    assets: AssetsConfig;
-  };
-  demographicAdjustments: DemographicAdjustment[];
-  regionalFactors: RegionalFactor[];
-}
-
-class CustomDivaScoring {
-  private config: CustomScoringConfig;
-
-  constructor(config: CustomScoringConfig) {
-    this.config = config;
-    this.validateConfig();
-  }
-
-  // Calculate score with custom configuration
-  async calculateCustomScore(userId: string, transactionData: Transaction[]): Promise<CustomDivaScore> {
-    // Get base component scores
-    const baseScores = await this.calculateBaseScores(transactionData);
-    
-    // Apply custom weights
-    const weightedScores = this.applyCustomWeights(baseScores);
-    
-    // Apply demographic adjustments
-    const demographicScore = await this.applyDemographicAdjustments(userId, weightedScores);
-    
-    // Apply regional factors
-    const finalScore = await this.applyRegionalFactors(userId, demographicScore);
-    
+    // Round to integers
     return {
-      overallScore: finalScore.overall,
-      componentScores: finalScore.components,
-      adjustments: finalScore.adjustments,
-      confidence: this.calculateConfidence(transactionData),
-      methodology: 'custom',
-      configVersion: this.config.version
+      cash: Math.round(allocation.cash),
+      bonds: Math.round(allocation.bonds),
+      equities: Math.round(allocation.equities),
+      alternatives: Math.round(allocation.alternatives)
     };
   }
 
-  // Custom component calculation with configuration
-  private async calculateCustomDisciplineScore(transactions: Transaction[]): Promise<number> {
-    const config = this.config.componentConfigs.discipline;
-    
-    const components = {
-      paymentTiming: this.calculatePaymentTiming(transactions, config.paymentTimingConfig),
-      creditUtilization: this.calculateCreditUtilization(transactions, config.creditConfig),
-      consistency: this.calculateConsistency(transactions, config.consistencyConfig)
-    };
-    
-    return Object.entries(components).reduce((total, [key, value]) => {
-      const weight = config.weights[key as keyof typeof config.weights];
-      return total + (value * weight);
-    }, 0);
+  private async saveRTSMResult(result: RTSMResult): Promise<void> {
+    await this.db.query(`
+      INSERT INTO rtsm_assessments (
+        user_id, overall_risk_score, risk_profile, 
+        risk_capacity_score, risk_tolerance_score, 
+        investment_experience_score, time_horizon_score,
+        recommended_allocation, responses, completed_at, expires_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+      )
+      ON CONFLICT (user_id) 
+      DO UPDATE SET
+        overall_risk_score = EXCLUDED.overall_risk_score,
+        risk_profile = EXCLUDED.risk_profile,
+        risk_capacity_score = EXCLUDED.risk_capacity_score,
+        risk_tolerance_score = EXCLUDED.risk_tolerance_score,
+        investment_experience_score = EXCLUDED.investment_experience_score,
+        time_horizon_score = EXCLUDED.time_horizon_score,
+        recommended_allocation = EXCLUDED.recommended_allocation,
+        responses = EXCLUDED.responses,
+        completed_at = EXCLUDED.completed_at,
+        expires_at = EXCLUDED.expires_at,
+        status = 'active'
+    `, [
+      result.user_id,
+      result.overall_risk_score,
+      result.risk_profile,
+      result.category_scores.risk_capacity,
+      result.category_scores.risk_tolerance,
+      result.category_scores.investment_experience,
+      result.category_scores.time_horizon,
+      JSON.stringify(result.recommended_allocation),
+      JSON.stringify(result.responses),
+      new Date(),
+      new Date(Date.now() + (365 * 24 * 60 * 60 * 1000)) // 1 year expiry
+    ]);
   }
+}
+```
 
-  // Demographic adjustments for scoring
-  private async applyDemographicAdjustments(userId: string, scores: ComponentScores): Promise<ComponentScores> {
-    const userProfile = await this.getUserDemographics(userId);
+### API Endpoints
+
+Create comprehensive API endpoints for DIVA score management:
+
+```typescript
+// diva-routes.ts
+import { Router } from 'express';
+import { DivaCalculator } from './diva-calculator';
+import { RTSMCalculator } from './rtsm-calculator';
+import { authMiddleware, validateInput } from './middleware';
+
+const router = Router();
+
+// Get current DIVA score
+router.get('/users/:userId/diva-score', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
     
-    const adjustments = this.config.demographicAdjustments.filter(adj => 
-      this.matchesDemographic(userProfile, adj.criteria)
-    );
-    
-    const adjustedScores = { ...scores };
-    
-    adjustments.forEach(adjustment => {
-      Object.entries(adjustment.scoreAdjustments).forEach(([component, modifier]) => {
-        adjustedScores[component as keyof ComponentScores] *= modifier;
-      });
+    const score = await divaService.getCurrentScore(userId);
+    if (!score) {
+      return res.status(404).json({ error: 'No DIVA score found. Please link a bank account first.' });
+    }
+
+    res.json({
+      success: true,
+      data: score
     });
-    
-    return adjustedScores;
-  }
-
-  // Industry-specific scoring configurations
-  static getIndustryConfig(industry: string): CustomScoringConfig {
-    const configs = {
-      freelancer: {
-        weights: {
-          discipline: 0.30,
-          income: 0.20,  // Lower weight due to variable income
-          velocity: 0.30,
-          assets: 0.20
-        },
-        componentConfigs: {
-          income: {
-            stabilityWeight: 0.2,   // Lower expectation for stability
-            diversificationWeight: 0.4, // Higher weight on diversification
-            growthWeight: 0.4
-          }
-        }
-      },
-      salariedEmployee: {
-        weights: {
-          discipline: 0.25,
-          income: 0.30,  // Higher weight for stable income
-          velocity: 0.25,
-          assets: 0.20
-        },
-        componentConfigs: {
-          income: {
-            stabilityWeight: 0.6,   // High expectation for stability
-            diversificationWeight: 0.2,
-            growthWeight: 0.2
-          }
-        }
-      },
-      entrepreneur: {
-        weights: {
-          discipline: 0.35,  // Higher weight on discipline
-          income: 0.15,      // Lower weight due to volatile income
-          velocity: 0.35,    // High weight on cash flow management
-          assets: 0.15
-        }
-      }
-    };
-    
-    return configs[industry] || configs.salariedEmployee;
-  }
-}
-
-// Usage
-const freelancerConfig = CustomDivaScoring.getIndustryConfig('freelancer');
-const customScoring = new CustomDivaScoring(freelancerConfig);
-
-const customScore = await customScoring.calculateCustomScore(userId, transactions);
-```
-
-## Frontend Integration
-
-### 1. React Component Implementation
-
-```typescript
-import React, { useState, useEffect } from 'react';
-import { AWOClient } from '@awo/api-sdk';
-
-interface DivaScoreDisplayProps {
-  userId: string;
-  showBreakdown?: boolean;
-  showInsights?: boolean;
-  autoRefresh?: boolean;
-}
-
-export const DivaScoreDisplay: React.FC<DivaScoreDisplayProps> = ({
-  userId,
-  showBreakdown = true,
-  showInsights = true,
-  autoRefresh = false
-}) => {
-  const [score, setScore] = useState<DivaScore | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  const client = new AWOClient({ apiKey: process.env.REACT_APP_AWO_API_KEY! });
-
-  useEffect(() => {
-    loadScore();
-    
-    if (autoRefresh) {
-      const interval = setInterval(loadScore, 300000); // 5 minutes
-      return () => clearInterval(interval);
-    }
-  }, [userId, autoRefresh]);
-
-  const loadScore = async () => {
-    try {
-      setLoading(true);
-      const scoreData = await client.diva.getScore(userId, {
-        includeInsights: showInsights,
-        includeRecommendations: showInsights
-      });
-      setScore(scoreData);
-      setLastUpdated(new Date());
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load score');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const refreshScore = async () => {
-    try {
-      setLoading(true);
-      const refreshedScore = await client.diva.refreshScore(userId, {
-        includeInsights: showInsights,
-        includeRecommendations: showInsights
-      });
-      setScore(refreshedScore);
-      setLastUpdated(new Date());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to refresh score');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getScoreColor = (score: number): string => {
-    if (score >= 80) return '#22C55E'; // Green
-    if (score >= 60) return '#EAB308'; // Yellow
-    if (score >= 40) return '#F97316'; // Orange
-    return '#EF4444'; // Red
-  };
-
-  const getScoreGrade = (score: number): string => {
-    if (score >= 90) return 'A+';
-    if (score >= 80) return 'A';
-    if (score >= 70) return 'B';
-    if (score >= 60) return 'C';
-    if (score >= 50) return 'D';
-    return 'F';
-  };
-
-  if (loading && !score) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2">Loading DIVA Score...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <p className="text-red-700">Error: {error}</p>
-        <button 
-          onClick={loadScore}
-          className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  if (!score) return null;
-
-  return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
-      {/* Main Score Display */}
-      <div className="text-center mb-6">
-        <div className="relative inline-flex items-center justify-center">
-          <svg className="transform -rotate-90 w-32 h-32">
-            <circle
-              cx="64"
-              cy="64"
-              r="56"
-              stroke="currentColor"
-              strokeWidth="8"
-              fill="transparent"
-              className="text-gray-200"
-            />
-            <circle
-              cx="64"
-              cy="64"
-              r="56"
-              stroke={getScoreColor(score.overallScore)}
-              strokeWidth="8"
-              fill="transparent"
-              strokeDasharray={`${2 * Math.PI * 56 * (score.overallScore / 100)} ${2 * Math.PI * 56}`}
-              className="transition-all duration-1000 ease-out"
-            />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-3xl font-bold" style={{ color: getScoreColor(score.overallScore) }}>
-                {Math.round(score.overallScore)}
-              </div>
-              <div className="text-sm text-gray-500">
-                Grade: {getScoreGrade(score.overallScore)}
-              </div>
-            </div>
-          </div>
-        </div>
-        <h3 className="text-xl font-semibold mt-4">DIVA Score</h3>
-        <p className="text-gray-600">
-          Last updated: {lastUpdated?.toLocaleDateString()}
-        </p>
-      </div>
-
-      {/* Component Breakdown */}
-      {showBreakdown && (
-        <div className="space-y-4 mb-6">
-          <h4 className="font-semibold text-lg">Component Breakdown</h4>
-          {Object.entries(score.scores).map(([component, value]) => (
-            <div key={component} className="flex items-center justify-between">
-              <span className="font-medium capitalize">
-                {component === 'discipline' && '💪 Discipline'}
-                {component === 'income' && '💰 Income'}
-                {component === 'velocity' && '⚡ Velocity'}
-                {component === 'assets' && '🏦 Assets'}
-              </span>
-              <div className="flex items-center space-x-2">
-                <div className="w-24 bg-gray-200 rounded-full h-2">
-                  <div
-                    className="h-2 rounded-full transition-all duration-500"
-                    style={{
-                      width: `${value}%`,
-                      backgroundColor: getScoreColor(value)
-                    }}
-                  />
-                </div>
-                <span className="font-medium w-8 text-right">{Math.round(value)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Top Insights */}
-      {showInsights && score.insights && score.insights.length > 0 && (
-        <div className="space-y-3 mb-6">
-          <h4 className="font-semibold text-lg">Key Insights</h4>
-          {score.insights.slice(0, 3).map((insight, index) => (
-            <div 
-              key={index}
-              className={`p-3 rounded-lg ${
-                insight.type === 'positive' ? 'bg-green-50 border-green-200' :
-                insight.type === 'warning' ? 'bg-yellow-50 border-yellow-200' :
-                'bg-blue-50 border-blue-200'
-              } border`}
-            >
-              <p className="font-medium">{insight.title}</p>
-              <p className="text-sm text-gray-600 mt-1">{insight.description}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Action Buttons */}
-      <div className="flex space-x-3">
-        <button
-          onClick={refreshScore}
-          disabled={loading}
-          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? 'Refreshing...' : 'Refresh Score'}
-        </button>
-        <button
-          onClick={() => window.open('/diva/insights', '_blank')}
-          className="flex-1 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-        >
-          View All Insights
-        </button>
-      </div>
-
-      {/* Confidence Indicator */}
-      <div className="mt-4 text-center">
-        <span className="text-sm text-gray-500">
-          Confidence: {score.metadata?.confidence || 0}%
-        </span>
-      </div>
-    </div>
-  );
-};
-
-export default DivaScoreDisplay;
-```
-
-### 2. React Native Implementation
-
-```typescript
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ActivityIndicator,
-  StyleSheet,
-  Animated,
-  Dimensions
-} from 'react-native';
-import { AWOClient } from '@awo/react-native-sdk';
-import Svg, { Circle } from 'react-native-svg';
-
-const { width } = Dimensions.get('window');
-
-interface DivaMobileDisplayProps {
-  userId: string;
-  onScorePress?: (score: DivaScore) => void;
-}
-
-export const DivaMobileDisplay: React.FC<DivaMobileDisplayProps> = ({
-  userId,
-  onScorePress
-}) => {
-  const [score, setScore] = useState<DivaScore | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [animatedValue] = useState(new Animated.Value(0));
-
-  const client = new AWOClient({ apiKey: process.env.AWO_API_KEY! });
-
-  useEffect(() => {
-    loadScore();
-  }, [userId]);
-
-  useEffect(() => {
-    if (score) {
-      Animated.timing(animatedValue, {
-        toValue: score.overallScore,
-        duration: 1500,
-        useNativeDriver: false
-      }).start();
-    }
-  }, [score]);
-
-  const loadScore = async () => {
-    try {
-      setLoading(true);
-      const scoreData = await client.diva.getScore(userId, {
-        includeInsights: true
-      });
-      setScore(scoreData);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load score');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getScoreColor = (score: number): string => {
-    if (score >= 80) return '#22C55E';
-    if (score >= 60) return '#EAB308';
-    if (score >= 40) return '#F97316';
-    return '#EF4444';
-  };
-
-  const circleRadius = 60;
-  const circleCircumference = 2 * Math.PI * circleRadius;
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text style={styles.loadingText}>Loading DIVA Score...</Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Error: {error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadScore}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (!score) return null;
-
-  return (
-    <TouchableOpacity 
-      style={styles.scoreCard}
-      onPress={() => onScorePress?.(score)}
-      activeOpacity={0.7}
-    >
-      {/* Circular Progress */}
-      <View style={styles.circleContainer}>
-        <Svg width={140} height={140} style={styles.circle}>
-          <Circle
-            cx={70}
-            cy={70}
-            r={circleRadius}
-            stroke="#E5E7EB"
-            strokeWidth={8}
-            fill="transparent"
-          />
-          <Animated.AnimatedSvgCircle
-            cx={70}
-            cy={70}
-            r={circleRadius}
-            stroke={getScoreColor(score.overallScore)}
-            strokeWidth={8}
-            fill="transparent"
-            strokeDasharray={circleCircumference}
-            strokeDashoffset={animatedValue.interpolate({
-              inputRange: [0, 100],
-              outputRange: [circleCircumference, 0]
-            })}
-            strokeLinecap="round"
-            transform={`rotate(-90 70 70)`}
-          />
-        </Svg>
-        <View style={styles.scoreTextContainer}>
-          <Text style={[styles.scoreText, { color: getScoreColor(score.overallScore) }]}>
-            {Math.round(score.overallScore)}
-          </Text>
-          <Text style={styles.scoreLabel}>DIVA Score</Text>
-        </View>
-      </View>
-
-      {/* Component Mini Bars */}
-      <View style={styles.componentsContainer}>
-        {Object.entries(score.scores).map(([component, value]) => (
-          <View key={component} style={styles.componentRow}>
-            <Text style={styles.componentLabel}>
-              {component.charAt(0).toUpperCase() + component.slice(1)}
-            </Text>
-            <View style={styles.componentBarContainer}>
-              <View 
-                style={[
-                  styles.componentBar,
-                  { 
-                    width: `${value}%`,
-                    backgroundColor: getScoreColor(value)
-                  }
-                ]} 
-              />
-            </View>
-            <Text style={styles.componentValue}>{Math.round(value)}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Top Insight Preview */}
-      {score.insights && score.insights.length > 0 && (
-        <View style={styles.insightPreview}>
-          <Text style={styles.insightTitle}>💡 Top Insight</Text>
-          <Text style={styles.insightText} numberOfLines={2}>
-            {score.insights[0].title}
-          </Text>
-        </View>
-      )}
-
-      {/* Last Updated */}
-      <Text style={styles.lastUpdated}>
-        Updated: {new Date(score.metadata?.lastCalculated || Date.now()).toLocaleDateString()}
-      </Text>
-    </TouchableOpacity>
-  );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#6B7280'
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#EF4444',
-    textAlign: 'center',
-    marginBottom: 20
-  },
-  retryButton: {
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600'
-  },
-  scoreCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    margin: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4
-  },
-  circleContainer: {
-    alignItems: 'center',
-    marginBottom: 20
-  },
-  circle: {
-    transform: [{ rotate: '-90deg' }]
-  },
-  scoreTextContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  scoreText: {
-    fontSize: 32,
-    fontWeight: 'bold'
-  },
-  scoreLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4
-  },
-  componentsContainer: {
-    marginBottom: 20
-  },
-  componentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8
-  },
-  componentLabel: {
-    width: 70,
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#374151'
-  },
-  componentBarContainer: {
-    flex: 1,
-    height: 6,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 3,
-    marginHorizontal: 8
-  },
-  componentBar: {
-    height: '100%',
-    borderRadius: 3
-  },
-  componentValue: {
-    width: 25,
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'right',
-    color: '#374151'
-  },
-  insightPreview: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16
-  },
-  insightTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
-    color: '#374151'
-  },
-  insightText: {
-    fontSize: 12,
-    color: '#6B7280',
-    lineHeight: 16
-  },
-  lastUpdated: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    textAlign: 'center'
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
-export default DivaMobileDisplay;
+// Trigger DIVA score refresh
+router.post('/users/:userId/diva-score/refresh', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { force_recalculation = false } = req.body;
+
+    // Check if user has sufficient data
+    const hasData = await bankingService.hasTransactionData(userId);
+    if (!hasData) {
+      return res.status(400).json({ 
+        error: 'Insufficient transaction data. Please link a bank account and wait for data synchronization.' 
+      });
+    }
+
+    // Queue calculation job
+    const calculationJob = await divaCalculator.calculateDivaScore({
+      user_id: userId,
+      analysis_period_months: 12,
+      force_recalculation
+    });
+
+    res.json({
+      success: true,
+      data: {
+        calculation_id: calculationJob.id,
+        estimated_completion: calculationJob.estimated_completion,
+        status: 'processing'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get DIVA score history
+router.get('/users/:userId/diva-score/history', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { months = 12 } = req.query;
+
+    const history = await divaService.getScoreHistory(userId, parseInt(months as string));
+
+    res.json({
+      success: true,
+      data: {
+        history,
+        trend_analysis: divaService.analyzeTrend(history)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get RTSM assessment questions
+router.get('/users/:userId/rtsm/questions', authMiddleware, async (req, res) => {
+  try {
+    const questions = await rtsmCalculator.getQuestions();
+    
+    res.json({
+      success: true,
+      data: { questions }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Submit RTSM assessment
+router.post('/users/:userId/rtsm/assessment', authMiddleware, validateInput, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { responses } = req.body;
+
+    const result = await rtsmCalculator.calculateRTSMScore(userId, responses);
+
+    // Trigger portfolio tier recalculation
+    await portfolioService.updateUserTier(userId, result);
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get combined portfolio recommendation
+router.get('/users/:userId/portfolio-recommendation', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const divaScore = await divaService.getCurrentScore(userId);
+    const rtsmAssessment = await rtsmService.getCurrentAssessment(userId);
+
+    if (!divaScore || !rtsmAssessment) {
+      return res.status(400).json({
+        error: 'Complete DIVA assessment and RTSM questionnaire required for portfolio recommendation'
+      });
+    }
+
+    const recommendation = await portfolioService.generateRecommendation({
+      diva_score: divaScore,
+      rtsm_assessment: rtsmAssessment,
+      user_preferences: await userService.getInvestmentPreferences(userId)
+    });
+
+    res.json({
+      success: true,
+      data: recommendation
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+export default router;
 ```
 
-## Best Practices
+## Testing DIVA Implementation
 
-<AccordionGroup>
-  <Accordion title="Performance Optimization">
-    **Optimize DIVA Score Performance:**
-    
-    - **Caching Strategy**: Cache scores for 1-24 hours based on user activity
-    - **Incremental Updates**: Only recalculate when new data is available
-    - **Background Processing**: Use queues for non-urgent score updates
-    - **Data Preprocessing**: Pre-aggregate transaction data for faster calculations
-    
-    ```typescript
-    class DivaPerformanceOptimizer {
-      private scoreCache = new Map<string, CachedScore>();
-      
-      async getOptimizedScore(userId: string): Promise<DivaScore> {
-        // Check cache first
-        const cached = this.scoreCache.get(userId);
-        if (cached && !this.isExpired(cached)) {
-          return cached.score;
-        }
-        
-        // Check if recalculation is needed
-        const lastUpdate = await this.getLastScoreUpdate(userId);
-        const hasNewData = await this.hasNewTransactionData(userId, lastUpdate);
-        
-        if (!hasNewData && cached) {
-          // Extend cache if no new data
-          this.extendCache(userId, cached);
-          return cached.score;
-        }
-        
-        // Recalculate score
-        const newScore = await this.calculateScore(userId);
-        this.cacheScore(userId, newScore);
-        
-        return newScore;
-      }
-    }
-    ```
-  </Accordion>
+### Unit Tests
 
-  <Accordion title="Error Handling">
-    **Robust Error Handling:**
-    
-    - **Graceful Degradation**: Show cached/partial scores when fresh calculation fails
-    - **Retry Logic**: Implement exponential backoff for failed calculations
-    - **Data Validation**: Validate transaction data before processing
-    - **Fallback Mechanisms**: Use simplified scoring when full calculation isn't possible
-    
-    ```typescript
-    class DivaErrorHandler {
-      async safeGetScore(userId: string): Promise<DivaScore | PartialScore> {
-        try {
-          return await this.client.diva.getScore(userId);
-        } catch (error) {
-          console.warn('Failed to get fresh DIVA score:', error);
-          
-          // Try cached score
-          const cached = await this.getCachedScore(userId);
-          if (cached) {
-            return { ...cached, isStale: true };
-          }
-          
-          // Try simplified calculation
-          try {
-            return await this.getSimplifiedScore(userId);
-          } catch (fallbackError) {
-            console.error('All DIVA score methods failed:', fallbackError);
-            
-            // Return default/placeholder score
-            return this.getDefaultScore(userId);
-          }
-        }
-      }
-      
-      private async getSimplifiedScore(userId: string): Promise<PartialScore> {
-        // Simplified calculation with minimal data requirements
-        const recentTransactions = await this.getRecentTransactions(userId, 30); // Last 30 days
-        
-        if (recentTransactions.length < 10) {
-          throw new Error('Insufficient data for simplified calculation');
-        }
-        
-        // Basic scoring based on limited data
-        const basicScore = this.calculateBasicScore(recentTransactions);
-        
-        return {
-          overallScore: basicScore,
-          isSimplified: true,
-          confidence: 50,
-          dataLimitations: ['Limited transaction history', 'Simplified calculation model']
-        };
-      }
-    }
-    ```
-  </Accordion>
+```typescript
+// diva-calculator.test.ts
+import { DivaCalculator } from '../src/diva-calculator';
+import { mockTransactionData, mockAccountData } from './fixtures';
 
-  <Accordion title="Data Privacy & Security">
-    **Protect User Financial Data:**
-    
-    - **Data Minimization**: Only process necessary transaction data
-    - **Encryption**: Encrypt sensitive data in transit and at rest
-    - **Access Controls**: Implement proper API authentication and authorization
-    - **Audit Logging**: Log all DIVA score calculations and data access
-    
-    ```typescript
-    class DivaSecurityManager {
-      async calculateSecureScore(userId: string): Promise<DivaScore> {
-        // Validate user permissions
-        await this.validateUserAccess(userId);
-        
-        // Audit log the calculation request
-        await this.auditLog({
-          action: 'diva_score_calculation',
-          userId,
-          timestamp: new Date(),
-          source: 'api_request'
-        });
-        
-        try {
-          // Get encrypted transaction data
-          const encryptedData = await this.getEncryptedTransactions(userId);
-          
-          // Decrypt for processing (in memory only)
-          const transactions = await this.decryptTransactions(encryptedData);
-          
-          // Calculate score
-          const score = await this.calculateScore(transactions);
-          
-          // Clear sensitive data from memory
-          this.clearSensitiveData(transactions);
-          
-          // Audit log the successful calculation
-          await this.auditLog({
-            action: 'diva_score_calculated',
-            userId,
-            score: score.overallScore,
-            timestamp: new Date()
-          });
-          
-          return score;
-        } catch (error) {
-          // Audit log the error
-          await this.auditLog({
-            action: 'diva_score_error',
-            userId,
-            error: error.message,
-            timestamp: new Date()
-          });
-          
-          throw error;
-        }
-      }
-      
-      private clearSensitiveData(data: any[]): void {
-        // Overwrite sensitive data in memory
-        data.forEach(item => {
-          Object.keys(item).forEach(key => {
-            if (typeof item[key] === 'string') {
-              item[key] = '';
-            } else if (typeof item[key] === 'number') {
-              item[key] = 0;
-            }
-          });
-        });
-      }
-    }
-    ```
-  </Accordion>
+describe('DivaCalculator', () => {
+  let calculator: DivaCalculator;
 
-  <Accordion title="Testing Strategy">
-    **Comprehensive Testing Approach:**
-    
-    - **Unit Tests**: Test individual component calculations
-    - **Integration Tests**: Test full score calculation workflows
-    - **Performance Tests**: Test with large datasets and concurrent users
-    - **Accuracy Tests**: Validate against known financial scenarios
-    
-    ```typescript
-    describe('DIVA Score Calculation', () => {
-      describe('Discipline Component', () => {
-        it('should calculate perfect discipline score for on-time payments', () => {
-          const transactions = createMockTransactions({
-            billPayments: generateOnTimePayments(12), // 12 months of on-time payments
-            creditUtilization: [{ ratio: 0.15, month: 'recent' }] // 15% utilization
-          });
-          
-          const disciplineScore = calculateDisciplineScore(transactions);
-          
-          expect(disciplineScore.score).toBeGreaterThanOrEqual(90);
-          expect(disciplineScore.components.paymentPunctuality).toBeGreaterThanOrEqual(0.95);
-        });
-        
-        it('should penalize late payments appropriately', () => {
-          const transactions = createMockTransactions({
-            billPayments: [
-              ...generateOnTimePayments(10),
-              ...generateLatePayments(2, { averageDaysLate: 15 })
-            ]
-          });
-          
-          const disciplineScore = calculateDisciplineScore(transactions);
-          
-          expect(disciplineScore.score).toBeLessThan(85);
-          expect(disciplineScore.insights).toContain(
-            expect.objectContaining({
-              type: 'warning',
-              category: 'payment_discipline'
-            })
-          );
-        });
-      });
+  beforeEach(() => {
+    calculator = new DivaCalculator(mockDb, mockBankingService);
+  });
+
+  describe('Discipline Score Calculation', () => {
+    test('should calculate perfect discipline score for consistent payments', async () => {
+      const transactions = mockTransactionData.consistentPayments;
+      const score = await calculator.calculateDisciplineScore({ transactions });
       
-      describe('Full Score Integration', () => {
-        it('should handle edge case of minimal transaction data', async () => {
-          const minimalTransactions = createMockTransactions({
-            count: 50, // Minimum required
-            period: '3 months',
-            quality: 'basic'
-          });
-          
-          const score = await calculateDivaScore('test-user', minimalTransactions);
-          
-          expect(score.overallScore).toBeGreaterThan(0);
-          expect(score.metadata.confidence).toBeLessThan(80); // Lower confidence with minimal data
-          expect(score.metadata.dataLimitations).toBeDefined();
-        });
-        
-        it('should produce consistent scores for identical data', async () => {
-          const transactions = createMockTransactions({ seed: 12345 });
-          
-          const score1 = await calculateDivaScore('test-user', transactions);
-          const score2 = await calculateDivaScore('test-user', transactions);
-          
-          expect(score1.overallScore).toEqual(score2.overallScore);
-          expect(score1.scores).toEqual(score2.scores);
-        });
-      });
-      
-      describe('Performance Tests', () => {
-        it('should calculate score within performance thresholds', async () => {
-          const largeDataset = createMockTransactions({
-            count: 5000, // Large transaction history
-            period: '2 years'
-          });
-          
-          const startTime = performance.now();
-          const score = await calculateDivaScore('test-user', largeDataset);
-          const endTime = performance.now();
-          
-          const calculationTime = endTime - startTime;
-          
-          expect(calculationTime).toBeLessThan(5000); // Should complete within 5 seconds
-          expect(score.overallScore).toBeDefined();
-        });
-      });
+      expect(score).toBeGreaterThan(900);
     });
-    ```
-  </Accordion>
-</AccordionGroup>
 
-## Troubleshooting
+    test('should penalize overdraft behavior', async () => {
+      const transactions = mockTransactionData.withOverdrafts;
+      const score = await calculator.calculateDisciplineScore({ transactions });
+      
+      expect(score).toBeLessThan(600);
+    });
+
+    test('should reward regular savings', async () => {
+      const transactions = mockTransactionData.regularSavers;
+      const score = await calculator.calculateDisciplineScore({ transactions });
+      
+      expect(score).toBeGreaterThan(700);
+    });
+  });
+
+  describe('Income Score Calculation', () => {
+    test('should score stable income highly', async () => {
+      const transactions = mockTransactionData.stableIncome;
+      const score = await calculator.calculateIncomeScore({ transactions });
+      
+      expect(score).toBeGreaterThan(800);
+    });
+
+    test('should reward income diversification', async () => {
+      const transactions = mockTransactionData.diversifiedIncome;
+      const score = await calculator.calculateIncomeScore({ transactions });
+      
+      expect(score).toBeGreaterThan(700);
+    });
+
+    test('should penalize irregular income', async () => {
+      const transactions = mockTransactionData.irregularIncome;
+      const score = await calculator.calculateIncomeScore({ transactions });
+      
+      expect(score).toBeLessThan(500);
+    });
+  });
+
+  describe('Portfolio Tier Assignment', () => {
+    test('should assign correct tiers based on score ranges', () => {
+      expect(calculator.determinePortfolioTier(950)).toBe('platinum');
+      expect(calculator.determinePortfolioTier(750)).toBe('gold');
+      expect(calculator.determinePortfolioTier(550)).toBe('silver');
+      expect(calculator.determinePortfolioTier(350)).toBe('bronze');
+    });
+  });
+
+  describe('Insights Generation', () => {
+    test('should generate actionable insights for low scores', async () => {
+      const components = {
+        discipline: 300,
+        income: 400,
+        velocity: 350,
+        assets: 200
+      };
+
+      const insights = await calculator.generateInsights(components, mockTransactionData.lowPerformer);
+      
+      expect(insights.length).toBeGreaterThan(2);
+      expect(insights.some(i => i.actionable)).toBe(true);
+      expect(insights.some(i => i.impact_level === 'high')).toBe(true);
+    });
+  });
+});
+```
+
+### Integration Tests
+
+```typescript
+// diva-integration.test.ts
+describe('DIVA Integration Tests', () => {
+  test('should complete full DIVA calculation flow', async () => {
+    // Create test user
+    const user = await testDb.createUser({
+      email: 'test@example.com',
+      country_code: 'ZA'
+    });
+
+    // Link test bank account with transactions
+    await testDb.linkBankAccount(user.id, {
+      account_id: 'test_account',
+      transactions: mockTransactionData.typicalUser
+    });
+
+    // Calculate DIVA score
+    const result = await divaCalculator.calculateDivaScore({
+      user_id: user.id,
+      analysis_period_months: 12
+    });
+
+    // Verify results
+    expect(result.overall_score).toBeGreaterThan(0);
+    expect(result.overall_score).toBeLessThanOrEqual(1000);
+    expect(result.portfolio_tier).toMatch(/bronze|silver|gold|platinum/);
+    expect(result.components.discipline).toBeDefined();
+    expect(result.components.income).toBeDefined();
+    expect(result.components.velocity).toBeDefined();
+    expect(result.components.assets).toBeDefined();
+
+    // Verify database storage
+    const savedScore = await testDb.getDivaScore(user.id);
+    expect(savedScore.overall_score).toBe(result.overall_score);
+    expect(savedScore.status).toBe('active');
+  });
+
+  test('should integrate DIVA with RTSM for portfolio assignment', async () => {
+    const user = await testDb.createUser();
+    
+    // Calculate DIVA score
+    const divaResult = await divaCalculator.calculateDivaScore({
+      user_id: user.id,
+      analysis_period_months: 12
+    });
+
+    // Complete RTSM assessment
+    const rtsmResult = await rtsmCalculator.calculateRTSMScore(user.id, [
+      { question_id: 'rc_001', answer: 60 }, // Age 36-45
+      { question_id: 'rc_002', answer: 80 }, // Stable income
+      { question_id: 'rt_001', answer: 80 }, // Risk tolerant
+      // ... more responses
+    ]);
+
+    // Verify combined portfolio assignment
+    const recommendation = await portfolioService.generateRecommendation({
+      diva_score: divaResult,
+      rtsm_assessment: rtsmResult
+    });
+
+    expect(recommendation.recommended_tier).toBeDefined();
+    expect(recommendation.asset_allocation).toBeDefined();
+    expect(recommendation.investment_limits).toBeDefined();
+  });
+});
+```
+
+## Monitoring and Optimization
+
+### Performance Monitoring
+
+Set up monitoring for DIVA score calculations:
+
+```typescript
+// diva-monitoring.ts
+export class DivaMonitoring {
+  async trackCalculationPerformance(userId: string, calculation: () => Promise<DivaScoreResult>): Promise<DivaScoreResult> {
+    const startTime = Date.now();
+    
+    try {
+      const result = await calculation();
+      
+      // Track successful calculation
+      await this.recordMetric('diva_calculation_success', {
+        user_id: userId,
+        calculation_time: Date.now() - startTime,
+        score: result.overall_score,
+        tier: result.portfolio_tier,
+        insights_count: result.insights.length
+      });
+
+      return result;
+    } catch (error) {
+      // Track calculation errors
+      await this.recordMetric('diva_calculation_error', {
+        user_id: userId,
+        error_type: error.constructor.name,
+        error_message: error.message,
+        calculation_time: Date.now() - startTime
+      });
+
+      throw error;
+    }
+  }
+
+  async generateCalculationReport(): Promise<{
+    total_calculations: number;
+    average_calculation_time: number;
+    success_rate: number;
+    tier_distribution: Record<string, number>;
+    common_errors: Array<{ error: string; count: number }>;
+  }> {
+    // Implementation for generating calculation performance reports
+    return this.queryMetrics('diva_calculations', {
+      period: '30d',
+      aggregations: ['count', 'avg_time', 'success_rate', 'tier_distribution']
+    });
+  }
+}
+```
+
+### Optimization Strategies
 
 <CardGroup cols={2}>
-  <Card title="Common Issues" icon="warning">
-    **Typical Problems & Solutions:**
-    
-    - **Low Confidence Scores**: Usually indicates insufficient transaction data
-    - **Calculation Failures**: Often due to data quality issues or missing categorization
-    - **Performance Issues**: Check for large datasets or inefficient queries
-    - **Inconsistent Results**: Verify data consistency and calculation reproducibility
+  <Card title="Database Optimization" icon="database">
+    **Indexing**: Optimize queries with proper indexes  
+    **Materialized Views**: Pre-calculate common aggregations  
+    **Partitioning**: Partition large transaction tables by date  
+    **Query Optimization**: Use EXPLAIN ANALYZE for slow queries
   </Card>
-  
-  <Card title="Debug Tools" icon="bug">
-    **Debugging Resources:**
-    
-    - **Score Breakdown**: Use detailed component analysis
-    - **Data Quality Reports**: Validate input transaction data
-    - **Calculation Logs**: Review step-by-step score computation
-    - **Performance Metrics**: Monitor calculation times and resource usage
+  <Card title="Calculation Optimization" icon="cpu">
+    **Caching**: Cache intermediate calculations  
+    **Batch Processing**: Process multiple users efficiently  
+    **Incremental Updates**: Update scores based on new data only  
+    **Parallel Processing**: Parallelize component calculations
   </Card>
 </CardGroup>
 
-## Next Steps
+## Troubleshooting Common Issues
+
+### Data Quality Issues
+
+| Issue | Symptoms | Solution |
+|-------|----------|----------|
+| Insufficient Transaction Data | Low confidence scores, default values | Require minimum 3 months of data |
+| Irregular Income Patterns | Volatile income scores | Implement income smoothing algorithms |
+| Duplicate Transactions | Inflated scores | Add transaction deduplication logic |
+| Missing Transaction Categories | Incorrect velocity calculations | Enhance transaction categorization |
+
+### Calculation Errors
 
 <Steps>
-  <Step title="Implement Basic Integration">
-    Start with the basic DIVA score retrieval and display in your application
+  <Step title="Validate Input Data">
+    Ensure all required transaction and account data is present and properly formatted
   </Step>
-  <Step title="Add Real-time Updates">
-    Implement webhooks and real-time score updates for better user experience
+  <Step title="Check Business Logic">
+    Verify that component calculations follow documented business rules
   </Step>
-  <Step title="Customize for Your Use Case">
-    Adapt scoring weights and components based on your specific requirements
+  <Step title="Review Thresholds">
+    Confirm that scoring thresholds align with business requirements
   </Step>
-  <Step title="Optimize Performance">
-    Implement caching, batch processing, and performance monitoring
-  </Step>
-  <Step title="Enhance User Experience">
-    Add insights, recommendations, and actionable guidance based on DIVA scores
+  <Step title="Test Edge Cases">
+    Handle users with extreme financial patterns appropriately
   </Step>
 </Steps>
 
-## Related Resources
+---
 
-- [DIVA Score API Reference](/api-reference/diva-score/get-score) - Complete API documentation
-- [DIVA Score Refresh](/api-reference/diva-score/refresh) - Trigger score recalculation
-- [DIVA Insights](/api-reference/diva-score/insights) - Get personalized recommendations
-- [Integration Walkthrough](/guides/integration-walkthrough) - Step-by-step integration guide
+*This DIVA Score Implementation Guide provides the foundation for building a sophisticated financial health scoring system tailored to African markets. The rule-based approach ensures transparency and regulatory compliance while providing actionable insights for users.*
+
+*For additional support, refer to the [Testing Strategies](/guides/testing-strategies) and [Best Practices](/guides/best-practices) guides.*

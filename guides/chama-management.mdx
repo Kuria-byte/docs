@@ -1,28 +1,2837 @@
----
-title: "Chama Management"
-description: "Chama Management implementation guide"
----
+# Chama Management Implementation Guide
 
-# Chama Management
-
-## Overview
-
-This guide documentation is coming soon.
+This comprehensive guide covers implementing AWO Platform's digital Chama (savings group) management system, modernizing traditional African rotating savings and credit associations with digital infrastructure, transparency, and democratic governance.
 
 <Info>
-This page is under development. Please check back later for complete implementation guide.
+Digital Chamas combine the social trust of traditional savings groups with modern financial tools, enabling transparent group savings, democratic investment decisions, and automated contribution management across SADC markets.
 </Info>
 
-## Getting Started
+## Understanding Digital Chamas
 
-Step-by-step instructions will be added here.
+### Traditional vs Digital Chamas
 
-## Examples
+<CardGroup cols={2}>
+  <Card title="Traditional Chamas" icon="users">
+    **Cash-Based**: Physical money collection and storage  
+    **Manual Record-Keeping**: Paper-based contribution tracking  
+    **In-Person Meetings**: Regular physical gatherings required  
+    **Trust-Based**: Relies on personal relationships and reputation  
+    **Limited Transparency**: Records managed by treasurer only
+  </Card>
+  <Card title="AWO Digital Chamas" icon="mobile">
+    **Digital Payments**: Automated mobile money and bank transfers  
+    **Immutable Ledger**: Blockchain-backed transaction recording  
+    **Remote Participation**: Mobile app-based group management  
+    **Algorithmic Trust**: Credit scoring and verification systems  
+    **Full Transparency**: Real-time visibility for all members
+  </Card>
+</CardGroup>
 
-Code examples and best practices will be provided.
+### Core Features
 
-## Next Steps
+**Group Formation & Management:**
+- Easy Chama creation with customizable rules
+- Member invitation and approval workflows
+- Role-based permissions (admin, treasurer, member, observer)
+- Democratic governance with voting mechanisms
 
-<Card title="Related Documentation" href="/api-reference/introduction">
-  Explore other sections of our documentation
-</Card>
+**Financial Operations:**
+- Automated contribution collection
+- Transparent contribution tracking
+- Democratic payout approval
+- Group investment opportunities
+- Emergency fund management
+
+**Communication & Engagement:**
+- In-app group messaging
+- Real-time notifications
+- Monthly statements via SMS
+- Achievement badges and gamification
+
+## Database Architecture
+
+### Core Schema Design
+
+Set up the database tables for comprehensive Chama management:
+
+```sql
+-- chamas table (group information)
+CREATE TABLE chamas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    created_by UUID NOT NULL REFERENCES users(id),
+    contribution_amount DECIMAL(12,2) NOT NULL CHECK (contribution_amount > 0),
+    contribution_frequency VARCHAR(20) NOT NULL CHECK (contribution_frequency IN ('weekly', 'bi_weekly', 'monthly')),
+    contribution_currency VARCHAR(3) NOT NULL DEFAULT 'ZAR',
+    start_date DATE NOT NULL,
+    end_date DATE,
+    current_cycle INTEGER NOT NULL DEFAULT 1,
+    total_cycles INTEGER,
+    status VARCHAR(20) NOT NULL DEFAULT 'forming' CHECK (status IN ('forming', 'active', 'paused', 'completed', 'cancelled')),
+    
+    -- Governance rules
+    min_members INTEGER NOT NULL DEFAULT 3,
+    max_members INTEGER NOT NULL DEFAULT 50,
+    voting_threshold DECIMAL(5,2) NOT NULL DEFAULT 60.00 CHECK (voting_threshold >= 50 AND voting_threshold <= 100),
+    treasurer_rotation BOOLEAN NOT NULL DEFAULT true,
+    auto_invest_threshold DECIMAL(12,2),
+    
+    -- Financial tracking
+    total_contributions DECIMAL(12,2) NOT NULL DEFAULT 0,
+    available_balance DECIMAL(12,2) NOT NULL DEFAULT 0,
+    invested_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    emergency_fund DECIMAL(12,2) NOT NULL DEFAULT 0,
+    
+    -- Metadata
+    privacy_level VARCHAR(20) NOT NULL DEFAULT 'private' CHECK (privacy_level IN ('public', 'private', 'invite_only')),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- chama_members table (membership information)
+CREATE TABLE chama_members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chama_id UUID NOT NULL REFERENCES chamas(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id),
+    role VARCHAR(20) NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'treasurer', 'member', 'observer')),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'suspended', 'left')),
+    joined_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    left_date DATE,
+    
+    -- Financial tracking per member
+    total_contributed DECIMAL(12,2) NOT NULL DEFAULT 0,
+    expected_contributions DECIMAL(12,2) NOT NULL DEFAULT 0,
+    contribution_status VARCHAR(20) NOT NULL DEFAULT 'current' CHECK (contribution_status IN ('ahead', 'current', 'behind', 'defaulted')),
+    last_contribution_date DATE,
+    next_contribution_due DATE,
+    
+    -- Engagement tracking
+    meetings_attended INTEGER NOT NULL DEFAULT 0,
+    votes_participated INTEGER NOT NULL DEFAULT 0,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    UNIQUE(chama_id, user_id)
+);
+
+-- chama_contributions table (contribution tracking)
+CREATE TABLE chama_contributions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chama_id UUID NOT NULL REFERENCES chamas(id),
+    member_id UUID NOT NULL REFERENCES chama_members(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    
+    amount DECIMAL(12,2) NOT NULL CHECK (amount > 0),
+    currency VARCHAR(3) NOT NULL,
+    contribution_period DATE NOT NULL, -- YYYY-MM-DD (first day of contribution period)
+    contribution_type VARCHAR(20) NOT NULL DEFAULT 'regular' CHECK (contribution_type IN ('regular', 'emergency', 'penalty', 'bonus', 'makeup')),
+    
+    -- Payment details
+    payment_method VARCHAR(30) NOT NULL,
+    payment_reference VARCHAR(100),
+    transaction_id UUID REFERENCES transactions(id),
+    
+    -- Status tracking
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'refunded')),
+    due_date DATE NOT NULL,
+    paid_date TIMESTAMP,
+    
+    -- Penalties and fees
+    late_fee DECIMAL(12,2) NOT NULL DEFAULT 0,
+    penalty_applied BOOLEAN NOT NULL DEFAULT false,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- chama_payouts table (payout management)
+CREATE TABLE chama_payouts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chama_id UUID NOT NULL REFERENCES chamas(id),
+    recipient_id UUID NOT NULL REFERENCES users(id),
+    
+    amount DECIMAL(12,2) NOT NULL CHECK (amount > 0),
+    currency VARCHAR(3) NOT NULL,
+    payout_type VARCHAR(20) NOT NULL CHECK (payout_type IN ('rotation', 'emergency', 'dividend', 'final_distribution')),
+    payout_period DATE NOT NULL,
+    
+    -- Approval tracking
+    status VARCHAR(20) NOT NULL DEFAULT 'proposed' CHECK (status IN ('proposed', 'voting', 'approved', 'processing', 'completed', 'rejected', 'cancelled')),
+    proposed_by UUID NOT NULL REFERENCES users(id),
+    voting_deadline TIMESTAMP,
+    
+    -- Financial details
+    source_fund VARCHAR(20) NOT NULL CHECK (source_fund IN ('contributions', 'investments', 'emergency_fund')),
+    transaction_id UUID REFERENCES transactions(id),
+    processing_fee DECIMAL(12,2) NOT NULL DEFAULT 0,
+    
+    -- Justification
+    reason TEXT NOT NULL,
+    supporting_documents JSONB,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- chama_votes table (democratic decision making)
+CREATE TABLE chama_votes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chama_id UUID NOT NULL REFERENCES chamas(id),
+    proposal_type VARCHAR(30) NOT NULL CHECK (proposal_type IN ('payout', 'investment', 'rule_change', 'member_action', 'emergency_fund')),
+    proposal_id UUID, -- References specific proposal (payout_id, investment_id, etc.)
+    
+    title VARCHAR(200) NOT NULL,
+    description TEXT NOT NULL,
+    proposed_by UUID NOT NULL REFERENCES users(id),
+    
+    -- Voting details
+    voting_type VARCHAR(20) NOT NULL DEFAULT 'simple_majority' CHECK (voting_type IN ('simple_majority', 'two_thirds', 'unanimous', 'weighted')),
+    required_threshold DECIMAL(5,2) NOT NULL,
+    voting_deadline TIMESTAMP NOT NULL,
+    
+    -- Status tracking
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'passed', 'failed', 'cancelled', 'expired')),
+    total_eligible_voters INTEGER NOT NULL,
+    votes_cast INTEGER NOT NULL DEFAULT 0,
+    yes_votes INTEGER NOT NULL DEFAULT 0,
+    no_votes INTEGER NOT NULL DEFAULT 0,
+    abstain_votes INTEGER NOT NULL DEFAULT 0,
+    
+    -- Results
+    final_result VARCHAR(20),
+    result_calculated_at TIMESTAMP,
+    executed_at TIMESTAMP,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- chama_vote_responses table (individual vote responses)
+CREATE TABLE chama_vote_responses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vote_id UUID NOT NULL REFERENCES chama_votes(id) ON DELETE CASCADE,
+    member_id UUID NOT NULL REFERENCES chama_members(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    
+    response VARCHAR(10) NOT NULL CHECK (response IN ('yes', 'no', 'abstain')),
+    weight DECIMAL(5,2) NOT NULL DEFAULT 1.00, -- For weighted voting
+    comment TEXT,
+    
+    cast_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    UNIQUE(vote_id, member_id)
+);
+
+-- chama_investments table (group investments)
+CREATE TABLE chama_investments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chama_id UUID NOT NULL REFERENCES chamas(id),
+    investment_type VARCHAR(30) NOT NULL CHECK (investment_type IN ('sme_debt', 'money_market', 'bonds', 'etf', 'real_estate')),
+    
+    product_id VARCHAR(100) NOT NULL,
+    product_name VARCHAR(200) NOT NULL,
+    investment_amount DECIMAL(12,2) NOT NULL CHECK (investment_amount > 0),
+    currency VARCHAR(3) NOT NULL,
+    
+    -- Investment details
+    expected_return DECIMAL(5,2), -- Annual percentage
+    investment_term_months INTEGER,
+    risk_level VARCHAR(20) CHECK (risk_level IN ('very_low', 'low', 'moderate', 'high', 'very_high')),
+    
+    -- Status tracking
+    status VARCHAR(20) NOT NULL DEFAULT 'proposed' CHECK (status IN ('proposed', 'approved', 'processing', 'active', 'matured', 'cancelled')),
+    invested_date DATE,
+    maturity_date DATE,
+    
+    -- Performance tracking
+    current_value DECIMAL(12,2),
+    realized_return DECIMAL(12,2) NOT NULL DEFAULT 0,
+    last_valuation_date DATE,
+    
+    -- Approval tracking
+    vote_id UUID REFERENCES chama_votes(id),
+    approved_by UUID REFERENCES users(id),
+    approved_at TIMESTAMP,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- chama_meetings table (meeting management)
+CREATE TABLE chama_meetings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chama_id UUID NOT NULL REFERENCES chamas(id),
+    
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    meeting_type VARCHAR(20) NOT NULL DEFAULT 'regular' CHECK (meeting_type IN ('regular', 'emergency', 'special', 'agm')),
+    
+    -- Scheduling
+    scheduled_date TIMESTAMP NOT NULL,
+    duration_minutes INTEGER NOT NULL DEFAULT 60,
+    location VARCHAR(200), -- Physical or virtual meeting link
+    meeting_format VARCHAR(20) NOT NULL DEFAULT 'virtual' CHECK (meeting_format IN ('physical', 'virtual', 'hybrid')),
+    
+    -- Status
+    status VARCHAR(20) NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'in_progress', 'completed', 'cancelled', 'postponed')),
+    
+    -- Meeting content
+    agenda JSONB,
+    minutes TEXT,
+    decisions_made JSONB,
+    action_items JSONB,
+    
+    -- Organizer
+    organized_by UUID NOT NULL REFERENCES users(id),
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- chama_meeting_attendance table
+CREATE TABLE chama_meeting_attendance (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    meeting_id UUID NOT NULL REFERENCES chama_meetings(id) ON DELETE CASCADE,
+    member_id UUID NOT NULL REFERENCES chama_members(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    
+    attendance_status VARCHAR(20) NOT NULL CHECK (attendance_status IN ('present', 'absent', 'excused', 'late')),
+    joined_at TIMESTAMP,
+    left_at TIMESTAMP,
+    
+    UNIQUE(meeting_id, member_id)
+);
+
+-- Indexes for performance
+CREATE INDEX idx_chamas_status ON chamas(status);
+CREATE INDEX idx_chamas_created_by ON chamas(created_by);
+CREATE INDEX idx_chama_members_chama_id ON chama_members(chama_id);
+CREATE INDEX idx_chama_members_user_id ON chama_members(user_id);
+CREATE INDEX idx_chama_members_status ON chama_members(status);
+CREATE INDEX idx_chama_contributions_chama_id ON chama_contributions(chama_id);
+CREATE INDEX idx_chama_contributions_member_id ON chama_contributions(member_id);
+CREATE INDEX idx_chama_contributions_period ON chama_contributions(contribution_period);
+CREATE INDEX idx_chama_payouts_chama_id ON chama_payouts(chama_id);
+CREATE INDEX idx_chama_payouts_status ON chama_payouts(status);
+CREATE INDEX idx_chama_votes_chama_id ON chama_votes(chama_id);
+CREATE INDEX idx_chama_votes_status ON chama_votes(status);
+CREATE INDEX idx_chama_investments_chama_id ON chama_investments(chama_id);
+```
+
+## Core Implementation
+
+### Chama Service Layer
+
+Implement the core Chama management service:
+
+```typescript
+// chama-service.ts
+import { DatabaseService } from './database-service';
+import { PaymentService } from './payment-service';
+import { NotificationService } from './notification-service';
+import { EventEmitter } from 'events';
+
+export interface ChamaCreationData {
+  name: string;
+  description: string;
+  contribution_amount: number;
+  contribution_frequency: 'weekly' | 'bi_weekly' | 'monthly';
+  contribution_currency: string;
+  start_date: string;
+  max_members: number;
+  voting_threshold: number;
+  treasurer_rotation: boolean;
+  privacy_level: 'public' | 'private' | 'invite_only';
+  auto_invest_threshold?: number;
+}
+
+export interface ChamaGroup {
+  id: string;
+  name: string;
+  description: string;
+  created_by: string;
+  contribution_amount: number;
+  contribution_frequency: string;
+  contribution_currency: string;
+  start_date: string;
+  current_cycle: number;
+  status: string;
+  member_count: number;
+  total_contributions: number;
+  available_balance: number;
+  governance_rules: {
+    min_members: number;
+    max_members: number;
+    voting_threshold: number;
+    treasurer_rotation: boolean;
+  };
+  created_at: string;
+}
+
+export interface ChamaMember {
+  id: string;
+  user_id: string;
+  full_name: string;
+  role: 'admin' | 'treasurer' | 'member' | 'observer';
+  status: 'pending' | 'active' | 'suspended' | 'left';
+  joined_date: string;
+  total_contributed: number;
+  contribution_status: 'ahead' | 'current' | 'behind' | 'defaulted';
+  last_contribution_date: string | null;
+  next_contribution_due: string | null;
+}
+
+export class ChamaService extends EventEmitter {
+  constructor(
+    private db: DatabaseService,
+    private paymentService: PaymentService,
+    private notificationService: NotificationService
+  ) {
+    super();
+  }
+
+  async createChama(createdBy: string, data: ChamaCreationData): Promise<ChamaGroup> {
+    // Validate user can create Chama
+    await this.validateChamaCreation(createdBy);
+
+    const chamaId = await this.db.transaction(async (trx) => {
+      // Create Chama
+      const [chama] = await trx('chamas').insert({
+        name: data.name,
+        description: data.description,
+        created_by: createdBy,
+        contribution_amount: data.contribution_amount,
+        contribution_frequency: data.contribution_frequency,
+        contribution_currency: data.contribution_currency,
+        start_date: data.start_date,
+        max_members: data.max_members,
+        voting_threshold: data.voting_threshold,
+        treasurer_rotation: data.treasurer_rotation,
+        privacy_level: data.privacy_level,
+        auto_invest_threshold: data.auto_invest_threshold,
+        status: 'forming'
+      }).returning('id');
+
+      // Add creator as admin
+      await trx('chama_members').insert({
+        chama_id: chama.id,
+        user_id: createdBy,
+        role: 'admin',
+        status: 'active',
+        joined_date: new Date()
+      });
+
+      return chama.id;
+    });
+
+    // Get created Chama details
+    const chamaGroup = await this.getChamaById(chamaId);
+
+    // Emit event for real-time updates
+    this.emit('chamaCreated', {
+      chama_id: chamaId,
+      created_by: createdBy,
+      chama_details: chamaGroup
+    });
+
+    return chamaGroup;
+  }
+
+  async joinChama(chamaId: string, userId: string, inviteCode?: string): Promise<{ status: string; pending_approval: boolean }> {
+    // Validate join request
+    await this.validateJoinRequest(chamaId, userId);
+
+    const chama = await this.getChamaById(chamaId);
+    
+    // Check if invite-only and validate invite code
+    if (chama.privacy_level === 'invite_only' && !inviteCode) {
+      throw new Error('Invite code required for this Chama');
+    }
+
+    if (inviteCode) {
+      await this.validateInviteCode(chamaId, inviteCode);
+    }
+
+    // Check member limit
+    if (chama.member_count >= chama.governance_rules.max_members) {
+      throw new Error('Chama has reached maximum member limit');
+    }
+
+    const memberStatus = chama.privacy_level === 'public' ? 'active' : 'pending';
+
+    await this.db.query(`
+      INSERT INTO chama_members (chama_id, user_id, role, status, joined_date, next_contribution_due)
+      VALUES ($1, $2, 'member', $3, $4, $5)
+    `, [
+      chamaId,
+      userId,
+      memberStatus,
+      new Date(),
+      this.calculateNextContributionDue(chama.contribution_frequency)
+    ]);
+
+    // Notify Chama admins of new member
+    await this.notifyAdmins(chamaId, 'new_member_joined', {
+      user_id: userId,
+      status: memberStatus
+    });
+
+    // Emit real-time event
+    this.emit('memberJoined', {
+      chama_id: chamaId,
+      user_id: userId,
+      status: memberStatus
+    });
+
+    return {
+      status: memberStatus,
+      pending_approval: memberStatus === 'pending'
+    };
+  }
+
+  async contributeToChama(
+    chamaId: string, 
+    userId: string, 
+    amount: number, 
+    paymentMethod: string,
+    contributionType: string = 'regular'
+  ): Promise<{ transaction_id: string; contribution_id: string }> {
+    
+    // Validate member and contribution
+    const member = await this.validateMemberContribution(chamaId, userId, amount);
+    const chama = await this.getChamaById(chamaId);
+
+    const contributionId = await this.db.transaction(async (trx) => {
+      // Create contribution record
+      const [contribution] = await trx('chama_contributions').insert({
+        chama_id: chamaId,
+        member_id: member.id,
+        user_id: userId,
+        amount,
+        currency: chama.contribution_currency,
+        contribution_period: this.getCurrentContributionPeriod(chama.contribution_frequency),
+        contribution_type: contributionType,
+        payment_method: paymentMethod,
+        status: 'pending',
+        due_date: member.next_contribution_due
+      }).returning('id');
+
+      return contribution.id;
+    });
+
+    // Process payment
+    const paymentResult = await this.paymentService.processPayment({
+      user_id: userId,
+      amount,
+      currency: chama.contribution_currency,
+      payment_method: paymentMethod,
+      description: `Chama contribution: ${chama.name}`,
+      metadata: {
+        chama_id: chamaId,
+        contribution_id: contributionId,
+        contribution_type: contributionType
+      }
+    });
+
+    // Update contribution with transaction ID
+    await this.db.query(`
+      UPDATE chama_contributions 
+      SET transaction_id = $1, status = 'processing'
+      WHERE id = $2
+    `, [paymentResult.transaction_id, contributionId]);
+
+    // Emit real-time event
+    this.emit('contributionInitiated', {
+      chama_id: chamaId,
+      user_id: userId,
+      contribution_id: contributionId,
+      amount,
+      status: 'processing'
+    });
+
+    return {
+      transaction_id: paymentResult.transaction_id,
+      contribution_id: contributionId
+    };
+  }
+
+  async processContributionPayment(transactionId: string, status: 'completed' | 'failed'): Promise<void> {
+    const contribution = await this.db.queryOne(`
+      SELECT c.*, ch.name as chama_name, u.full_name
+      FROM chama_contributions c
+      JOIN chamas ch ON c.chama_id = ch.id
+      JOIN users u ON c.user_id = u.id
+      WHERE c.transaction_id = $1
+    `, [transactionId]);
+
+    if (!contribution) {
+      throw new Error('Contribution not found');
+    }
+
+    await this.db.transaction(async (trx) => {
+      if (status === 'completed') {
+        // Update contribution status
+        await trx('chama_contributions')
+          .where('id', contribution.id)
+          .update({
+            status: 'completed',
+            paid_date: new Date()
+          });
+
+        // Update member contribution tracking
+        await trx('chama_members')
+          .where('id', contribution.member_id)
+          .increment('total_contributed', contribution.amount)
+          .update({
+            last_contribution_date: new Date(),
+            next_contribution_due: this.calculateNextContributionDue(contribution.contribution_frequency),
+            contribution_status: 'current'
+          });
+
+        // Update Chama balance
+        await trx('chamas')
+          .where('id', contribution.chama_id)
+          .increment('total_contributions', contribution.amount)
+          .increment('available_balance', contribution.amount);
+
+      } else {
+        // Mark contribution as failed
+        await trx('chama_contributions')
+          .where('id', contribution.id)
+          .update({ status: 'failed' });
+      }
+    });
+
+    // Notify all members of successful contribution
+    if (status === 'completed') {
+      await this.notifyAllMembers(contribution.chama_id, 'contribution_received', {
+        contributor_name: contribution.full_name,
+        amount: contribution.amount,
+        chama_name: contribution.chama_name
+      });
+
+      // Check if auto-investment threshold is reached
+      await this.checkAutoInvestmentThreshold(contribution.chama_id);
+    }
+
+    // Emit real-time event
+    this.emit('contributionProcessed', {
+      chama_id: contribution.chama_id,
+      user_id: contribution.user_id,
+      contribution_id: contribution.id,
+      amount: contribution.amount,
+      status
+    });
+  }
+
+  async proposePayout(
+    chamaId: string,
+    proposedBy: string,
+    recipientId: string,
+    amount: number,
+    reason: string,
+    payoutType: 'rotation' | 'emergency' | 'dividend' = 'rotation'
+  ): Promise<{ payout_id: string; vote_id: string }> {
+    
+    // Validate payout proposal
+    await this.validatePayoutProposal(chamaId, proposedBy, recipientId, amount, payoutType);
+
+    const chama = await this.getChamaById(chamaId);
+
+    const result = await this.db.transaction(async (trx) => {
+      // Create payout record
+      const [payout] = await trx('chama_payouts').insert({
+        chama_id: chamaId,
+        recipient_id: recipientId,
+        amount,
+        currency: chama.contribution_currency,
+        payout_type: payoutType,
+        payout_period: new Date(),
+        status: 'voting',
+        proposed_by: proposedBy,
+        voting_deadline: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)), // 7 days
+        source_fund: 'contributions',
+        reason
+      }).returning('id');
+
+      // Create voting proposal
+      const [vote] = await trx('chama_votes').insert({
+        chama_id: chamaId,
+        proposal_type: 'payout',
+        proposal_id: payout.id,
+        title: `${payoutType.charAt(0).toUpperCase() + payoutType.slice(1)} Payout Proposal`,
+        description: `Proposal to pay ${amount} ${chama.contribution_currency} to member. Reason: ${reason}`,
+        proposed_by: proposedBy,
+        voting_type: 'simple_majority',
+        required_threshold: chama.governance_rules.voting_threshold,
+        voting_deadline: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)),
+        total_eligible_voters: await this.getActiveMemberCount(chamaId),
+        status: 'active'
+      }).returning('id');
+
+      // Update payout with vote ID
+      await trx('chama_payouts')
+        .where('id', payout.id)
+        .update({ voting_deadline: vote.voting_deadline });
+
+      return { payout_id: payout.id, vote_id: vote.id };
+    });
+
+    // Notify all members of new proposal
+    await this.notifyAllMembers(chamaId, 'payout_proposal', {
+      proposal_id: result.vote_id,
+      amount,
+      recipient_id: recipientId,
+      reason,
+      voting_deadline: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000))
+    });
+
+    // Emit real-time event
+    this.emit('payoutProposed', {
+      chama_id: chamaId,
+      payout_id: result.payout_id,
+      vote_id: result.vote_id,
+      proposed_by: proposedBy,
+      amount
+    });
+
+    return result;
+  }
+
+  async castVote(
+    voteId: string,
+    userId: string,
+    response: 'yes' | 'no' | 'abstain',
+    comment?: string
+  ): Promise<{ vote_recorded: boolean; vote_result?: string }> {
+    
+    // Validate voting eligibility
+    const vote = await this.validateVotingEligibility(voteId, userId);
+
+    await this.db.transaction(async (trx) => {
+      // Record vote response
+      await trx('chama_vote_responses').insert({
+        vote_id: voteId,
+        member_id: vote.member_id,
+        user_id: userId,
+        response,
+        comment
+      });
+
+      // Update vote counts
+      const updateField = `${response}_votes`;
+      await trx('chama_votes')
+        .where('id', voteId)
+        .increment('votes_cast', 1)
+        .increment(updateField, 1);
+    });
+
+    // Check if voting is complete
+    const voteResult = await this.checkVotingCompletion(voteId);
+
+    // Emit real-time event
+    this.emit('voteReceived', {
+      vote_id: voteId,
+      user_id: userId,
+      response,
+      chama_id: vote.chama_id
+    });
+
+    return {
+      vote_recorded: true,
+      vote_result: voteResult
+    };
+  }
+
+  async getActiveChamas(userId: string): Promise<ChamaGroup[]> {
+    const chamas = await this.db.query(`
+      SELECT 
+        c.*,
+        COUNT(cm.id) as member_count
+      FROM chamas c
+      JOIN chama_members cm ON c.id = cm.chama_id
+      WHERE cm.user_id = $1 
+        AND cm.status = 'active'
+        AND c.status IN ('forming', 'active')
+      GROUP BY c.id
+      ORDER BY c.created_at DESC
+    `, [userId]);
+
+    return chamas.map(this.transformChamaData);
+  }
+
+  async getChamaMembers(chamaId: string, requestingUserId: string): Promise<ChamaMember[]> {
+    // Verify user is a member
+    await this.validateMembership(chamaId, requestingUserId);
+
+    const members = await this.db.query(`
+      SELECT 
+        cm.*,
+        u.full_name,
+        u.profile_image_url
+      FROM chama_members cm
+      JOIN users u ON cm.user_id = u.id
+      WHERE cm.chama_id = $1 
+        AND cm.status IN ('active', 'pending')
+      ORDER BY 
+        CASE cm.role 
+          WHEN 'admin' THEN 1 
+          WHEN 'treasurer' THEN 2 
+          ELSE 3 
+        END,
+        cm.joined_date ASC
+    `, [chamaId]);
+
+    return members.map(this.transformMemberData);
+  }
+
+  async getChamaFinancialSummary(chamaId: string, requestingUserId: string): Promise<{
+    total_contributions: number;
+    available_balance: number;
+    invested_amount: number;
+    emergency_fund: number;
+    monthly_target: number;
+    contribution_compliance: number;
+    recent_transactions: Array<any>;
+  }> {
+    // Verify user is a member
+    await this.validateMembership(chamaId, requestingUserId);
+
+    const chama = await this.getChamaById(chamaId);
+    
+    // Calculate monthly target based on frequency and member count
+    const memberCount = await this.getActiveMemberCount(chamaId);
+    const monthlyMultiplier = chama.contribution_frequency === 'weekly' ? 4.33 : 
+                             chama.contribution_frequency === 'bi_weekly' ? 2.17 : 1;
+    const monthlyTarget = chama.contribution_amount * memberCount * monthlyMultiplier;
+
+    // Calculate contribution compliance (last 30 days)
+    const complianceStats = await this.db.queryOne(`
+      SELECT 
+        COUNT(*) as expected_contributions,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_contributions
+      FROM chama_contributions
+      WHERE chama_id = $1 
+        AND due_date >= CURRENT_DATE - INTERVAL '30 days'
+        AND contribution_type = 'regular'
+    `, [chamaId]);
+
+    const complianceRate = complianceStats.expected_contributions > 0 
+      ? (complianceStats.completed_contributions / complianceStats.expected_contributions) * 100 
+      : 100;
+
+    // Get recent transactions
+    const recentTransactions = await this.db.query(`
+      SELECT 
+        'contribution' as type,
+        c.amount,
+        c.currency,
+        c.paid_date as transaction_date,
+        u.full_name as member_name,
+        c.contribution_type
+      FROM chama_contributions c
+      JOIN users u ON c.user_id = u.id
+      WHERE c.chama_id = $1 
+        AND c.status = 'completed'
+        AND c.paid_date >= CURRENT_DATE - INTERVAL '30 days'
+      
+      UNION ALL
+      
+      SELECT 
+        'payout' as type,
+        p.amount,
+        p.currency,
+        p.created_at as transaction_date,
+        u.full_name as member_name,
+        p.payout_type as contribution_type
+      FROM chama_payouts p
+      JOIN users u ON p.recipient_id = u.id
+      WHERE p.chama_id = $1 
+        AND p.status = 'completed'
+        AND p.created_at >= CURRENT_DATE - INTERVAL '30 days'
+      
+      ORDER BY transaction_date DESC
+      LIMIT 20
+    `, [chamaId]);
+
+    return {
+      total_contributions: chama.total_contributions,
+      available_balance: chama.available_balance,
+      invested_amount: chama.invested_amount,
+      emergency_fund: chama.emergency_fund,
+      monthly_target: monthlyTarget,
+      contribution_compliance: Math.round(complianceRate),
+      recent_transactions: recentTransactions
+    };
+  }
+
+  // Helper methods
+  private async validateChamaCreation(userId: string): Promise<void> {
+    // Check if user can create another Chama (limit 3 active Chamas)
+    const activeChamas = await this.db.queryOne(`
+      SELECT COUNT(*) as count
+      FROM chamas c
+      JOIN chama_members cm ON c.id = cm.chama_id
+      WHERE cm.user_id = $1 
+        AND cm.role = 'admin'
+        AND c.status IN ('forming', 'active')
+    `, [userId]);
+
+    if (activeChamas.count >= 3) {
+      throw new Error('Maximum limit of 3 active Chamas reached');
+    }
+  }
+
+  private async validateJoinRequest(chamaId: string, userId: string): Promise<void> {
+    // Check if user is already a member
+    const existingMember = await this.db.queryOne(`
+      SELECT id FROM chama_members
+      WHERE chama_id = $1 AND user_id = $2
+    `, [chamaId, userId]);
+
+    if (existingMember) {
+      throw new Error('User is already a member of this Chama');
+    }
+
+    // Check if user has reached maximum Chama limit (5 active memberships)
+    const membershipCount = await this.db.queryOne(`
+      SELECT COUNT(*) as count
+      FROM chama_members cm
+      JOIN chamas c ON cm.chama_id = c.id
+      WHERE cm.user_id = $1 
+        AND cm.status = 'active'
+        AND c.status IN ('forming', 'active')
+    `, [userId]);
+
+    if (membershipCount.count >= 5) {
+      throw new Error('Maximum limit of 5 active Chama memberships reached');
+    }
+  }
+
+  private calculateNextContributionDue(frequency: string): Date {
+    const now = new Date();
+    switch (frequency) {
+      case 'weekly':
+        return new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000));
+      case 'bi_weekly':
+        return new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000));
+      case 'monthly':
+        const nextMonth = new Date(now);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        return nextMonth;
+      default:
+        return new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
+    }
+  }
+
+  private getCurrentContributionPeriod(frequency: string): Date {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    
+    if (frequency === 'monthly') {
+      return new Date(year, month, 1); // First day of current month
+    } else {
+      // For weekly/bi-weekly, use week-based periods
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay()); // Start of current week
+      return weekStart;
+    }
+  }
+
+  private transformChamaData(raw: any): ChamaGroup {
+    return {
+      id: raw.id,
+      name: raw.name,
+      description: raw.description,
+      created_by: raw.created_by,
+      contribution_amount: parseFloat(raw.contribution_amount),
+      contribution_frequency: raw.contribution_frequency,
+      contribution_currency: raw.contribution_currency,
+      start_date: raw.start_date,
+      current_cycle: raw.current_cycle,
+      status: raw.status,
+      member_count: parseInt(raw.member_count),
+      total_contributions: parseFloat(raw.total_contributions),
+      available_balance: parseFloat(raw.available_balance),
+      governance_rules: {
+        min_members: raw.min_members,
+        max_members: raw.max_members,
+        voting_threshold: parseFloat(raw.voting_threshold),
+        treasurer_rotation: raw.treasurer_rotation
+      },
+      created_at: raw.created_at
+    };
+  }
+
+  private transformMemberData(raw: any): ChamaMember {
+    return {
+      id: raw.id,
+      user_id: raw.user_id,
+      full_name: raw.full_name,
+      role: raw.role,
+      status: raw.status,
+      joined_date: raw.joined_date,
+      total_contributed: parseFloat(raw.total_contributed),
+      contribution_status: raw.contribution_status,
+      last_contribution_date: raw.last_contribution_date,
+      next_contribution_due: raw.next_contribution_due
+    };
+  }
+}
+```
+
+### Real-Time Features
+
+Implement real-time updates using Socket.io:
+
+```typescript
+// chama-realtime.ts
+import { Server as SocketServer } from 'socket.io';
+import { ChamaService } from './chama-service';
+
+export class ChamaRealtimeService {
+  private io: SocketServer;
+  private chamaService: ChamaService;
+
+  constructor(io: SocketServer, chamaService: ChamaService) {
+    this.io = io;
+    this.chamaService = chamaService;
+    this.setupEventHandlers();
+  }
+
+  private setupEventHandlers(): void {
+    // Listen for Chama events
+    this.chamaService.on('chamaCreated', (data) => {
+      this.io.to(`user:${data.created_by}`).emit('chama_created', data);
+    });
+
+    this.chamaService.on('memberJoined', (data) => {
+      this.io.to(`chama:${data.chama_id}`).emit('member_joined', data);
+    });
+
+    this.chamaService.on('contributionInitiated', (data) => {
+      this.io.to(`chama:${data.chama_id}`).emit('contribution_initiated', data);
+    });
+
+    this.chamaService.on('contributionProcessed', (data) => {
+      this.io.to(`chama:${data.chama_id}`).emit('contribution_processed', data);
+      
+      // Update member contribution status in real-time
+      this.broadcastMemberUpdate(data.chama_id, data.user_id);
+    });
+
+    this.chamaService.on('payoutProposed', (data) => {
+      this.io.to(`chama:${data.chama_id}`).emit('payout_proposed', data);
+    });
+
+    this.chamaService.on('voteReceived', (data) => {
+      this.io.to(`chama:${data.chama_id}`).emit('vote_received', data);
+    });
+  }
+
+  async joinChamaRoom(socket: any, chamaId: string, userId: string): Promise<void> {
+    // Verify user is a member of the Chama
+    const isMember = await this.chamaService.validateMembership(chamaId, userId);
+    
+    if (isMember) {
+      socket.join(`chama:${chamaId}`);
+      
+      // Send current Chama state
+      const chamaData = await this.chamaService.getChamaById(chamaId);
+      const members = await this.chamaService.getChamaMembers(chamaId, userId);
+      
+      socket.emit('chama_state', {
+        chama: chamaData,
+        members,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  private async broadcastMemberUpdate(chamaId: string, userId: string): Promise<void> {
+    const memberData = await this.chamaService.getMemberDetails(chamaId, userId);
+    
+    this.io.to(`chama:${chamaId}`).emit('member_updated', {
+      chama_id: chamaId,
+      member: memberData,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  leaveChamaRoom(socket: any, chamaId: string): void {
+    socket.leave(`chama:${chamaId}`);
+  }
+}
+```
+
+## API Implementation
+
+### REST API Endpoints
+
+Create comprehensive API endpoints for Chama management:
+
+```typescript
+// chama-routes.ts
+import { Router } from 'express';
+import { ChamaService } from './chama-service';
+import { authMiddleware, validateInput, rateLimitMiddleware } from './middleware';
+import { body, param, query } from 'express-validator';
+
+const router = Router();
+
+// Create new Chama
+router.post('/chamas', 
+  authMiddleware,
+  rateLimitMiddleware({ windowMs: 60000, max: 3 }), // 3 per minute
+  [
+    body('name').isLength({ min: 3, max: 100 }).trim().escape(),
+    body('description').optional().isLength({ max: 500 }).trim().escape(),
+    body('contribution_amount').isFloat({ min: 1 }).toFloat(),
+    body('contribution_frequency').isIn(['weekly', 'bi_weekly', 'monthly']),
+    body('contribution_currency').isLength({ min: 3, max: 3 }),
+    body('start_date').isISO8601().toDate(),
+    body('max_members').isInt({ min: 3, max: 50 }),
+    body('voting_threshold').isFloat({ min: 50, max: 100 }),
+    body('privacy_level').isIn(['public', 'private', 'invite_only'])
+  ],
+  validateInput,
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const chamaData = req.body;
+
+      const chama = await chamaService.createChama(userId, chamaData);
+
+      res.status(201).json({
+        success: true,
+        data: chama,
+        message: 'Chama created successfully'
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+// Get user's Chamas
+router.get('/users/:userId/chamas',
+  authMiddleware,
+  [param('userId').isUUID()],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { status } = req.query;
+
+      // Verify user can access this data
+      if (req.user.id !== userId && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Unauthorized access' });
+      }
+
+      const chamas = await chamaService.getUserChamas(userId, status as string);
+
+      res.json({
+        success: true,
+        data: { chamas }
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Join Chama
+router.post('/chamas/:chamaId/members',
+  authMiddleware,
+  [
+    param('chamaId').isUUID(),
+    body('invite_code').optional().isString()
+  ],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { chamaId } = req.params;
+      const { invite_code } = req.body;
+      const userId = req.user.id;
+
+      const result = await chamaService.joinChama(chamaId, userId, invite_code);
+
+      res.json({
+        success: true,
+        data: result,
+        message: result.pending_approval ? 
+          'Join request submitted for approval' : 
+          'Successfully joined Chama'
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+// Get Chama members
+router.get('/chamas/:chamaId/members',
+  authMiddleware,
+  [param('chamaId').isUUID()],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { chamaId } = req.params;
+      const userId = req.user.id;
+
+      const members = await chamaService.getChamaMembers(chamaId, userId);
+
+      res.json({
+        success: true,
+        data: { members }
+      });
+    } catch (error) {
+      res.status(403).json({ error: error.message });
+    }
+  }
+);
+
+// Make contribution
+router.post('/chamas/:chamaId/contributions',
+  authMiddleware,
+  rateLimitMiddleware({ windowMs: 300000, max: 10 }), // 10 per 5 minutes
+  [
+    param('chamaId').isUUID(),
+    body('amount').isFloat({ min: 1 }),
+    body('payment_method').isIn(['wallet', 'mobile_money', 'bank_transfer']),
+    body('contribution_type').optional().isIn(['regular', 'emergency', 'makeup', 'bonus'])
+  ],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { chamaId } = req.params;
+      const { amount, payment_method, contribution_type = 'regular' } = req.body;
+      const userId = req.user.id;
+
+      const result = await chamaService.contributeToChama(
+        chamaId, 
+        userId, 
+        amount, 
+        payment_method,
+        contribution_type
+      );
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Contribution initiated successfully'
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+// Propose payout
+router.post('/chamas/:chamaId/payouts',
+  authMiddleware,
+  [
+    param('chamaId').isUUID(),
+    body('recipient_id').isUUID(),
+    body('amount').isFloat({ min: 1 }),
+    body('reason').isLength({ min: 10, max: 500 }).trim().escape(),
+    body('payout_type').isIn(['rotation', 'emergency', 'dividend'])
+  ],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { chamaId } = req.params;
+      const { recipient_id, amount, reason, payout_type } = req.body;
+      const userId = req.user.id;
+
+      const result = await chamaService.proposePayout(
+        chamaId,
+        userId,
+        recipient_id,
+        amount,
+        reason,
+        payout_type
+      );
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Payout proposal created successfully'
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+// Cast vote
+router.post('/chamas/votes/:voteId/responses',
+  authMiddleware,
+  [
+    param('voteId').isUUID(),
+    body('response').isIn(['yes', 'no', 'abstain']),
+    body('comment').optional().isLength({ max: 500 }).trim().escape()
+  ],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { voteId } = req.params;
+      const { response, comment } = req.body;
+      const userId = req.user.id;
+
+      const result = await chamaService.castVote(voteId, userId, response, comment);
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Vote recorded successfully'
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+// Get Chama financial summary
+router.get('/chamas/:chamaId/financial-summary',
+  authMiddleware,
+  [param('chamaId').isUUID()],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { chamaId } = req.params;
+      const userId = req.user.id;
+
+      const summary = await chamaService.getChamaFinancialSummary(chamaId, userId);
+
+      res.json({
+        success: true,
+        data: summary
+      });
+    } catch (error) {
+      res.status(403).json({ error: error.message });
+    }
+  }
+);
+
+// Get active votes
+router.get('/chamas/:chamaId/votes',
+  authMiddleware,
+  [
+    param('chamaId').isUUID(),
+    query('status').optional().isIn(['active', 'passed', 'failed', 'expired'])
+  ],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { chamaId } = req.params;
+      const { status = 'active' } = req.query;
+      const userId = req.user.id;
+
+      const votes = await chamaService.getChamaVotes(chamaId, userId, status as string);
+
+      res.json({
+        success: true,
+        data: { votes }
+      });
+    } catch (error) {
+      res.status(403).json({ error: error.message });
+    }
+  }
+);
+
+export default router;
+```
+
+## Testing Implementation
+
+### Unit Tests
+
+```typescript
+// chama-service.test.ts
+import { ChamaService } from '../src/chama-service';
+import { MockDatabase, MockPaymentService, MockNotificationService } from './mocks';
+
+describe('ChamaService', () => {
+  let chamaService: ChamaService;
+  let mockDb: MockDatabase;
+  let mockPaymentService: MockPaymentService;
+
+  beforeEach(() => {
+    mockDb = new MockDatabase();
+    mockPaymentService = new MockPaymentService();
+    mockNotificationService = new MockNotificationService();
+    
+    chamaService = new ChamaService(mockDb, mockPaymentService, mockNotificationService);
+  });
+
+  describe('Chama Creation', () => {
+    test('should create Chama with valid data', async () => {
+      const userId = 'user-123';
+      const chamaData = {
+        name: 'Test Savings Group',
+        description: 'A test Chama for unit testing',
+        contribution_amount: 1000,
+        contribution_frequency: 'monthly',
+        contribution_currency: 'ZAR',
+        start_date: '2024-02-01',
+        max_members: 20,
+        voting_threshold: 60,
+        treasurer_rotation: true,
+        privacy_level: 'private'
+      };
+
+      const result = await chamaService.createChama(userId, chamaData);
+
+      expect(result.id).toBeDefined();
+      expect(result.name).toBe(chamaData.name);
+      expect(result.created_by).toBe(userId);
+      expect(result.status).toBe('forming');
+      expect(result.member_count).toBe(1); // Creator is auto-added
+    });
+
+    test('should prevent user from creating too many Chamas', async () => {
+      const userId = 'user-123';
+      
+      // Mock user already has 3 active Chamas
+      mockDb.setUserActiveChamasCount(userId, 3);
+
+      const chamaData = {
+        name: 'Fourth Chama',
+        contribution_amount: 500,
+        contribution_frequency: 'monthly',
+        contribution_currency: 'ZAR',
+        start_date: '2024-02-01',
+        max_members: 10,
+        voting_threshold: 60,
+        privacy_level: 'private'
+      };
+
+      await expect(chamaService.createChama(userId, chamaData))
+        .rejects.toThrow('Maximum limit of 3 active Chamas reached');
+    });
+  });
+
+  describe('Member Management', () => {
+    test('should allow user to join public Chama', async () => {
+      const chamaId = 'chama-123';
+      const userId = 'user-456';
+
+      // Mock public Chama with available space
+      mockDb.setChamaData(chamaId, {
+        id: chamaId,
+        privacy_level: 'public',
+        member_count: 5,
+        max_members: 20,
+        status: 'active'
+      });
+
+      const result = await chamaService.joinChama(chamaId, userId);
+
+      expect(result.status).toBe('active');
+      expect(result.pending_approval).toBe(false);
+    });
+
+    test('should require approval for private Chama', async () => {
+      const chamaId = 'chama-123';
+      const userId = 'user-456';
+
+      mockDb.setChamaData(chamaId, {
+        id: chamaId,
+        privacy_level: 'private',
+        member_count: 5,
+        max_members: 20,
+        status: 'active'
+      });
+
+      const result = await chamaService.joinChama(chamaId, userId);
+
+      expect(result.status).toBe('pending');
+      expect(result.pending_approval).toBe(true);
+    });
+
+    test('should prevent joining when Chama is full', async () => {
+      const chamaId = 'chama-123';
+      const userId = 'user-456';
+
+      mockDb.setChamaData(chamaId, {
+        id: chamaId,
+        member_count: 20,
+        max_members: 20,
+        status: 'active'
+      });
+
+      await expect(chamaService.joinChama(chamaId, userId))
+        .rejects.toThrow('Chama has reached maximum member limit');
+    });
+  });
+
+  describe('Contribution Processing', () => {
+    test('should process valid contribution', async () => {
+      const chamaId = 'chama-123';
+      const userId = 'user-456';
+      const amount = 1000;
+
+      mockDb.setChamaData(chamaId, {
+        id: chamaId,
+        contribution_amount: 1000,
+        contribution_currency: 'ZAR'
+      });
+
+      mockDb.setMemberData(chamaId, userId, {
+        id: 'member-123',
+        status: 'active',
+        next_contribution_due: new Date(Date.now() + 86400000) // Tomorrow
+      });
+
+      const result = await chamaService.contributeToChama(
+        chamaId, userId, amount, 'mobile_money'
+      );
+
+      expect(result.contribution_id).toBeDefined();
+      expect(result.transaction_id).toBeDefined();
+      expect(mockPaymentService.lastPayment.amount).toBe(amount);
+    });
+
+    test('should reject contribution from non-member', async () => {
+      const chamaId = 'chama-123';
+      const userId = 'user-456';
+
+      mockDb.setChamaData(chamaId, { id: chamaId });
+      mockDb.setMemberData(chamaId, userId, null); // Not a member
+
+      await expect(chamaService.contributeToChama(chamaId, userId, 1000, 'wallet'))
+        .rejects.toThrow('User is not an active member');
+    });
+  });
+
+  describe('Voting System', () => {
+    test('should record valid vote', async () => {
+      const voteId = 'vote-123';
+      const userId = 'user-456';
+
+      mockDb.setVoteData(voteId, {
+        id: voteId,
+        status: 'active',
+        voting_deadline: new Date(Date.now() + 86400000), // Tomorrow
+        chama_id: 'chama-123'
+      });
+
+      mockDb.setMemberData('chama-123', userId, {
+        id: 'member-123',
+        status: 'active'
+      });
+
+      const result = await chamaService.castVote(voteId, userId, 'yes', 'I support this proposal');
+
+      expect(result.vote_recorded).toBe(true);
+      expect(mockDb.getVoteResponse(voteId, userId)).toEqual({
+        response: 'yes',
+        comment: 'I support this proposal'
+      });
+    });
+
+    test('should prevent duplicate voting', async () => {
+      const voteId = 'vote-123';
+      const userId = 'user-456';
+
+      mockDb.setVoteData(voteId, {
+        id: voteId,
+        status: 'active',
+        voting_deadline: new Date(Date.now() + 86400000)
+      });
+
+      mockDb.setExistingVoteResponse(voteId, userId, 'no');
+
+      await expect(chamaService.castVote(voteId, userId, 'yes'))
+        .rejects.toThrow('User has already voted');
+    });
+  });
+});
+```
+
+### Integration Tests
+
+```typescript
+// chama-integration.test.ts
+describe('Chama Integration Tests', () => {
+  test('should complete full Chama lifecycle', async () => {
+    // Create Chama
+    const creator = await testDb.createUser({ email: 'creator@test.com' });
+    const chamaData = {
+      name: 'Integration Test Chama',
+      description: 'Testing full lifecycle',
+      contribution_amount: 500,
+      contribution_frequency: 'monthly',
+      contribution_currency: 'ZAR',
+      start_date: new Date().toISOString(),
+      max_members: 5,
+      voting_threshold: 60,
+      privacy_level: 'public'
+    };
+
+    const chama = await chamaService.createChama(creator.id, chamaData);
+    expect(chama.id).toBeDefined();
+
+    // Add members
+    const member1 = await testDb.createUser({ email: 'member1@test.com' });
+    const member2 = await testDb.createUser({ email: 'member2@test.com' });
+    const member3 = await testDb.createUser({ email: 'member3@test.com' });
+
+    await chamaService.joinChama(chama.id, member1.id);
+    await chamaService.joinChama(chama.id, member2.id);
+    await chamaService.joinChama(chama.id, member3.id);
+
+    // Verify membership
+    const members = await chamaService.getChamaMembers(chama.id, creator.id);
+    expect(members).toHaveLength(4); // Creator + 3 members
+
+    // Process contributions
+    for (const member of [creator, member1, member2, member3]) {
+      const contribution = await chamaService.contributeToChama(
+        chama.id, member.id, 500, 'test_payment'
+      );
+      
+      // Simulate payment completion
+      await chamaService.processContributionPayment(
+        contribution.transaction_id, 'completed'
+      );
+    }
+
+    // Verify Chama balance
+    const summary = await chamaService.getChamaFinancialSummary(chama.id, creator.id);
+    expect(summary.total_contributions).toBe(2000); // 4 members × R500
+    expect(summary.available_balance).toBe(2000);
+
+    // Propose payout
+    const payoutProposal = await chamaService.proposePayout(
+      chama.id, creator.id, member1.id, 800, 'First rotation payout', 'rotation'
+    );
+
+    // Vote on proposal
+    await chamaService.castVote(payoutProposal.vote_id, creator.id, 'yes');
+    await chamaService.castVote(payoutProposal.vote_id, member1.id, 'yes');
+    await chamaService.castVote(payoutProposal.vote_id, member2.id, 'yes');
+    
+    // Verify vote result
+    const voteResult = await chamaService.getVoteResult(payoutProposal.vote_id);
+    expect(voteResult.final_result).toBe('passed');
+    expect(voteResult.yes_votes).toBe(3);
+  });
+});
+```
+
+## Monitoring and Analytics
+
+### Chama Analytics Dashboard
+
+```typescript
+// chama-analytics.ts
+export class ChamaAnalyticsService {
+  constructor(private db: DatabaseService) {}
+
+  async generateChamaReport(chamaId: string, period: 'monthly' | 'quarterly' | 'yearly'): Promise<{
+    financial_summary: any;
+    member_engagement: any;
+    voting_patterns: any;
+    growth_metrics: any;
+    compliance_metrics: any;
+  }> {
+    const dateRange = this.getDateRange(period);
+    
+    const [
+      financialSummary,
+      memberEngagement,
+      votingPatterns,
+      growthMetrics,
+      complianceMetrics
+    ] = await Promise.all([
+      this.getFinancialSummary(chamaId, dateRange),
+      this.getMemberEngagement(chamaId, dateRange),
+      this.getVotingPatterns(chamaId, dateRange),
+      this.getGrowthMetrics(chamaId, dateRange),
+      this.getComplianceMetrics(chamaId, dateRange)
+    ]);
+
+    return {
+      financial_summary: financialSummary,
+      member_engagement: memberEngagement,
+      voting_patterns: votingPatterns,
+      growth_metrics: growthMetrics,
+      compliance_metrics: complianceMetrics
+    };
+  }
+
+  private async getFinancialSummary(chamaId: string, dateRange: { start: Date; end: Date }): Promise<any> {
+    const summary = await this.db.queryOne(`
+      SELECT 
+        COUNT(DISTINCT cc.id) as total_transactions,
+        SUM(CASE WHEN cc.status = 'completed' THEN cc.amount ELSE 0 END) as total_contributions,
+        SUM(CASE WHEN cp.status = 'completed' THEN cp.amount ELSE 0 END) as total_payouts,
+        AVG(cc.amount) as avg_contribution_amount,
+        COUNT(DISTINCT cc.user_id) as contributing_members,
+        SUM(CASE WHEN cc.paid_date <= cc.due_date THEN 1 ELSE 0 END) / COUNT(cc.id)::float * 100 as on_time_rate
+      FROM chama_contributions cc
+      LEFT JOIN chama_payouts cp ON cp.chama_id = cc.chama_id 
+        AND cp.created_at BETWEEN $2 AND $3
+      WHERE cc.chama_id = $1 
+        AND cc.created_at BETWEEN $2 AND $3
+    `, [chamaId, dateRange.start, dateRange.end]);
+
+    // Monthly trend analysis
+    const monthlyTrends = await this.db.query(`
+      SELECT 
+        DATE_TRUNC('month', cc.paid_date) as month,
+        SUM(cc.amount) as monthly_contributions,
+        COUNT(DISTINCT cc.user_id) as active_contributors,
+        AVG(cc.amount) as avg_amount
+      FROM chama_contributions cc
+      WHERE cc.chama_id = $1 
+        AND cc.status = 'completed'
+        AND cc.paid_date BETWEEN $2 AND $3
+      GROUP BY DATE_TRUNC('month', cc.paid_date)
+      ORDER BY month
+    `, [chamaId, dateRange.start, dateRange.end]);
+
+    return {
+      ...summary,
+      monthly_trends: monthlyTrends,
+      net_position: summary.total_contributions - summary.total_payouts
+    };
+  }
+
+  private async getMemberEngagement(chamaId: string, dateRange: { start: Date; end: Date }): Promise<any> {
+    const engagement = await this.db.query(`
+      SELECT 
+        u.id,
+        u.full_name,
+        cm.role,
+        COUNT(DISTINCT cc.id) as contributions_made,
+        COUNT(DISTINCT cvr.id) as votes_cast,
+        COUNT(DISTINCT cma.id) as meetings_attended,
+        cm.total_contributed,
+        CASE 
+          WHEN cm.contribution_status = 'current' THEN 'Active'
+          WHEN cm.contribution_status = 'ahead' THEN 'Ahead'
+          WHEN cm.contribution_status = 'behind' THEN 'Behind'
+          ELSE 'At Risk'
+        END as engagement_status
+      FROM chama_members cm
+      JOIN users u ON cm.user_id = u.id
+      LEFT JOIN chama_contributions cc ON cm.id = cc.member_id 
+        AND cc.created_at BETWEEN $2 AND $3
+      LEFT JOIN chama_vote_responses cvr ON cm.id = cvr.member_id
+        AND cvr.cast_at BETWEEN $2 AND $3
+      LEFT JOIN chama_meeting_attendance cma ON cm.id = cma.member_id
+        AND cma.meeting_id IN (
+          SELECT id FROM chama_meetings 
+          WHERE chama_id = $1 AND scheduled_date BETWEEN $2 AND $3
+        )
+      WHERE cm.chama_id = $1 AND cm.status = 'active'
+      GROUP BY u.id, u.full_name, cm.role, cm.total_contributed, cm.contribution_status
+      ORDER BY engagement_score DESC
+    `, [chamaId, dateRange.start, dateRange.end]);
+
+    // Calculate engagement scores
+    const scoredEngagement = engagement.map(member => ({
+      ...member,
+      engagement_score: this.calculateEngagementScore(member)
+    }));
+
+    const engagementStats = {
+      highly_engaged: scoredEngagement.filter(m => m.engagement_score >= 80).length,
+      moderately_engaged: scoredEngagement.filter(m => m.engagement_score >= 50 && m.engagement_score < 80).length,
+      low_engagement: scoredEngagement.filter(m => m.engagement_score < 50).length,
+      average_score: scoredEngagement.reduce((sum, m) => sum + m.engagement_score, 0) / scoredEngagement.length
+    };
+
+    return {
+      members: scoredEngagement,
+      statistics: engagementStats
+    };
+  }
+
+  private async getVotingPatterns(chamaId: string, dateRange: { start: Date; end: Date }): Promise<any> {
+    const votingData = await this.db.query(`
+      SELECT 
+        cv.proposal_type,
+        cv.status,
+        cv.total_eligible_voters,
+        cv.votes_cast,
+        cv.yes_votes,
+        cv.no_votes,
+        cv.abstain_votes,
+        CASE 
+          WHEN cv.votes_cast > 0 THEN cv.votes_cast::float / cv.total_eligible_voters * 100
+          ELSE 0
+        END as participation_rate,
+        CASE 
+          WHEN cv.yes_votes > 0 THEN cv.yes_votes::float / cv.votes_cast * 100
+          ELSE 0
+        END as approval_rate
+      FROM chama_votes cv
+      WHERE cv.chama_id = $1 
+        AND cv.created_at BETWEEN $2 AND $3
+      ORDER BY cv.created_at DESC
+    `, [chamaId, dateRange.start, dateRange.end]);
+
+    const votingStats = {
+      total_votes: votingData.length,
+      average_participation: votingData.reduce((sum, v) => sum + v.participation_rate, 0) / votingData.length || 0,
+      average_approval: votingData.filter(v => v.votes_cast > 0)
+        .reduce((sum, v) => sum + v.approval_rate, 0) / votingData.filter(v => v.votes_cast > 0).length || 0,
+      by_proposal_type: this.groupBy(votingData, 'proposal_type')
+    };
+
+    return {
+      votes: votingData,
+      statistics: votingStats
+    };
+  }
+
+  private async getGrowthMetrics(chamaId: string, dateRange: { start: Date; end: Date }): Promise<any> {
+    const growthData = await this.db.query(`
+      SELECT 
+        DATE_TRUNC('month', cm.joined_date) as month,
+        COUNT(*) as new_members,
+        SUM(COUNT(*)) OVER (ORDER BY DATE_TRUNC('month', cm.joined_date)) as cumulative_members
+      FROM chama_members cm
+      WHERE cm.chama_id = $1 
+        AND cm.joined_date BETWEEN $2 AND $3
+      GROUP BY DATE_TRUNC('month', cm.joined_date)
+      ORDER BY month
+    `, [chamaId, dateRange.start, dateRange.end]);
+
+    const retentionData = await this.db.queryOne(`
+      SELECT 
+        COUNT(CASE WHEN cm.status = 'active' THEN 1 END) as active_members,
+        COUNT(CASE WHEN cm.status = 'left' THEN 1 END) as left_members,
+        COUNT(CASE WHEN cm.status = 'suspended' THEN 1 END) as suspended_members,
+        COUNT(CASE WHEN cm.status = 'active' THEN 1 END)::float / COUNT(*) * 100 as retention_rate
+      FROM chama_members cm
+      WHERE cm.chama_id = $1
+    `, [chamaId]);
+
+    return {
+      member_growth: growthData,
+      retention_metrics: retentionData
+    };
+  }
+
+  private async getComplianceMetrics(chamaId: string, dateRange: { start: Date; end: Date }): Promise<any> {
+    const complianceData = await this.db.queryOne(`
+      SELECT 
+        COUNT(CASE WHEN cc.status = 'completed' AND cc.paid_date <= cc.due_date THEN 1 END) as on_time_payments,
+        COUNT(CASE WHEN cc.status = 'completed' AND cc.paid_date > cc.due_date THEN 1 END) as late_payments,
+        COUNT(CASE WHEN cc.status = 'failed' OR cc.due_date < CURRENT_DATE AND cc.status != 'completed' THEN 1 END) as missed_payments,
+        COUNT(*) as total_expected_payments,
+        AVG(CASE WHEN cc.paid_date > cc.due_date THEN EXTRACT(DAYS FROM cc.paid_date - cc.due_date) ELSE 0 END) as avg_days_late
+      FROM chama_contributions cc
+      WHERE cc.chama_id = $1 
+        AND cc.due_date BETWEEN $2 AND $3
+    `, [chamaId, dateRange.start, dateRange.end]);
+
+    const riskMetrics = await this.db.query(`
+      SELECT 
+        cm.user_id,
+        u.full_name,
+        cm.contribution_status,
+        COUNT(CASE WHEN cc.status IN ('failed', 'pending') AND cc.due_date < CURRENT_DATE THEN 1 END) as overdue_count,
+        SUM(CASE WHEN cc.status IN ('failed', 'pending') AND cc.due_date < CURRENT_DATE THEN cc.amount ELSE 0 END) as overdue_amount
+      FROM chama_members cm
+      JOIN users u ON cm.user_id = u.id
+      LEFT JOIN chama_contributions cc ON cm.id = cc.member_id
+      WHERE cm.chama_id = $1 
+        AND cm.status = 'active'
+      GROUP BY cm.user_id, u.full_name, cm.contribution_status
+      HAVING COUNT(CASE WHEN cc.status IN ('failed', 'pending') AND cc.due_date < CURRENT_DATE THEN 1 END) > 0
+      ORDER BY overdue_amount DESC
+    `, [chamaId]);
+
+    const complianceRate = complianceData.total_expected_payments > 0 
+      ? (complianceData.on_time_payments / complianceData.total_expected_payments) * 100 
+      : 100;
+
+    return {
+      compliance_rate: complianceRate,
+      payment_breakdown: complianceData,
+      at_risk_members: riskMetrics
+    };
+  }
+
+  private calculateEngagementScore(member: any): number {
+    let score = 0;
+    
+    // Contribution consistency (40%)
+    if (member.contribution_status === 'current' || member.contribution_status === 'ahead') {
+      score += 40;
+    } else if (member.contribution_status === 'behind') {
+      score += 20;
+    }
+    
+    // Voting participation (30%)
+    const expectedVotes = 4; // Assume 4 votes per period
+    const votingRate = Math.min(member.votes_cast / expectedVotes, 1);
+    score += votingRate * 30;
+    
+    // Meeting attendance (20%)
+    const expectedMeetings = 3; // Assume 3 meetings per period
+    const attendanceRate = Math.min(member.meetings_attended / expectedMeetings, 1);
+    score += attendanceRate * 20;
+    
+    // Role-based bonus (10%)
+    if (member.role === 'admin' || member.role === 'treasurer') {
+      score += 10;
+    } else {
+      score += 5;
+    }
+    
+    return Math.round(Math.min(score, 100));
+  }
+
+  private groupBy(array: any[], key: string): any {
+    return array.reduce((groups, item) => {
+      const group = item[key];
+      if (!groups[group]) {
+        groups[group] = [];
+      }
+      groups[group].push(item);
+      return groups;
+    }, {});
+  }
+
+  private getDateRange(period: string): { start: Date; end: Date } {
+    const end = new Date();
+    const start = new Date();
+    
+    switch (period) {
+      case 'monthly':
+        start.setMonth(start.getMonth() - 1);
+        break;
+      case 'quarterly':
+        start.setMonth(start.getMonth() - 3);
+        break;
+      case 'yearly':
+        start.setFullYear(start.getFullYear() - 1);
+        break;
+    }
+    
+    return { start, end };
+  }
+}
+```
+
+### Performance Monitoring
+
+```typescript
+// chama-monitoring.ts
+export class ChamaMonitoringService {
+  constructor(private db: DatabaseService, private metricsService: MetricsService) {}
+
+  async trackChamaPerformance(): Promise<void> {
+    const metrics = await this.collectSystemMetrics();
+    await this.recordMetrics(metrics);
+    await this.checkAlerts(metrics);
+  }
+
+  private async collectSystemMetrics(): Promise<{
+    total_active_chamas: number;
+    total_members: number;
+    daily_contributions: number;
+    daily_contribution_volume: number;
+    avg_response_time: number;
+    failed_transactions: number;
+    system_health_score: number;
+  }> {
+    const [
+      activeChamas,
+      totalMembers,
+      dailyContributions,
+      failedTransactions,
+      avgResponseTime
+    ] = await Promise.all([
+      this.db.queryOne(`SELECT COUNT(*) as count FROM chamas WHERE status = 'active'`),
+      this.db.queryOne(`SELECT COUNT(*) as count FROM chama_members WHERE status = 'active'`),
+      this.db.queryOne(`
+        SELECT 
+          COUNT(*) as count,
+          SUM(amount) as volume
+        FROM chama_contributions 
+        WHERE created_at >= CURRENT_DATE
+          AND status = 'completed'
+      `),
+      this.db.queryOne(`
+        SELECT COUNT(*) as count 
+        FROM chama_contributions 
+        WHERE created_at >= CURRENT_DATE
+          AND status = 'failed'
+      `),
+      this.getAverageResponseTime()
+    ]);
+
+    const systemHealthScore = this.calculateSystemHealth({
+      failedTransactionRate: failedTransactions.count / Math.max(dailyContributions.count, 1),
+      avgResponseTime: avgResponseTime,
+      activeChamas: activeChamas.count
+    });
+
+    return {
+      total_active_chamas: activeChamas.count,
+      total_members: totalMembers.count,
+      daily_contributions: dailyContributions.count,
+      daily_contribution_volume: dailyContributions.volume || 0,
+      avg_response_time: avgResponseTime,
+      failed_transactions: failedTransactions.count,
+      system_health_score: systemHealthScore
+    };
+  }
+
+  private calculateSystemHealth(metrics: {
+    failedTransactionRate: number;
+    avgResponseTime: number;
+    activeChamas: number;
+  }): number {
+    let score = 100;
+    
+    // Penalize high failure rates
+    if (metrics.failedTransactionRate > 0.05) score -= 20; // &gt;5% failure rate
+    if (metrics.failedTransactionRate > 0.02) score -= 10; // &gt;2% failure rate
+    
+    // Penalize slow response times
+    if (metrics.avgResponseTime > 1000) score -= 15; // &gt;1 second
+    if (metrics.avgResponseTime > 500) score -= 10; // &gt;500ms
+    
+    // Bonus for system activity
+    if (metrics.activeChamas > 100) score += 5;
+    
+    return Math.max(0, Math.min(100, score));
+  }
+
+  async generateSystemHealthReport(): Promise<{
+    overall_health: string;
+    metrics: any;
+    alerts: any[];
+    recommendations: string[];
+  }> {
+    const metrics = await this.collectSystemMetrics();
+    const alerts = await this.getActiveAlerts();
+    const recommendations = this.generateRecommendations(metrics, alerts);
+
+    const healthStatus = metrics.system_health_score >= 90 ? 'Excellent' :
+                        metrics.system_health_score >= 70 ? 'Good' :
+                        metrics.system_health_score >= 50 ? 'Fair' : 'Poor';
+
+    return {
+      overall_health: healthStatus,
+      metrics,
+      alerts,
+      recommendations
+    };
+  }
+
+  private generateRecommendations(metrics: any, alerts: any[]): string[] {
+    const recommendations: string[] = [];
+
+    if (metrics.system_health_score < 70) {
+      recommendations.push('System health is below optimal. Review failed transactions and response times.');
+    }
+
+    if (metrics.avg_response_time > 500) {
+      recommendations.push('API response times are elevated. Consider database optimization or scaling.');
+    }
+
+    if (metrics.failed_transactions > metrics.daily_contributions * 0.02) {
+      recommendations.push('High transaction failure rate detected. Review payment gateway integration.');
+    }
+
+    if (alerts.length > 5) {
+      recommendations.push('Multiple active alerts detected. Prioritize resolution of critical issues.');
+    }
+
+    return recommendations;
+  }
+}
+```
+
+## Best Practices & Optimization
+
+### Database Optimization
+
+<CardGroup cols={2}>
+  <Card title="Query Optimization" icon="database">
+    **Indexing Strategy**: Create indexes on frequently queried columns  
+    **Query Analysis**: Use EXPLAIN ANALYZE for slow queries  
+    **Connection Pooling**: Implement proper connection management  
+    **Partitioning**: Partition large tables by date or chama_id
+  </Card>
+  <Card title="Data Archival" icon="archive">
+    **Historical Data**: Archive old contribution records  
+    **Completed Chamas**: Move completed Chamas to archive tables  
+    **Audit Logs**: Maintain audit trails with automated cleanup  
+    **Backup Strategy**: Regular backups with point-in-time recovery
+  </Card>
+</CardGroup>
+
+### Security Best Practices
+
+<Steps>
+  <Step title="Access Control">
+    Implement role-based permissions ensuring members can only access their Chama data
+  </Step>
+  <Step title="Data Validation">
+    Validate all input data on both client and server sides with proper sanitization
+  </Step>
+  <Step title="Audit Logging">
+    Log all financial transactions and sensitive operations for compliance
+  </Step>
+  <Step title="Encryption">
+    Encrypt sensitive data at rest and in transit using industry standards
+  </Step>
+</Steps>
+
+### Performance Optimization Strategies
+
+```typescript
+// chama-cache.ts
+export class ChamaCacheService {
+  constructor(private redis: RedisClient) {}
+
+  async getCachedChamaData(chamaId: string): Promise<ChamaGroup | null> {
+    const cached = await this.redis.get(`chama:${chamaId}`);
+    return cached ? JSON.parse(cached) : null;
+  }
+
+  async setChamaCache(chamaId: string, data: ChamaGroup, ttl: number = 300): Promise<void> {
+    await this.redis.setex(`chama:${chamaId}`, ttl, JSON.stringify(data));
+  }
+
+  async invalidateChamaCache(chamaId: string): Promise<void> {
+    await this.redis.del(`chama:${chamaId}`);
+    await this.redis.del(`chama:${chamaId}:members`);
+    await this.redis.del(`chama:${chamaId}:financial`);
+  }
+
+  async getCachedFinancialSummary(chamaId: string): Promise<any | null> {
+    const cached = await this.redis.get(`chama:${chamaId}:financial`);
+    return cached ? JSON.parse(cached) : null;
+  }
+
+  async setFinancialSummaryCache(chamaId: string, data: any): Promise<void> {
+    // Cache for 5 minutes since financial data changes frequently
+    await this.redis.setex(`chama:${chamaId}:financial`, 300, JSON.stringify(data));
+  }
+}
+```
+
+## Troubleshooting Common Issues
+
+### Payment Processing Issues
+
+| Issue | Symptoms | Solution | Prevention |
+|-------|----------|----------|------------|
+| Failed Contributions | Contributions stuck in "processing" | Check payment gateway logs, retry failed payments | Implement payment retry logic with exponential backoff |
+| Duplicate Payments | Same contribution recorded multiple times | Add idempotency keys, check for duplicates | Use unique transaction references and proper validation |
+| Currency Mismatches | Contributions in wrong currency | Validate currency before processing | Enforce currency consistency in UI and API |
+| Payment Delays | Slow payment confirmations | Check webhook delivery, implement polling | Set up webhook monitoring and fallback polling |
+
+### Voting System Issues
+
+<Steps>
+  <Step title="Duplicate Votes">
+    **Symptoms**: Multiple vote records for same user  
+    **Solution**: Add unique constraint on (vote_id, member_id)  
+    **Prevention**: Implement client-side vote state management
+  </Step>
+  <Step title="Vote Counting Errors">
+    **Symptoms**: Incorrect vote tallies  
+    **Solution**: Recount votes using database functions  
+    **Prevention**: Use database triggers for automatic counting
+  </Step>
+  <Step title="Expired Votes">
+    **Symptoms**: Votes continuing after deadline  
+    **Solution**: Implement scheduled job to close expired votes  
+    **Prevention**: Add deadline validation in vote casting API
+  </Step>
+</Steps>
+
+### Member Management Issues
+
+**Common Problems and Solutions:**
+
+```typescript
+// member-cleanup.ts
+export class MemberCleanupService {
+  async cleanupInactiveMembers(): Promise<void> {
+    // Find members who haven't contributed in 90 days
+    const inactiveMembers = await this.db.query(`
+      SELECT cm.id, cm.chama_id, cm.user_id
+      FROM chama_members cm
+      WHERE cm.status = 'active'
+        AND cm.last_contribution_date < CURRENT_DATE - INTERVAL '90 days'
+        AND NOT EXISTS (
+          SELECT 1 FROM chama_contributions cc
+          WHERE cc.member_id = cm.id
+            AND cc.created_at > CURRENT_DATE - INTERVAL '30 days'
+        )
+    `);
+
+    for (const member of inactiveMembers) {
+      await this.handleInactiveMember(member);
+    }
+  }
+
+  private async handleInactiveMember(member: any): Promise<void> {
+    // Send warning notification
+    await this.notificationService.sendInactivityWarning(member.user_id, member.chama_id);
+    
+    // Update member status to "at risk"
+    await this.db.query(`
+      UPDATE chama_members 
+      SET contribution_status = 'defaulted',
+          updated_at = NOW()
+      WHERE id = $1
+    `, [member.id]);
+    
+    // Log the action
+    await this.auditService.logMemberAction(member.chama_id, member.user_id, 'inactivity_warning');
+  }
+}
+```
+
+### Data Consistency Issues
+
+**Ensuring Financial Accuracy:**
+
+```sql
+-- Data consistency check queries
+-- Check for balance mismatches
+SELECT 
+  c.id,
+  c.name,
+  c.total_contributions as recorded_total,
+  COALESCE(SUM(cc.amount), 0) as calculated_total,
+  c.total_contributions - COALESCE(SUM(cc.amount), 0) as difference
+FROM chamas c
+LEFT JOIN chama_contributions cc ON c.id = cc.chama_id 
+  AND cc.status = 'completed'
+GROUP BY c.id, c.name, c.total_contributions
+HAVING ABS(c.total_contributions - COALESCE(SUM(cc.amount), 0)) > 0.01;
+
+-- Check for orphaned records
+SELECT COUNT(*) as orphaned_contributions
+FROM chama_contributions cc
+LEFT JOIN chama_members cm ON cc.member_id = cm.id
+WHERE cm.id IS NULL;
+
+-- Check for inconsistent member totals
+SELECT 
+  cm.id,
+  cm.total_contributed as recorded_total,
+  COALESCE(SUM(cc.amount), 0) as calculated_total
+FROM chama_members cm
+LEFT JOIN chama_contributions cc ON cm.id = cc.member_id 
+  AND cc.status = 'completed'
+GROUP BY cm.id, cm.total_contributed
+HAVING ABS(cm.total_contributed - COALESCE(SUM(cc.amount), 0)) > 0.01;
+```
+
+## Mobile App Integration
+
+### React Native Components
+
+```typescript
+// ChamaCard.tsx
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { formatCurrency, formatDate } from '../utils/formatting';
+
+interface ChamaCardProps {
+  chama: ChamaGroup;
+  onPress: () => void;
+}
+
+export const ChamaCard: React.FC<ChamaCardProps> = ({ chama, onPress }) => {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return '#10B981';
+      case 'forming': return '#F59E0B';
+      case 'paused': return '#6B7280';
+      default: return '#EF4444';
+    }
+  };
+
+  const contributionProgress = chama.member_count > 0 
+    ? (chama.total_contributions / (chama.contribution_amount * chama.member_count * 12)) * 100 
+    : 0;
+
+  return (
+    <TouchableOpacity style={styles.card} onPress={onPress}>
+      <View style={styles.header}>
+        <Text style={styles.name}>{chama.name}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(chama.status) }]}>
+          <Text style={styles.statusText}>{chama.status.toUpperCase()}</Text>
+        </View>
+      </View>
+      
+      <Text style={styles.description} numberOfLines={2}>
+        {chama.description}
+      </Text>
+      
+      <View style={styles.statsRow}>
+        <View style={styles.stat}>
+          <Text style={styles.statLabel}>Members</Text>
+          <Text style={styles.statValue}>{chama.member_count}</Text>
+        </View>
+        <View style={styles.stat}>
+          <Text style={styles.statLabel}>Contribution</Text>
+          <Text style={styles.statValue}>
+            {formatCurrency(chama.contribution_amount, chama.contribution_currency)}
+          </Text>
+        </View>
+        <View style={styles.stat}>
+          <Text style={styles.statLabel}>Balance</Text>
+          <Text style={styles.statValue}>
+            {formatCurrency(chama.available_balance, chama.contribution_currency)}
+          </Text>
+        </View>
+      </View>
+      
+      <View style={styles.progressContainer}>
+        <Text style={styles.progressLabel}>Annual Progress</Text>
+        <View style={styles.progressBar}>
+          <View 
+            style={[styles.progressFill, { width: `${Math.min(contributionProgress, 100)}%` }]} 
+          />
+        </View>
+        <Text style={styles.progressText}>{Math.round(contributionProgress)}%</Text>
+      </View>
+      
+      <Text style={styles.frequency}>
+        {chama.contribution_frequency.replace('_', ' ')} contributions
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  name: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    flex: 1,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  description: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  stat: {
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  progressContainer: {
+    marginBottom: 12,
+  },
+  progressLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#10B981',
+  },
+  progressText: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  frequency: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+});
+```
+
+### Contribution Flow Component
+
+```typescript
+// ContributionFlow.tsx
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { useChama } from '../hooks/useChama';
+import { PaymentMethodSelector } from './PaymentMethodSelector';
+import { LoadingSpinner } from './LoadingSpinner';
+
+interface ContributionFlowProps {
+  chamaId: string;
+  onSuccess: () => void;
+  onCancel: () => void;
+}
+
+export const ContributionFlow: React.FC<ContributionFlowProps> = ({
+  chamaId,
+  onSuccess,
+  onCancel
+}) => {
+  const [amount, setAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { chama, contributeToChama } = useChama(chamaId);
+
+  const [contributionInfo, setContributionInfo] = useState({
+    expectedAmount: 0,
+    dueDate: '',
+    isLate: false,
+    lateFee: 0
+  });
+
+  useEffect(() => {
+    if (chama) {
+      // Calculate contribution info
+      const expected = chama.contribution_amount;
+      const dueDate = new Date(); // Calculate actual due date
+      const isLate = new Date() > dueDate;
+      const lateFee = isLate ? expected * 0.05 : 0; // 5% late fee
+      
+      setContributionInfo({
+        expectedAmount: expected,
+        dueDate: dueDate.toISOString().split('T')[0],
+        isLate,
+        lateFee
+      });
+      
+      setAmount(expected.toString());
+    }
+  }, [chama]);
+
+  const handleContribute = async () => {
+    if (!amount || !paymentMethod) {
+      Alert.alert('Error', 'Please enter amount and select payment method');
+      return;
+    }
+
+    const contributionAmount = parseFloat(amount);
+    if (contributionAmount <= 0) {
+      Alert.alert('Error', 'Please enter a valid amount');
+      return;
+    }
+
+    setIsProcessing(true);
+    
+    try {
+      const result = await contributeToChama({
+        chamaId,
+        amount: contributionAmount,
+        paymentMethod,
+        contributionType: 'regular'
+      });
+
+      Alert.alert(
+        'Contribution Initiated',
+        `Your contribution of ${contributionAmount} has been initiated. Transaction ID: ${result.transaction_id}`,
+        [{ text: 'OK', onPress: onSuccess }]
+      );
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Failed to process contribution');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (!chama) {
+    return <LoadingSpinner />;
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Make Contribution</Text>
+      <Text style={styles.chamaName}>{chama.name}</Text>
+      
+      <View style={styles.infoCard}>
+        <Text style={styles.infoTitle}>Contribution Details</Text>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>Expected Amount:</Text>
+          <Text style={styles.infoValue}>
+            {chama.contribution_currency} {contributionInfo.expectedAmount}
+          </Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>Due Date:</Text>
+          <Text style={[styles.infoValue, contributionInfo.isLate && styles.lateText]}>
+            {contributionInfo.dueDate}
+          </Text>
+        </View>
+        {contributionInfo.isLate && (
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Late Fee:</Text>
+            <Text style={[styles.infoValue, styles.lateText]}>
+              {chama.contribution_currency} {contributionInfo.lateFee}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.inputSection}>
+        <Text style={styles.inputLabel}>Contribution Amount</Text>
+        <TextInput
+          style={styles.amountInput}
+          value={amount}
+          onChangeText={setAmount}
+          placeholder="Enter amount"
+          keyboardType="numeric"
+          editable={!isProcessing}
+        />
+      </View>
+
+      <PaymentMethodSelector
+        selectedMethod={paymentMethod}
+        onMethodSelect={setPaymentMethod}
+        currency={chama.contribution_currency}
+      />
+
+      <View style={styles.summary}>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Contribution:</Text>
+          <Text style={styles.summaryValue}>
+            {chama.contribution_currency} {amount || '0'}
+          </Text>
+        </View>
+        {contributionInfo.isLate && (
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Late Fee:</Text>
+            <Text style={[styles.summaryValue, styles.lateText]}>
+              {chama.contribution_currency} {contributionInfo.lateFee}
+            </Text>
+          </View>
+        )}
+        <View style={[styles.summaryRow, styles.totalRow]}>
+          <Text style={styles.totalLabel}>Total:</Text>
+          <Text style={styles.totalValue}>
+            {chama.contribution_currency} {(parseFloat(amount || '0') + contributionInfo.lateFee).toFixed(2)}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity 
+          style={styles.cancelButton} 
+          onPress={onCancel}
+          disabled={isProcessing}
+        >
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.contributeButton, isProcessing && styles.disabledButton]} 
+          onPress={handleContribute}
+          disabled={isProcessing || !amount || !paymentMethod}
+        >
+          {isProcessing ? (
+            <LoadingSpinner size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.contributeButtonText}>Contribute</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#F9FAFB',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  chamaName: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1F2937',
+  },
+  lateText: {
+    color: '#EF4444',
+  },
+  inputSection: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  amountInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#1F2937',
+  },
+  summary: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 20,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1F2937',
+  },
+  totalRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    marginTop: 8,
+    paddingTop: 12,
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  totalValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 'auto',
+    paddingTop: 20,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  contributeButton: {
+    flex: 2,
+    backgroundColor: '#10B981',
+    paddingVertical: 14,
+    borderRadius: 8,
+  },
+  contributeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#9CA3AF',
+  },
+});
+```
+
+## Deployment Checklist
+
+### Pre-Production Testing
+
+<Steps>
+  <Step title="Functional Testing">
+    ✅ Chama creation and member management  
+    ✅ Contribution processing end-to-end  
+    ✅ Voting system with all scenarios  
+    ✅ Payout processing and approval workflows  
+    ✅ Real-time notifications and updates
+  </Step>
+  <Step title="Performance Testing">
+    ✅ Load testing with 1000+ concurrent users  
+    ✅ Database performance under heavy load  
+    ✅ Payment processing performance  
+    ✅ Real-time feature scalability  
+    ✅ Mobile app performance on low-end devices
+  </Step>
+  <Step title="Security Testing">
+    ✅ Authentication and authorization  
+    ✅ Input validation and SQL injection prevention  
+    ✅ API rate limiting and abuse prevention  
+    ✅ Data encryption verification  
+    ✅ Financial transaction security
+  </Step>
+  <Step title="Integration Testing">
+    ✅ Payment gateway integration  
+    ✅ Mobile money provider APIs  
+    ✅ SMS and push notification services  
+    ✅ Real-time WebSocket connections  
+    ✅ Database transaction integrity
+  </Step>
+</Steps>
+
+### Production Configuration
+
+```typescript
+// production-config.ts
+export const productionConfig = {
+  database: {
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT || '5432'),
+    database: process.env.DB_NAME,
+    username: process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
+    ssl: true,
+    pool: {
+      min: 10,
+      max: 100,
+      acquireTimeoutMillis: 30000,
+      idleTimeoutMillis: 600000
+    }
+  },
+  redis: {
+    host: process.env.REDIS_HOST,
+    port: parseInt(process.env.REDIS_PORT || '6379'),
+    password: process.env.REDIS_PASSWORD,
+    retryDelayOnFailover: 100,
+    maxRetriesPerRequest: 3
+  },
+  rateLimiting: {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 1000, // Limit each IP to 1000 requests per windowMs
+    skipSuccessfulRequests: false
+  },
+  security: {
+    jwtSecret: process.env.JWT_SECRET,
+    jwtExpiresIn: '15m',
+    refreshTokenExpiresIn: '30d',
+    bcryptRounds: 12
+  },
+  monitoring: {
+    sentryDsn: process.env.SENTRY_DSN,
+    logLevel: 'info',
+    enableMetrics: true
+  }
+};
+```
+
+---
+
+*This Chama Management Implementation Guide provides a complete foundation for building sophisticated group savings functionality within AWO Platform. The system combines traditional African savings group concepts with modern financial technology, enabling transparent, democratic, and automated group financial management.*
+
+*For additional implementation details, refer to the [Bank Integration Guide](/guides/bank-integration), [Payment Processing Guide](/guides/payment-processing), and [Testing Strategies](/guides/testing-strategies).*

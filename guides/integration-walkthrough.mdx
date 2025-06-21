@@ -1,671 +1,1045 @@
----
-title: 'Integration Walkthrough'
-description: 'Get up and running with AWO APIs in under 10 minutes'
----
+# Integration Walkthrough
 
-# AWO Integration Walkthrough
+This comprehensive walkthrough guides you through integrating with AWO Platform from initial setup to production deployment, covering all essential components for African fintech applications.
 
-This guide will walk you through integrating with the AWO platform, from initial setup to implementing core features. By the end, you'll have a working integration that can authenticate users, fetch their financial data, and calculate DIVA scores.
+<Info>
+This guide assumes you have completed the [Development Environment Setup](/quick-setup/development-environment) and have your API credentials ready.
+</Info>
+
+## Overview
+
+AWO Platform integration involves several key components designed for the African financial services market:
+
+<CardGroup cols={2}>
+  <Card title="Core Services" icon="shield">
+    Authentication, User Management, AWO Wallet, DIVA Scoring
+  </Card>
+  <Card title="Financial Services" icon="wallet">
+    Open Banking, Mobile Money, Investment Platform, Cross-Border Payments
+  </Card>
+  <Card title="Community Features" icon="users">
+    Digital Chama Management, Wealth Coaching, Educational Content
+  </Card>
+  <Card title="African-Specific" icon="globe">
+    USSD Banking, Agent Networks, Multi-Currency, Offline Support
+  </Card>
+</CardGroup>
 
 ## Prerequisites
 
-Before you begin, ensure you have:
+Before starting the integration walkthrough:
 
-<CardGroup cols={2}>
-  <Card title="Developer Account" icon="user-check">
-    Sign up at developer.awo-platform.com for API credentials
-  </Card>
-  <Card title="API Keys" icon="key">
-    Generate your API keys from the developer dashboard
-  </Card>
-</CardGroup>
+<Steps>
+  <Step title="Development Environment">
+    Set up your development environment with Node.js 18+, React Native CLI, and database access
+  </Step>
+  <Step title="API Credentials">
+    Obtain your API keys from the AWO Developer Portal and configure environment variables
+  </Step>
+  <Step title="Test Accounts">
+    Create test user accounts and understand the tier-based access system
+  </Step>
+  <Step title="Partner Services">
+    Set up sandbox accounts with Stitch (Open Banking), Flutterwave (Payments), and Smile ID (KYC)
+  </Step>
+</Steps>
 
-## Step 1: Environment Setup
+## Phase 1: Basic Integration
 
-### Base Configuration
+### Authentication Setup
 
-Set up your environment with the AWO API base URLs:
+Implement JWT-based authentication with refresh tokens:
 
-<CodeGroup>
-```javascript JavaScript
-const AWO_CONFIG = {
-  baseURL: 'https://api.awo-platform.com/v1',
-  authURL: 'https://auth.awo-platform.com',
-  sandboxURL: 'https://sandbox-api.awo-platform.com/v1'
-};
-```
+```typescript
+// auth-service.ts
+import axios from 'axios';
 
-```python Python
-AWO_CONFIG = {
-    'base_url': 'https://api.awo-platform.com/v1',
-    'auth_url': 'https://auth.awo-platform.com',
-    'sandbox_url': 'https://sandbox-api.awo-platform.com/v1'
+interface AuthResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  user: User;
+}
+
+export class AuthService {
+  private baseURL = process.env.AWO_API_BASE_URL;
+  private refreshToken: string | null = null;
+
+  async login(email: string, password: string): Promise<AuthResponse> {
+    try {
+      const response = await axios.post(`${this.baseURL}/auth/login`, {
+        email,
+        password,
+        device_info: {
+          platform: 'mobile',
+          device_id: await this.getDeviceId(),
+          app_version: '1.0.0'
+        }
+      });
+
+      // Store refresh token securely
+      this.refreshToken = response.data.refresh_token;
+      await this.storeRefreshToken(response.data.refresh_token);
+
+      return response.data;
+    } catch (error) {
+      throw this.handleAuthError(error);
+    }
+  }
+
+  async refreshAccessToken(): Promise<string> {
+    if (!this.refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    const response = await axios.post(`${this.baseURL}/auth/refresh`, {
+      refresh_token: this.refreshToken
+    });
+
+    return response.data.access_token;
+  }
+
+  private async storeRefreshToken(token: string): Promise<void> {
+    // Use secure storage (Keychain on iOS, Keystore on Android)
+    await SecureStore.setItemAsync('refresh_token', token);
+  }
 }
 ```
 
-```php PHP
-<?php
-$awoConfig = [
-    'baseURL' => 'https://api.awo-platform.com/v1',
-    'authURL' => 'https://auth.awo-platform.com',
-    'sandboxURL' => 'https://sandbox-api.awo-platform.com/v1'
-];
-?>
-```
-</CodeGroup>
+### User Registration with KYC
 
-### Install SDK (Optional)
+Implement tier-based user registration:
 
-<Tabs>
-  <Tab title="JavaScript/Node.js">
-    ```bash
-    npm install @awo-platform/javascript-sdk
-    ```
-  </Tab>
-  <Tab title="React Native">
-    ```bash
-    npm install @awo-platform/react-native-sdk
-    ```
-  </Tab>
-  <Tab title="Python">
-    ```bash
-    pip install awo-platform-python
-    ```
-  </Tab>
-</Tabs>
-
-## Step 2: Authentication Implementation
-
-### User Registration
-
-First, implement user registration to create AWO accounts:
-
-<CodeGroup>
-```javascript JavaScript
-const registerUser = async (userData) => {
-  const response = await fetch(`${AWO_CONFIG.baseURL}/auth/register`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': process.env.AWO_API_KEY
-    },
-    body: JSON.stringify({
-      phoneNumber: userData.phoneNumber,
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      country: userData.country,
-      dateOfBirth: userData.dateOfBirth,
-      gender: userData.gender
-    })
-  });
-  
-  return await response.json();
-};
-```
-
-```python Python
-import requests
-
-def register_user(user_data):
-    response = requests.post(
-        f"{AWO_CONFIG['base_url']}/auth/register",
-        headers={
-            'Content-Type': 'application/json',
-            'X-API-Key': os.getenv('AWO_API_KEY')
-        },
-        json={
-            'phoneNumber': user_data['phone_number'],
-            'firstName': user_data['first_name'],
-            'lastName': user_data['last_name'],
-            'country': user_data['country'],
-            'dateOfBirth': user_data['date_of_birth'],
-            'gender': user_data['gender']
-        }
-    )
-    return response.json()
-```
-</CodeGroup>
-
-### User Login
-
-Implement the login flow with OTP verification:
-
-<CodeGroup>
-```javascript JavaScript
-// Step 1: Request OTP
-const requestOTP = async (phoneNumber) => {
-  const response = await fetch(`${AWO_CONFIG.baseURL}/auth/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': process.env.AWO_API_KEY
-    },
-    body: JSON.stringify({ phoneNumber })
-  });
-  
-  return await response.json();
-};
-
-// Step 2: Verify OTP and get tokens
-const verifyOTP = async (phoneNumber, otpCode) => {
-  const response = await fetch(`${AWO_CONFIG.baseURL}/auth/verify-otp`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': process.env.AWO_API_KEY
-    },
-    body: JSON.stringify({ 
-      phoneNumber, 
-      otpCode 
-    })
-  });
-  
-  const data = await response.json();
-  
-  // Store tokens securely
-  localStorage.setItem('awo_access_token', data.accessToken);
-  localStorage.setItem('awo_refresh_token', data.refreshToken);
-  
-  return data;
-};
-```
-
-```python Python
-def request_otp(phone_number):
-    response = requests.post(
-        f"{AWO_CONFIG['base_url']}/auth/login",
-        headers={
-            'Content-Type': 'application/json',
-            'X-API-Key': os.getenv('AWO_API_KEY')
-        },
-        json={'phoneNumber': phone_number}
-    )
-    return response.json()
-
-def verify_otp(phone_number, otp_code):
-    response = requests.post(
-        f"{AWO_CONFIG['base_url']}/auth/verify-otp",
-        headers={
-            'Content-Type': 'application/json',
-            'X-API-Key': os.getenv('AWO_API_KEY')
-        },
-        json={
-            'phoneNumber': phone_number,
-            'otpCode': otp_code
-        }
-    )
-    return response.json()
-```
-</CodeGroup>
-
-## Step 3: User Profile Management
-
-### Fetch User Profile
-
-Once authenticated, retrieve the user's profile information:
-
-<CodeGroup>
-```javascript JavaScript
-const getUserProfile = async () => {
-  const token = localStorage.getItem('awo_access_token');
-  
-  const response = await fetch(`${AWO_CONFIG.baseURL}/users/profile`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'X-API-Key': process.env.AWO_API_KEY
-    }
-  });
-  
-  return await response.json();
-};
-```
-
-```python Python
-def get_user_profile(access_token):
-    response = requests.get(
-        f"{AWO_CONFIG['base_url']}/users/profile",
-        headers={
-            'Authorization': f'Bearer {access_token}',
-            'X-API-Key': os.getenv('AWO_API_KEY')
-        }
-    )
-    return response.json()
-```
-</CodeGroup>
-
-### Update User Profile
-
-Allow users to update their profile information:
-
-<CodeGroup>
-```javascript JavaScript
-const updateUserProfile = async (updates) => {
-  const token = localStorage.getItem('awo_access_token');
-  
-  const response = await fetch(`${AWO_CONFIG.baseURL}/users/profile`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'X-API-Key': process.env.AWO_API_KEY
-    },
-    body: JSON.stringify(updates)
-  });
-  
-  return await response.json();
-};
-```
-</CodeGroup>
-
-## Step 4: Bank Account Integration
-
-### Connect Bank Account
-
-Implement Open Banking integration to connect user bank accounts:
-
-<CodeGroup>
-```javascript JavaScript
-const connectBankAccount = async (bankId) => {
-  const token = localStorage.getItem('awo_access_token');
-  
-  const response = await fetch(`${AWO_CONFIG.baseURL}/accounts/connect`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'X-API-Key': process.env.AWO_API_KEY
-    },
-    body: JSON.stringify({ 
-      bankId,
-      redirectUri: 'https://yourapp.com/bank-callback'
-    })
-  });
-  
-  const data = await response.json();
-  
-  // Redirect user to bank authorization page
-  window.location.href = data.authorizationUrl;
-  
-  return data;
-};
-```
-
-```python Python
-def connect_bank_account(access_token, bank_id):
-    response = requests.post(
-        f"{AWO_CONFIG['base_url']}/accounts/connect",
-        headers={
-            'Authorization': f'Bearer {access_token}',
-            'Content-Type': 'application/json',
-            'X-API-Key': os.getenv('AWO_API_KEY')
-        },
-        json={
-            'bankId': bank_id,
-            'redirectUri': 'https://yourapp.com/bank-callback'
-        }
-    )
-    return response.json()
-```
-</CodeGroup>
-
-### List Connected Accounts
-
-Retrieve all connected bank accounts for a user:
-
-<CodeGroup>
-```javascript JavaScript
-const getConnectedAccounts = async () => {
-  const token = localStorage.getItem('awo_access_token');
-  
-  const response = await fetch(`${AWO_CONFIG.baseURL}/accounts/list`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'X-API-Key': process.env.AWO_API_KEY
-    }
-  });
-  
-  return await response.json();
-};
-```
-</CodeGroup>
-
-## Step 5: DIVA Score Integration
-
-### Fetch DIVA Score
-
-Get the user's current DIVA score and components:
-
-<CodeGroup>
-```javascript JavaScript
-const getDIVAScore = async () => {
-  const token = localStorage.getItem('awo_access_token');
-  
-  const response = await fetch(`${AWO_CONFIG.baseURL}/diva-score/get-score`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'X-API-Key': process.env.AWO_API_KEY
-    }
-  });
-  
-  const data = await response.json();
-  
-  return {
-    overallScore: data.overallScore,
-    components: {
-      discipline: data.disciplineScore,
-      income: data.incomeScore,
-      velocity: data.velocityScore,
-      assets: data.assetsScore
-    },
-    insights: data.insights,
-    recommendations: data.recommendations
-  };
-};
-```
-
-```python Python
-def get_diva_score(access_token):
-    response = requests.get(
-        f"{AWO_CONFIG['base_url']}/diva-score/get-score",
-        headers={
-            'Authorization': f'Bearer {access_token}',
-            'X-API-Key': os.getenv('AWO_API_KEY')
-        }
-    )
-    return response.json()
-```
-</CodeGroup>
-
-### Display DIVA Score
-
-Create a visual representation of the DIVA score:
-
-<CodeGroup>
-```javascript React
-import React, { useState, useEffect } from 'react';
-
-const DIVAScoreWidget = () => {
-  const [divaScore, setDivaScore] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchScore = async () => {
-      try {
-        const score = await getDIVAScore();
-        setDivaScore(score);
-      } catch (error) {
-        console.error('Error fetching DIVA score:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchScore();
-  }, []);
-
-  if (loading) return <div>Loading DIVA Score...</div>;
-
-  return (
-    <div className="diva-score-widget">
-      <h2>Your DIVA Score</h2>
-      <div className="score-circle">
-        <span className="score-value">{divaScore.overallScore}</span>
-        <span className="score-max">/1000</span>
-      </div>
-      
-      <div className="score-components">
-        <div className="component">
-          <span>Discipline</span>
-          <span>{divaScore.components.discipline}</span>
-        </div>
-        <div className="component">
-          <span>Income</span>
-          <span>{divaScore.components.income}</span>
-        </div>
-        <div className="component">
-          <span>Velocity</span>
-          <span>{divaScore.components.velocity}</span>
-        </div>
-        <div className="component">
-          <span>Assets</span>
-          <span>{divaScore.components.assets}</span>
-        </div>
-      </div>
-
-      <div className="recommendations">
-        <h3>Recommendations</h3>
-        {divaScore.recommendations.map((rec, index) => (
-          <div key={index} className="recommendation">
-            {rec.message}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-```
-</CodeGroup>
-
-## Step 6: Transaction Data
-
-### Fetch Transactions
-
-Retrieve and display user transaction history:
-
-<CodeGroup>
-```javascript JavaScript
-const getTransactions = async (params = {}) => {
-  const token = localStorage.getItem('awo_access_token');
-  const queryParams = new URLSearchParams({
-    page: params.page || 1,
-    limit: params.limit || 50,
-    startDate: params.startDate || '',
-    endDate: params.endDate || '',
-    category: params.category || ''
-  }).toString();
-  
-  const response = await fetch(
-    `${AWO_CONFIG.baseURL}/transactions/list?${queryParams}`, 
-    {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'X-API-Key': process.env.AWO_API_KEY
-      }
-    }
-  );
-  
-  return await response.json();
-};
-```
-</CodeGroup>
-
-## Step 7: Error Handling
-
-Implement robust error handling for all API calls:
-
-<CodeGroup>
-```javascript JavaScript
-class AWOError extends Error {
-  constructor(message, status, code) {
-    super(message);
-    this.status = status;
-    this.code = code;
-  }
+```typescript
+// registration-service.ts
+export interface UserRegistration {
+  email: string;
+  password: string;
+  phone_number: string;
+  full_name: string;
+  country_code: string; // SADC country codes
+  preferred_language: 'en' | 'af' | 'pt' | 'fr';
 }
 
-const handleAPIResponse = async (response) => {
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new AWOError(
-      data.message || 'API request failed',
-      response.status,
-      data.code
-    );
+export interface KYCDocuments {
+  id_number: string;
+  id_type: 'national_id' | 'passport' | 'drivers_license';
+  id_document_front: File;
+  id_document_back?: File;
+  selfie_image: File;
+  proof_of_address?: File;
+}
+
+export class RegistrationService {
+  async registerUser(data: UserRegistration): Promise<{ user_id: string; verification_status: string }> {
+    const response = await this.apiClient.post('/auth/register', {
+      ...data,
+      terms_accepted: true,
+      privacy_policy_accepted: true,
+      marketing_consent: false // Default to false for GDPR compliance
+    });
+
+    return response.data;
   }
-  
-  return data;
-};
 
-// Usage example
-const safeAPICall = async (apiFunction) => {
-  try {
-    return await apiFunction();
-  } catch (error) {
-    if (error instanceof AWOError) {
-      switch (error.status) {
-        case 401:
-          // Handle authentication error
-          await refreshToken();
-          return await apiFunction();
-        case 429:
-          // Handle rate limiting
-          console.warn('Rate limited, retrying after delay');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          return await apiFunction();
-        default:
-          console.error('AWO API Error:', error.message);
-          throw error;
-      }
-    }
-    throw error;
-  }
-};
-```
-</CodeGroup>
-
-## Step 8: Token Management
-
-Implement automatic token refresh:
-
-<CodeGroup>
-```javascript JavaScript
-const refreshToken = async () => {
-  const refreshToken = localStorage.getItem('awo_refresh_token');
-  
-  const response = await fetch(`${AWO_CONFIG.baseURL}/auth/refresh`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': process.env.AWO_API_KEY
-    },
-    body: JSON.stringify({ refreshToken })
-  });
-  
-  const data = await response.json();
-  
-  localStorage.setItem('awo_access_token', data.accessToken);
-  localStorage.setItem('awo_refresh_token', data.refreshToken);
-  
-  return data;
-};
-
-// Automatic token refresh interceptor
-const apiCallWithAuth = async (url, options = {}) => {
-  const token = localStorage.getItem('awo_access_token');
-  
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      'Authorization': `Bearer ${token}`,
-      'X-API-Key': process.env.AWO_API_KEY
-    }
-  });
-  
-  if (response.status === 401) {
-    await refreshToken();
-    const newToken = localStorage.getItem('awo_access_token');
+  async submitKYCDocuments(userId: string, documents: KYCDocuments): Promise<{ verification_id: string }> {
+    const formData = new FormData();
     
-    return fetch(url, {
-      ...options,
-      headers: {
-        ...options.headers,
-        'Authorization': `Bearer ${newToken}`,
-        'X-API-Key': process.env.AWO_API_KEY
+    // Add document files
+    formData.append('id_document_front', documents.id_document_front);
+    if (documents.id_document_back) {
+      formData.append('id_document_back', documents.id_document_back);
+    }
+    formData.append('selfie_image', documents.selfie_image);
+    
+    // Add metadata
+    formData.append('id_number', documents.id_number);
+    formData.append('id_type', documents.id_type);
+
+    const response = await this.apiClient.post(`/users/${userId}/kyc`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+
+    return response.data;
+  }
+}
+```
+
+### Wallet Integration
+
+Set up the AWO Wallet with multi-currency support:
+
+```typescript
+// wallet-service.ts
+export interface WalletBalance {
+  currency: 'ZAR' | 'BWP' | 'NAD' | 'ZMW' | 'USD';
+  available_balance: number;
+  pending_balance: number;
+  reserved_balance: number;
+  last_updated: string;
+}
+
+export interface TransactionRequest {
+  amount: number;
+  currency: string;
+  recipient?: string;
+  description: string;
+  transaction_type: 'deposit' | 'withdrawal' | 'transfer' | 'investment';
+  payment_method: 'bank_transfer' | 'mobile_money' | 'card';
+}
+
+export class WalletService {
+  async getBalances(userId: string): Promise<WalletBalance[]> {
+    const response = await this.apiClient.get(`/users/${userId}/wallet/balances`);
+    return response.data.balances;
+  }
+
+  async initiateDeposit(userId: string, request: TransactionRequest): Promise<{ transaction_id: string; payment_url?: string }> {
+    const response = await this.apiClient.post(`/users/${userId}/wallet/deposit`, {
+      ...request,
+      callback_url: `${this.appConfig.baseUrl}/payment-callback`,
+      metadata: {
+        source: 'mobile_app',
+        user_tier: await this.getUserTier(userId)
+      }
+    });
+
+    return response.data;
+  }
+
+  async getTransactionHistory(userId: string, params: {
+    page?: number;
+    limit?: number;
+    currency?: string;
+    transaction_type?: string;
+    date_from?: string;
+    date_to?: string;
+  }): Promise<{ transactions: Transaction[]; pagination: PaginationInfo }> {
+    const response = await this.apiClient.get(`/users/${userId}/wallet/transactions`, { params });
+    return response.data;
+  }
+}
+```
+
+## Phase 2: DIVA Score Integration
+
+### DIVA Score Implementation
+
+Integrate the DIVA scoring system with real-time updates:
+
+```typescript
+// diva-service.ts
+export interface DivaScore {
+  overall_score: number; // 0-1000
+  components: {
+    discipline: number;
+    income: number;
+    velocity: number;
+    assets: number;
+  };
+  portfolio_tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  calculated_at: string;
+  next_update_due: string;
+  insights: DivaInsight[];
+}
+
+export interface DivaInsight {
+  category: 'discipline' | 'income' | 'velocity' | 'assets';
+  message: string;
+  recommendation: string;
+  impact_level: 'low' | 'medium' | 'high';
+  actionable: boolean;
+}
+
+export class DivaService {
+  async getCurrentScore(userId: string): Promise<DivaScore> {
+    const response = await this.apiClient.get(`/users/${userId}/diva-score`);
+    return response.data;
+  }
+
+  async getScoreHistory(userId: string, months: number = 12): Promise<DivaScore[]> {
+    const response = await this.apiClient.get(`/users/${userId}/diva-score/history`, {
+      params: { months }
+    });
+    return response.data.history;
+  }
+
+  async triggerScoreRefresh(userId: string): Promise<{ refresh_id: string; estimated_completion: string }> {
+    const response = await this.apiClient.post(`/users/${userId}/diva-score/refresh`);
+    return response.data;
+  }
+
+  async subscribeToScoreUpdates(userId: string, callback: (score: DivaScore) => void): void {
+    this.socketClient.on(`diva_score_update_${userId}`, callback);
+  }
+}
+```
+
+### RTSM Assessment Integration
+
+Implement risk tolerance scoring:
+
+```typescript
+// rtsm-service.ts
+export interface RTSMQuestion {
+  id: string;
+  category: 'risk_capacity' | 'risk_tolerance' | 'investment_experience' | 'time_horizon';
+  question_text: string;
+  question_type: 'multiple_choice' | 'scale' | 'yes_no';
+  options?: { value: number; label: string }[];
+  required: boolean;
+}
+
+export interface RTSMAssessment {
+  user_id: string;
+  responses: Array<{
+    question_id: string;
+    answer: number | string;
+  }>;
+  completed_at: string;
+  score: {
+    overall_risk_score: number; // 0-100
+    risk_profile: 'conservative' | 'moderate' | 'balanced' | 'growth' | 'aggressive';
+    recommended_allocation: {
+      cash: number;
+      bonds: number;
+      equities: number;
+      alternatives: number;
+    };
+  };
+}
+
+export class RTSMService {
+  async getAssessmentQuestions(userId: string): Promise<RTSMQuestion[]> {
+    const response = await this.apiClient.get(`/users/${userId}/rtsm/questions`);
+    return response.data.questions;
+  }
+
+  async submitAssessment(userId: string, responses: Array<{ question_id: string; answer: number | string }>): Promise<RTSMAssessment> {
+    const response = await this.apiClient.post(`/users/${userId}/rtsm/assessment`, {
+      responses,
+      assessment_date: new Date().toISOString()
+    });
+    return response.data;
+  }
+
+  async getCurrentAssessment(userId: string): Promise<RTSMAssessment | null> {
+    try {
+      const response = await this.apiClient.get(`/users/${userId}/rtsm/current`);
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 404) return null;
+      throw error;
+    }
+  }
+}
+```
+
+## Phase 3: Chama Management Integration
+
+### Digital Chama Implementation
+
+Set up group savings management:
+
+```typescript
+// chama-service.ts
+export interface ChamaGroup {
+  id: string;
+  name: string;
+  description: string;
+  total_members: number;
+  contribution_amount: number;
+  contribution_frequency: 'weekly' | 'monthly';
+  next_payout_date: string;
+  total_contributions: number;
+  current_cycle: number;
+  governance_rules: {
+    minimum_members: number;
+    maximum_members: number;
+    voting_threshold: number; // Percentage required for decisions
+    treasurer_rotation: boolean;
+  };
+  status: 'active' | 'paused' | 'completed';
+  created_at: string;
+}
+
+export interface ChamaMember {
+  user_id: string;
+  full_name: string;
+  role: 'member' | 'treasurer' | 'admin';
+  joined_date: string;
+  contribution_status: 'current' | 'behind' | 'ahead';
+  total_contributed: number;
+  last_contribution: string | null;
+}
+
+export class ChamaService {
+  async createChama(data: {
+    name: string;
+    description: string;
+    contribution_amount: number;
+    contribution_frequency: 'weekly' | 'monthly';
+    max_members: number;
+    start_date: string;
+  }): Promise<ChamaGroup> {
+    const response = await this.apiClient.post('/chamas', {
+      ...data,
+      governance_rules: {
+        minimum_members: 3,
+        maximum_members: data.max_members,
+        voting_threshold: 60, // 60% majority for decisions
+        treasurer_rotation: true
+      }
+    });
+
+    return response.data;
+  }
+
+  async joinChama(chamaId: string, userId: string): Promise<{ status: string; pending_approval: boolean }> {
+    const response = await this.apiClient.post(`/chamas/${chamaId}/members`, {
+      user_id: userId,
+      agreement_accepted: true
+    });
+
+    return response.data;
+  }
+
+  async contributeToChama(chamaId: string, userId: string, amount: number): Promise<{ transaction_id: string }> {
+    const response = await this.apiClient.post(`/chamas/${chamaId}/contributions`, {
+      user_id: userId,
+      amount,
+      payment_method: 'wallet',
+      contribution_period: new Date().toISOString().substring(0, 7) // YYYY-MM
+    });
+
+    return response.data;
+  }
+
+  async getChamaMembers(chamaId: string): Promise<ChamaMember[]> {
+    const response = await this.apiClient.get(`/chamas/${chamaId}/members`);
+    return response.data.members;
+  }
+
+  async initiateGroupVoting(chamaId: string, proposal: {
+    title: string;
+    description: string;
+    proposal_type: 'payout' | 'investment' | 'rule_change';
+    amount?: number;
+    voting_deadline: string;
+  }): Promise<{ voting_id: string }> {
+    const response = await this.apiClient.post(`/chamas/${chamaId}/votes`, proposal);
+    return response.data;
+  }
+}
+```
+
+## Phase 4: Investment Platform Integration
+
+### Portfolio Management
+
+Implement tiered investment platform:
+
+```typescript
+// investment-service.ts
+export interface InvestmentProduct {
+  id: string;
+  name: string;
+  description: string;
+  category: 'money_market' | 'bonds' | 'equity' | 'mixed' | 'sme_debt';
+  risk_level: 'very_low' | 'low' | 'moderate' | 'high' | 'very_high';
+  minimum_investment: number;
+  expected_return: {
+    annual_return: number;
+    volatility: number;
+  };
+  fees: {
+    management_fee: number;
+    performance_fee: number;
+    entry_fee: number;
+    exit_fee: number;
+  };
+  tier_requirements: Array<'bronze' | 'silver' | 'gold' | 'platinum'>;
+  currency: string;
+  liquidity: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annual';
+}
+
+export interface UserPortfolio {
+  user_id: string;
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  total_value: number;
+  available_cash: number;
+  invested_amount: number;
+  unrealized_gains: number;
+  holdings: Array<{
+    product_id: string;
+    product_name: string;
+    shares: number;
+    current_value: number;
+    cost_basis: number;
+    gain_loss: number;
+    gain_loss_percentage: number;
+  }>;
+  recommended_allocation: {
+    cash: number;
+    bonds: number;
+    equities: number;
+    alternatives: number;
+  };
+  last_updated: string;
+}
+
+export class InvestmentService {
+  async getAvailableProducts(userId: string): Promise<InvestmentProduct[]> {
+    const userTier = await this.getUserTier(userId);
+    const response = await this.apiClient.get('/investments/products', {
+      params: { user_tier: userTier }
+    });
+    return response.data.products;
+  }
+
+  async getUserPortfolio(userId: string): Promise<UserPortfolio> {
+    const response = await this.apiClient.get(`/users/${userId}/portfolio`);
+    return response.data;
+  }
+
+  async placeInvestmentOrder(userId: string, order: {
+    product_id: string;
+    amount: number;
+    order_type: 'buy' | 'sell';
+    price_type: 'market' | 'limit';
+    limit_price?: number;
+  }): Promise<{ order_id: string; estimated_execution: string }> {
+    const response = await this.apiClient.post(`/users/${userId}/investments/orders`, {
+      ...order,
+      source_account: 'wallet',
+      terms_accepted: true
+    });
+
+    return response.data;
+  }
+
+  async getSMEInvestmentOpportunities(userId: string): Promise<SMEOpportunity[]> {
+    const userTier = await this.getUserTier(userId);
+    if (!['gold', 'platinum'].includes(userTier)) {
+      throw new Error('SME investments require Gold or Platinum tier');
+    }
+
+    const response = await this.apiClient.get('/investments/sme-opportunities', {
+      params: { user_tier: userTier }
+    });
+    return response.data.opportunities;
+  }
+}
+```
+
+## Phase 5: Payment Integration
+
+### Mobile Money Integration
+
+Implement African mobile money payments:
+
+```typescript
+// mobile-money-service.ts
+export interface MobileMoneyProvider {
+  code: string;
+  name: string;
+  country: string;
+  currency: string;
+  min_amount: number;
+  max_amount: number;
+  fees: Array<{
+    min_amount: number;
+    max_amount: number;
+    fee: number;
+    fee_type: 'fixed' | 'percentage';
+  }>;
+}
+
+export interface MobileMoneyTransaction {
+  transaction_id: string;
+  provider: string;
+  phone_number: string;
+  amount: number;
+  currency: string;
+  transaction_type: 'deposit' | 'withdrawal';
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  provider_reference?: string;
+  fees: number;
+  net_amount: number;
+  initiated_at: string;
+  completed_at?: string;
+}
+
+export class MobileMoneyService {
+  async getAvailableProviders(countryCode: string): Promise<MobileMoneyProvider[]> {
+    const response = await this.apiClient.get('/payments/mobile-money/providers', {
+      params: { country: countryCode }
+    });
+    return response.data.providers;
+  }
+
+  async initiateDeposit(data: {
+    user_id: string;
+    provider: string;
+    phone_number: string;
+    amount: number;
+    currency: string;
+  }): Promise<MobileMoneyTransaction> {
+    const response = await this.apiClient.post('/payments/mobile-money/deposit', {
+      ...data,
+      callback_url: `${this.config.baseUrl}/webhooks/mobile-money`,
+      metadata: {
+        source: 'awo_mobile_app',
+        initiated_from: 'wallet_topup'
+      }
+    });
+
+    return response.data;
+  }
+
+  async initiateWithdrawal(data: {
+    user_id: string;
+    provider: string;
+    phone_number: string;
+    amount: number;
+    currency: string;
+  }): Promise<MobileMoneyTransaction> {
+    // Verify sufficient wallet balance
+    const balance = await this.walletService.getBalance(data.user_id, data.currency);
+    if (balance.available_balance < data.amount) {
+      throw new Error('Insufficient wallet balance');
+    }
+
+    const response = await this.apiClient.post('/payments/mobile-money/withdrawal', {
+      ...data,
+      callback_url: `${this.config.baseUrl}/webhooks/mobile-money`
+    });
+
+    return response.data;
+  }
+
+  async getTransactionStatus(transactionId: string): Promise<MobileMoneyTransaction> {
+    const response = await this.apiClient.get(`/payments/mobile-money/transactions/${transactionId}`);
+    return response.data;
+  }
+}
+```
+
+## Phase 6: Real-Time Features
+
+### WebSocket Integration
+
+Set up real-time notifications and updates:
+
+```typescript
+// realtime-service.ts
+import io, { Socket } from 'socket.io-client';
+
+export interface RealtimeEvent {
+  type: 'diva_score_update' | 'chama_activity' | 'payment_status' | 'investment_update' | 'system_notification';
+  data: any;
+  timestamp: string;
+  user_id?: string;
+  chama_id?: string;
+}
+
+export class RealtimeService {
+  private socket: Socket | null = null;
+  private eventHandlers: Map<string, Function[]> = new Map();
+
+  async connect(userId: string, accessToken: string): Promise<void> {
+    this.socket = io(process.env.AWO_WEBSOCKET_URL, {
+      auth: {
+        token: accessToken,
+        user_id: userId
+      },
+      transports: ['websocket', 'polling'], // Fallback for poor African connectivity
+      timeout: 10000,
+      retries: 3
+    });
+
+    this.socket.on('connect', () => {
+      console.log('Connected to AWO real-time service');
+      this.subscribeToUserEvents(userId);
+    });
+
+    this.socket.on('disconnect', (reason) => {
+      console.log('Disconnected from real-time service:', reason);
+      if (reason === 'io server disconnect') {
+        // Reconnect automatically
+        this.socket?.connect();
+      }
+    });
+
+    this.socket.on('error', (error) => {
+      console.error('WebSocket error:', error);
+    });
+
+    // Handle specific event types
+    this.socket.on('event', (event: RealtimeEvent) => {
+      this.handleEvent(event);
+    });
+  }
+
+  private subscribeToUserEvents(userId: string): void {
+    if (!this.socket) return;
+
+    // Subscribe to user-specific events
+    this.socket.emit('subscribe', {
+      channels: [
+        `user:${userId}`,
+        `diva_score:${userId}`,
+        `wallet:${userId}`,
+        `portfolio:${userId}`
+      ]
+    });
+  }
+
+  subscribeToChamaEvents(chamaId: string): void {
+    if (!this.socket) return;
+
+    this.socket.emit('subscribe', {
+      channels: [`chama:${chamaId}`]
+    });
+  }
+
+  onEvent(eventType: string, handler: Function): void {
+    if (!this.eventHandlers.has(eventType)) {
+      this.eventHandlers.set(eventType, []);
+    }
+    this.eventHandlers.get(eventType)?.push(handler);
+  }
+
+  private handleEvent(event: RealtimeEvent): void {
+    const handlers = this.eventHandlers.get(event.type) || [];
+    handlers.forEach(handler => handler(event));
+  }
+
+  disconnect(): void {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
+  }
+}
+```
+
+## Phase 7: Offline Support
+
+### Offline-First Architecture
+
+Implement offline capabilities for African connectivity:
+
+```typescript
+// offline-service.ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-netinfo/netinfo';
+
+export interface OfflineAction {
+  id: string;
+  type: 'transaction' | 'contribution' | 'investment' | 'profile_update';
+  data: any;
+  timestamp: string;
+  retry_count: number;
+  max_retries: number;
+}
+
+export class OfflineService {
+  private isOnline: boolean = true;
+  private pendingActions: OfflineAction[] = [];
+  private syncInProgress: boolean = false;
+
+  async initialize(): Promise<void> {
+    // Load pending actions from storage
+    const stored = await AsyncStorage.getItem('pending_actions');
+    if (stored) {
+      this.pendingActions = JSON.parse(stored);
+    }
+
+    // Monitor network connectivity
+    NetInfo.addEventListener(state => {
+      const wasOnline = this.isOnline;
+      this.isOnline = state.isConnected || false;
+
+      if (!wasOnline && this.isOnline) {
+        // Came back online, sync pending actions
+        this.syncPendingActions();
       }
     });
   }
-  
-  return response;
-};
+
+  async queueAction(action: Omit<OfflineAction, 'id' | 'timestamp' | 'retry_count'>): Promise<string> {
+    const offlineAction: OfflineAction = {
+      id: this.generateId(),
+      timestamp: new Date().toISOString(),
+      retry_count: 0,
+      max_retries: action.max_retries || 3,
+      ...action
+    };
+
+    this.pendingActions.push(offlineAction);
+    await this.savePendingActions();
+
+    // If online, try to sync immediately
+    if (this.isOnline) {
+      this.syncPendingActions();
+    }
+
+    return offlineAction.id;
+  }
+
+  private async syncPendingActions(): Promise<void> {
+    if (this.syncInProgress || !this.isOnline || this.pendingActions.length === 0) {
+      return;
+    }
+
+    this.syncInProgress = true;
+
+    for (const action of [...this.pendingActions]) {
+      try {
+        await this.executeAction(action);
+        // Remove successful action
+        this.pendingActions = this.pendingActions.filter(a => a.id !== action.id);
+      } catch (error) {
+        console.error(`Failed to sync action ${action.id}:`, error);
+        
+        // Increment retry count
+        action.retry_count++;
+        
+        // Remove if max retries exceeded
+        if (action.retry_count >= action.max_retries) {
+          this.pendingActions = this.pendingActions.filter(a => a.id !== action.id);
+          // Notify user of failed action
+          this.notifyActionFailed(action);
+        }
+      }
+    }
+
+    await this.savePendingActions();
+    this.syncInProgress = false;
+  }
+
+  private async executeAction(action: OfflineAction): Promise<void> {
+    switch (action.type) {
+      case 'transaction':
+        await this.walletService.processTransaction(action.data);
+        break;
+      case 'contribution':
+        await this.chamaService.processContribution(action.data);
+        break;
+      case 'investment':
+        await this.investmentService.processOrder(action.data);
+        break;
+      case 'profile_update':
+        await this.userService.updateProfile(action.data);
+        break;
+      default:
+        throw new Error(`Unknown action type: ${action.type}`);
+    }
+  }
+
+  private async savePendingActions(): Promise<void> {
+    await AsyncStorage.setItem('pending_actions', JSON.stringify(this.pendingActions));
+  }
+
+  private generateId(): string {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private notifyActionFailed(action: OfflineAction): void {
+    // Implementation depends on your notification system
+    console.warn(`Action ${action.type} failed after ${action.max_retries} retries`);
+  }
+}
 ```
-</CodeGroup>
 
 ## Testing Your Integration
 
-### Using Sandbox Environment
+### Integration Test Suite
 
-Test your integration using our sandbox environment:
+Set up comprehensive integration tests:
 
-```javascript
-// Switch to sandbox for testing
-const AWO_CONFIG = {
-  baseURL: 'https://sandbox-api.awo-platform.com/v1',
-  authURL: 'https://sandbox-auth.awo-platform.com'
-};
+```typescript
+// integration-tests.ts
+import { AWOTestClient } from './test-client';
 
-// Use test credentials
-const testUser = {
-  phoneNumber: '+27123456789',
-  firstName: 'Test',
-  lastName: 'User',
-  country: 'ZA',
-  dateOfBirth: '1990-01-01',
-  gender: 'F'
-};
+describe('AWO Platform Integration', () => {
+  let testClient: AWOTestClient;
+  let testUser: any;
+
+  beforeAll(async () => {
+    testClient = new AWOTestClient({
+      baseURL: process.env.AWO_TEST_API_URL,
+      apiKey: process.env.AWO_TEST_API_KEY
+    });
+  });
+
+  describe('User Registration Flow', () => {
+    test('should register new user with Tier 1 KYC', async () => {
+      const userData = {
+        email: 'test@example.co.za',
+        phone_number: '+27123456789',
+        full_name: 'Test User',
+        country_code: 'ZA',
+        preferred_language: 'en'
+      };
+
+      const result = await testClient.auth.register(userData);
+      
+      expect(result.user_id).toBeDefined();
+      expect(result.verification_status).toBe('tier_1_pending');
+      
+      testUser = result;
+    });
+
+    test('should complete Tier 2 KYC verification', async () => {
+      const kycData = {
+        id_number: '9001011234567',
+        id_type: 'national_id',
+        id_document_front: await testClient.loadTestFile('test-id-front.jpg'),
+        selfie_image: await testClient.loadTestFile('test-selfie.jpg')
+      };
+
+      const result = await testClient.kyc.submitDocuments(testUser.user_id, kycData);
+      expect(result.verification_id).toBeDefined();
+    });
+  });
+
+  describe('DIVA Score Integration', () => {
+    test('should calculate initial DIVA score', async () => {
+      // Link test bank account
+      await testClient.banking.linkTestAccount(testUser.user_id, 'test_bank_account');
+      
+      // Trigger score calculation
+      const refreshResult = await testClient.diva.triggerRefresh(testUser.user_id);
+      expect(refreshResult.refresh_id).toBeDefined();
+
+      // Wait for calculation completion
+      await testClient.waitForCompletion(refreshResult.refresh_id, 30000);
+
+      // Verify score
+      const score = await testClient.diva.getCurrentScore(testUser.user_id);
+      expect(score.overall_score).toBeGreaterThan(0);
+      expect(score.portfolio_tier).toMatch(/bronze|silver|gold|platinum/);
+    });
+  });
+
+  describe('Wallet Operations', () => {
+    test('should process mobile money deposit', async () => {
+      const depositData = {
+        amount: 1000,
+        currency: 'ZAR',
+        payment_method: 'mobile_money',
+        provider: 'test_provider',
+        phone_number: '+27123456789'
+      };
+
+      const result = await testClient.wallet.initiateDeposit(testUser.user_id, depositData);
+      expect(result.transaction_id).toBeDefined();
+
+      // Simulate payment completion
+      await testClient.simulatePaymentCompletion(result.transaction_id);
+
+      // Verify balance update
+      const balances = await testClient.wallet.getBalances(testUser.user_id);
+      const zarBalance = balances.find(b => b.currency === 'ZAR');
+      expect(zarBalance?.available_balance).toBeGreaterThanOrEqual(1000);
+    });
+  });
+
+  describe('Chama Integration', () => {
+    test('should create and join Chama', async () => {
+      const chamaData = {
+        name: 'Test Savings Group',
+        description: 'Integration test Chama',
+        contribution_amount: 500,
+        contribution_frequency: 'monthly',
+        max_members: 10,
+        start_date: new Date().toISOString()
+      };
+
+      const chama = await testClient.chama.create(chamaData);
+      expect(chama.id).toBeDefined();
+
+      // Create additional test users
+      const member2 = await testClient.createTestUser();
+      const member3 = await testClient.createTestUser();
+
+      // Join Chama
+      await testClient.chama.join(chama.id, member2.user_id);
+      await testClient.chama.join(chama.id, member3.user_id);
+
+      // Verify membership
+      const members = await testClient.chama.getMembers(chama.id);
+      expect(members.length).toBe(3);
+    });
+  });
+});
 ```
 
-### Test Scenarios
+## Production Deployment Checklist
 
-<Accordion title="Authentication Flow">
-1. Register a new user
-2. Request OTP for login
-3. Verify OTP and receive tokens
-4. Test token refresh
-5. Test logout
-</Accordion>
+Before deploying to production:
 
-<Accordion title="Bank Integration">
-1. Connect to sandbox bank account
-2. Retrieve account list
-3. Fetch transaction history
-4. Test transaction categorization
-</Accordion>
-
-<Accordion title="DIVA Score">
-1. Calculate initial DIVA score
-2. Simulate transactions to change score
-3. Fetch updated score and insights
-4. Test score history retrieval
-</Accordion>
+<Steps>
+  <Step title="Security Review">
+    ✅ All API endpoints authenticated and authorized  
+    ✅ Input validation on all user inputs  
+    ✅ Rate limiting configured  
+    ✅ HTTPS enforced across all connections  
+    ✅ Sensitive data encrypted at rest
+  </Step>
+  <Step title="Performance Testing">
+    ✅ Load testing completed for expected African traffic patterns  
+    ✅ Database queries optimized with proper indexing  
+    ✅ CDN configured for African edge locations  
+    ✅ Mobile app performance tested on mid-range Android devices  
+    ✅ Offline sync tested with poor connectivity simulation
+  </Step>
+  <Step title="Compliance Verification">
+    ✅ GDPR/POPIA compliance verified  
+    ✅ Financial regulations compliance in target countries  
+    ✅ KYC/AML procedures tested and documented  
+    ✅ Data residency requirements met  
+    ✅ Audit logging enabled for all financial transactions
+  </Step>
+  <Step title="Integration Testing">
+    ✅ All payment gateways tested in production mode  
+    ✅ Bank integrations verified with real accounts  
+    ✅ SMS/email notifications working  
+    ✅ Push notifications configured  
+    ✅ Real-time features tested under load
+  </Step>
+  <Step title="Monitoring Setup">
+    ✅ Application performance monitoring configured  
+    ✅ Error tracking and alerting set up  
+    ✅ Business metrics dashboards created  
+    ✅ Infrastructure monitoring enabled  
+    ✅ Security monitoring and incident response procedures documented
+  </Step>
+</Steps>
 
 ## Next Steps
 
+After completing this integration walkthrough:
+
 <CardGroup cols={2}>
-  <Card title="Implement Chamas" icon="users" href="/guides/chama-management">
-    Add community savings group functionality
+  <Card title="Advanced Features" icon="rocket">
+    Implement wealth coaching, youth accounts, cross-border payments, and alternative access channels
   </Card>
-  <Card title="Add Investments" icon="chart-line" href="/api-reference/investments/portfolio">
-    Integrate investment marketplace features
+  <Card title="Market Expansion" icon="globe">
+    Configure for additional SADC countries, local payment methods, and regulatory requirements
   </Card>
-  <Card title="Payment Processing" icon="credit-card" href="/guides/payment-processing">
-    Enable deposits, withdrawals, and transfers
+  <Card title="Performance Optimization" icon="gauge">
+    Implement advanced caching, database optimization, and mobile performance enhancements
   </Card>
-  <Card title="Advanced Features" icon="cog" href="/guides/best-practices">
-    Implement webhooks, notifications, and analytics
+  <Card title="Analytics Integration" icon="chart-bar">
+    Set up business intelligence, user behavior tracking, and financial performance monitoring
   </Card>
 </CardGroup>
 
-## Support
+---
 
-If you encounter any issues during integration:
+*This integration walkthrough provides a comprehensive foundation for building applications with AWO Platform. For specific implementation details, refer to the detailed guides for each feature area.*
 
-- Check our [Troubleshooting Guide](/guides/troubleshooting)
-- Review the complete [API Reference](/api-reference/auth/login)
-- Contact developer support: developers@awo-platform.com
-- Join our developer community on GitHub
-
-<Note>
-Remember to never expose your API keys in client-side code. Always use environment variables and secure server-side storage for sensitive credentials.
-</Note>
+*Need help? Contact our developer support team or join our Discord community for assistance.*
