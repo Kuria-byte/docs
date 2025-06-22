@@ -1,28 +1,2360 @@
----
-title: "Bank Integration"
-description: "Bank Integration implementation guide"
----
+# Bank Integration Guide
 
-# Bank Integration
-
-## Overview
-
-This guide documentation is coming soon.
+This comprehensive guide covers integrating AWO Platform with banking services across SADC markets using Open Banking APIs, including Stitch for South Africa and Nigeria, Mono for broader African coverage, and direct bank API integration strategies.
 
 <Info>
-This page is under development. Please check back later for complete implementation guide.
+Open Banking integration enables secure bank account linking, real-time transaction data synchronization, and payment initiation services essential for DIVA score calculation and financial insights across African markets.
 </Info>
 
-## Getting Started
+## Open Banking Landscape in Africa
 
-Step-by-step instructions will be added here.
+### Market Overview
 
-## Examples
+<CardGroup cols={2}>
+  <Card title="South Africa" icon="building">
+    **Leaders**: Stitch, Investec API, Standard Bank API  
+    **Regulation**: Open Banking framework developing  
+    **Coverage**: Major banks including FNB, Standard Bank, ABSA, Nedbank  
+    **Status**: Most mature African market
+  </Card>
+  <Card title="Nigeria" icon="wallet">
+    **Leaders**: Mono, Okra, Stitch  
+    **Regulation**: CBN Open Banking guidelines  
+    **Coverage**: Access Bank, GTBank, UBA, Zenith, First Bank  
+    **Status**: Rapidly developing ecosystem
+  </Card>
+  <Card title="Kenya" icon="mobile">
+    **Leaders**: Mono, Pesapal, iPay  
+    **Regulation**: CBN Digital Financial Services  
+    **Coverage**: KCB, Equity Bank, Co-op Bank, NCBA  
+    **Status**: Mobile-money dominated, API growth
+  </Card>
+  <Card title="Ghana" icon="coins">
+    **Leaders**: Mono, Hubtel  
+    **Regulation**: Bank of Ghana digitization push  
+    **Coverage**: GCB, Ecobank, Standard Chartered  
+    **Status**: Emerging Open Banking adoption
+  </Card>
+</CardGroup>
 
-Code examples and best practices will be provided.
+### AWO Integration Strategy
 
-## Next Steps
+**Primary Providers:**
+- **Stitch**: Primary for South Africa, secondary for Nigeria
+- **Mono**: Primary for Nigeria, Kenya, Ghana
+- **Direct APIs**: Bank-specific integrations where beneficial
+- **Fallback**: Screen scraping as last resort (deprecated)
 
-<Card title="Related Documentation" href="/api-reference/introduction">
-  Explore other sections of our documentation
-</Card>
+## Architecture Overview
+
+### Integration Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                AWO PLATFORM                             │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │         Banking Integration Layer                   │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐│ │
+│  │  │   Stitch    │ │    Mono     │ │  Direct Bank    ││ │
+│  │  │ Integration │ │ Integration │ │     APIs        ││ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                           │                             │
+│  ┌─────────────────────────▼─────────────────────────────┐ │
+│  │         Account Linking Service                     │ │
+│  │    ┌─────────────┐ ┌─────────────┐ ┌──────────────┐ │ │
+│  │    │   OAuth     │ │Account Mgmt │ │ Consent Mgmt │ │ │
+│  │    │   Handler   │ │   Service   │ │   Service    │ │ │
+│  │    └─────────────┘ └─────────────┘ └──────────────┘ │ │
+│  └─────────────────────────────────────────────────────┘ │
+│                           │                             │
+│  ┌─────────────────────────▼─────────────────────────────┐ │
+│  │      Transaction Processing Service                 │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐│ │
+│  │  │Transaction  │ │Categorization│ │   Data         ││ │
+│  │  │   Sync      │ │   Engine    │ │ Enrichment     ││ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                           │                             │
+│  ┌─────────────────────────▼─────────────────────────────┐ │
+│  │            DIVA Score Calculator                    │ │
+│  │         (Uses enriched transaction data)           │ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+
+External Services:
+┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐
+│   Stitch    │ │    Mono     │ │    Direct Bank APIs     │
+│     API     │ │     API     │ │  (FNB, GTBank, etc.)    │
+└─────────────┘ └─────────────┘ └─────────────────────────┘
+```
+
+## Database Schema
+
+### Banking Data Models
+
+Set up the required database tables for banking integration:
+
+```sql
+-- bank_providers table (supported banking providers)
+CREATE TABLE bank_providers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    provider_code VARCHAR(20) NOT NULL UNIQUE, -- 'stitch', 'mono', 'direct_fnb'
+    provider_name VARCHAR(100) NOT NULL,
+    country_code VARCHAR(2) NOT NULL,
+    provider_type VARCHAR(20) NOT NULL CHECK (provider_type IN ('aggregator', 'direct_api', 'screen_scraping')),
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'deprecated')),
+    
+    -- API Configuration
+    base_url VARCHAR(500) NOT NULL,
+    auth_type VARCHAR(20) NOT NULL CHECK (auth_type IN ('oauth2', 'api_key', 'basic_auth')),
+    sandbox_base_url VARCHAR(500),
+    
+    -- Capabilities
+    supports_account_linking BOOLEAN NOT NULL DEFAULT true,
+    supports_transaction_history BOOLEAN NOT NULL DEFAULT true,
+    supports_balance_inquiry BOOLEAN NOT NULL DEFAULT true,
+    supports_payment_initiation BOOLEAN NOT NULL DEFAULT false,
+    
+    -- Rate limiting
+    rate_limit_per_minute INTEGER DEFAULT 60,
+    rate_limit_per_hour INTEGER DEFAULT 1000,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- supported_banks table (individual banks per provider)
+CREATE TABLE supported_banks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    provider_id UUID NOT NULL REFERENCES bank_providers(id),
+    bank_code VARCHAR(50) NOT NULL,
+    bank_name VARCHAR(200) NOT NULL,
+    country_code VARCHAR(2) NOT NULL,
+    bank_logo_url VARCHAR(500),
+    
+    -- Bank-specific settings
+    supports_instant_verification BOOLEAN NOT NULL DEFAULT false,
+    supports_real_time_transactions BOOLEAN NOT NULL DEFAULT false,
+    average_linking_time_seconds INTEGER DEFAULT 300,
+    
+    -- Status and availability
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'maintenance', 'deprecated')),
+    availability_percentage DECIMAL(5,2) DEFAULT 99.0,
+    
+    -- Display settings
+    display_order INTEGER DEFAULT 100,
+    is_popular BOOLEAN NOT NULL DEFAULT false,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    UNIQUE(provider_id, bank_code)
+);
+
+-- user_bank_accounts table (linked bank accounts)
+CREATE TABLE user_bank_accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    provider_id UUID NOT NULL REFERENCES bank_providers(id),
+    bank_id UUID NOT NULL REFERENCES supported_banks(id),
+    
+    -- External provider data
+    external_account_id VARCHAR(200) NOT NULL,
+    external_user_id VARCHAR(200),
+    
+    -- Account details
+    account_number VARCHAR(50),
+    account_name VARCHAR(200),
+    account_type VARCHAR(50), -- 'checking', 'savings', 'credit', 'investment'
+    bank_name VARCHAR(200) NOT NULL,
+    branch_code VARCHAR(20),
+    
+    -- Currency and balance
+    currency VARCHAR(3) NOT NULL,
+    current_balance DECIMAL(15,2),
+    available_balance DECIMAL(15,2),
+    last_balance_update TIMESTAMP,
+    
+    -- Linking status
+    status VARCHAR(20) NOT NULL DEFAULT 'linked' CHECK (status IN ('linking', 'linked', 'expired', 'error', 'revoked')),
+    consent_expires_at TIMESTAMP,
+    last_successful_sync TIMESTAMP,
+    
+    -- Sync settings
+    auto_sync_enabled BOOLEAN NOT NULL DEFAULT true,
+    sync_frequency_hours INTEGER DEFAULT 24,
+    transaction_history_days INTEGER DEFAULT 365,
+    
+    -- Metadata
+    linked_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    last_error_message TEXT,
+    last_error_at TIMESTAMP,
+    retry_count INTEGER DEFAULT 0,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    UNIQUE(user_id, external_account_id, provider_id)
+);
+
+-- bank_transactions table (synchronized transaction data)
+CREATE TABLE bank_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_bank_account_id UUID NOT NULL REFERENCES user_bank_accounts(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    
+    -- External provider data
+    external_transaction_id VARCHAR(200) NOT NULL,
+    provider_id UUID NOT NULL REFERENCES bank_providers(id),
+    
+    -- Transaction details
+    amount DECIMAL(15,2) NOT NULL,
+    currency VARCHAR(3) NOT NULL,
+    transaction_date DATE NOT NULL,
+    posted_date DATE,
+    description TEXT NOT NULL,
+    reference VARCHAR(200),
+    
+    -- Transaction classification
+    transaction_type VARCHAR(20) NOT NULL CHECK (transaction_type IN ('debit', 'credit')),
+    category VARCHAR(50),
+    subcategory VARCHAR(50),
+    merchant_name VARCHAR(200),
+    
+    -- Balance information
+    balance_after DECIMAL(15,2),
+    running_balance DECIMAL(15,2),
+    
+    -- Enhanced data
+    location JSONB, -- Geographic data if available
+    additional_data JSONB, -- Provider-specific additional fields
+    
+    -- AWO processing
+    is_processed BOOLEAN NOT NULL DEFAULT false,
+    processed_at TIMESTAMP,
+    diva_category VARCHAR(30), -- 'income', 'expense', 'transfer', 'investment'
+    diva_subcategory VARCHAR(50),
+    confidence_score DECIMAL(3,2) DEFAULT 0.85, -- Categorization confidence
+    
+    -- Deduplication
+    hash_signature VARCHAR(64), -- For detecting duplicates
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    UNIQUE(user_bank_account_id, external_transaction_id)
+);
+
+-- bank_sync_logs table (sync operation tracking)
+CREATE TABLE bank_sync_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_bank_account_id UUID NOT NULL REFERENCES user_bank_accounts(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    provider_id UUID NOT NULL REFERENCES bank_providers(id),
+    
+    -- Sync operation details
+    sync_type VARCHAR(20) NOT NULL CHECK (sync_type IN ('manual', 'scheduled', 'webhook', 'real_time')),
+    status VARCHAR(20) NOT NULL CHECK (status IN ('started', 'completed', 'failed', 'partial')),
+    
+    -- Sync metrics
+    transactions_fetched INTEGER DEFAULT 0,
+    transactions_new INTEGER DEFAULT 0,
+    transactions_updated INTEGER DEFAULT 0,
+    transactions_duplicates INTEGER DEFAULT 0,
+    
+    -- Timing
+    started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMP,
+    duration_seconds INTEGER,
+    
+    -- Error handling
+    error_message TEXT,
+    error_code VARCHAR(50),
+    retry_attempt INTEGER DEFAULT 0,
+    
+    -- API usage
+    api_calls_made INTEGER DEFAULT 0,
+    rate_limit_hit BOOLEAN DEFAULT false,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- consent_management table (OAuth and consent tracking)
+CREATE TABLE consent_management (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    provider_id UUID NOT NULL REFERENCES bank_providers(id),
+    
+    -- Consent details
+    consent_id VARCHAR(200) NOT NULL,
+    consent_type VARCHAR(30) NOT NULL CHECK (consent_type IN ('account_access', 'payment_initiation', 'account_information')),
+    status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'authorized', 'rejected', 'expired', 'revoked')),
+    
+    -- OAuth flow
+    authorization_code VARCHAR(500),
+    access_token_hash VARCHAR(64), -- Store hash, not actual token
+    refresh_token_hash VARCHAR(64),
+    token_expires_at TIMESTAMP,
+    
+    -- Permissions granted
+    permissions JSONB NOT NULL, -- Array of specific permissions
+    granted_at TIMESTAMP,
+    expires_at TIMESTAMP,
+    
+    -- User consent
+    user_consent_ip VARCHAR(45),
+    user_consent_user_agent TEXT,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    UNIQUE(user_id, provider_id, consent_id)
+);
+
+-- Indexes for performance
+CREATE INDEX idx_user_bank_accounts_user_id ON user_bank_accounts(user_id);
+CREATE INDEX idx_user_bank_accounts_status ON user_bank_accounts(status);
+CREATE INDEX idx_user_bank_accounts_provider ON user_bank_accounts(provider_id);
+CREATE INDEX idx_bank_transactions_user_account ON bank_transactions(user_bank_account_id);
+CREATE INDEX idx_bank_transactions_user_id ON bank_transactions(user_id);
+CREATE INDEX idx_bank_transactions_date ON bank_transactions(transaction_date);
+CREATE INDEX idx_bank_transactions_type ON bank_transactions(transaction_type);
+CREATE INDEX idx_bank_transactions_category ON bank_transactions(category);
+CREATE INDEX idx_bank_transactions_processed ON bank_transactions(is_processed);
+CREATE INDEX idx_bank_sync_logs_account ON bank_sync_logs(user_bank_account_id);
+CREATE INDEX idx_bank_sync_logs_status ON bank_sync_logs(status);
+CREATE INDEX idx_consent_management_user ON consent_management(user_id);
+CREATE INDEX idx_consent_management_status ON consent_management(status);
+
+-- Insert default providers
+INSERT INTO bank_providers (provider_code, provider_name, country_code, provider_type, base_url, auth_type, supports_payment_initiation) VALUES
+('stitch', 'Stitch', 'ZA', 'aggregator', 'https://api.stitch.money', 'oauth2', true),
+('mono', 'Mono', 'NG', 'aggregator', 'https://api.withmono.com', 'oauth2', false),
+('stitch_ng', 'Stitch Nigeria', 'NG', 'aggregator', 'https://api.stitch.money', 'oauth2', true);
+```
+
+## Core Banking Service Implementation
+
+### Banking Integration Service
+
+```typescript
+// banking-service.ts
+import { DatabaseService } from './database-service';
+import { StitchProvider } from './providers/stitch-provider';
+import { MonoProvider } from './providers/mono-provider';
+import { EncryptionService } from './encryption-service';
+import { EventEmitter } from 'events';
+
+export interface BankAccount {
+  id: string;
+  external_account_id: string;
+  account_number: string;
+  account_name: string;
+  account_type: string;
+  bank_name: string;
+  currency: string;
+  current_balance: number;
+  available_balance: number;
+  status: string;
+  linked_at: string;
+  last_successful_sync: string;
+}
+
+export interface Transaction {
+  id: string;
+  external_transaction_id: string;
+  amount: number;
+  currency: string;
+  transaction_date: string;
+  description: string;
+  transaction_type: 'debit' | 'credit';
+  category: string;
+  merchant_name?: string;
+  balance_after: number;
+}
+
+export interface AccountLinkingRequest {
+  user_id: string;
+  provider_code: string;
+  bank_code?: string;
+  redirect_url: string;
+  permissions: string[];
+}
+
+export interface AccountLinkingResult {
+  authorization_url: string;
+  consent_id: string;
+  expires_at: string;
+  state: string;
+}
+
+export class BankingService extends EventEmitter {
+  private providers: Map<string, any> = new Map();
+
+  constructor(
+    private db: DatabaseService,
+    private encryption: EncryptionService
+  ) {
+    super();
+    this.initializeProviders();
+  }
+
+  private initializeProviders(): void {
+    // Initialize Stitch provider
+    this.providers.set('stitch', new StitchProvider({
+      clientId: process.env.STITCH_CLIENT_ID!,
+      clientSecret: process.env.STITCH_CLIENT_SECRET!,
+      environment: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+      webhookSecret: process.env.STITCH_WEBHOOK_SECRET!
+    }));
+
+    // Initialize Mono provider
+    this.providers.set('mono', new MonoProvider({
+      secretKey: process.env.MONO_SECRET_KEY!,
+      environment: process.env.NODE_ENV === 'production' ? 'production' : 'test',
+      webhookSecret: process.env.MONO_WEBHOOK_SECRET!
+    }));
+  }
+
+  async getSupportedBanks(countryCode: string): Promise<Array<{
+    provider_code: string;
+    provider_name: string;
+    banks: Array<{
+      bank_code: string;
+      bank_name: string;
+      bank_logo_url: string;
+      supports_instant_verification: boolean;
+      is_popular: boolean;
+    }>;
+  }>> {
+    const providers = await this.db.query(`
+      SELECT bp.*, array_agg(
+        json_build_object(
+          'bank_code', sb.bank_code,
+          'bank_name', sb.bank_name,
+          'bank_logo_url', sb.bank_logo_url,
+          'supports_instant_verification', sb.supports_instant_verification,
+          'is_popular', sb.is_popular
+        ) ORDER BY sb.display_order, sb.bank_name
+      ) as banks
+      FROM bank_providers bp
+      JOIN supported_banks sb ON bp.id = sb.provider_id
+      WHERE bp.country_code = $1 
+        AND bp.status = 'active'
+        AND sb.status = 'active'
+      GROUP BY bp.id, bp.provider_code, bp.provider_name
+      ORDER BY bp.provider_code
+    `, [countryCode]);
+
+    return providers.map(p => ({
+      provider_code: p.provider_code,
+      provider_name: p.provider_name,
+      banks: p.banks
+    }));
+  }
+
+  async initiateAccountLinking(request: AccountLinkingRequest): Promise<AccountLinkingResult> {
+    const provider = this.providers.get(request.provider_code);
+    if (!provider) {
+      throw new Error(`Unsupported provider: ${request.provider_code}`);
+    }
+
+    // Validate user can link more accounts
+    await this.validateAccountLinkingEligibility(request.user_id);
+
+    // Get provider configuration
+    const providerConfig = await this.db.queryOne(`
+      SELECT * FROM bank_providers 
+      WHERE provider_code = $1 AND status = 'active'
+    `, [request.provider_code]);
+
+    if (!providerConfig) {
+      throw new Error('Provider not available');
+    }
+
+    // Initiate OAuth flow with provider
+    const linkingResult = await provider.initiateAccountLinking({
+      user_id: request.user_id,
+      bank_code: request.bank_code,
+      redirect_url: request.redirect_url,
+      permissions: request.permissions,
+      webhook_url: `${process.env.AWO_WEBHOOK_BASE_URL}/webhooks/banking/${request.provider_code}`
+    });
+
+    // Store consent request
+    await this.db.query(`
+      INSERT INTO consent_management (
+        user_id, provider_id, consent_id, consent_type, 
+        status, permissions, expires_at
+      ) VALUES ($1, $2, $3, 'account_access', 'pending', $4, $5)
+    `, [
+      request.user_id,
+      providerConfig.id,
+      linkingResult.consent_id,
+      JSON.stringify(request.permissions),
+      linkingResult.expires_at
+    ]);
+
+    // Emit event for tracking
+    this.emit('accountLinkingInitiated', {
+      user_id: request.user_id,
+      provider_code: request.provider_code,
+      consent_id: linkingResult.consent_id
+    });
+
+    return linkingResult;
+  }
+
+  async completeAccountLinking(
+    userId: string,
+    providerCode: string,
+    authorizationCode: string,
+    consentId: string
+  ): Promise<{ accounts: BankAccount[]; sync_initiated: boolean }> {
+    
+    const provider = this.providers.get(providerCode);
+    if (!provider) {
+      throw new Error(`Unsupported provider: ${providerCode}`);
+    }
+
+    try {
+      // Exchange authorization code for access token
+      const tokenResponse = await provider.exchangeAuthorizationCode(authorizationCode, consentId);
+
+      // Get user's bank accounts
+      const accounts = await provider.getAccounts(tokenResponse.access_token);
+
+      // Store accounts in database
+      const savedAccounts = await this.storeLinkedAccounts(
+        userId,
+        providerCode,
+        accounts,
+        tokenResponse,
+        consentId
+      );
+
+      // Update consent status
+      await this.updateConsentStatus(userId, providerCode, consentId, 'authorized', tokenResponse);
+
+      // Initiate initial transaction sync
+      const syncPromises = savedAccounts.map(account => 
+        this.initiateTransactionSync(account.id, 'initial')
+      );
+      await Promise.allSettled(syncPromises);
+
+      // Emit success event
+      this.emit('accountLinkingCompleted', {
+        user_id: userId,
+        provider_code: providerCode,
+        accounts_linked: savedAccounts.length,
+        consent_id: consentId
+      });
+
+      return {
+        accounts: savedAccounts,
+        sync_initiated: true
+      };
+
+    } catch (error) {
+      // Update consent status to failed
+      await this.updateConsentStatus(userId, providerCode, consentId, 'rejected');
+      
+      // Emit error event
+      this.emit('accountLinkingFailed', {
+        user_id: userId,
+        provider_code: providerCode,
+        consent_id: consentId,
+        error: error.message
+      });
+
+      throw error;
+    }
+  }
+
+  async getUserBankAccounts(userId: string): Promise<BankAccount[]> {
+    const accounts = await this.db.query(`
+      SELECT 
+        uba.*,
+        bp.provider_code,
+        bp.provider_name,
+        sb.bank_name,
+        sb.bank_logo_url
+      FROM user_bank_accounts uba
+      JOIN bank_providers bp ON uba.provider_id = bp.id
+      JOIN supported_banks sb ON uba.bank_id = sb.id
+      WHERE uba.user_id = $1 
+        AND uba.status IN ('linked', 'linking')
+      ORDER BY uba.linked_at DESC
+    `, [userId]);
+
+    return accounts.map(this.transformAccountData);
+  }
+
+  async syncAccountTransactions(
+    accountId: string,
+    syncType: 'manual' | 'scheduled' = 'manual'
+  ): Promise<{
+    success: boolean;
+    transactions_synced: number;
+    new_transactions: number;
+    sync_duration: number;
+  }> {
+    
+    const startTime = Date.now();
+    const syncId = await this.createSyncLog(accountId, syncType);
+
+    try {
+      // Get account details
+      const account = await this.db.queryOne(`
+        SELECT uba.*, bp.provider_code, cm.access_token_hash
+        FROM user_bank_accounts uba
+        JOIN bank_providers bp ON uba.provider_id = bp.id
+        JOIN consent_management cm ON uba.user_id = cm.user_id 
+          AND uba.provider_id = cm.provider_id
+        WHERE uba.id = $1 AND cm.status = 'authorized'
+      `, [accountId]);
+
+      if (!account) {
+        throw new Error('Account not found or not authorized');
+      }
+
+      const provider = this.providers.get(account.provider_code);
+      if (!provider) {
+        throw new Error(`Provider ${account.provider_code} not available`);
+      }
+
+      // Get access token (decrypt from storage)
+      const accessToken = await this.getDecryptedAccessToken(account.access_token_hash);
+
+      // Fetch transactions from provider
+      const transactions = await provider.getTransactions(
+        accessToken,
+        account.external_account_id,
+        {
+          from: this.getLastSyncDate(account),
+          to: new Date(),
+          limit: 1000
+        }
+      );
+
+      // Process and store transactions
+      const processResult = await this.processTransactions(accountId, transactions);
+
+      // Update account balance
+      if (transactions.length > 0) {
+        await this.updateAccountBalance(accountId, transactions[0].balance_after);
+      }
+
+      // Complete sync log
+      const duration = Math.round((Date.now() - startTime) / 1000);
+      await this.completeSyncLog(syncId, 'completed', {
+        transactions_fetched: transactions.length,
+        transactions_new: processResult.new_transactions,
+        transactions_updated: processResult.updated_transactions,
+        duration_seconds: duration
+      });
+
+      // Update last successful sync
+      await this.db.query(`
+        UPDATE user_bank_accounts 
+        SET last_successful_sync = NOW() 
+        WHERE id = $1
+      `, [accountId]);
+
+      // Emit sync completed event
+      this.emit('transactionsSynced', {
+        account_id: accountId,
+        user_id: account.user_id,
+        transactions_synced: transactions.length,
+        new_transactions: processResult.new_transactions
+      });
+
+      return {
+        success: true,
+        transactions_synced: transactions.length,
+        new_transactions: processResult.new_transactions,
+        sync_duration: duration
+      };
+
+    } catch (error) {
+      // Log sync failure
+      await this.completeSyncLog(syncId, 'failed', {
+        error_message: error.message,
+        duration_seconds: Math.round((Date.now() - startTime) / 1000)
+      });
+
+      // Emit sync failed event
+      this.emit('transactionSyncFailed', {
+        account_id: accountId,
+        error: error.message
+      });
+
+      throw error;
+    }
+  }
+
+  async getAccountTransactions(
+    userId: string,
+    accountId: string,
+    options: {
+      from_date?: string;
+      to_date?: string;
+      limit?: number;
+      offset?: number;
+      category?: string;
+    } = {}
+  ): Promise<{
+    transactions: Transaction[];
+    total_count: number;
+    pagination: {
+      limit: number;
+      offset: number;
+      has_more: boolean;
+    };
+  }> {
+    
+    // Verify user owns the account
+    await this.validateAccountOwnership(userId, accountId);
+
+    const {
+      from_date,
+      to_date,
+      limit = 50,
+      offset = 0,
+      category
+    } = options;
+
+    // Build query conditions
+    const conditions = ['bt.user_id = $1', 'bt.user_bank_account_id = $2'];
+    const params = [userId, accountId];
+    let paramCount = 2;
+
+    if (from_date) {
+      conditions.push(`bt.transaction_date >= $${++paramCount}`);
+      params.push(from_date);
+    }
+
+    if (to_date) {
+      conditions.push(`bt.transaction_date <= $${++paramCount}`);
+      params.push(to_date);
+    }
+
+    if (category) {
+      conditions.push(`bt.category = $${++paramCount}`);
+      params.push(category);
+    }
+
+    // Get total count
+    const countResult = await this.db.queryOne(`
+      SELECT COUNT(*) as total
+      FROM bank_transactions bt
+      WHERE ${conditions.join(' AND ')}
+    `, params);
+
+    // Get transactions
+    const transactions = await this.db.query(`
+      SELECT 
+        bt.*,
+        uba.bank_name,
+        uba.account_number
+      FROM bank_transactions bt
+      JOIN user_bank_accounts uba ON bt.user_bank_account_id = uba.id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY bt.transaction_date DESC, bt.created_at DESC
+      LIMIT $${++paramCount} OFFSET $${++paramCount}
+    `, [...params, limit, offset]);
+
+    return {
+      transactions: transactions.map(this.transformTransactionData),
+      total_count: parseInt(countResult.total),
+      pagination: {
+        limit,
+        offset,
+        has_more: offset + limit < parseInt(countResult.total)
+      }
+    };
+  }
+
+  async categorizeTransactions(userId: string, accountId?: string): Promise<{
+    categorized_count: number;
+    categories_assigned: string[];
+  }> {
+    
+    // Get uncategorized transactions
+    const whereClause = accountId 
+      ? 'WHERE bt.user_id = $1 AND bt.user_bank_account_id = $2 AND bt.category IS NULL'
+      : 'WHERE bt.user_id = $1 AND bt.category IS NULL';
+    
+    const params = accountId ? [userId, accountId] : [userId];
+
+    const transactions = await this.db.query(`
+      SELECT id, description, amount, transaction_type, merchant_name
+      FROM bank_transactions bt
+      ${whereClause}
+      LIMIT 1000
+    `, params);
+
+    if (transactions.length === 0) {
+      return { categorized_count: 0, categories_assigned: [] };
+    }
+
+    // Categorize transactions using rule-based engine
+    const categorizedTransactions = await this.categorizeTransactionBatch(transactions);
+    
+    // Update transactions with categories
+    for (const transaction of categorizedTransactions) {
+      await this.db.query(`
+        UPDATE bank_transactions 
+        SET 
+          category = $1,
+          subcategory = $2,
+          diva_category = $3,
+          diva_subcategory = $4,
+          confidence_score = $5,
+          is_processed = true,
+          processed_at = NOW()
+        WHERE id = $6
+      `, [
+        transaction.category,
+        transaction.subcategory,
+        transaction.diva_category,
+        transaction.diva_subcategory,
+        transaction.confidence_score,
+        transaction.id
+      ]);
+    }
+
+    const uniqueCategories = [...new Set(categorizedTransactions.map(t => t.category))];
+
+    // Emit categorization completed event
+    this.emit('transactionsCategorized', {
+      user_id: userId,
+      account_id: accountId,
+      categorized_count: categorizedTransactions.length,
+      categories: uniqueCategories
+    });
+
+    return {
+      categorized_count: categorizedTransactions.length,
+      categories_assigned: uniqueCategories
+    };
+  }
+
+  async revokeAccountAccess(userId: string, accountId: string): Promise<{ success: boolean }> {
+    const account = await this.db.queryOne(`
+      SELECT uba.*, bp.provider_code, cm.consent_id
+      FROM user_bank_accounts uba
+      JOIN bank_providers bp ON uba.provider_id = bp.id
+      JOIN consent_management cm ON uba.user_id = cm.user_id 
+        AND uba.provider_id = cm.provider_id
+      WHERE uba.id = $1 AND uba.user_id = $2
+    `, [accountId, userId]);
+
+    if (!account) {
+      throw new Error('Account not found');
+    }
+
+    try {
+      const provider = this.providers.get(account.provider_code);
+      
+      // Revoke consent with provider
+      if (provider && account.consent_id) {
+        await provider.revokeConsent(account.consent_id);
+      }
+
+      // Update database
+      await this.db.transaction(async (trx) => {
+        // Update account status
+        await trx('user_bank_accounts')
+          .where('id', accountId)
+          .update({ 
+            status: 'revoked',
+            updated_at: new Date()
+          });
+
+        // Update consent status
+        await trx('consent_management')
+          .where('user_id', userId)
+          .where('provider_id', account.provider_id)
+          .update({ 
+            status: 'revoked',
+            updated_at: new Date()
+          });
+      });
+
+      // Emit revocation event
+      this.emit('accountAccessRevoked', {
+        user_id: userId,
+        account_id: accountId,
+        provider_code: account.provider_code
+      });
+
+      return { success: true };
+
+    } catch (error) {
+      throw new Error(`Failed to revoke account access: ${error.message}`);
+    }
+  }
+
+  // Helper methods
+  private async validateAccountLinkingEligibility(userId: string): Promise<void> {
+    const linkedCount = await this.db.queryOne(`
+      SELECT COUNT(*) as count
+      FROM user_bank_accounts
+      WHERE user_id = $1 AND status IN ('linked', 'linking')
+    `, [userId]);
+
+    if (linkedCount.count >= 5) { // Maximum 5 linked accounts
+      throw new Error('Maximum number of linked accounts reached');
+    }
+  }
+
+  private async storeLinkedAccounts(
+    userId: string,
+    providerCode: string,
+    accounts: any[],
+    tokenResponse: any,
+    consentId: string
+  ): Promise<BankAccount[]> {
+    
+    const provider = await this.db.queryOne(`
+      SELECT id FROM bank_providers WHERE provider_code = $1
+    `, [providerCode]);
+
+    const savedAccounts: BankAccount[] = [];
+
+    for (const account of accounts) {
+      // Find matching bank
+      const bank = await this.db.queryOne(`
+        SELECT id FROM supported_banks 
+        WHERE provider_id = $1 AND bank_code = $2
+      `, [provider.id, account.bank_code]);
+
+      if (!bank) {
+        console.warn(`Bank not found: ${account.bank_code} for provider ${providerCode}`);
+        continue;
+      }
+
+      // Insert account
+      const [savedAccount] = await this.db.query(`
+        INSERT INTO user_bank_accounts (
+          user_id, provider_id, bank_id, external_account_id,
+          account_number, account_name, account_type, bank_name,
+          currency, current_balance, available_balance, status,
+          consent_expires_at, auto_sync_enabled
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING *
+      `, [
+        userId,
+        provider.id,
+        bank.id,
+        account.id,
+        account.account_number,
+        account.account_name,
+        account.account_type,
+        account.bank_name,
+        account.currency,
+        account.current_balance,
+        account.available_balance,
+        'linked',
+        tokenResponse.expires_at,
+        true
+      ]);
+
+      savedAccounts.push(this.transformAccountData(savedAccount));
+    }
+
+    return savedAccounts;
+  }
+
+  private async processTransactions(accountId: string, transactions: any[]): Promise<{
+    new_transactions: number;
+    updated_transactions: number;
+    duplicates: number;
+  }> {
+    
+    let newCount = 0;
+    let updatedCount = 0;
+    let duplicateCount = 0;
+
+    for (const transaction of transactions) {
+      const hashSignature = this.generateTransactionHash(transaction);
+      
+      // Check for existing transaction
+      const existing = await this.db.queryOne(`
+        SELECT id FROM bank_transactions
+        WHERE user_bank_account_id = $1 
+          AND external_transaction_id = $2
+      `, [accountId, transaction.id]);
+
+      if (existing) {
+        duplicateCount++;
+        continue;
+      }
+
+      // Insert new transaction
+      await this.db.query(`
+        INSERT INTO bank_transactions (
+          user_bank_account_id, user_id, external_transaction_id,
+          provider_id, amount, currency, transaction_date,
+          description, reference, transaction_type, balance_after,
+          hash_signature, additional_data
+        ) 
+        SELECT $1, uba.user_id, $2, uba.provider_id, $3, $4, $5, $6, $7, $8, $9, $10, $11
+        FROM user_bank_accounts uba 
+        WHERE uba.id = $1
+      `, [
+        accountId,
+        transaction.id,
+        transaction.amount,
+        transaction.currency,
+        transaction.date,
+        transaction.description,
+        transaction.reference,
+        transaction.amount < 0 ? 'debit' : 'credit',
+        transaction.balance,
+        hashSignature,
+        JSON.stringify(transaction.additional_data || {})
+      ]);
+
+      newCount++;
+    }
+
+    return {
+      new_transactions: newCount,
+      updated_transactions: updatedCount,
+      duplicates: duplicateCount
+    };
+  }
+
+  private generateTransactionHash(transaction: any): string {
+    const crypto = require('crypto');
+    const data = `${transaction.date}-${transaction.amount}-${transaction.description}-${transaction.reference || ''}`;
+    return crypto.createHash('sha256').update(data).digest('hex');
+  }
+
+  private transformAccountData(raw: any): BankAccount {
+    return {
+      id: raw.id,
+      external_account_id: raw.external_account_id,
+      account_number: raw.account_number,
+      account_name: raw.account_name,
+      account_type: raw.account_type,
+      bank_name: raw.bank_name,
+      currency: raw.currency,
+      current_balance: parseFloat(raw.current_balance || '0'),
+      available_balance: parseFloat(raw.available_balance || '0'),
+      status: raw.status,
+      linked_at: raw.linked_at,
+      last_successful_sync: raw.last_successful_sync
+    };
+  }
+
+  private transformTransactionData(raw: any): Transaction {
+    return {
+      id: raw.id,
+      external_transaction_id: raw.external_transaction_id,
+      amount: parseFloat(raw.amount),
+      currency: raw.currency,
+      transaction_date: raw.transaction_date,
+      description: raw.description,
+      transaction_type: raw.transaction_type,
+      category: raw.category,
+      merchant_name: raw.merchant_name,
+      balance_after: parseFloat(raw.balance_after || '0')
+    };
+  }
+}
+```
+
+## Provider-Specific Implementations
+
+### Stitch Provider Implementation
+
+```typescript
+// providers/stitch-provider.ts
+import axios, { AxiosInstance } from 'axios';
+import { BankingProvider } from './banking-provider-interface';
+
+export interface StitchConfig {
+  clientId: string;
+  clientSecret: string;
+  environment: 'sandbox' | 'production';
+  webhookSecret: string;
+}
+
+export class StitchProvider implements BankingProvider {
+  private client: AxiosInstance;
+  private baseURL: string;
+
+  constructor(private config: StitchConfig) {
+    this.baseURL = config.environment === 'production' 
+      ? 'https://api.stitch.money' 
+      : 'https://api.sandbox.stitch.money';
+    
+    this.client = axios.create({
+      baseURL: this.baseURL,
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'AWO-Platform/1.0'
+      }
+    });
+
+    this.setupInterceptors();
+  }
+
+  async initiateAccountLinking(params: {
+    user_id: string;
+    bank_code?: string;
+    redirect_url: string;
+    permissions: string[];
+    webhook_url: string;
+  }): Promise<{
+    authorization_url: string;
+    consent_id: string;
+    expires_at: string;
+    state: string;
+  }> {
+    
+    // Get client token for API access
+    const clientToken = await this.getClientToken();
+
+    // Create account linking request
+    const response = await this.client.post('/graphql', {
+      query: `
+        mutation CreateAccountLinkingRequest($input: CreateAccountLinkingRequestInput!) {
+          clientAccountLinkingRequestCreate(input: $input) {
+            accountLinkingRequest {
+              id
+              url
+              expiresAt
+            }
+          }
+        }
+      `,
+      variables: {
+        input: {
+          redirectUri: params.redirect_url,
+          webhookUri: params.webhook_url,
+          permissions: {
+            accounts: params.permissions.includes('accounts'),
+            transactions: params.permissions.includes('transactions'),
+            balance: params.permissions.includes('balance')
+          },
+          state: params.user_id,
+          bankId: params.bank_code
+        }
+      }
+    }, {
+      headers: { Authorization: `Bearer ${clientToken}` }
+    });
+
+    const linkingRequest = response.data.data.clientAccountLinkingRequestCreate.accountLinkingRequest;
+
+    return {
+      authorization_url: linkingRequest.url,
+      consent_id: linkingRequest.id,
+      expires_at: linkingRequest.expiresAt,
+      state: params.user_id
+    };
+  }
+
+  async exchangeAuthorizationCode(authCode: string, consentId: string): Promise<{
+    access_token: string;
+    token_type: string;
+    expires_in: number;
+    expires_at: string;
+    refresh_token?: string;
+  }> {
+    
+    const response = await this.client.post('/connect/token', {
+      grant_type: 'authorization_code',
+      client_id: this.config.clientId,
+      client_secret: this.config.clientSecret,
+      code: authCode,
+      redirect_uri: 'unused' // Stitch doesn't validate this for server-side flows
+    }, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+
+    const tokenData = response.data;
+    const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000));
+
+    return {
+      access_token: tokenData.access_token,
+      token_type: tokenData.token_type,
+      expires_in: tokenData.expires_in,
+      expires_at: expiresAt.toISOString(),
+      refresh_token: tokenData.refresh_token
+    };
+  }
+
+  async getAccounts(accessToken: string): Promise<Array<{
+    id: string;
+    account_number: string;
+    account_name: string;
+    account_type: string;
+    bank_name: string;
+    bank_code: string;
+    currency: string;
+    current_balance: number;
+    available_balance: number;
+  }>> {
+    
+    const response = await this.client.post('/graphql', {
+      query: `
+        query GetUserBankAccounts {
+          user {
+            bankAccounts {
+              id
+              name
+              accountNumber
+              accountType
+              currentBalance
+              availableBalance
+              currency
+              bank {
+                id
+                name
+                logo
+              }
+            }
+          }
+        }
+      `
+    }, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    const accounts = response.data.data.user.bankAccounts;
+
+    return accounts.map(account => ({
+      id: account.id,
+      account_number: account.accountNumber,
+      account_name: account.name,
+      account_type: account.accountType.toLowerCase(),
+      bank_name: account.bank.name,
+      bank_code: account.bank.id,
+      currency: account.currency,
+      current_balance: account.currentBalance / 100, // Stitch returns cents
+      available_balance: account.availableBalance / 100
+    }));
+  }
+
+  async getTransactions(
+    accessToken: string,
+    accountId: string,
+    options: {
+      from: Date;
+      to: Date;
+      limit?: number;
+    }
+  ): Promise<Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    date: string;
+    description: string;
+    reference?: string;
+    balance: number;
+    transaction_type: 'debit' | 'credit';
+    additional_data?: any;
+  }>> {
+    
+    const response = await this.client.post('/graphql', {
+      query: `
+        query GetBankAccountTransactions($accountId: ID!, $from: Date!, $to: Date!, $first: Int) {
+          node(id: $accountId) {
+            ... on BankAccount {
+              transactions(from: $from, to: $to, first: $first) {
+                edges {
+                  node {
+                    id
+                    amount
+                    currency
+                    date
+                    description
+                    reference
+                    runningBalance
+                    category {
+                      name
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `,
+      variables: {
+        accountId,
+        from: options.from.toISOString().split('T')[0],
+        to: options.to.toISOString().split('T')[0],
+        first: options.limit || 100
+      }
+    }, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    const transactions = response.data.data.node.transactions.edges;
+
+    return transactions.map(edge => {
+      const transaction = edge.node;
+      return {
+        id: transaction.id,
+        amount: transaction.amount / 100, // Convert from cents
+        currency: transaction.currency,
+        date: transaction.date,
+        description: transaction.description,
+        reference: transaction.reference,
+        balance: transaction.runningBalance / 100,
+        transaction_type: transaction.amount < 0 ? 'debit' : 'credit',
+        additional_data: {
+          category: transaction.category?.name
+        }
+      };
+    });
+  }
+
+  async refreshAccessToken(refreshToken: string): Promise<{
+    access_token: string;
+    expires_in: number;
+    expires_at: string;
+  }> {
+    
+    const response = await this.client.post('/connect/token', {
+      grant_type: 'refresh_token',
+      client_id: this.config.clientId,
+      client_secret: this.config.clientSecret,
+      refresh_token: refreshToken
+    }, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+
+    const tokenData = response.data;
+    const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000));
+
+    return {
+      access_token: tokenData.access_token,
+      expires_in: tokenData.expires_in,
+      expires_at: expiresAt.toISOString()
+    };
+  }
+
+  async revokeConsent(consentId: string): Promise<void> {
+    const clientToken = await this.getClientToken();
+
+    await this.client.post('/graphql', {
+      query: `
+        mutation DeleteAccountLinkingRequest($id: ID!) {
+          clientAccountLinkingRequestDelete(input: { id: $id }) {
+            success
+          }
+        }
+      `,
+      variables: { id: consentId }
+    }, {
+      headers: { Authorization: `Bearer ${clientToken}` }
+    });
+  }
+
+  async verifyWebhook(payload: string, signature: string): Promise<boolean> {
+    const crypto = require('crypto');
+    const expectedSignature = crypto
+      .createHmac('sha256', this.config.webhookSecret)
+      .update(payload)
+      .digest('hex');
+
+    return signature === `sha256=${expectedSignature}`;
+  }
+
+  // Private helper methods
+  private async getClientToken(): Promise<string> {
+    const response = await this.client.post('/connect/token', {
+      grant_type: 'client_credentials',
+      client_id: this.config.clientId,
+      client_secret: this.config.clientSecret,
+      scope: 'client_accounts'
+    }, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+
+    return response.data.access_token;
+  }
+
+  private setupInterceptors(): void {
+    // Request interceptor for logging
+    this.client.interceptors.request.use(
+      (config) => {
+        console.log(`Stitch API Request: ${config.method?.toUpperCase()} ${config.url}`);
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    // Response interceptor for error handling
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response) {
+          console.error('Stitch API Error:', {
+            status: error.response.status,
+            data: error.response.data,
+            url: error.config.url
+          });
+          
+          // Handle specific Stitch error formats
+          if (error.response.data.errors) {
+            const stitchError = error.response.data.errors[0];
+            throw new Error(`Stitch API Error: ${stitchError.message}`);
+          }
+        }
+        throw error;
+      }
+    );
+  }
+}
+```
+
+### Mono Provider Implementation
+
+```typescript
+// providers/mono-provider.ts
+import axios, { AxiosInstance } from 'axios';
+import { BankingProvider } from './banking-provider-interface';
+
+export interface MonoConfig {
+  secretKey: string;
+  environment: 'test' | 'production';
+  webhookSecret: string;
+}
+
+export class MonoProvider implements BankingProvider {
+  private client: AxiosInstance;
+  private baseURL: string;
+
+  constructor(private config: MonoConfig) {
+    this.baseURL = config.environment === 'production' 
+      ? 'https://api.withmono.com' 
+      : 'https://api.withmono.com';
+    
+    this.client = axios.create({
+      baseURL: this.baseURL,
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+        'mono-sec-key': config.secretKey
+      }
+    });
+
+    this.setupInterceptors();
+  }
+
+  async initiateAccountLinking(params: {
+    user_id: string;
+    bank_code?: string;
+    redirect_url: string;
+    permissions: string[];
+    webhook_url: string;
+  }): Promise<{
+    authorization_url: string;
+    consent_id: string;
+    expires_at: string;
+    state: string;
+  }> {
+    
+    // Mono uses Connect Widget, but we can also use direct API
+    const response = await this.client.post('/account/initiate', {
+      customer: {
+        id: params.user_id,
+        email: `user-${params.user_id}@awo-platform.com` // Mono requires email
+      },
+      meta: {
+        ref: params.user_id
+      },
+      config: {
+        data_status: "LIVE", // or "TEST" for sandbox
+        auth_method: "internet_banking",
+        ...(params.bank_code && { bank_code: params.bank_code })
+      },
+      webhook_url: params.webhook_url,
+      redirect_url: params.redirect_url
+    });
+
+    const linkingData = response.data;
+    const expiresAt = new Date(Date.now() + (15 * 60 * 1000)); // 15 minutes
+
+    return {
+      authorization_url: linkingData.auth_url,
+      consent_id: linkingData.id,
+      expires_at: expiresAt.toISOString(),
+      state: params.user_id
+    };
+  }
+
+  async exchangeAuthorizationCode(authCode: string, consentId: string): Promise<{
+    access_token: string;
+    token_type: string;
+    expires_in: number;
+    expires_at: string;
+    refresh_token?: string;
+  }> {
+    
+    // In Mono, the account linking process gives us the account ID directly
+    // We use the consent_id as the account reference
+    const expiresIn = 30 * 24 * 60 * 60; // 30 days
+    const expiresAt = new Date(Date.now() + (expiresIn * 1000));
+
+    return {
+      access_token: consentId, // Mono uses account ID as token
+      token_type: 'mono_account_id',
+      expires_in: expiresIn,
+      expires_at: expiresAt.toISOString()
+    };
+  }
+
+  async getAccounts(accountId: string): Promise<Array<{
+    id: string;
+    account_number: string;
+    account_name: string;
+    account_type: string;
+    bank_name: string;
+    bank_code: string;
+    currency: string;
+    current_balance: number;
+    available_balance: number;
+  }>> {
+    
+    const response = await this.client.get(`/accounts/${accountId}`);
+    const accountData = response.data;
+
+    // Get account balance
+    const balanceResponse = await this.client.get(`/accounts/${accountId}/balance`);
+    const balance = balanceResponse.data;
+
+    return [{
+      id: accountData._id,
+      account_number: accountData.account_number,
+      account_name: accountData.name,
+      account_type: accountData.type || 'savings',
+      bank_name: accountData.institution.name,
+      bank_code: accountData.institution.bank_code,
+      currency: accountData.currency || 'NGN',
+      current_balance: balance.balance / 100, // Mono returns kobo/cents
+      available_balance: balance.available_balance / 100
+    }];
+  }
+
+  async getTransactions(
+    accountId: string,
+    externalAccountId: string,
+    options: {
+      from: Date;
+      to: Date;
+      limit?: number;
+    }
+  ): Promise<Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    date: string;
+    description: string;
+    reference?: string;
+    balance: number;
+    transaction_type: 'debit' | 'credit';
+    additional_data?: any;
+  }>> {
+    
+    const params = new URLSearchParams({
+      start: options.from.toISOString().split('T')[0],
+      end: options.to.toISOString().split('T')[0],
+      paginate: 'false'
+    });
+
+    if (options.limit) {
+      params.append('limit', options.limit.toString());
+    }
+
+    const response = await this.client.get(`/accounts/${accountId}/transactions?${params}`);
+    const transactions = response.data.data;
+
+    return transactions.map(transaction => ({
+      id: transaction._id,
+      amount: Math.abs(transaction.amount) / 100, // Convert from kobo/cents
+      currency: transaction.currency || 'NGN',
+      date: transaction.date,
+      description: transaction.narration,
+      reference: transaction.reference,
+      balance: transaction.balance / 100,
+      transaction_type: transaction.type === 'debit' ? 'debit' : 'credit',
+      additional_data: {
+        category: transaction.category,
+        location: transaction.location
+      }
+    }));
+  }
+
+  async refreshAccessToken(refreshToken: string): Promise<{
+    access_token: string;
+    expires_in: number;
+    expires_at: string;
+  }> {
+    
+    // Mono doesn't have traditional token refresh, account stays valid
+    const expiresIn = 30 * 24 * 60 * 60; // 30 days
+    const expiresAt = new Date(Date.now() + (expiresIn * 1000));
+
+    return {
+      access_token: refreshToken,
+      expires_in: expiresIn,
+      expires_at: expiresAt.toISOString()
+    };
+  }
+
+  async revokeConsent(accountId: string): Promise<void> {
+    await this.client.delete(`/accounts/${accountId}/unlink`);
+  }
+
+  async verifyWebhook(payload: string, signature: string): Promise<boolean> {
+    const crypto = require('crypto');
+    const expectedSignature = crypto
+      .createHmac('sha256', this.config.webhookSecret)
+      .update(payload)
+      .digest('hex');
+
+    return signature === expectedSignature;
+  }
+
+  // Mono-specific methods
+  async getAccountStatement(accountId: string, period: 'last3months' | 'last6months' | 'last12months'): Promise<{
+    account_id: string;
+    period: string;
+    statement_url: string;
+  }> {
+    
+    const response = await this.client.post(`/accounts/${accountId}/statement`, {
+      period,
+      output: 'pdf'
+    });
+
+    return {
+      account_id: accountId,
+      period,
+      statement_url: response.data.statement
+    };
+  }
+
+  async getAccountCoverage(): Promise<Array<{
+    bank_code: string;
+    bank_name: string;
+    logo: string;
+    color: string;
+    type: string[];
+  }>> {
+    
+    const response = await this.client.get('/coverage');
+    return response.data.banks;
+  }
+
+  private setupInterceptors(): void {
+    // Request interceptor
+    this.client.interceptors.request.use(
+      (config) => {
+        console.log(`Mono API Request: ${config.method?.toUpperCase()} ${config.url}`);
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    // Response interceptor
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response) {
+          console.error('Mono API Error:', {
+            status: error.response.status,
+            data: error.response.data,
+            url: error.config.url
+          });
+
+          // Handle Mono error format
+          if (error.response.data.message) {
+            throw new Error(`Mono API Error: ${error.response.data.message}`);
+          }
+        }
+        throw error;
+      }
+    );
+  }
+}
+```
+
+## API Endpoints
+
+### Banking REST API
+
+```typescript
+// banking-routes.ts
+import { Router } from 'express';
+import { BankingService } from './banking-service';
+import { authMiddleware, validateInput, rateLimitMiddleware } from './middleware';
+import { body, param, query } from 'express-validator';
+
+const router = Router();
+
+// Get supported banks by country
+router.get('/banking/banks/:countryCode',
+  authMiddleware,
+  [param('countryCode').isLength({ min: 2, max: 2 }).isAlpha()],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { countryCode } = req.params;
+      const banks = await bankingService.getSupportedBanks(countryCode.toUpperCase());
+
+      res.json({
+        success: true,
+        data: { banks }
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Initiate account linking
+router.post('/banking/link',
+  authMiddleware,
+  rateLimitMiddleware({ windowMs: 300000, max: 5 }), // 5 per 5 minutes
+  [
+    body('provider_code').isIn(['stitch', 'mono', 'stitch_ng']),
+    body('bank_code').optional().isString(),
+    body('redirect_url').isURL(),
+    body('permissions').isArray({ min: 1 })
+  ],
+  validateInput,
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { provider_code, bank_code, redirect_url, permissions } = req.body;
+
+      const result = await bankingService.initiateAccountLinking({
+        user_id: userId,
+        provider_code,
+        bank_code,
+        redirect_url,
+        permissions
+      });
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Account linking initiated. Redirect user to authorization_url.'
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+// Complete account linking
+router.post('/banking/link/complete',
+  authMiddleware,
+  [
+    body('provider_code').isIn(['stitch', 'mono', 'stitch_ng']),
+    body('authorization_code').isString(),
+    body('consent_id').isString()
+  ],
+  validateInput,
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { provider_code, authorization_code, consent_id } = req.body;
+
+      const result = await bankingService.completeAccountLinking(
+        userId,
+        provider_code,
+        authorization_code,
+        consent_id
+      );
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Bank accounts linked successfully'
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+// Get user's bank accounts
+router.get('/users/:userId/bank-accounts',
+  authMiddleware,
+  [param('userId').isUUID()],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      // Verify user can access this data
+      if (req.user.id !== userId && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Unauthorized access' });
+      }
+
+      const accounts = await bankingService.getUserBankAccounts(userId);
+
+      res.json({
+        success: true,
+        data: { accounts }
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Sync account transactions
+router.post('/banking/accounts/:accountId/sync',
+  authMiddleware,
+  rateLimitMiddleware({ windowMs: 60000, max: 3 }), // 3 per minute
+  [param('accountId').isUUID()],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const userId = req.user.id;
+
+      // Verify user owns the account
+      await bankingService.validateAccountOwnership(userId, accountId);
+
+      const result = await bankingService.syncAccountTransactions(accountId, 'manual');
+
+      res.json({
+        success: true,
+        data: result,
+        message: `Synced ${result.new_transactions} new transactions`
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+// Get account transactions
+router.get('/banking/accounts/:accountId/transactions',
+  authMiddleware,
+  [
+    param('accountId').isUUID(),
+    query('from_date').optional().isISO8601(),
+    query('to_date').optional().isISO8601(),
+    query('limit').optional().isInt({ min: 1, max: 200 }),
+    query('offset').optional().isInt({ min: 0 }),
+    query('category').optional().isString()
+  ],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const userId = req.user.id;
+      const options = req.query;
+
+      const result = await bankingService.getAccountTransactions(userId, accountId, options);
+
+      res.json({
+        success: true,
+        data: result
+      });
+    } catch (error) {
+      res.status(403).json({ error: error.message });
+    }
+  }
+);
+
+// Categorize transactions
+router.post('/banking/accounts/:accountId/categorize',
+  authMiddleware,
+  [param('accountId').isUUID()],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const userId = req.user.id;
+
+      // Verify user owns the account
+      await bankingService.validateAccountOwnership(userId, accountId);
+
+      const result = await bankingService.categorizeTransactions(userId, accountId);
+
+      res.json({
+        success: true,
+        data: result,
+        message: `Categorized ${result.categorized_count} transactions`
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+// Revoke account access
+router.delete('/banking/accounts/:accountId',
+  authMiddleware,
+  [param('accountId').isUUID()],
+  validateInput,
+  async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const userId = req.user.id;
+
+      const result = await bankingService.revokeAccountAccess(userId, accountId);
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Account access revoked successfully'
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+export default router;
+```
+
+## Webhook Implementation
+
+### Banking Webhooks Handler
+
+```typescript
+// banking-webhooks.ts
+import { Router } from 'express';
+import { BankingService } from './banking-service';
+import { StitchProvider } from './providers/stitch-provider';
+import { MonoProvider } from './providers/mono-provider';
+
+const router = Router();
+
+// Stitch webhook handler
+router.post('/webhooks/banking/stitch',
+  async (req, res) => {
+    try {
+      const signature = req.headers['x-stitch-signature'] as string;
+      const payload = JSON.stringify(req.body);
+
+      const stitchProvider = new StitchProvider(/* config */);
+      
+      if (!await stitchProvider.verifyWebhook(payload, signature)) {
+        return res.status(401).json({ error: 'Invalid webhook signature' });
+      }
+
+      const event = req.body;
+      
+      switch (event.type) {
+        case 'account.linked':
+          await handleStitchAccountLinked(event.data);
+          break;
+        case 'transaction.created':
+          await handleStitchTransactionCreated(event.data);
+          break;
+        case 'account.updated':
+          await handleStitchAccountUpdated(event.data);
+          break;
+        case 'consent.revoked':
+          await handleStitchConsentRevoked(event.data);
+          break;
+        default:
+          console.log(`Unhandled Stitch webhook event: ${event.type}`);
+      }
+
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('Stitch webhook error:', error);
+      res.status(500).json({ error: 'Webhook processing failed' });
+    }
+  }
+);
+
+// Mono webhook handler
+router.post('/webhooks/banking/mono',
+  async (req, res) => {
+    try {
+      const signature = req.headers['x-mono-signature'] as string;
+      const payload = JSON.stringify(req.body);
+
+      const monoProvider = new MonoProvider(/* config */);
+      
+      if (!await monoProvider.verifyWebhook(payload, signature)) {
+        return res.status(401).json({ error: 'Invalid webhook signature' });
+      }
+
+      const event = req.body;
+      
+      switch (event.event) {
+        case 'mono.events.account_connected':
+          await handleMonoAccountConnected(event.data);
+          break;
+        case 'mono.events.account_updated':
+          await handleMonoAccountUpdated(event.data);
+          break;
+        case 'mono.events.account_disconnected':
+          await handleMonoAccountDisconnected(event.data);
+          break;
+        default:
+          console.log(`Unhandled Mono webhook event: ${event.event}`);
+      }
+
+      res.status(200).json({ received: true });
+    } catch (error) {
+      console.error('Mono webhook error:', error);
+      res.status(500).json({ error: 'Webhook processing failed' });
+    }
+  }
+);
+
+// Webhook event handlers
+async function handleStitchAccountLinked(data: any): Promise<void> {
+  // Update account status to linked
+  await bankingService.updateAccountStatus(data.accountId, 'linked');
+  
+  // Trigger initial transaction sync
+  await bankingService.syncAccountTransactions(data.accountId, 'webhook');
+}
+
+async function handleStitchTransactionCreated(data: any): Promise<void> {
+  // Process new transaction
+  await bankingService.processWebhookTransaction('stitch', data);
+}
+
+async function handleMonoAccountConnected(data: any): Promise<void> {
+  // Update account linking status
+  await bankingService.completeWebhookAccountLinking('mono', data);
+}
+
+async function handleMonoAccountUpdated(data: any): Promise<void> {
+  // Sync latest account data
+  await bankingService.syncAccountTransactions(data.account, 'webhook');
+}
+
+export default router;
+```
+
+## Testing & Quality Assurance
+
+### Unit Testing
+
+```typescript
+// banking-service.test.ts
+import { BankingService } from '../src/banking-service';
+import { MockDatabase, MockStitchProvider, MockMonoProvider } from './mocks';
+
+describe('BankingService', () => {
+  let bankingService: BankingService;
+  let mockDb: MockDatabase;
+
+  beforeEach(() => {
+    mockDb = new MockDatabase();
+    bankingService = new BankingService(mockDb, mockEncryption);
+  });
+
+  describe('Account Linking', () => {
+    test('should initiate Stitch account linking', async () => {
+      const request = {
+        user_id: 'user-123',
+        provider_code: 'stitch',
+        redirect_url: 'https://app.awo.com/callback',
+        permissions: ['accounts', 'transactions']
+      };
+
+      const result = await bankingService.initiateAccountLinking(request);
+
+      expect(result.authorization_url).toContain('stitch.money');
+      expect(result.consent_id).toBeDefined();
+      expect(result.expires_at).toBeDefined();
+    });
+
+    test('should complete account linking successfully', async () => {
+      const mockAccounts = [{
+        id: 'acc-123',
+        account_number: '1234567890',
+        account_name: 'Test Account',
+        bank_name: 'Test Bank',
+        currency: 'ZAR',
+        current_balance: 1000
+      }];
+
+      mockStitchProvider.setMockAccounts(mockAccounts);
+
+      const result = await bankingService.completeAccountLinking(
+        'user-123',
+        'stitch',
+        'auth-code-123',
+        'consent-123'
+      );
+
+      expect(result.accounts).toHaveLength(1);
+      expect(result.sync_initiated).toBe(true);
+      expect(result.accounts[0].account_number).toBe('1234567890');
+    });
+  });
+
+  describe('Transaction Sync', () => {
+    test('should sync transactions successfully', async () => {
+      const accountId = 'account-123';
+      const mockTransactions = [
+        {
+          id: 'txn-1',
+          amount: -50,
+          currency: 'ZAR',
+          date: '2024-01-15',
+          description: 'Grocery Store',
+          balance: 950
+        },
+        {
+          id: 'txn-2',
+          amount: 1000,
+          currency: 'ZAR',
+          date: '2024-01-14',
+          description: 'Salary',
+          balance: 1000
+        }
+      ];
+
+      mockStitchProvider.setMockTransactions(mockTransactions);
+      mockDb.setAccountData(accountId, {
+        provider_code: 'stitch',
+        user_id: 'user-123',
+        status: 'linked'
+      });
+
+      const result = await bankingService.syncAccountTransactions(accountId);
+
+      expect(result.success).toBe(true);
+      expect(result.new_transactions).toBe(2);
+      expect(result.transactions_synced).toBe(2);
+    });
+
+    test('should handle duplicate transactions', async () => {
+      const accountId = 'account-123';
+      
+      // Pre-populate with existing transaction
+      mockDb.setExistingTransaction(accountId, 'txn-1');
+
+      const mockTransactions = [
+        {
+          id: 'txn-1', // Duplicate
+          amount: -50,
+          currency: 'ZAR',
+          date: '2024-01-15',
+          description: 'Grocery Store',
+          balance: 950
+        },
+        {
+          id: 'txn-2', // New
+          amount: 100,
+          currency: 'ZAR',
+          date: '2024-01-16',
+          description: 'Transfer',
+          balance: 1050
+        }
+      ];
+
+      mockStitchProvider.setMockTransactions(mockTransactions);
+
+      const result = await bankingService.syncAccountTransactions(accountId);
+
+      expect(result.new_transactions).toBe(1); // Only txn-2 is new
+      expect(result.transactions_synced).toBe(2); // Both were processed
+    });
+  });
+
+  describe('Transaction Categorization', () => {
+    test('should categorize transactions correctly', async () => {
+      const transactions = [
+        {
+          id: 'txn-1',
+          description: 'WOOLWORTHS CAPE TOWN',
+          amount: -150,
+          transaction_type: 'debit'
+        },
+        {
+          id: 'txn-2',
+          description: 'SALARY PAYMENT XYZ CORP',
+          amount: 5000,
+          transaction_type: 'credit'
+        }
+      ];
+
+      mockDb.setUncategorizedTransactions('user-123', transactions);
+
+      const result = await bankingService.categorizeTransactions('user-123');
+
+      expect(result.categorized_count).toBe(2);
+      expect(result.categories_assigned).toContain('groceries');
+      expect(result.categories_assigned).toContain('salary');
+    });
+  });
+});
+```
+
+### Integration Testing
+
+```typescript
+// banking-integration.test.ts
+describe('Banking Integration Tests', () => {
+  test('should complete full Stitch integration flow', async () => {
+    // Setup test user
+    const user = await testDb.createUser({
+      email: 'test@example.co.za',
+      country_code: 'ZA'
+    });
+
+    // Initiate linking
+    const linkingResult = await bankingService.initiateAccountLinking({
+      user_id: user.id,
+      provider_code: 'stitch',
+      redirect_url: 'http://localhost:3000/callback',
+      permissions: ['accounts', 'transactions']
+    });
+
+    expect(linkingResult.authorization_url).toContain('stitch.money');
+
+    // Simulate OAuth callback with authorization code
+    const accounts = await bankingService.completeAccountLinking(
+      user.id,
+      'stitch',
+      'test-auth-code',
+      linkingResult.consent_id
+    );
+
+    expect(accounts.accounts).toHaveLength(1);
+
+    // Verify account is stored
+    const userAccounts = await bankingService.getUserBankAccounts(user.id);
+    expect(userAccounts).toHaveLength(1);
+    expect(userAccounts[0].status).toBe('linked');
+
+    // Test transaction sync
+    const syncResult = await bankingService.syncAccountTransactions(
+      userAccounts[0].id
+    );
+
+    expect(syncResult.success).toBe(true);
+    expect(syncResult.transactions_synced).toBeGreaterThan(0);
+
+    // Verify transactions are stored
+    const transactions = await bankingService.getAccountTransactions(
+      user.id,
+      userAccounts[0].id,
+      { limit: 10 }
+    );
+
+    expect(transactions.transactions.length).toBeGreaterThan(0);
+  });
+});
+```
+
+## Deployment Considerations
+
+### Environment Configuration
+
+```typescript
+// banking-config.ts
+export const bankingConfig = {
+  providers: {
+    stitch: {
+      clientId: process.env.STITCH_CLIENT_ID,
+      clientSecret: process.env.STITCH_CLIENT_SECRET,
+      environment: process.env.STITCH_ENV || 'sandbox',
+      webhookSecret: process.env.STITCH_WEBHOOK_SECRET,
+      maxAccountsPerUser: 5,
+      syncIntervalHours: 6
+    },
+    mono: {
+      secretKey: process.env.MONO_SECRET_KEY,
+      environment: process.env.MONO_ENV || 'test',
+      webhookSecret: process.env.MONO_WEBHOOK_SECRET,
+      maxAccountsPerUser: 3,
+      syncIntervalHours: 12
+    }
+  },
+  rateLimits: {
+    accountLinking: { windowMs: 300000, max: 5 }, // 5 per 5 minutes
+    transactionSync: { windowMs: 60000, max: 10 }, // 10 per minute
+    apiCalls: { windowMs: 60000, max: 100 } // 100 per minute
+  },
+  security: {
+    encryptionKey: process.env.BANKING_ENCRYPTION_KEY,
+    tokenStorageMethod: 'encrypted_database',
+    consentExpiryDays: 90,
+    maxRetryAttempts: 3
+  },
+  monitoring: {
+    enableMetrics: true,
+    alertThresholds: {
+      failureRate: 0.05, // 5%
+      responseTime: 5000, // 5 seconds
+      syncDelayHours: 24
+    }
+  }
+};
+```
+
+### Production Checklist
+
+<Steps>
+  <Step title="Provider Setup">
+    ✅ Stitch production credentials configured  
+    ✅ Mono production API keys active  
+    ✅ Webhook endpoints publicly accessible  
+    ✅ SSL certificates valid and up to date  
+    ✅ Provider rate limits understood and configured
+  </Step>
+  <Step title="Security Validation">
+    ✅ Access tokens encrypted at rest  
+    ✅ Webhook signature verification working  
+    ✅ API rate limiting enabled  
+    ✅ Input validation on all endpoints  
+    ✅ Database access properly secured
+  </Step>
+  <Step title="Monitoring Setup">
+    ✅ Transaction sync monitoring enabled  
+    ✅ Provider API health checks configured  
+    ✅ Error alerting set up  
+    ✅ Performance metrics tracked  
+    ✅ Compliance audit logging active
+  </Step>
+  <Step title="Testing Verification">
+    ✅ End-to-end linking flow tested  
+    ✅ Transaction sync performance validated  
+    ✅ Error handling scenarios covered  
+    ✅ Webhook processing tested  
+    ✅ Load testing completed
+  </Step>
+</Steps>
+
+---
+
+*This Bank Integration Guide provides comprehensive coverage of integrating with African Open Banking providers to enable secure account linking, transaction synchronization, and financial data analysis essential for AWO Platform's DIVA scoring and financial insights.*
+
+*For additional implementation details, refer to the [Payment Processing Guide](/guides/payment-processing), [Testing Strategies](/guides/testing-strategies), and [Security Best Practices](/security-practices/development-guidelines).*

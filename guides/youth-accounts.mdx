@@ -1,52 +1,3659 @@
----
-title: "Youth Accounts"
-description: "AWO Platform youth accounts implementation guide"
----
+# Youth Accounts Setup Guide
 
-# Youth Accounts
-
-## Overview
+This comprehensive guide walks you through implementing AWO Platform's youth account system, designed to provide age-appropriate financial education and supervised savings for users under 18 across SADC markets, with robust parental controls and educational pathways.
 
 <Info>
-This comprehensive guide covers youth accounts for the AWO Platform.
+AWO's youth account system empowers African families to introduce financial literacy early while maintaining appropriate oversight. The system includes parental controls, educational content, spending limits, and a gradual transition to full account access at age 18.
 </Info>
 
-## Step-by-Step Implementation
+## Youth Account System Overview
 
-<Steps>
-  <Step title="Planning">
-    Plan your implementation approach
-  </Step>
-  <Step title="Setup">
-    Set up required components
-  </Step>
-  <Step title="Implementation">
-    Implement the feature
-  </Step>
-  <Step title="Testing">
-    Test your implementation
-  </Step>
-  <Step title="Deployment">
-    Deploy to production
-  </Step>
-</Steps>
+### Age-Based Account Tiers
 
-## Code Examples
+<CardGroup cols={2}>
+  <Card title="Junior Savers (13-15 years)" icon="piggy-bank">
+    **Account Type**: Basic savings with parental oversight  
+    **Features**: Educational content, basic savings goals, parental approval for all transactions  
+    **Limits**: Maximum R1,000 balance, R100 per transaction  
+    **Access**: View-only financial dashboard with simplified metrics
+  </Card>
+  <Card title="Teen Investors (16-17 years)" icon="trending-up">
+    **Account Type**: Enhanced savings with limited investment access  
+    **Features**: Basic investment education, micro-investments, spending categories  
+    **Limits**: Maximum R5,000 balance, R500 per transaction  
+    **Access**: Limited portfolio access with educational simulations
+  </Card>
+</CardGroup>
 
-Implementation examples will be provided here.
+<CardGroup cols={2}>
+  <Card title="Pre-Adult Transition (17.5-18 years)" icon="graduation-cap">
+    **Account Type**: Supervised independence preparation  
+    **Features**: Full platform preview, transition planning, financial goal setting  
+    **Limits**: Gradual limit increases based on demonstrated responsibility  
+    **Access**: Nearly full access with parental monitoring capabilities
+  </Card>
+  <Card title="Young Adult (18+ years)" icon="adult">
+    **Account Type**: Full AWO Platform access  
+    **Features**: Complete DIVA scoring, full investment access, independent management  
+    **Limits**: Based on DIVA score and income verification  
+    **Access**: Complete platform functionality with optional family sharing
+  </Card>
+</CardGroup>
 
-## Best Practices
+## Prerequisites
 
-Implementation best practices will be documented here.
+### Development Environment Requirements
 
-## Common Pitfalls
+<CardGroup cols={2}>
+  <Card title="Backend Infrastructure" icon="server">
+    **Express.js**: Youth account service and parental controls  
+    **PostgreSQL**: Youth profiles, parental relationships, and transaction limits  
+    **Redis**: Real-time parental notifications and session management  
+    **Age Verification**: Integration with identity verification services
+  </Card>
+  <Card title="Compliance Requirements" icon="shield">
+    **COPPA Compliance**: Children's Online Privacy Protection Act alignment  
+    **POPIA Youth**: South African data protection for minors  
+    **Parental Consent**: Digital consent mechanisms and verification  
+    **Educational Standards**: Age-appropriate financial literacy content
+  </Card>
+</CardGroup>
 
-<Warning>
-Common mistakes and how to avoid them will be listed here.
-</Warning>
+### African Market Considerations
+
+<CardGroup cols={2}>
+  <Card title="Cultural Sensitivity" icon="globe">
+    **Family Structures**: Extended family and community oversight models  
+    **Cultural Values**: Ubuntu philosophy and community responsibility  
+    **Educational Approach**: Story-based learning and oral tradition integration  
+    **Economic Context**: Understanding of informal economic participation
+  </Card>
+  <Card title="Regulatory Compliance" icon="legal">
+    **Age Verification**: Working with African ID systems and birth certificates  
+    **Parental Authority**: Legal guardian verification across SADC countries  
+    **Data Protection**: Enhanced privacy protections for minors  
+    **Educational Compliance**: Alignment with national financial literacy curricula
+  </Card>
+</CardGroup>
+
+## Database Schema Implementation
+
+### 1. Youth Account Database Models
+
+```sql
+-- Youth Account Profiles
+CREATE TABLE youth_accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    date_of_birth DATE NOT NULL,
+    age_tier VARCHAR(20) NOT NULL, -- junior_saver, teen_investor, pre_adult, young_adult
+    account_status VARCHAR(20) DEFAULT 'active', -- active, suspended, transitioning, graduated
+    parental_consent_given BOOLEAN DEFAULT false,
+    parental_consent_date TIMESTAMP,
+    parental_consent_method VARCHAR(50), -- digital_signature, physical_document, video_verification
+    educational_level VARCHAR(50), -- primary, secondary, tertiary
+    school_name VARCHAR(255),
+    transition_date DATE, -- When they become 18
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT valid_age_tier CHECK (age_tier IN ('junior_saver', 'teen_investor', 'pre_adult', 'young_adult'))
+);
+
+-- Parental/Guardian Relationships
+CREATE TABLE parental_relationships (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    youth_account_id UUID NOT NULL REFERENCES youth_accounts(id),
+    parent_user_id UUID NOT NULL REFERENCES users(id),
+    relationship_type VARCHAR(30) NOT NULL, -- parent, guardian, custodian, family_elder
+    is_primary_guardian BOOLEAN DEFAULT false,
+    legal_authority_verified BOOLEAN DEFAULT false,
+    verification_document_url VARCHAR(500),
+    permissions JSONB NOT NULL DEFAULT '{}', -- JSON object defining specific permissions
+    notification_preferences JSONB DEFAULT '{}',
+    status VARCHAR(20) DEFAULT 'active', -- active, inactive, revoked
+    approved_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT valid_relationship CHECK (relationship_type IN ('parent', 'guardian', 'custodian', 'family_elder'))
+);
+
+-- Age-Based Account Limits
+CREATE TABLE youth_account_limits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    age_tier VARCHAR(20) NOT NULL,
+    country CHAR(2) NOT NULL DEFAULT 'ZA',
+    max_account_balance DECIMAL(15,2) NOT NULL,
+    max_transaction_amount DECIMAL(15,2) NOT NULL,
+    max_daily_spending DECIMAL(15,2) NOT NULL,
+    max_monthly_spending DECIMAL(15,2) NOT NULL,
+    allowed_transaction_types TEXT[] NOT NULL,
+    requires_parental_approval TEXT[] NOT NULL,
+    investment_access_level VARCHAR(20) DEFAULT 'none', -- none, simulated, limited, restricted
+    can_send_money BOOLEAN DEFAULT false,
+    can_receive_money BOOLEAN DEFAULT true,
+    educational_requirements TEXT[],
+    effective_date DATE DEFAULT CURRENT_DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    UNIQUE(age_tier, country, effective_date)
+);
+
+-- Parental Approval Workflows
+CREATE TABLE parental_approvals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    youth_account_id UUID NOT NULL REFERENCES youth_accounts(id),
+    parent_user_id UUID NOT NULL REFERENCES users(id),
+    transaction_id UUID, -- Reference to pending transaction
+    approval_type VARCHAR(30) NOT NULL, -- transaction, account_change, limit_increase, investment
+    request_details JSONB NOT NULL,
+    requested_amount DECIMAL(15,2),
+    approval_status VARCHAR(20) DEFAULT 'pending', -- pending, approved, denied, expired
+    approval_reason TEXT,
+    requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    responded_at TIMESTAMP,
+    expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '72 hours'),
+    notification_sent BOOLEAN DEFAULT false,
+    reminder_sent BOOLEAN DEFAULT false,
+    
+    CONSTRAINT valid_approval_status CHECK (approval_status IN ('pending', 'approved', 'denied', 'expired'))
+);
+
+-- Youth Transaction History with Enhanced Tracking
+CREATE TABLE youth_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    youth_account_id UUID NOT NULL REFERENCES youth_accounts(id),
+    transaction_type VARCHAR(30) NOT NULL, -- allowance, savings, spending, investment, gift
+    category VARCHAR(50), -- education, entertainment, savings_goal, charity
+    amount DECIMAL(15,2) NOT NULL,
+    description TEXT,
+    merchant_name VARCHAR(255),
+    transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    parental_approval_id UUID REFERENCES parental_approvals(id),
+    requires_approval BOOLEAN DEFAULT false,
+    is_educational BOOLEAN DEFAULT false,
+    educational_lesson_id UUID,
+    status VARCHAR(20) DEFAULT 'completed', -- pending, completed, failed, cancelled
+    learning_notes TEXT, -- What the youth learned from this transaction
+    parent_notes TEXT, -- Notes from parent/guardian
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Educational Progress Tracking
+CREATE TABLE youth_education_progress (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    youth_account_id UUID NOT NULL REFERENCES youth_accounts(id),
+    module_id VARCHAR(50) NOT NULL,
+    module_name VARCHAR(255) NOT NULL,
+    age_appropriate_level VARCHAR(20) NOT NULL, -- beginner, intermediate, advanced
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP,
+    progress_percentage INTEGER DEFAULT 0,
+    quiz_score INTEGER, -- Out of 100
+    practical_exercise_completed BOOLEAN DEFAULT false,
+    parent_review_required BOOLEAN DEFAULT false,
+    parent_reviewed_at TIMESTAMP,
+    badges_earned TEXT[],
+    next_recommended_module VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT valid_progress CHECK (progress_percentage >= 0 AND progress_percentage <= 100),
+    UNIQUE(youth_account_id, module_id)
+);
+
+-- Savings Goals for Youth
+CREATE TABLE youth_savings_goals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    youth_account_id UUID NOT NULL REFERENCES youth_accounts(id),
+    goal_name VARCHAR(255) NOT NULL,
+    goal_description TEXT,
+    target_amount DECIMAL(15,2) NOT NULL,
+    current_amount DECIMAL(15,2) DEFAULT 0,
+    target_date DATE,
+    goal_category VARCHAR(50), -- education, gadget, charity, emergency_fund, investment
+    is_parent_suggested BOOLEAN DEFAULT false,
+    parent_contribution_allowed BOOLEAN DEFAULT true,
+    motivational_milestones JSONB, -- JSON array of milestone rewards
+    visual_theme VARCHAR(50), -- For gamification
+    status VARCHAR(20) DEFAULT 'active', -- active, completed, paused, cancelled
+    completed_at TIMESTAMP,
+    celebration_method VARCHAR(50), -- How to celebrate completion
+    learning_outcome TEXT, -- What they learned from achieving this goal
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Youth Investment Simulations (Educational)
+CREATE TABLE youth_investment_simulations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    youth_account_id UUID NOT NULL REFERENCES youth_accounts(id),
+    simulation_name VARCHAR(255) NOT NULL,
+    simulation_type VARCHAR(30) NOT NULL, -- stock_market, savings_account, business_investment
+    virtual_starting_amount DECIMAL(15,2) NOT NULL,
+    current_virtual_amount DECIMAL(15,2) NOT NULL,
+    investments JSONB NOT NULL, -- Array of virtual investments
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    duration_days INTEGER DEFAULT 30,
+    educational_objectives TEXT[],
+    performance_metrics JSONB,
+    lessons_learned TEXT,
+    parent_discussion_notes TEXT,
+    status VARCHAR(20) DEFAULT 'active', -- active, completed, paused
+    completed_at TIMESTAMP,
+    
+    CONSTRAINT valid_simulation_type CHECK (simulation_type IN ('stock_market', 'savings_account', 'business_investment', 'cryptocurrency'))
+);
+
+-- Parental Dashboard and Monitoring
+CREATE TABLE parental_monitoring_settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    parental_relationship_id UUID NOT NULL REFERENCES parental_relationships(id),
+    notification_frequency VARCHAR(20) DEFAULT 'daily', -- real_time, daily, weekly
+    spending_alert_threshold DECIMAL(15,2) DEFAULT 50.00,
+    unusual_activity_alerts BOOLEAN DEFAULT true,
+    educational_progress_updates BOOLEAN DEFAULT true,
+    goal_achievement_notifications BOOLEAN DEFAULT true,
+    monthly_summary_reports BOOLEAN DEFAULT true,
+    emergency_contact_alerts BOOLEAN DEFAULT true,
+    preferred_notification_method VARCHAR(20) DEFAULT 'email', -- email, sms, push, whatsapp
+    quiet_hours_start TIME DEFAULT '22:00',
+    quiet_hours_end TIME DEFAULT '07:00',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Youth Account Graduation Tracking
+CREATE TABLE account_graduation_tracking (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    youth_account_id UUID NOT NULL REFERENCES youth_accounts(id),
+    graduation_date DATE NOT NULL, -- When they turn 18
+    preparation_phase_started BOOLEAN DEFAULT false,
+    preparation_checklist JSONB, -- JSON object tracking readiness items
+    financial_literacy_assessment_score INTEGER,
+    parent_readiness_confirmation BOOLEAN DEFAULT false,
+    account_transition_status VARCHAR(30) DEFAULT 'not_started',
+    full_access_granted_at TIMESTAMP,
+    post_graduation_monitoring_period INTEGER DEFAULT 90, -- Days of continued monitoring
+    mentorship_program_enrolled BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT valid_transition_status CHECK (account_transition_status IN ('not_started', 'preparing', 'ready', 'transitioning', 'completed'))
+);
+
+-- Create indexes for performance
+CREATE INDEX idx_youth_accounts_age_tier ON youth_accounts(age_tier, account_status);
+CREATE INDEX idx_youth_accounts_transition_date ON youth_accounts(transition_date) WHERE transition_date IS NOT NULL;
+CREATE INDEX idx_parental_relationships_youth_primary ON parental_relationships(youth_account_id, is_primary_guardian);
+CREATE INDEX idx_parental_approvals_pending ON parental_approvals(youth_account_id, approval_status) WHERE approval_status = 'pending';
+CREATE INDEX idx_youth_transactions_date_type ON youth_transactions(youth_account_id, transaction_date, transaction_type);
+CREATE INDEX idx_youth_education_progress_completion ON youth_education_progress(youth_account_id, completed_at);
+CREATE INDEX idx_youth_savings_goals_active ON youth_savings_goals(youth_account_id, status) WHERE status = 'active';
+```
+
+### 2. Youth Account Service Implementation
+
+```typescript
+// src/services/youth/youthAccountService.ts
+import { Pool } from 'pg';
+import { YouthAccount, ParentalRelationship, YouthTransaction } from '@/types/youth';
+import { logger } from '@/lib/utils/logger';
+
+export class YouthAccountService {
+  constructor(private db: Pool) {}
+
+  async createYouthAccount(
+    parentUserId: string,
+    youthData: {
+      firstName: string;
+      lastName: string;
+      dateOfBirth: Date;
+      email?: string;
+      phoneNumber?: string;
+      educationalLevel: string;
+      schoolName?: string;
+    },
+    parentalConsent: {
+      consentMethod: string;
+      consentDocumentUrl?: string;
+      relationshipType: string;
+    }
+  ): Promise<string> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Validate age and eligibility
+      const age = this.calculateAge(youthData.dateOfBirth);
+      if (age < 13 || age >= 18) {
+        throw new Error('Youth accounts are for ages 13-17 only');
+      }
+
+      // Validate parental authority
+      await this.validateParentalAuthority(parentUserId, parentalConsent.relationshipType);
+
+      // Create user account first
+      const userInsertQuery = `
+        INSERT INTO users 
+        (first_name, last_name, email, phone_number, country, date_of_birth, account_type, is_minor)
+        VALUES ($1, $2, $3, $4, 'ZA', $5, 'youth', true)
+        RETURNING id
+      `;
+
+      const userResult = await client.query(userInsertQuery, [
+        youthData.firstName,
+        youthData.lastName,
+        youthData.email,
+        youthData.phoneNumber,
+        youthData.dateOfBirth
+      ]);
+
+      const userId = userResult.rows[0].id;
+
+      // Determine age tier
+      const ageTier = this.determineAgeTier(age);
+
+      // Create youth account
+      const youthAccountQuery = `
+        INSERT INTO youth_accounts 
+        (user_id, date_of_birth, age_tier, parental_consent_given, 
+         parental_consent_date, parental_consent_method, educational_level, school_name, transition_date)
+        VALUES ($1, $2, $3, true, CURRENT_TIMESTAMP, $4, $5, $6, $7)
+        RETURNING id
+      `;
+
+      const transitionDate = new Date(youthData.dateOfBirth);
+      transitionDate.setFullYear(transitionDate.getFullYear() + 18);
+
+      const youthResult = await client.query(youthAccountQuery, [
+        userId,
+        youthData.dateOfBirth,
+        ageTier,
+        parentalConsent.consentMethod,
+        youthData.educationalLevel,
+        youthData.schoolName,
+        transitionDate
+      ]);
+
+      const youthAccountId = youthResult.rows[0].id;
+
+      // Create parental relationship
+      await this.createParentalRelationship(
+        client,
+        youthAccountId,
+        parentUserId,
+        parentalConsent.relationshipType,
+        true // Primary guardian
+      );
+
+      // Set up default account limits
+      await this.applyDefaultAccountLimits(client, youthAccountId, ageTier);
+
+      // Initialize educational progress
+      await this.initializeEducationalPath(client, youthAccountId, ageTier);
+
+      // Create graduation tracking
+      await this.initializeGraduationTracking(client, youthAccountId, transitionDate);
+
+      await client.query('COMMIT');
+
+      // Send welcome notifications
+      await this.sendYouthAccountWelcome(userId, parentUserId);
+
+      logger.info(`Youth account created: ${youthAccountId} for user: ${userId}`);
+      return youthAccountId;
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error creating youth account:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private calculateAge(dateOfBirth: Date): number {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  }
+
+  private determineAgeTier(age: number): string {
+    if (age >= 13 && age <= 15) return 'junior_saver';
+    if (age >= 16 && age <= 17) return 'teen_investor';
+    if (age >= 17.5 && age < 18) return 'pre_adult';
+    return 'young_adult';
+  }
+
+  private async validateParentalAuthority(
+    parentUserId: string,
+    relationshipType: string
+  ): Promise<void> {
+    // Verify parent has completed KYC
+    const parentQuery = `
+      SELECT kyc_status, account_status 
+      FROM users 
+      WHERE id = $1
+    `;
+
+    const parentResult = await this.db.query(parentQuery, [parentUserId]);
+    const parent = parentResult.rows[0];
+
+    if (!parent) {
+      throw new Error('Parent account not found');
+    }
+
+    if (parent.kyc_status !== 'verified') {
+      throw new Error('Parent must complete KYC verification first');
+    }
+
+    if (parent.account_status !== 'active') {
+      throw new Error('Parent account must be active');
+    }
+
+    // Additional verification for guardians/custodians
+    if (relationshipType !== 'parent') {
+      // Would require additional documentation verification
+      logger.info(`Non-parent guardian relationship detected: ${relationshipType}`);
+    }
+  }
+
+  private async createParentalRelationship(
+    client: any,
+    youthAccountId: string,
+    parentUserId: string,
+    relationshipType: string,
+    isPrimary: boolean = false
+  ): Promise<void> {
+    const defaultPermissions = this.getDefaultParentalPermissions(relationshipType);
+    
+    const insertQuery = `
+      INSERT INTO parental_relationships 
+      (youth_account_id, parent_user_id, relationship_type, is_primary_guardian, 
+       legal_authority_verified, permissions, approved_at)
+      VALUES ($1, $2, $3, $4, true, $5, CURRENT_TIMESTAMP)
+    `;
+
+    await client.query(insertQuery, [
+      youthAccountId,
+      parentUserId,
+      relationshipType,
+      isPrimary,
+      JSON.stringify(defaultPermissions)
+    ]);
+  }
+
+  private getDefaultParentalPermissions(relationshipType: string): any {
+    const basePermissions = {
+      view_transactions: true,
+      approve_transactions: true,
+      set_spending_limits: true,
+      view_educational_progress: true,
+      manage_savings_goals: true,
+      receive_notifications: true
+    };
+
+    switch (relationshipType) {
+      case 'parent':
+        return {
+          ...basePermissions,
+          modify_account_settings: true,
+          add_remove_guardians: true,
+          close_account: true
+        };
+      case 'guardian':
+        return {
+          ...basePermissions,
+          modify_account_settings: true,
+          add_remove_guardians: false,
+          close_account: false
+        };
+      case 'custodian':
+        return {
+          ...basePermissions,
+          modify_account_settings: false,
+          add_remove_guardians: false,
+          close_account: false
+        };
+      default:
+        return basePermissions;
+    }
+  }
+
+  async processYouthTransaction(
+    youthAccountId: string,
+    transactionData: {
+      type: string;
+      category: string;
+      amount: number;
+      description: string;
+      merchantName?: string;
+      isEducational?: boolean;
+    }
+  ): Promise<string> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Get youth account and limits
+      const youthAccount = await this.getYouthAccountById(youthAccountId);
+      if (!youthAccount) {
+        throw new Error('Youth account not found');
+      }
+
+      // Check if transaction requires parental approval
+      const requiresApproval = await this.checkApprovalRequirement(
+        youthAccount,
+        transactionData
+      );
+
+      if (requiresApproval) {
+        // Create pending transaction and approval request
+        const transactionId = await this.createPendingTransaction(
+          client,
+          youthAccountId,
+          transactionData
+        );
+
+        await this.requestParentalApproval(
+          client,
+          youthAccountId,
+          transactionId,
+          'transaction',
+          transactionData
+        );
+
+        await client.query('COMMIT');
+        return transactionId;
+      } else {
+        // Process transaction immediately
+        const transactionId = await this.executeYouthTransaction(
+          client,
+          youthAccountId,
+          transactionData
+        );
+
+        await client.query('COMMIT');
+
+        // Send notification to parents
+        await this.notifyParentsOfTransaction(youthAccountId, transactionId);
+
+        return transactionId;
+      }
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error processing youth transaction:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async checkApprovalRequirement(
+    youthAccount: any,
+    transactionData: any
+  ): Promise<boolean> {
+    // Get account limits for the youth's tier
+    const limitsQuery = `
+      SELECT requires_parental_approval, max_transaction_amount
+      FROM youth_account_limits
+      WHERE age_tier = $1 AND country = $2
+      ORDER BY effective_date DESC
+      LIMIT 1
+    `;
+
+    const limitsResult = await this.db.query(limitsQuery, [
+      youthAccount.age_tier,
+      youthAccount.country || 'ZA'
+    ]);
+
+    if (limitsResult.rows.length === 0) {
+      return true; // Default to requiring approval if no limits found
+    }
+
+    const limits = limitsResult.rows[0];
+
+    // Check if transaction type requires approval
+    if (limits.requires_parental_approval.includes(transactionData.type)) {
+      return true;
+    }
+
+    // Check if amount exceeds auto-approval threshold
+    if (transactionData.amount > limits.max_transaction_amount) {
+      return true;
+    }
+
+    // Check daily/monthly spending limits
+    const spendingToday = await this.getTodaySpending(youthAccount.id);
+    const spendingThisMonth = await this.getMonthlySpending(youthAccount.id);
+
+    if (spendingToday + transactionData.amount > limits.max_daily_spending) {
+      return true;
+    }
+
+    if (spendingThisMonth + transactionData.amount > limits.max_monthly_spending) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private async createPendingTransaction(
+    client: any,
+    youthAccountId: string,
+    transactionData: any
+  ): Promise<string> {
+    const insertQuery = `
+      INSERT INTO youth_transactions 
+      (youth_account_id, transaction_type, category, amount, description, 
+       merchant_name, requires_approval, is_educational, status)
+      VALUES ($1, $2, $3, $4, $5, $6, true, $7, 'pending')
+      RETURNING id
+    `;
+
+    const result = await client.query(insertQuery, [
+      youthAccountId,
+      transactionData.type,
+      transactionData.category,
+      transactionData.amount,
+      transactionData.description,
+      transactionData.merchantName,
+      transactionData.isEducational || false
+    ]);
+
+    return result.rows[0].id;
+  }
+
+  private async requestParentalApproval(
+    client: any,
+    youthAccountId: string,
+    transactionId: string,
+    approvalType: string,
+    requestDetails: any
+  ): Promise<void> {
+    // Get primary guardian
+    const guardianQuery = `
+      SELECT parent_user_id 
+      FROM parental_relationships 
+      WHERE youth_account_id = $1 AND is_primary_guardian = true AND status = 'active'
+    `;
+
+    const guardianResult = await client.query(guardianQuery, [youthAccountId]);
+    
+    if (guardianResult.rows.length === 0) {
+      throw new Error('No primary guardian found');
+    }
+
+    const primaryGuardianId = guardianResult.rows[0].parent_user_id;
+
+    // Create approval request
+    const approvalQuery = `
+      INSERT INTO parental_approvals 
+      (youth_account_id, parent_user_id, transaction_id, approval_type, 
+       request_details, requested_amount)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id
+    `;
+
+    const approvalResult = await client.query(approvalQuery, [
+      youthAccountId,
+      primaryGuardianId,
+      transactionId,
+      approvalType,
+      JSON.stringify(requestDetails),
+      requestDetails.amount
+    ]);
+
+    // Send notification to guardian
+    await this.sendApprovalNotification(
+      primaryGuardianId,
+      approvalResult.rows[0].id,
+      requestDetails
+    );
+  }
+
+  async processParentalApproval(
+    approvalId: string,
+    parentUserId: string,
+    decision: 'approved' | 'denied',
+    reason?: string
+  ): Promise<void> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Update approval record
+      const updateApprovalQuery = `
+        UPDATE parental_approvals 
+        SET 
+          approval_status = $1,
+          approval_reason = $2,
+          responded_at = CURRENT_TIMESTAMP
+        WHERE id = $3 AND parent_user_id = $4 AND approval_status = 'pending'
+        RETURNING youth_account_id, transaction_id, request_details
+      `;
+
+      const approvalResult = await client.query(updateApprovalQuery, [
+        decision,
+        reason,
+        approvalId,
+        parentUserId
+      ]);
+
+      if (approvalResult.rows.length === 0) {
+        throw new Error('Approval request not found or already processed');
+      }
+
+      const approval = approvalResult.rows[0];
+
+      if (decision === 'approved') {
+        // Execute the transaction
+        if (approval.transaction_id) {
+          await this.executeApprovedTransaction(client, approval.transaction_id);
+        }
+      } else {
+        // Cancel the transaction
+        if (approval.transaction_id) {
+          await client.query(
+            'UPDATE youth_transactions SET status = $1 WHERE id = $2',
+            ['cancelled', approval.transaction_id]
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+
+      // Notify youth of decision
+      await this.notifyYouthOfApprovalDecision(
+        approval.youth_account_id,
+        decision,
+        reason
+      );
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error processing parental approval:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async executeApprovedTransaction(client: any, transactionId: string): Promise<void> {
+    // Update transaction status
+    await client.query(
+      'UPDATE youth_transactions SET status = $1 WHERE id = $2',
+      ['completed', transactionId]
+    );
+
+    // Update account balance (simplified - would integrate with wallet service)
+    logger.info(`Executing approved youth transaction: ${transactionId}`);
+  }
+
+  async addSavingsGoal(
+    youthAccountId: string,
+    goalData: {
+      name: string;
+      description: string;
+      targetAmount: number;
+      targetDate: Date;
+      category: string;
+      isParentSuggested?: boolean;
+    }
+  ): Promise<string> {
+    const insertQuery = `
+      INSERT INTO youth_savings_goals 
+      (youth_account_id, goal_name, goal_description, target_amount, 
+       target_date, goal_category, is_parent_suggested)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id
+    `;
+
+    const result = await this.db.query(insertQuery, [
+      youthAccountId,
+      goalData.name,
+      goalData.description,
+      goalData.targetAmount,
+      goalData.targetDate,
+      goalData.category,
+      goalData.isParentSuggested || false
+    ]);
+
+    const goalId = result.rows[0].id;
+
+    // Create educational milestone for goal setting
+    await this.recordEducationalAchievement(
+      youthAccountId,
+      'goal_setting',
+      'Created savings goal: ' + goalData.name
+    );
+
+    return goalId;
+  }
+
+  async updateEducationalProgress(
+    youthAccountId: string,
+    moduleId: string,
+    progressData: {
+      progressPercentage: number;
+      quizScore?: number;
+      practicalExerciseCompleted?: boolean;
+      learningNotes?: string;
+    }
+  ): Promise<void> {
+    const updateQuery = `
+      UPDATE youth_education_progress 
+      SET 
+        progress_percentage = $1,
+        quiz_score = $2,
+        practical_exercise_completed = $3,
+        completed_at = CASE WHEN $1 = 100 THEN CURRENT_TIMESTAMP ELSE completed_at END,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE youth_account_id = $4 AND module_id = $5
+    `;
+
+    await this.db.query(updateQuery, [
+      progressData.progressPercentage,
+      progressData.quizScore,
+      progressData.practicalExerciseCompleted,
+      youthAccountId,
+      moduleId
+    ]);
+
+    // Award badges for completion
+    if (progressData.progressPercentage === 100) {
+      await this.awardEducationalBadge(youthAccountId, moduleId);
+    }
+  }
+
+  private async recordEducationalAchievement(
+    youthAccountId: string,
+    achievementType: string,
+    description: string
+  ): Promise<void> {
+    logger.info(`Educational achievement for youth ${youthAccountId}: ${achievementType} - ${description}`);
+    // Implementation would record in educational progress system
+  }
+
+  private async awardEducationalBadge(
+    youthAccountId: string,
+    moduleId: string
+  ): Promise<void> {
+    const badgeName = `${moduleId}_completion`;
+    
+    const updateQuery = `
+      UPDATE youth_education_progress 
+      SET badges_earned = array_append(badges_earned, $1)
+      WHERE youth_account_id = $2 AND module_id = $3
+    `;
+
+    await this.db.query(updateQuery, [badgeName, youthAccountId, moduleId]);
+
+    // Notify parents of achievement
+    await this.notifyParentsOfEducationalAchievement(youthAccountId, badgeName);
+  }
+
+  async checkGraduationEligibility(youthAccountId: string): Promise<{
+    isEligible: boolean;
+    readinessScore: number;
+    missingRequirements: string[];
+    recommendedActions: string[];
+  }> {
+    // Get youth account details
+    const youthAccount = await this.getYouthAccountById(youthAccountId);
+    if (!youthAccount) {
+      throw new Error('Youth account not found');
+    }
+
+    const age = this.calculateAge(new Date(youthAccount.date_of_birth));
+    const readinessChecks = [];
+    const missingRequirements = [];
+    const recommendedActions = [];
+
+    // Age requirement
+    if (age >= 17.5) {
+      readinessChecks.push(true);
+    } else {
+      readinessChecks.push(false);
+      missingRequirements.push('Must be at least 17.5 years old');
+    }
+
+    // Educational progress requirement
+    const educationQuery = `
+      SELECT COUNT(*) as completed_modules
+      FROM youth_education_progress
+      WHERE youth_account_id = $1 AND completed_at IS NOT NULL
+    `;
+
+    const educationResult = await this.db.query(educationQuery, [youthAccountId]);
+    const completedModules = parseInt(educationResult.rows[0].completed_modules);
+
+    if (completedModules >= 5) {
+      readinessChecks.push(true);
+    } else {
+      readinessChecks.push(false);
+      missingRequirements.push(`Complete at least 5 educational modules (${completedModules}/5 completed)`);
+      recommendedActions.push('Focus on completing financial literacy modules');
+    }
+
+    // Savings behavior assessment
+    const savingsQuery = `
+      SELECT COUNT(*) as active_goals, AVG(current_amount/target_amount) as avg_progress
+      FROM youth_savings_goals
+      WHERE youth_account_id = $1 AND status = 'active'
+    `;
+
+    const savingsResult = await this.db.query(savingsQuery, [youthAccountId]);
+    const activeSavingsGoals = parseInt(savingsResult.rows[0].active_goals);
+
+    if (activeSavingsGoals >= 1) {
+      readinessChecks.push(true);
+    } else {
+      readinessChecks.push(false);
+      missingRequirements.push('Maintain at least one active savings goal');
+      recommendedActions.push('Create and work towards a savings goal');
+    }
+
+    // Responsible spending assessment
+    const spendingQuery = `
+      SELECT COUNT(*) as total_transactions,
+             COUNT(CASE WHEN requires_approval = false THEN 1 END) as auto_approved
+      FROM youth_transactions
+      WHERE youth_account_id = $1 
+      AND transaction_date >= CURRENT_DATE - INTERVAL '90 days'
+      AND status = 'completed'
+    `;
+
+    const spendingResult = await this.db.query(spendingQuery, [youthAccountId]);
+    const totalTransactions = parseInt(spendingResult.rows[0].total_transactions);
+    const autoApproved = parseInt(spendingResult.rows[0].auto_approved);
+    
+    const responsibleSpendingRate = totalTransactions > 0 ? (autoApproved / totalTransactions) : 0;
+
+    if (responsibleSpendingRate >= 0.8) {
+      readinessChecks.push(true);
+    } else {
+      readinessChecks.push(false);
+      missingRequirements.push('Demonstrate responsible spending (80% of transactions auto-approved)');
+      recommendedActions.push('Focus on staying within spending limits');
+    }
+
+    const readinessScore = (readinessChecks.filter(Boolean).length / readinessChecks.length) * 100;
+    const isEligible = readinessScore >= 75; // 75% readiness required
+
+    return {
+      isEligible,
+      readinessScore,
+      missingRequirements,
+      recommendedActions
+    };
+  }
+
+  private async getYouthAccountById(youthAccountId: string): Promise<any> {
+    const query = `
+      SELECT ya.*, u.country
+      FROM youth_accounts ya
+      JOIN users u ON ya.user_id = u.id
+      WHERE ya.id = $1
+    `;
+
+    const result = await this.db.query(query, [youthAccountId]);
+    return result.rows[0];
+  }
+
+  private async getTodaySpending(youthAccountId: string): Promise<number> {
+    const query = `
+      SELECT COALESCE(SUM(amount), 0) as total_spending
+      FROM youth_transactions
+      WHERE youth_account_id = $1 
+      AND DATE(transaction_date) = CURRENT_DATE
+      AND transaction_type IN ('spending', 'purchase')
+      AND status = 'completed'
+    `;
+
+    const result = await this.db.query(query, [youthAccountId]);
+    return parseFloat(result.rows[0].total_spending);
+  }
+
+  private async getMonthlySpending(youthAccountId: string): Promise<number> {
+    const query = `
+      SELECT COALESCE(SUM(amount), 0) as total_spending
+      FROM youth_transactions
+      WHERE youth_account_id = $1 
+      AND DATE_TRUNC('month', transaction_date) = DATE_TRUNC('month', CURRENT_DATE)
+      AND transaction_type IN ('spending', 'purchase')
+      AND status = 'completed'
+    `;
+
+    const result = await this.db.query(query, [youthAccountId]);
+    return parseFloat(result.rows[0].total_spending);
+  }
+
+  private async applyDefaultAccountLimits(
+    client: any,
+    youthAccountId: string,
+    ageTier: string
+  ): Promise<void> {
+    // Default limits would be applied based on age tier and country
+    logger.info(`Applying default limits for ${ageTier} account: ${youthAccountId}`);
+  }
+
+  private async initializeEducationalPath(
+    client: any,
+    youthAccountId: string,
+    ageTier: string
+  ): Promise<void> {
+    // Initialize age-appropriate educational modules
+    const modules = this.getAgeAppropriateModules(ageTier);
+    
+    for (const module of modules) {
+      await client.query(`
+        INSERT INTO youth_education_progress 
+        (youth_account_id, module_id, module_name, age_appropriate_level)
+        VALUES ($1, $2, $3, $4)
+      `, [youthAccountId, module.id, module.name, module.level]);
+    }
+  }
+
+  private getAgeAppropriateModules(ageTier: string): Array<{
+    id: string;
+    name: string;
+    level: string;
+  }> {
+    const modulesByTier: { [key: string]: any[] } = {
+      'junior_saver': [
+        { id: 'money_basics', name: 'What is Money?', level: 'beginner' },
+        { id: 'saving_fundamentals', name: 'Why Save Money?', level: 'beginner' },
+        { id: 'goal_setting', name: 'Setting Financial Goals', level: 'beginner' }
+      ],
+      'teen_investor': [
+        { id: 'budgeting_basics', name: 'Creating a Budget', level: 'intermediate' },
+        { id: 'investment_intro', name: 'Introduction to Investing', level: 'intermediate' },
+        { id: 'banking_services', name: 'Understanding Banking', level: 'intermediate' }
+      ],
+      'pre_adult': [
+        { id: 'advanced_investing', name: 'Investment Strategies', level: 'advanced' },
+        { id: 'credit_and_debt', name: 'Credit and Debt Management', level: 'advanced' },
+        { id: 'adult_financial_planning', name: 'Planning for Financial Independence', level: 'advanced' }
+      ]
+    };
+
+    return modulesByTier[ageTier] || [];
+  }
+
+  private async initializeGraduationTracking(
+    client: any,
+    youthAccountId: string,
+    transitionDate: Date
+  ): Promise<void> {
+    const defaultChecklist = {
+      financial_literacy_assessment: false,
+      savings_goal_achievement: false,
+      responsible_spending_demonstration: false,
+      parent_readiness_confirmation: false,
+      account_security_setup: false
+    };
+
+    await client.query(`
+      INSERT INTO account_graduation_tracking 
+      (youth_account_id, graduation_date, preparation_checklist)
+      VALUES ($1, $2, $3)
+    `, [youthAccountId, transitionDate, JSON.stringify(defaultChecklist)]);
+  }
+
+  private async executeYouthTransaction(
+    client: any,
+    youthAccountId: string,
+    transactionData: any
+  ): Promise<string> {
+    const insertQuery = `
+      INSERT INTO youth_transactions 
+      (youth_account_id, transaction_type, category, amount, description, 
+       merchant_name, is_educational, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed')
+      RETURNING id
+    `;
+
+    const result = await client.query(insertQuery, [
+      youthAccountId,
+      transactionData.type,
+      transactionData.category,
+      transactionData.amount,
+      transactionData.description,
+      transactionData.merchantName,
+      transactionData.isEducational || false
+    ]);
+
+    return result.rows[0].id;
+  }
+
+  private async sendYouthAccountWelcome(
+    youthUserId: string,
+    parentUserId: string
+  ): Promise<void> {
+    logger.info(`Sending welcome notifications for youth account: ${youthUserId}, parent: ${parentUserId}`);
+  }
+
+  private async sendApprovalNotification(
+    parentUserId: string,
+    approvalId: string,
+    requestDetails: any
+  ): Promise<void> {
+    logger.info(`Sending approval notification to parent: ${parentUserId} for approval: ${approvalId}`);
+  }
+
+  private async notifyParentsOfTransaction(
+    youthAccountId: string,
+    transactionId: string
+  ): Promise<void> {
+    logger.info(`Notifying parents of transaction: ${transactionId} for youth: ${youthAccountId}`);
+  }
+
+  private async notifyYouthOfApprovalDecision(
+    youthAccountId: string,
+    decision: string,
+    reason?: string
+  ): Promise<void> {
+    logger.info(`Notifying youth ${youthAccountId} of approval decision: ${decision}`);
+  }
+
+  private async notifyParentsOfEducationalAchievement(
+    youthAccountId: string,
+    achievement: string
+  ): Promise<void> {
+    logger.info(`Notifying parents of educational achievement: ${achievement} for youth: ${youthAccountId}`);
+  }
+}
+```
+
+## Parental Dashboard Implementation
+
+### 3. Parental Control Interface
+
+```typescript
+// src/components/youth/ParentalDashboard.tsx
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { 
+  DollarSign, 
+  TrendingUp, 
+  Shield, 
+  BookOpen, 
+  Target, 
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Eye,
+  Settings
+} from 'lucide-react';
+import { useYouthAccountStore } from '@/store/youthAccount';
+import { formatCurrency } from '@/lib/utils/currency';
+
+interface ParentalDashboardProps {
+  parentUserId: string;
+}
+
+export function ParentalDashboard({ parentUserId }: ParentalDashboardProps) {
+  const [selectedChild, setSelectedChild] = useState&lt;string | null>(null);
+  
+  const {
+    youthAccounts,
+    pendingApprovals,
+    isLoading,
+    fetchYouthAccounts,
+    fetchPendingApprovals,
+    processApproval
+  } = useYouthAccountStore();
+
+  useEffect(() => {
+    fetchYouthAccounts(parentUserId);
+    fetchPendingApprovals(parentUserId);
+  }, [parentUserId, fetchYouthAccounts, fetchPendingApprovals]);
+
+  const handleApproval = async (approvalId: string, decision: 'approved' | 'denied', reason?: string) => {
+    try {
+      await processApproval(approvalId, parentUserId, decision, reason);
+      await fetchPendingApprovals(parentUserId); // Refresh approvals
+    } catch (error) {
+      console.error('Error processing approval:', error);
+    }
+  };
+
+  if (isLoading) {
+    return &lt;div className="flex items-center justify-center h-64">Loading dashboard...&lt;/div>;
+  }
+
+  const selectedYouthAccount = selectedChild 
+    ? youthAccounts.find(account => account.id === selectedChild)
+    : youthAccounts[0];
+
+  return (
+    &lt;div className="space-y-6">
+      {/* Header */}
+      &lt;div className="flex justify-between items-center">
+        &lt;div>
+          &lt;h1 className="text-3xl font-bold">Parental Dashboard&lt;/h1>
+          &lt;p className="text-muted-foreground">
+            Monitor and guide your children's financial journey
+          &lt;/p>
+        &lt;/div>
+        &lt;Button variant="outline" size="sm">
+          &lt;Settings className="h-4 w-4 mr-2" />
+          Dashboard Settings
+        &lt;/Button>
+      &lt;/div>
+
+      {/* Pending Approvals Alert */}
+      {pendingApprovals.length > 0 && (
+        &lt;Alert>
+          &lt;AlertCircle className="h-4 w-4" />
+          &lt;AlertDescription>
+            You have {pendingApprovals.length} pending approval{pendingApprovals.length === 1 ? '' : 's'} requiring your attention.
+          &lt;/AlertDescription>
+        &lt;/Alert>
+      )}
+
+      {/* Children Overview */}
+      &lt;div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {youthAccounts.map((account) => (
+          &lt;Card 
+            key={account.id} 
+            className={`cursor-pointer transition-all ${
+              selectedChild === account.id ? 'ring-2 ring-primary' : 'hover:shadow-md'
+            }`}
+            onClick={() => setSelectedChild(account.id)}
+          >
+            &lt;CardHeader className="pb-3">
+              &lt;div className="flex items-center space-x-3">
+                &lt;Avatar>
+                  &lt;AvatarImage src={account.profileImage} />
+                  &lt;AvatarFallback>
+                    {account.firstName[0]}{account.lastName[0]}
+                  &lt;/AvatarFallback>
+                &lt;/Avatar>
+                &lt;div>
+                  &lt;h3 className="font-semibold">{account.firstName} {account.lastName}&lt;/h3>
+                  &lt;p className="text-sm text-muted-foreground">
+                    Age {account.age} • {account.ageTier.replace('_', ' ')}
+                  &lt;/p>
+                &lt;/div>
+              &lt;/div>
+            &lt;/CardHeader>
+            &lt;CardContent>
+              &lt;div className="space-y-2">
+                &lt;div className="flex justify-between text-sm">
+                  &lt;span>Balance:&lt;/span>
+                  &lt;span className="font-medium">{formatCurrency(account.balance, 'ZAR')}&lt;/span>
+                &lt;/div>
+                &lt;div className="flex justify-between text-sm">
+                  &lt;span>This Month:&lt;/span>
+                  &lt;span>{formatCurrency(account.monthlySpending, 'ZAR')} spent&lt;/span>
+                &lt;/div>
+                &lt;div className="flex justify-between text-sm">
+                  &lt;span>Learning:&lt;/span>
+                  &lt;span>{account.educationProgress}% complete&lt;/span>
+                &lt;/div>
+              &lt;/div>
+            &lt;/CardContent>
+          &lt;/Card>
+        ))}
+      &lt;/div>
+
+      {/* Detailed View */}
+      {selectedYouthAccount && (
+        &lt;Tabs defaultValue="overview" className="space-y-6">
+          &lt;TabsList className="grid w-full grid-cols-5">
+            &lt;TabsTrigger value="overview">Overview&lt;/TabsTrigger>
+            &lt;TabsTrigger value="transactions">Transactions&lt;/TabsTrigger>
+            &lt;TabsTrigger value="education">Education&lt;/TabsTrigger>
+            &lt;TabsTrigger value="goals">Goals&lt;/TabsTrigger>
+            &lt;TabsTrigger value="approvals">Approvals&lt;/TabsTrigger>
+          &lt;/TabsList>
+
+          &lt;TabsContent value="overview" className="space-y-6">
+            &lt;OverviewTab youthAccount={selectedYouthAccount} />
+          &lt;/TabsContent>
+
+          &lt;TabsContent value="transactions" className="space-y-6">
+            &lt;TransactionsTab youthAccountId={selectedYouthAccount.id} />
+          &lt;/TabsContent>
+
+          &lt;TabsContent value="education" className="space-y-6">
+            &lt;EducationTab youthAccountId={selectedYouthAccount.id} />
+          &lt;/TabsContent>
+
+          &lt;TabsContent value="goals" className="space-y-6">
+            &lt;GoalsTab youthAccountId={selectedYouthAccount.id} />
+          &lt;/TabsContent>
+
+          &lt;TabsContent value="approvals" className="space-y-6">
+            &lt;ApprovalsTab 
+              pendingApprovals={pendingApprovals.filter(a => a.youthAccountId === selectedYouthAccount.id)}
+              onApprove={handleApproval}
+            />
+          &lt;/TabsContent>
+        &lt;/Tabs>
+      )}
+    &lt;/div>
+  );
+}
+
+// Overview Tab Component
+function OverviewTab({ youthAccount }: { youthAccount: any }) {
+  return (
+    &lt;div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Account Balance */}
+      &lt;Card>
+        &lt;CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          &lt;CardTitle className="text-sm font-medium">Account Balance&lt;/CardTitle>
+          &lt;DollarSign className="h-4 w-4 text-muted-foreground" />
+        &lt;/CardHeader>
+        &lt;CardContent>
+          &lt;div className="text-2xl font-bold">{formatCurrency(youthAccount.balance, 'ZAR')}&lt;/div>
+          &lt;p className="text-xs text-muted-foreground">
+            {youthAccount.balanceChange > 0 ? '+' : ''}{formatCurrency(youthAccount.balanceChange, 'ZAR')} this week
+          &lt;/p>
+        &lt;/CardContent>
+      &lt;/Card>
+
+      {/* Monthly Spending */}
+      &lt;Card>
+        &lt;CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          &lt;CardTitle className="text-sm font-medium">Monthly Spending&lt;/CardTitle>
+          &lt;TrendingUp className="h-4 w-4 text-muted-foreground" />
+        &lt;/CardHeader>
+        &lt;CardContent>
+          &lt;div className="text-2xl font-bold">{formatCurrency(youthAccount.monthlySpending, 'ZAR')}&lt;/div>
+          &lt;Progress value={(youthAccount.monthlySpending / youthAccount.monthlyLimit) * 100} className="mt-2" />
+          &lt;p className="text-xs text-muted-foreground mt-1">
+            {formatCurrency(youthAccount.monthlyLimit - youthAccount.monthlySpending, 'ZAR')} remaining
+          &lt;/p>
+        &lt;/CardContent>
+      &lt;/Card>
+
+      {/* Savings Goals */}
+      &lt;Card>
+        &lt;CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          &lt;CardTitle className="text-sm font-medium">Active Goals&lt;/CardTitle>
+          &lt;Target className="h-4 w-4 text-muted-foreground" />
+        &lt;/CardHeader>
+        &lt;CardContent>
+          &lt;div className="text-2xl font-bold">{youthAccount.activeGoals}&lt;/div>
+          &lt;p className="text-xs text-muted-foreground">
+            {youthAccount.goalsAchievedThisYear} goals achieved this year
+          &lt;/p>
+        &lt;/CardContent>
+      &lt;/Card>
+
+      {/* Education Progress */}
+      &lt;Card>
+        &lt;CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          &lt;CardTitle className="text-sm font-medium">Learning Progress&lt;/CardTitle>
+          &lt;BookOpen className="h-4 w-4 text-muted-foreground" />
+        &lt;/CardHeader>
+        &lt;CardContent>
+          &lt;div className="text-2xl font-bold">{youthAccount.educationProgress}%&lt;/div>
+          &lt;Progress value={youthAccount.educationProgress} className="mt-2" />
+          &lt;p className="text-xs text-muted-foreground mt-1">
+            {youthAccount.badgesEarned} badges earned
+          &lt;/p>
+        &lt;/CardContent>
+      &lt;/Card>
+    &lt;/div>
+  );
+}
+
+// Transactions Tab Component
+function TransactionsTab({ youthAccountId }: { youthAccountId: string }) {
+  const [transactions, setTransactions] = useState([]);
+  
+  useEffect(() => {
+    // Fetch transactions for the youth account
+    // Implementation would load transaction history
+  }, [youthAccountId]);
+
+  return (
+    &lt;Card>
+      &lt;CardHeader>
+        &lt;CardTitle>Recent Transactions&lt;/CardTitle>
+        &lt;p className="text-sm text-muted-foreground">
+          Monitor your child's spending and saving activities
+        &lt;/p>
+      &lt;/CardHeader>
+      &lt;CardContent>
+        &lt;div className="space-y-4">
+          {transactions.length === 0 ? (
+            &lt;p className="text-center text-muted-foreground py-8">
+              No transactions yet
+            &lt;/p>
+          ) : (
+            transactions.map((transaction: any) => (
+              &lt;div key={transaction.id} className="flex items-center justify-between border-b pb-3">
+                &lt;div>
+                  &lt;p className="font-medium">{transaction.description}&lt;/p>
+                  &lt;p className="text-sm text-muted-foreground">
+                    {transaction.category} • {new Date(transaction.date).toLocaleDateString()}
+                  &lt;/p>
+                &lt;/div>
+                &lt;div className="text-right">
+                  &lt;p className={`font-medium ${transaction.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {transaction.amount > 0 ? '+' : ''}{formatCurrency(Math.abs(transaction.amount), 'ZAR')}
+                  &lt;/p>
+                  &lt;Badge variant="outline" className="text-xs">
+                    {transaction.status}
+                  &lt;/Badge>
+                &lt;/div>
+              &lt;/div>
+            ))
+          )}
+        &lt;/div>
+      &lt;/CardContent>
+    &lt;/Card>
+  );
+}
+
+// Education Tab Component
+function EducationTab({ youthAccountId }: { youthAccountId: string }) {
+  const [educationModules, setEducationModules] = useState([]);
+
+  return (
+    &lt;Card>
+      &lt;CardHeader>
+        &lt;CardTitle>Educational Progress&lt;/CardTitle>
+        &lt;p className="text-sm text-muted-foreground">
+          Track your child's financial literacy journey
+        &lt;/p>
+      &lt;/CardHeader>
+      &lt;CardContent>
+        &lt;div className="space-y-4">
+          {educationModules.map((module: any) => (
+            &lt;div key={module.id} className="border rounded-lg p-4">
+              &lt;div className="flex items-center justify-between mb-2">
+                &lt;h4 className="font-semibold">{module.name}&lt;/h4>
+                {module.completed ? (
+                  &lt;CheckCircle className="h-5 w-5 text-green-500" />
+                ) : (
+                  &lt;Clock className="h-5 w-5 text-yellow-500" />
+                )}
+              &lt;/div>
+              &lt;Progress value={module.progress} className="mb-2" />
+              &lt;p className="text-sm text-muted-foreground">
+                {module.progress}% complete • Level: {module.level}
+              &lt;/p>
+              {module.badges.length > 0 && (
+                &lt;div className="flex gap-2 mt-2">
+                  {module.badges.map((badge: string) => (
+                    &lt;Badge key={badge} variant="secondary" className="text-xs">
+                      {badge}
+                    &lt;/Badge>
+                  ))}
+                &lt;/div>
+              )}
+            &lt;/div>
+          ))}
+        &lt;/div>
+      &lt;/CardContent>
+    &lt;/Card>
+  );
+}
+
+// Goals Tab Component
+function GoalsTab({ youthAccountId }: { youthAccountId: string }) {
+  const [savingsGoals, setSavingsGoals] = useState([]);
+
+  return (
+    &lt;Card>
+      &lt;CardHeader>
+        &lt;div className="flex justify-between items-center">
+          &lt;div>
+            &lt;CardTitle>Savings Goals&lt;/CardTitle>
+            &lt;p className="text-sm text-muted-foreground">
+              Help your child achieve their financial goals
+            &lt;/p>
+          &lt;/div>
+          &lt;Button size="sm">Add Goal&lt;/Button>
+        &lt;/div>
+      &lt;/CardHeader>
+      &lt;CardContent>
+        &lt;div className="space-y-4">
+          {savingsGoals.map((goal: any) => (
+            &lt;div key={goal.id} className="border rounded-lg p-4">
+              &lt;div className="flex justify-between items-start mb-3">
+                &lt;div>
+                  &lt;h4 className="font-semibold">{goal.name}&lt;/h4>
+                  &lt;p className="text-sm text-muted-foreground">{goal.description}&lt;/p>
+                &lt;/div>
+                &lt;Badge variant={goal.isParentSuggested ? 'default' : 'outline'}>
+                  {goal.isParentSuggested ? 'Parent Suggested' : 'Self-Set'}
+                &lt;/Badge>
+              &lt;/div>
+              
+              &lt;div className="space-y-2">
+                &lt;div className="flex justify-between text-sm">
+                  &lt;span>Progress:&lt;/span>
+                  &lt;span>{formatCurrency(goal.currentAmount, 'ZAR')} / {formatCurrency(goal.targetAmount, 'ZAR')}&lt;/span>
+                &lt;/div>
+                &lt;Progress value={(goal.currentAmount / goal.targetAmount) * 100} />
+                &lt;div className="flex justify-between text-xs text-muted-foreground">
+                  &lt;span>Target Date: {new Date(goal.targetDate).toLocaleDateString()}&lt;/span>
+                  &lt;span>{Math.round((goal.currentAmount / goal.targetAmount) * 100)}% complete&lt;/span>
+                &lt;/div>
+              &lt;/div>
+            &lt;/div>
+          ))}
+        &lt;/div>
+      &lt;/CardContent>
+    &lt;/Card>
+  );
+}
+
+// Approvals Tab Component
+function ApprovalsTab({ 
+  pendingApprovals, 
+  onApprove 
+}: { 
+  pendingApprovals: any[];
+  onApprove: (approvalId: string, decision: 'approved' | 'denied', reason?: string) => void;
+}) {
+  const [selectedApproval, setSelectedApproval] = useState&lt;any | null>(null);
+
+  return (
+    &lt;Card>
+      &lt;CardHeader>
+        &lt;CardTitle>Pending Approvals&lt;/CardTitle>
+        &lt;p className="text-sm text-muted-foreground">
+          Review and approve your child's transaction requests
+        &lt;/p>
+      &lt;/CardHeader>
+      &lt;CardContent>
+        {pendingApprovals.length === 0 ? (
+          &lt;p className="text-center text-muted-foreground py-8">
+            No pending approvals
+          &lt;/p>
+        ) : (
+          &lt;div className="space-y-4">
+            {pendingApprovals.map((approval) => (
+              &lt;div key={approval.id} className="border rounded-lg p-4">
+                &lt;div className="flex justify-between items-start mb-3">
+                  &lt;div>
+                    &lt;h4 className="font-semibold">{approval.requestDetails.description}&lt;/h4>
+                    &lt;p className="text-sm text-muted-foreground">
+                      {approval.approvalType} • {formatCurrency(approval.requestedAmount, 'ZAR')}
+                    &lt;/p>
+                    &lt;p className="text-xs text-muted-foreground">
+                      Requested {new Date(approval.requestedAt).toLocaleDateString()}
+                    &lt;/p>
+                  &lt;/div>
+                  &lt;Badge variant="outline">
+                    &lt;Clock className="h-3 w-3 mr-1" />
+                    Pending
+                  &lt;/Badge>
+                &lt;/div>
+                
+                &lt;div className="flex gap-2">
+                  &lt;Button 
+                    size="sm" 
+                    onClick={() => onApprove(approval.id, 'approved')}
+                    className="flex-1"
+                  >
+                    &lt;CheckCircle className="h-4 w-4 mr-2" />
+                    Approve
+                  &lt;/Button>
+                  &lt;Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => onApprove(approval.id, 'denied')}
+                    className="flex-1"
+                  >
+                    Deny
+                  &lt;/Button>
+                  &lt;Button size="sm" variant="ghost">
+                    &lt;Eye className="h-4 w-4" />
+                  &lt;/Button>
+                &lt;/div>
+              &lt;/div>
+            ))}
+          &lt;/div>
+        )}
+      &lt;/CardContent>
+    &lt;/Card>
+  );
+}
+```
+
+## Educational Content Implementation
+
+### 4. Age-Appropriate Learning Modules
+
+```typescript
+// src/services/education/youthEducationService.ts
+import { Pool } from 'pg';
+import { EducationModule, EducationProgress } from '@/types/education';
+import { logger } from '@/lib/utils/logger';
+
+export class YouthEducationService {
+  constructor(private db: Pool) {}
+
+  async getAgeAppropriateModules(ageTier: string, completedModules: string[] = []): Promise<EducationModule[]> {
+    const modulesByTier = {
+      'junior_saver': [
+        {
+          id: 'money_basics',
+          title: 'What is Money?',
+          description: 'Learn about different types of money and how they work',
+          level: 'beginner',
+          estimatedMinutes: 15,
+          activities: [
+            { type: 'video', title: 'Money Around the World', duration: 5 },
+            { type: 'quiz', title: 'Money Types Quiz', questions: 5 },
+            { type: 'game', title: 'Coin Counting Game', duration: 5 }
+          ],
+          learningObjectives: [
+            'Identify different types of money',
+            'Understand money as a tool for exchange',
+            'Recognize South African currency denominations'
+          ],
+          culturalContext: {
+            examples: ['Ubuntu marketplace', 'Community trading', 'Family money sharing'],
+            stories: ['The wise village trader', 'How grandmother saved for the future']
+          }
+        },
+        {
+          id: 'saving_fundamentals',
+          title: 'Why Save Money?',
+          description: 'Discover the importance of saving and how it helps achieve goals',
+          level: 'beginner',
+          estimatedMinutes: 20,
+          activities: [
+            { type: 'story', title: 'The Ant and the Grasshopper (African Version)', duration: 8 },
+            { type: 'interactive', title: 'Build Your Savings Jar', duration: 7 },
+            { type: 'quiz', title: 'Saving Benefits Quiz', questions: 5 }
+          ],
+          learningObjectives: [
+            'Understand why saving is important',
+            'Identify different reasons to save',
+            'Learn about delayed gratification'
+          ],
+          culturalContext: {
+            examples: ['Community harvest savings', 'Stokvel participation', 'Family emergency funds'],
+            stories: ['The community that saved for drought', 'Nomsa\'s school fee savings']
+          }
+        }
+      ],
+      'teen_investor': [
+        {
+          id: 'budgeting_basics',
+          title: 'Creating Your First Budget',
+          description: 'Learn how to plan and track your money',
+          level: 'intermediate',
+          estimatedMinutes: 30,
+          activities: [
+            { type: 'tutorial', title: 'Budget Building Workshop', duration: 15 },
+            { type: 'calculator', title: 'Personal Budget Tool', duration: 10 },
+            { type: 'challenge', title: '30-Day Budget Challenge', duration: 5 }
+          ],
+          learningObjectives: [
+            'Create a basic budget',
+            'Track income and expenses',
+            'Identify spending categories',
+            'Make financial trade-offs'
+          ],
+          practicalExercise: {
+            title: 'Track Your Spending for a Week',
+            description: 'Monitor all your expenses for 7 days using the AWO app',
+            deliverable: 'Spending category breakdown'
+          }
+        },
+        {
+          id: 'investment_intro',
+          title: 'Introduction to Investing',
+          description: 'Understand how money can grow through investments',
+          level: 'intermediate',
+          estimatedMinutes: 25,
+          activities: [
+            { type: 'simulation', title: 'Virtual Stock Market', duration: 15 },
+            { type: 'video', title: 'Investment Success Stories', duration: 7 },
+            { type: 'quiz', title: 'Investment Concepts Quiz', questions: 8 }
+          ],
+          learningObjectives: [
+            'Understand basic investment concepts',
+            'Learn about risk and return',
+            'Explore different investment types',
+            'Practice with virtual investments'
+          ],
+          parentGuidance: {
+            discussionPoints: [
+              'Family investment goals',
+              'Risk tolerance discussion',
+              'Long-term vs short-term thinking'
+            ],
+            activities: [
+              'Research family investments together',
+              'Discuss investment news stories',
+              'Set family investment goals'
+            ]
+          }
+        }
+      ],
+      'pre_adult': [
+        {
+          id: 'advanced_investing',
+          title: 'Investment Strategies and Portfolio Management',
+          description: 'Learn advanced investment concepts and portfolio building',
+          level: 'advanced',
+          estimatedMinutes: 45,
+          activities: [
+            { type: 'case_study', title: 'Real Investment Portfolios', duration: 20 },
+            { type: 'simulation', title: 'Portfolio Builder', duration: 15 },
+            { type: 'research', title: 'Investment Research Project', duration: 10 }
+          ],
+          learningObjectives: [
+            'Build diversified portfolios',
+            'Understand asset allocation',
+            'Analyze investment performance',
+            'Make informed investment decisions'
+          ],
+          realWorldApplication: {
+            title: 'Build Your Transition Portfolio',
+            description: 'Design an investment portfolio for your adult account transition',
+            mentorSupport: true
+          }
+        }
+      ]
+    };
+
+    const tierModules = modulesByTier[ageTier as keyof typeof modulesByTier] || [];
+    
+    // Filter out completed modules and add progress information
+    return tierModules.filter(module => !completedModules.includes(module.id));
+  }
+
+  async startEducationModule(
+    youthAccountId: string,
+    moduleId: string
+  ): Promise<void> {
+    // Check if already started
+    const existingQuery = `
+      SELECT id FROM youth_education_progress 
+      WHERE youth_account_id = $1 AND module_id = $2
+    `;
+
+    const existing = await this.db.query(existingQuery, [youthAccountId, moduleId]);
+
+    if (existing.rows.length > 0) {
+      // Module already started, just update started timestamp
+      await this.db.query(
+        'UPDATE youth_education_progress SET started_at = CURRENT_TIMESTAMP WHERE youth_account_id = $1 AND module_id = $2',
+        [youthAccountId, moduleId]
+      );
+    } else {
+      // Create new progress record
+      const module = await this.getModuleById(moduleId);
+      if (!module) {
+        throw new Error('Education module not found');
+      }
+
+      const insertQuery = `
+        INSERT INTO youth_education_progress 
+        (youth_account_id, module_id, module_name, age_appropriate_level, progress_percentage)
+        VALUES ($1, $2, $3, $4, 0)
+      `;
+
+      await this.db.query(insertQuery, [
+        youthAccountId,
+        moduleId,
+        module.title,
+        module.level
+      ]);
+    }
+
+    logger.info(`Education module started: ${moduleId} for youth: ${youthAccountId}`);
+  }
+
+  async updateModuleProgress(
+    youthAccountId: string,
+    moduleId: string,
+    progressData: {
+      activityCompleted: string;
+      progressPercentage: number;
+      quizScore?: number;
+      timeSpentMinutes?: number;
+      learningNotes?: string;
+    }
+  ): Promise<void> {
+    const updateQuery = `
+      UPDATE youth_education_progress 
+      SET 
+        progress_percentage = $1,
+        quiz_score = COALESCE($2, quiz_score),
+        completed_at = CASE WHEN $1 = 100 THEN CURRENT_TIMESTAMP ELSE completed_at END,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE youth_account_id = $3 AND module_id = $4
+    `;
+
+    await this.db.query(updateQuery, [
+      progressData.progressPercentage,
+      progressData.quizScore,
+      youthAccountId,
+      moduleId
+    ]);
+
+    // Award badges and achievements
+    if (progressData.progressPercentage === 100) {
+      await this.awardCompletionBadge(youthAccountId, moduleId);
+      await this.recommendNextModule(youthAccountId, moduleId);
+    }
+
+    // Special recognition for high quiz scores
+    if (progressData.quizScore && progressData.quizScore >= 90) {
+      await this.awardHighScoreBadge(youthAccountId, moduleId);
+    }
+
+    // Notify parents of progress
+    await this.notifyParentsOfProgress(youthAccountId, moduleId, progressData.progressPercentage);
+  }
+
+  async getEducationProgress(youthAccountId: string): Promise<{
+    completedModules: number;
+    totalModules: number;
+    currentLevel: string;
+    badgesEarned: string[];
+    nextRecommendedModule?: string;
+    weeklyGoal: {
+      target: number;
+      completed: number;
+      timeRemaining: number;
+    };
+  }> {
+    // Get youth account tier
+    const youthQuery = `
+      SELECT age_tier FROM youth_accounts WHERE id = $1
+    `;
+
+    const youthResult = await this.db.query(youthQuery, [youthAccountId]);
+    const ageTier = youthResult.rows[0]?.age_tier;
+
+    if (!ageTier) {
+      throw new Error('Youth account not found');
+    }
+
+    // Get progress statistics
+    const progressQuery = `
+      SELECT 
+        COUNT(*) as total_modules,
+        COUNT(CASE WHEN completed_at IS NOT NULL THEN 1 END) as completed_modules,
+        array_agg(DISTINCT unnest(badges_earned)) FILTER (WHERE badges_earned IS NOT NULL) as all_badges,
+        MAX(age_appropriate_level) as current_level
+      FROM youth_education_progress
+      WHERE youth_account_id = $1
+    `;
+
+    const progressResult = await this.db.query(progressQuery, [youthAccountId]);
+    const progress = progressResult.rows[0];
+
+    // Get this week's activity
+    const weeklyQuery = `
+      SELECT COUNT(*) as modules_started_this_week
+      FROM youth_education_progress
+      WHERE youth_account_id = $1 
+      AND started_at >= DATE_TRUNC('week', CURRENT_DATE)
+    `;
+
+    const weeklyResult = await this.db.query(weeklyQuery, [youthAccountId]);
+    const weeklyActivity = weeklyResult.rows[0];
+
+    // Weekly goal: 1 module per week for consistency
+    const weeklyGoal = {
+      target: 1,
+      completed: parseInt(weeklyActivity.modules_started_this_week) || 0,
+      timeRemaining: 7 - new Date().getDay() // Days remaining in week
+    };
+
+    return {
+      completedModules: parseInt(progress.completed_modules) || 0,
+      totalModules: parseInt(progress.total_modules) || 0,
+      currentLevel: progress.current_level || 'beginner',
+      badgesEarned: progress.all_badges || [],
+      weeklyGoal
+    };
+  }
+
+  async createCustomLearningPath(
+    youthAccountId: string,
+    interests: string[],
+    goals: string[],
+    parentPriorities: string[]
+  ): Promise<string[]> {
+    // Get youth account details
+    const youthQuery = `
+      SELECT age_tier FROM youth_accounts WHERE id = $1
+    `;
+
+    const youthResult = await this.db.query(youthQuery, [youthAccountId]);
+    const ageTier = youthResult.rows[0]?.age_tier;
+
+    // Algorithm to create personalized learning path
+    const availableModules = await this.getAgeAppropriateModules(ageTier);
+    const customPath: string[] = [];
+
+    // Prioritize based on goals and interests
+    const priorityModules = availableModules.filter(module => {
+      const moduleKeywords = module.description.toLowerCase().split(' ');
+      return interests.some(interest => 
+        moduleKeywords.includes(interest.toLowerCase())
+      ) || goals.some(goal =>
+        moduleKeywords.includes(goal.toLowerCase())
+      );
+    });
+
+    // Add priority modules first
+    customPath.push(...priorityModules.slice(0, 3).map(m => m.id));
+
+    // Fill remaining path with foundational modules
+    const foundationalModules = availableModules.filter(module => 
+      module.level === 'beginner' && !customPath.includes(module.id)
+    );
+
+    customPath.push(...foundationalModules.slice(0, 2).map(m => m.id));
+
+    // Store custom learning path
+    await this.storeLearningPath(youthAccountId, customPath);
+
+    return customPath;
+  }
+
+  private async getModuleById(moduleId: string): Promise<EducationModule | null> {
+    // In a real implementation, this would fetch from a modules database
+    // For now, we'll return a basic module structure
+    return {
+      id: moduleId,
+      title: 'Education Module',
+      description: 'Learning module description',
+      level: 'beginner',
+      estimatedMinutes: 20,
+      activities: [],
+      learningObjectives: []
+    };
+  }
+
+  private async awardCompletionBadge(youthAccountId: string, moduleId: string): Promise<void> {
+    const badgeName = `${moduleId}_master`;
+    
+    const updateQuery = `
+      UPDATE youth_education_progress 
+      SET badges_earned = array_append(COALESCE(badges_earned, '{}'), $1)
+      WHERE youth_account_id = $2 AND module_id = $3
+    `;
+
+    await this.db.query(updateQuery, [badgeName, youthAccountId, moduleId]);
+
+    logger.info(`Badge awarded: ${badgeName} to youth: ${youthAccountId}`);
+  }
+
+  private async awardHighScoreBadge(youthAccountId: string, moduleId: string): Promise<void> {
+    const badgeName = `${moduleId}_scholar`;
+    
+    const updateQuery = `
+      UPDATE youth_education_progress 
+      SET badges_earned = array_append(COALESCE(badges_earned, '{}'), $1)
+      WHERE youth_account_id = $2 AND module_id = $3
+    `;
+
+    await this.db.query(updateQuery, [badgeName, youthAccountId, moduleId]);
+  }
+
+  private async recommendNextModule(youthAccountId: string, completedModuleId: string): Promise<void> {
+    // Logic to recommend the next appropriate module
+    const nextModuleId = this.getNextRecommendedModule(completedModuleId);
+    
+    if (nextModuleId) {
+      const updateQuery = `
+        UPDATE youth_education_progress 
+        SET next_recommended_module = $1
+        WHERE youth_account_id = $2 AND module_id = $3
+      `;
+
+      await this.db.query(updateQuery, [nextModuleId, youthAccountId, completedModuleId]);
+    }
+  }
+
+  private getNextRecommendedModule(completedModuleId: string): string | null {
+    // Simple progression logic
+    const moduleProgression: { [key: string]: string } = {
+      'money_basics': 'saving_fundamentals',
+      'saving_fundamentals': 'goal_setting',
+      'goal_setting': 'budgeting_basics',
+      'budgeting_basics': 'investment_intro',
+      'investment_intro': 'advanced_investing'
+    };
+
+    return moduleProgression[completedModuleId] || null;
+  }
+
+  private async notifyParentsOfProgress(
+    youthAccountId: string,
+    moduleId: string,
+    progressPercentage: number
+  ): Promise<void> {
+    logger.info(`Notifying parents of progress: Youth ${youthAccountId}, Module ${moduleId}, Progress ${progressPercentage}%`);
+    // Implementation would send notifications to parents
+  }
+
+  private async storeLearningPath(youthAccountId: string, path: string[]): Promise<void> {
+    // Store the custom learning path in the database
+    const updateQuery = `
+      UPDATE youth_accounts 
+      SET custom_learning_path = $1
+      WHERE id = $2
+    `;
+
+    await this.db.query(updateQuery, [JSON.stringify(path), youthAccountId]);
+  }
+}
+```
+
+## Account Graduation Process
+
+### 5. Transition to Adult Account
+
+```typescript
+// src/services/youth/graduationService.ts
+import { Pool } from 'pg';
+import { logger } from '@/lib/utils/logger';
+
+export class AccountGraduationService {
+  constructor(private db: Pool) {}
+
+  async initiateGraduationProcess(youthAccountId: string): Promise<{
+    readinessAssessment: any;
+    transitionTimeline: any;
+    requiredActions: string[];
+  }> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Get youth account details
+      const youthQuery = `
+        SELECT ya.*, u.date_of_birth
+        FROM youth_accounts ya
+        JOIN users u ON ya.user_id = u.id
+        WHERE ya.id = $1
+      `;
+
+      const youthResult = await client.query(youthQuery, [youthAccountId]);
+      const youthAccount = youthResult.rows[0];
+
+      if (!youthAccount) {
+        throw new Error('Youth account not found');
+      }
+
+      const age = this.calculateAge(new Date(youthAccount.date_of_birth));
+
+      // Check if graduation can be initiated
+      if (age < 17.5) {
+        throw new Error('Graduation process can only be initiated after age 17.5');
+      }
+
+      // Perform readiness assessment
+      const readinessAssessment = await this.performReadinessAssessment(youthAccountId);
+
+      // Create graduation tracking record if not exists
+      await this.ensureGraduationTracking(client, youthAccountId);
+
+      // Update graduation status
+      await client.query(
+        'UPDATE account_graduation_tracking SET preparation_phase_started = true WHERE youth_account_id = $1',
+        [youthAccountId]
+      );
+
+      // Generate transition timeline
+      const transitionTimeline = this.generateTransitionTimeline(new Date(youthAccount.date_of_birth));
+
+      // Determine required actions
+      const requiredActions = this.determineRequiredActions(readinessAssessment);
+
+      await client.query('COMMIT');
+
+      // Notify parents of graduation initiation
+      await this.notifyParentsOfGraduationStart(youthAccountId);
+
+      return {
+        readinessAssessment,
+        transitionTimeline,
+        requiredActions
+      };
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error initiating graduation process:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async performReadinessAssessment(youthAccountId: string): Promise<{
+    financialLiteracyScore: number;
+    responsibleSpendingScore: number;
+    savingsHabitScore: number;
+    goalAchievementScore: number;
+    overallReadinessScore: number;
+    recommendations: string[];
+  }> {
+    // Financial Literacy Assessment
+    const educationQuery = `
+      SELECT 
+        COUNT(*) as total_modules,
+        COUNT(CASE WHEN completed_at IS NOT NULL THEN 1 END) as completed_modules,
+        AVG(quiz_score) as avg_quiz_score
+      FROM youth_education_progress
+      WHERE youth_account_id = $1
+    `;
+
+    const educationResult = await this.db.query(educationQuery, [youthAccountId]);
+    const education = educationResult.rows[0];
+
+    const financialLiteracyScore = this.calculateFinancialLiteracyScore(education);
+
+    // Responsible Spending Assessment
+    const spendingQuery = `
+      SELECT 
+        COUNT(*) as total_transactions,
+        COUNT(CASE WHEN requires_approval = false THEN 1 END) as auto_approved_transactions,
+        AVG(amount) as avg_transaction_amount
+      FROM youth_transactions
+      WHERE youth_account_id = $1 
+      AND transaction_date >= CURRENT_DATE - INTERVAL '180 days'
+      AND status = 'completed'
+    `;
+
+    const spendingResult = await this.db.query(spendingQuery, [youthAccountId]);
+    const spending = spendingResult.rows[0];
+
+    const responsibleSpendingScore = this.calculateResponsibleSpendingScore(spending);
+
+    // Savings Habit Assessment
+    const savingsQuery = `
+      SELECT 
+        COUNT(*) as total_goals,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_goals,
+        AVG(current_amount::float / target_amount::float) as avg_goal_progress
+      FROM youth_savings_goals
+      WHERE youth_account_id = $1
+    `;
+
+    const savingsResult = await this.db.query(savingsQuery, [youthAccountId]);
+    const savings = savingsResult.rows[0];
+
+    const savingsHabitScore = this.calculateSavingsHabitScore(savings);
+
+    // Goal Achievement Assessment
+    const goalAchievementScore = this.calculateGoalAchievementScore(savings);
+
+    // Calculate overall readiness score
+    const overallReadinessScore = (
+      financialLiteracyScore * 0.3 +
+      responsibleSpendingScore * 0.25 +
+      savingsHabitScore * 0.25 +
+      goalAchievementScore * 0.2
+    );
+
+    // Generate recommendations
+    const recommendations = this.generateReadinessRecommendations({
+      financialLiteracyScore,
+      responsibleSpendingScore,
+      savingsHabitScore,
+      goalAchievementScore
+    });
+
+    return {
+      financialLiteracyScore,
+      responsibleSpendingScore,
+      savingsHabitScore,
+      goalAchievementScore,
+      overallReadinessScore,
+      recommendations
+    };
+  }
+
+  private calculateFinancialLiteracyScore(education: any): number {
+    const completionRate = education.total_modules > 0 
+      ? (education.completed_modules / education.total_modules) 
+      : 0;
+    
+    const quizPerformance = (education.avg_quiz_score || 0) / 100;
+    
+    return Math.round((completionRate * 0.6 + quizPerformance * 0.4) * 100);
+  }
+
+  private calculateResponsibleSpendingScore(spending: any): number {
+    if (spending.total_transactions === 0) {
+      return 50; // Neutral score for no transaction history
+    }
+
+    const autoApprovalRate = spending.auto_approved_transactions / spending.total_transactions;
+    return Math.round(autoApprovalRate * 100);
+  }
+
+  private calculateSavingsHabitScore(savings: any): number {
+    if (savings.total_goals === 0) {
+      return 0; // No savings goals set
+    }
+
+    const avgProgress = savings.avg_goal_progress || 0;
+    const goalEngagement = Math.min(savings.total_goals / 3, 1); // Max credit for 3+ goals
+    
+    return Math.round((avgProgress * 0.7 + goalEngagement * 0.3) * 100);
+  }
+
+  private calculateGoalAchievementScore(savings: any): number {
+    if (savings.total_goals === 0) {
+      return 0;
+    }
+
+    const completionRate = savings.completed_goals / savings.total_goals;
+    return Math.round(completionRate * 100);
+  }
+
+  private generateReadinessRecommendations(scores: any): string[] {
+    const recommendations: string[] = [];
+
+    if (scores.financialLiteracyScore < 70) {
+      recommendations.push('Complete additional financial education modules to improve literacy score');
+    }
+
+    if (scores.responsibleSpendingScore < 75) {
+      recommendations.push('Focus on making more transactions within approved limits to demonstrate responsibility');
+    }
+
+    if (scores.savingsHabitScore < 60) {
+      recommendations.push('Set and actively work towards savings goals to build financial discipline');
+    }
+
+    if (scores.goalAchievementScore < 50) {
+      recommendations.push('Complete at least one savings goal to demonstrate commitment to financial planning');
+    }
+
+    if (recommendations.length === 0) {
+      recommendations.push('Excellent financial readiness! Continue current habits as you transition to full account access.');
+    }
+
+    return recommendations;
+  }
+
+  private generateTransitionTimeline(dateOfBirth: Date): {
+    phases: Array<{
+      phase: string;
+      startDate: Date;
+      endDate: Date;
+      description: string;
+      milestones: string[];
+    }>;
+    graduationDate: Date;
+  } {
+    const graduationDate = new Date(dateOfBirth);
+    graduationDate.setFullYear(graduationDate.getFullYear() + 18);
+
+    const sixMonthsBefore = new Date(graduationDate);
+    sixMonthsBefore.setMonth(sixMonthsBefore.getMonth() - 6);
+
+    const threeMonthsBefore = new Date(graduationDate);
+    threeMonthsBefore.setMonth(threeMonthsBefore.getMonth() - 3);
+
+    const oneMonthBefore = new Date(graduationDate);
+    oneMonthBefore.setMonth(oneMonthBefore.getMonth() - 1);
+
+    const phases = [
+      {
+        phase: 'Preparation Phase',
+        startDate: sixMonthsBefore,
+        endDate: threeMonthsBefore,
+        description: 'Build financial literacy and demonstrate responsible financial behavior',
+        milestones: [
+          'Complete advanced financial education modules',
+          'Achieve 80%+ responsible spending rate',
+          'Set and progress towards meaningful savings goals'
+        ]
+      },
+      {
+        phase: 'Assessment Phase',
+        startDate: threeMonthsBefore,
+        endDate: oneMonthBefore,
+        description: 'Formal readiness assessment and transition planning',
+        milestones: [
+          'Complete financial literacy assessment',
+          'Receive parental readiness confirmation',
+          'Review and approve transition plan'
+        ]
+      },
+      {
+        phase: 'Transition Phase',
+        startDate: oneMonthBefore,
+        endDate: graduationDate,
+        description: 'Gradual introduction to full account features',
+        milestones: [
+          'Preview full platform features',
+          'Complete DIVA score preparation',
+          'Set up adult account security'
+        ]
+      },
+      {
+        phase: 'Post-Graduation Monitoring',
+        startDate: graduationDate,
+        endDate: new Date(graduationDate.getTime() + 90 * 24 * 60 * 60 * 1000), // 90 days later
+        description: 'Continued support and monitoring during initial adult account period',
+        milestones: [
+          'Successfully manage full account access',
+          'Complete first DIVA score assessment',
+          'Demonstrate continued responsible financial behavior'
+        ]
+      }
+    ];
+
+    return {
+      phases,
+      graduationDate
+    };
+  }
+
+  private determineRequiredActions(readinessAssessment: any): string[] {
+    const actions: string[] = [];
+
+    if (readinessAssessment.overallReadinessScore < 75) {
+      actions.push('Improve overall readiness score to at least 75%');
+    }
+
+    if (readinessAssessment.financialLiteracyScore < 70) {
+      actions.push('Complete remaining financial education modules');
+      actions.push('Achieve 70%+ average on module quizzes');
+    }
+
+    if (readinessAssessment.responsibleSpendingScore < 75) {
+      actions.push('Demonstrate responsible spending for the next 60 days');
+      actions.push('Maintain 75%+ auto-approval rate for transactions');
+    }
+
+    if (readinessAssessment.savingsHabitScore < 60) {
+      actions.push('Create and actively pursue savings goals');
+      actions.push('Maintain consistent saving habits');
+    }
+
+    actions.push('Obtain parental confirmation of readiness');
+    actions.push('Complete final financial literacy assessment');
+
+    return actions;
+  }
+
+  async executeAccountGraduation(youthAccountId: string): Promise<{
+    newAdultAccountId: string;
+    transferredAssets: any;
+    preservedHistory: any;
+  }> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Validate graduation eligibility
+      const readinessAssessment = await this.performReadinessAssessment(youthAccountId);
+      
+      if (readinessAssessment.overallReadinessScore < 75) {
+        throw new Error('Account not ready for graduation. Please complete required actions first.');
+      }
+
+      // Get youth account details
+      const youthQuery = `
+        SELECT ya.*, u.*
+        FROM youth_accounts ya
+        JOIN users u ON ya.user_id = u.id
+        WHERE ya.id = $1
+      `;
+
+      const youthResult = await client.query(youthQuery, [youthAccountId]);
+      const youthAccount = youthResult.rows[0];
+
+      // Verify age requirement
+      const age = this.calculateAge(new Date(youthAccount.date_of_birth));
+      if (age < 18) {
+        throw new Error('Must be 18 years old to graduate to adult account');
+      }
+
+      // Convert user account to adult
+      await client.query(`
+        UPDATE users 
+        SET account_type = 'standard', is_minor = false, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      `, [youthAccount.user_id]);
+
+      // Update youth account status
+      await client.query(`
+        UPDATE youth_accounts 
+        SET account_status = 'graduated', updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      `, [youthAccountId]);
+
+      // Transfer financial assets and history
+      const transferredAssets = await this.transferAssetsToAdultAccount(
+        client, 
+        youthAccountId, 
+        youthAccount.user_id
+      );
+
+      // Preserve educational and achievement history
+      const preservedHistory = await this.preserveYouthHistory(client, youthAccountId);
+
+      // Create initial DIVA score entry
+      await this.initializeAdultDivaScore(client, youthAccount.user_id);
+
+      // Update graduation tracking
+      await client.query(`
+        UPDATE account_graduation_tracking 
+        SET 
+          account_transition_status = 'completed',
+          full_access_granted_at = CURRENT_TIMESTAMP
+        WHERE youth_account_id = $1
+      `, [youthAccountId]);
+
+      await client.query('COMMIT');
+
+      // Send graduation notifications
+      await this.sendGraduationNotifications(youthAccount.user_id, youthAccountId);
+
+      // Schedule post-graduation monitoring
+      await this.schedulePostGraduationMonitoring(youthAccount.user_id);
+
+      logger.info(`Account graduation completed for youth: ${youthAccountId} -> adult: ${youthAccount.user_id}`);
+
+      return {
+        newAdultAccountId: youthAccount.user_id,
+        transferredAssets,
+        preservedHistory
+      };
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error executing account graduation:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async transferAssetsToAdultAccount(
+    client: any,
+    youthAccountId: string,
+    adultUserId: string
+  ): Promise<{
+    totalBalance: number;
+    savingsGoals: number;
+    investmentSimulations: number;
+  }> {
+    // Get total account balance
+    const balanceQuery = `
+      SELECT COALESCE(SUM(amount), 0) as total_balance
+      FROM youth_transactions
+      WHERE youth_account_id = $1 AND status = 'completed'
+    `;
+
+    const balanceResult = await client.query(balanceQuery, [youthAccountId]);
+    const totalBalance = parseFloat(balanceResult.rows[0].total_balance);
+
+    // Transfer savings goals to adult account (convert to regular goals)
+    const goalsQuery = `
+      SELECT COUNT(*) as active_goals
+      FROM youth_savings_goals
+      WHERE youth_account_id = $1 AND status = 'active'
+    `;
+
+    const goalsResult = await client.query(goalsQuery, [youthAccountId]);
+    const activeGoals = parseInt(goalsResult.rows[0].active_goals);
+
+    // Mark investment simulations as graduated
+    await client.query(`
+      UPDATE youth_investment_simulations 
+      SET status = 'graduated', completed_at = CURRENT_TIMESTAMP
+      WHERE youth_account_id = $1 AND status = 'active'
+    `, [youthAccountId]);
+
+    const simulationsQuery = `
+      SELECT COUNT(*) as total_simulations
+      FROM youth_investment_simulations
+      WHERE youth_account_id = $1
+    `;
+
+    const simulationsResult = await client.query(simulationsQuery, [youthAccountId]);
+    const totalSimulations = parseInt(simulationsResult.rows[0].total_simulations);
+
+    return {
+      totalBalance,
+      savingsGoals: activeGoals,
+      investmentSimulations: totalSimulations
+    };
+  }
+
+  private async preserveYouthHistory(client: any, youthAccountId: string): Promise<{
+    educationalAchievements: any[];
+    badgesEarned: string[];
+    milestonesReached: any[];
+  }> {
+    // Get educational achievements
+    const educationQuery = `
+      SELECT module_name, completed_at, quiz_score, badges_earned
+      FROM youth_education_progress
+      WHERE youth_account_id = $1 AND completed_at IS NOT NULL
+    `;
+
+    const educationResult = await client.query(educationQuery, [youthAccountId]);
+    const educationalAchievements = educationResult.rows;
+
+    // Collect all badges earned
+    const badgesQuery = `
+      SELECT DISTINCT unnest(badges_earned) as badge
+      FROM youth_education_progress
+      WHERE youth_account_id = $1 AND badges_earned IS NOT NULL
+    `;
+
+    const badgesResult = await client.query(badgesQuery, [youthAccountId]);
+    const badgesEarned = badgesResult.rows.map(row => row.badge);
+
+    // Get milestone achievements
+    const milestonesQuery = `
+      SELECT goal_name, completed_at, target_amount, current_amount
+      FROM youth_savings_goals
+      WHERE youth_account_id = $1 AND status = 'completed'
+    `;
+
+    const milestonesResult = await client.query(milestonesQuery, [youthAccountId]);
+    const milestonesReached = milestonesResult.rows;
+
+    // Create achievement summary record for adult account
+    await client.query(`
+      INSERT INTO user_achievements 
+      (user_id, achievement_type, achievement_data, earned_at)
+      VALUES ($1, 'youth_graduation', $2, CURRENT_TIMESTAMP)
+    `, [
+      (await this.getAdultUserId(youthAccountId)),
+      JSON.stringify({
+        totalEducationalModules: educationalAchievements.length,
+        totalBadges: badgesEarned.length,
+        totalGoalsAchieved: milestonesReached.length,
+        graduationDate: new Date()
+      })
+    ]);
+
+    return {
+      educationalAchievements,
+      badgesEarned,
+      milestonesReached
+    };
+  }
+
+  private async initializeAdultDivaScore(client: any, userId: string): Promise<void> {
+    // Create initial DIVA score entry with youth account bonus
+    const initialScore = {
+      discipline: 0.6, // Start with good discipline from youth training
+      income: 0.3,     // Lower initially due to age
+      velocity: 0.4,   // Moderate velocity
+      assets: 0.2      // Lower assets due to age
+    };
+
+    const overallScore = (
+      initialScore.discipline * 0.3 +
+      initialScore.income * 0.25 +
+      initialScore.velocity * 0.25 +
+      initialScore.assets * 0.2
+    ) * 1000; // Convert to 0-1000 scale
+
+    await client.query(`
+      INSERT INTO diva_scores 
+      (user_id, overall_score, discipline_score, income_score, velocity_score, assets_score, calculated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+    `, [
+      userId,
+      Math.round(overallScore),
+      initialScore.discipline,
+      initialScore.income,
+      initialScore.velocity,
+      initialScore.assets
+    ]);
+  }
+
+  private async getAdultUserId(youthAccountId: string): Promise<string> {
+    const query = `SELECT user_id FROM youth_accounts WHERE id = $1`;
+    const result = await this.db.query(query, [youthAccountId]);
+    return result.rows[0].user_id;
+  }
+
+  private calculateAge(dateOfBirth: Date): number {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  }
+
+  private async ensureGraduationTracking(client: any, youthAccountId: string): Promise<void> {
+    const existingQuery = `
+      SELECT id FROM account_graduation_tracking WHERE youth_account_id = $1
+    `;
+
+    const existing = await client.query(existingQuery, [youthAccountId]);
+
+    if (existing.rows.length === 0) {
+      // Create graduation tracking record
+      const youthAccount = await this.getYouthAccountById(youthAccountId);
+      const graduationDate = new Date(youthAccount.date_of_birth);
+      graduationDate.setFullYear(graduationDate.getFullYear() + 18);
+
+      await client.query(`
+        INSERT INTO account_graduation_tracking 
+        (youth_account_id, graduation_date, preparation_checklist)
+        VALUES ($1, $2, $3)
+      `, [
+        youthAccountId,
+        graduationDate,
+        JSON.stringify({
+          financial_literacy_assessment: false,
+          savings_goal_achievement: false,
+          responsible_spending_demonstration: false,
+          parent_readiness_confirmation: false,
+          account_security_setup: false
+        })
+      ]);
+    }
+  }
+
+  private async getYouthAccountById(youthAccountId: string): Promise<any> {
+    const query = `
+      SELECT ya.*, u.date_of_birth
+      FROM youth_accounts ya
+      JOIN users u ON ya.user_id = u.id
+      WHERE ya.id = $1
+    `;
+
+    const result = await this.db.query(query, [youthAccountId]);
+    return result.rows[0];
+  }
+
+  private async sendGraduationNotifications(userId: string, youthAccountId: string): Promise<void> {
+    logger.info(`Sending graduation notifications for user: ${userId}, youth account: ${youthAccountId}`);
+    // Implementation would send celebratory notifications to user and parents
+  }
+
+  private async schedulePostGraduationMonitoring(userId: string): Promise<void> {
+    // Schedule 90-day monitoring period
+    logger.info(`Scheduling post-graduation monitoring for user: ${userId}`);
+    // Implementation would set up monitoring tasks
+  }
+
+  private async notifyParentsOfGraduationStart(youthAccountId: string): Promise<void> {
+    logger.info(`Notifying parents of graduation process start for youth: ${youthAccountId}`);
+    // Implementation would send notifications to parents
+  }
+}
+```
+
+## Testing Implementation
+
+### 6. Youth Account Testing Suite
+
+```typescript
+// src/services/__tests__/youthAccountService.test.ts
+import { YouthAccountService } from '../youth/youthAccountService';
+import { mockDB } from '../../__mocks__/database';
+
+describe('YouthAccountService', () => {
+  let youthAccountService: YouthAccountService;
+
+  beforeEach(() => {
+    youthAccountService = new YouthAccountService(mockDB);
+    jest.clearAllMocks();
+  });
+
+  describe('createYouthAccount', () => {
+    it('should create a youth account for eligible age', async () => {
+      const parentUserId = 'parent-123';
+      const youthData = {
+        firstName: 'Sarah',
+        lastName: 'Smith',
+        dateOfBirth: new Date('2009-01-01'), // 16 years old
+        email: 'sarah@example.com',
+        educationalLevel: 'secondary',
+        schoolName: 'Cape Town High School'
+      };
+
+      const parentalConsent = {
+        consentMethod: 'digital_signature',
+        relationshipType: 'parent'
+      };
+
+      // Mock database responses
+      mockDB.query
+        .mockResolvedValueOnce({ rows: [{ id: 'user-123' }] }) // User creation
+        .mockResolvedValueOnce({ rows: [{ id: 'youth-123' }] }) // Youth account creation
+        .mockResolvedValueOnce({ rows: [] }); // Parental relationship creation
+
+      const youthAccountId = await youthAccountService.createYouthAccount(
+        parentUserId,
+        youthData,
+        parentalConsent
+      );
+
+      expect(youthAccountId).toBe('youth-123');
+      expect(mockDB.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO users'),
+        expect.arrayContaining([youthData.firstName, youthData.lastName])
+      );
+    });
+
+    it('should reject account creation for ineligible age', async () => {
+      const youthData = {
+        firstName: 'Too',
+        lastName: 'Young',
+        dateOfBirth: new Date('2015-01-01'), // 10 years old
+        educationalLevel: 'primary'
+      };
+
+      await expect(
+        youthAccountService.createYouthAccount('parent-123', youthData, {
+          consentMethod: 'digital_signature',
+          relationshipType: 'parent'
+        })
+      ).rejects.toThrow('Youth accounts are for ages 13-17 only');
+    });
+  });
+
+  describe('processYouthTransaction', () => {
+    it('should process small transaction without approval', async () => {
+      const youthAccountId = 'youth-123';
+      const transactionData = {
+        type: 'spending',
+        category: 'education',
+        amount: 25,
+        description: 'School supplies',
+        isEducational: true
+      };
+
+      // Mock youth account and limits
+      mockDB.query
+        .mockResolvedValueOnce({ rows: [{ age_tier: 'junior_saver', id: youthAccountId }] }) // getYouthAccountById
+        .mockResolvedValueOnce({ rows: [{ 
+          requires_parental_approval: ['large_purchase'],
+          max_transaction_amount: 100,
+          max_daily_spending: 200,
+          max_monthly_spending: 500
+        }] }) // Account limits
+        .mockResolvedValueOnce({ rows: [{ total_spending: 10 }] }) // Today's spending
+        .mockResolvedValueOnce({ rows: [{ total_spending: 150 }] }) // Monthly spending
+        .mockResolvedValueOnce({ rows: [{ id: 'trans-123' }] }); // Execute transaction
+
+      const transactionId = await youthAccountService.processYouthTransaction(
+        youthAccountId,
+        transactionData
+      );
+
+      expect(transactionId).toBe('trans-123');
+      expect(mockDB.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO youth_transactions'),
+        expect.arrayContaining([youthAccountId, 'spending', 'education', 25])
+      );
+    });
+
+    it('should require approval for large transaction', async () => {
+      const youthAccountId = 'youth-123';
+      const transactionData = {
+        type: 'spending',
+        category: 'entertainment',
+        amount: 150, // Exceeds limit
+        description: 'Gaming console'
+      };
+
+      // Mock youth account requiring approval
+      mockDB.query
+        .mockResolvedValueOnce({ rows: [{ age_tier: 'teen_investor', id: youthAccountId }] })
+        .mockResolvedValueOnce({ rows: [{ 
+          requires_parental_approval: ['entertainment'],
+          max_transaction_amount: 100 // Amount exceeds this
+        }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'trans-pending-123' }] }) // Pending transaction
+        .mockResolvedValueOnce({ rows: [{ parent_user_id: 'parent-123' }] }) // Primary guardian
+        .mockResolvedValueOnce({ rows: [{ id: 'approval-123' }] }); // Approval request
+
+      const transactionId = await youthAccountService.processYouthTransaction(
+        youthAccountId,
+        transactionData
+      );
+
+      expect(transactionId).toBe('trans-pending-123');
+      expect(mockDB.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO parental_approvals'),
+        expect.anything()
+      );
+    });
+  });
+
+  describe('checkGraduationEligibility', () => {
+    it('should assess graduation readiness correctly', async () => {
+      const youthAccountId = 'youth-123';
+
+      // Mock youth account (17.5 years old)
+      mockDB.query
+        .mockResolvedValueOnce({ rows: [{ 
+          age_tier: 'pre_adult',
+          date_of_birth: new Date('2007-01-01'), // 17.5+ years old
+          id: youthAccountId 
+        }] })
+        .mockResolvedValueOnce({ rows: [{ completed_modules: 6 }] }) // Education
+        .mockResolvedValueOnce({ rows: [{ active_goals: 2 }] }) // Savings goals
+        .mockResolvedValueOnce({ rows: [{ 
+          total_transactions: 50,
+          auto_approved: 42 // 84% auto-approval rate
+        }] }); // Spending behavior
+
+      const eligibility = await youthAccountService.checkGraduationEligibility(youthAccountId);
+
+      expect(eligibility.isEligible).toBe(true);
+      expect(eligibility.readinessScore).toBeGreaterThan(75);
+      expect(eligibility.missingRequirements).toHaveLength(0);
+    });
+
+    it('should identify missing requirements for graduation', async () => {
+      const youthAccountId = 'youth-123';
+
+      // Mock youth account with deficiencies
+      mockDB.query
+        .mockResolvedValueOnce({ rows: [{ 
+          age_tier: 'teen_investor',
+          date_of_birth: new Date('2007-06-01'), // 17.5+ years old
+          id: youthAccountId 
+        }] })
+        .mockResolvedValueOnce({ rows: [{ completed_modules: 2 }] }) // Low education
+        .mockResolvedValueOnce({ rows: [{ active_goals: 0 }] }) // No savings goals
+        .mockResolvedValueOnce({ rows: [{ 
+          total_transactions: 20,
+          auto_approved: 10 // 50% auto-approval rate
+        }] });
+
+      const eligibility = await youthAccountService.checkGraduationEligibility(youthAccountId);
+
+      expect(eligibility.isEligible).toBe(false);
+      expect(eligibility.readinessScore).toBeLessThan(75);
+      expect(eligibility.missingRequirements.length).toBeGreaterThan(0);
+      expect(eligibility.recommendedActions.length).toBeGreaterThan(0);
+    });
+  });
+});
+```
+
+## Monitoring and Analytics
+
+### 7. Youth Account Analytics
+
+```typescript
+// src/services/analytics/youthAnalyticsService.ts
+import { Pool } from 'pg';
+import { logger } from '@/lib/utils/logger';
+
+export class YouthAnalyticsService {
+  constructor(private db: Pool) {}
+
+  async getYouthPlatformMetrics(): Promise<{
+    totalYouthAccounts: number;
+    accountsByTier: { [tier: string]: number };
+    parentalEngagement: {
+      activeParents: number;
+      avgApprovalsPerWeek: number;
+      avgResponseTime: number;
+    };
+    educationalProgress: {
+      avgCompletionRate: number;
+      popularModules: Array<{ module: string; completions: number }>;
+      badgesAwarded: number;
+    };
+    financialBehavior: {
+      avgMonthlySpending: number;
+      topSpendingCategories: Array<{ category: string; amount: number }>;
+      savingsGoalParticipation: number;
+    };
+    graduationMetrics: {
+      accountsNearGraduation: number;
+      avgReadinessScore: number;
+      successfulGraduations: number;
+    };
+  }> {
+    try {
+      // Total youth accounts by tier
+      const accountsQuery = `
+        SELECT 
+          COUNT(*) as total_accounts,
+          age_tier,
+          COUNT(*) FILTER (WHERE account_status = 'active') as active_accounts
+        FROM youth_accounts
+        GROUP BY age_tier
+      `;
+
+      const accountsResult = await this.db.query(accountsQuery);
+      
+      const totalYouthAccounts = accountsResult.rows.reduce((sum, row) => sum + parseInt(row.active_accounts), 0);
+      const accountsByTier = accountsResult.rows.reduce((acc, row) => {
+        acc[row.age_tier] = parseInt(row.active_accounts);
+        return acc;
+      }, {});
+
+      // Parental engagement metrics
+      const parentalQuery = `
+        SELECT 
+          COUNT(DISTINCT parent_user_id) as active_parents,
+          AVG(EXTRACT(EPOCH FROM (responded_at - requested_at))/3600) as avg_response_hours,
+          COUNT(*) FILTER (WHERE requested_at >= CURRENT_DATE - INTERVAL '7 days') as approvals_this_week
+        FROM parental_approvals
+        WHERE approval_status != 'pending'
+        AND requested_at >= CURRENT_DATE - INTERVAL '30 days'
+      `;
+
+      const parentalResult = await this.db.query(parentalQuery);
+      const parentalData = parentalResult.rows[0];
+
+      // Educational progress metrics
+      const educationQuery = `
+        SELECT 
+          AVG(progress_percentage) as avg_completion_rate,
+          COUNT(*) FILTER (WHERE completed_at IS NOT NULL) as total_completions,
+          COUNT(DISTINCT unnest(badges_earned)) as total_badges
+        FROM youth_education_progress
+      `;
+
+      const educationResult = await this.db.query(educationQuery);
+      const educationData = educationResult.rows[0];
+
+      // Popular modules
+      const modulesQuery = `
+        SELECT module_name, COUNT(*) as completions
+        FROM youth_education_progress
+        WHERE completed_at IS NOT NULL
+        GROUP BY module_name
+        ORDER BY completions DESC
+        LIMIT 5
+      `;
+
+      const modulesResult = await this.db.query(modulesQuery);
+
+      // Financial behavior metrics
+      const financialQuery = `
+        SELECT 
+          AVG(monthly_spending.amount) as avg_monthly_spending,
+          COUNT(DISTINCT ysg.youth_account_id) as users_with_goals
+        FROM (
+          SELECT 
+            youth_account_id,
+            DATE_TRUNC('month', transaction_date) as month,
+            SUM(amount) as amount
+          FROM youth_transactions
+          WHERE transaction_type IN ('spending', 'purchase')
+          AND status = 'completed'
+          AND transaction_date >= CURRENT_DATE - INTERVAL '6 months'
+          GROUP BY youth_account_id, DATE_TRUNC('month', transaction_date)
+        ) monthly_spending
+        FULL OUTER JOIN youth_savings_goals ysg ON ysg.status = 'active'
+      `;
+
+      const financialResult = await this.db.query(financialQuery);
+      const financialData = financialResult.rows[0];
+
+      // Top spending categories
+      const categoriesQuery = `
+        SELECT category, SUM(amount) as total_amount
+        FROM youth_transactions
+        WHERE transaction_type IN ('spending', 'purchase')
+        AND status = 'completed'
+        AND transaction_date >= CURRENT_DATE - INTERVAL '30 days'
+        GROUP BY category
+        ORDER BY total_amount DESC
+        LIMIT 5
+      `;
+
+      const categoriesResult = await this.db.query(categoriesQuery);
+
+      // Graduation metrics
+      const graduationQuery = `
+        SELECT 
+          COUNT(*) FILTER (WHERE EXTRACT(YEAR FROM AGE(CURRENT_DATE, date_of_birth)) >= 17.5) as near_graduation,
+          COUNT(*) FILTER (WHERE account_status = 'graduated') as graduated_accounts
+        FROM youth_accounts ya
+        JOIN users u ON ya.user_id = u.id
+      `;
+
+      const graduationResult = await this.db.query(graduationQuery);
+      const graduationData = graduationResult.rows[0];
+
+      return {
+        totalYouthAccounts,
+        accountsByTier,
+        parentalEngagement: {
+          activeParents: parseInt(parentalData.active_parents) || 0,
+          avgApprovalsPerWeek: parseInt(parentalData.approvals_this_week) || 0,
+          avgResponseTime: parseFloat(parentalData.avg_response_hours) || 0
+        },
+        educationalProgress: {
+          avgCompletionRate: parseFloat(educationData.avg_completion_rate) || 0,
+          popularModules: modulesResult.rows,
+          badgesAwarded: parseInt(educationData.total_badges) || 0
+        },
+        financialBehavior: {
+          avgMonthlySpending: parseFloat(financialData.avg_monthly_spending) || 0,
+          topSpendingCategories: categoriesResult.rows,
+          savingsGoalParticipation: parseInt(financialData.users_with_goals) || 0
+        },
+        graduationMetrics: {
+          accountsNearGraduation: parseInt(graduationData.near_graduation) || 0,
+          avgReadinessScore: 0, // Would require additional calculation
+          successfulGraduations: parseInt(graduationData.graduated_accounts) || 0
+        }
+      };
+
+    } catch (error) {
+      logger.error('Error getting youth platform metrics:', error);
+      throw new Error('Failed to get youth platform metrics');
+    }
+  }
+
+  async generateParentInsights(parentUserId: string): Promise<{
+    childrenSummary: Array<{
+      childId: string;
+      name: string;
+      financialHealthScore: number;
+      educationalProgress: number;
+      monthlyTrends: any[];
+      recommendations: string[];
+    }>;
+    familyFinancialEducation: {
+      completedModules: number;
+      upcomingMilestones: any[];
+      suggestedActivities: string[];
+    };
+    parentingTips: string[];
+  }> {
+    try {
+      // Get all children for this parent
+      const childrenQuery = `
+        SELECT 
+          ya.id as youth_account_id,
+          u.first_name,
+          u.last_name,
+          ya.age_tier,
+          EXTRACT(YEAR FROM AGE(CURRENT_DATE, u.date_of_birth)) as age
+        FROM youth_accounts ya
+        JOIN users u ON ya.user_id = u.id
+        JOIN parental_relationships pr ON ya.id = pr.youth_account_id
+        WHERE pr.parent_user_id = $1 AND pr.status = 'active'
+      `;
+
+      const childrenResult = await this.db.query(childrenQuery, [parentUserId]);
+      const children = childrenResult.rows;
+
+      const childrenSummary = await Promise.all(
+        children.map(async (child) => {
+          return await this.generateChildInsights(child.youth_account_id, child);
+        })
+      );
+
+      // Family educational progress
+      const familyEducationQuery = `
+        SELECT 
+          COUNT(DISTINCT module_id) as total_modules_started,
+          COUNT(DISTINCT module_id) FILTER (WHERE completed_at IS NOT NULL) as completed_modules
+        FROM youth_education_progress yep
+        JOIN youth_accounts ya ON yep.youth_account_id = ya.id
+        JOIN parental_relationships pr ON ya.id = pr.youth_account_id
+        WHERE pr.parent_user_id = $1
+      `;
+
+      const familyEducationResult = await this.db.query(familyEducationQuery, [parentUserId]);
+      const familyEducation = familyEducationResult.rows[0];
+
+      // Generate family insights
+      const familyFinancialEducation = {
+        completedModules: parseInt(familyEducation.completed_modules) || 0,
+        upcomingMilestones: await this.getUpcomingMilestones(parentUserId),
+        suggestedActivities: this.getSuggestedFamilyActivities()
+      };
+
+      const parentingTips = this.generateParentingTips(childrenSummary);
+
+      return {
+        childrenSummary,
+        familyFinancialEducation,
+        parentingTips
+      };
+
+    } catch (error) {
+      logger.error('Error generating parent insights:', error);
+      throw new Error('Failed to generate parent insights');
+    }
+  }
+
+  private async generateChildInsights(youthAccountId: string, childInfo: any): Promise<any> {
+    // Calculate financial health score
+    const financialHealthQuery = `
+      SELECT 
+        COUNT(*) FILTER (WHERE requires_approval = false) * 100.0 / NULLIF(COUNT(*), 0) as approval_rate,
+        COUNT(DISTINCT ysg.id) as active_goals,
+        AVG(progress_percentage) as avg_education_progress
+      FROM youth_transactions yt
+      FULL OUTER JOIN youth_savings_goals ysg ON yt.youth_account_id = ysg.youth_account_id AND ysg.status = 'active'
+      FULL OUTER JOIN youth_education_progress yep ON yt.youth_account_id = yep.youth_account_id
+      WHERE yt.youth_account_id = $1
+      AND yt.transaction_date >= CURRENT_DATE - INTERVAL '90 days'
+    `;
+
+    const healthResult = await this.db.query(financialHealthQuery, [youthAccountId]);
+    const healthData = healthResult.rows[0];
+
+    const financialHealthScore = this.calculateChildFinancialHealth(healthData);
+    const educationalProgress = parseFloat(healthData.avg_education_progress) || 0;
+
+    // Get monthly trends
+    const trendsQuery = `
+      SELECT 
+        DATE_TRUNC('month', transaction_date) as month,
+        SUM(amount) FILTER (WHERE transaction_type IN ('spending', 'purchase')) as spending,
+        SUM(amount) FILTER (WHERE transaction_type = 'savings') as savings
+      FROM youth_transactions
+      WHERE youth_account_id = $1
+      AND transaction_date >= CURRENT_DATE - INTERVAL '6 months'
+      GROUP BY DATE_TRUNC('month', transaction_date)
+      ORDER BY month
+    `;
+
+    const trendsResult = await this.db.query(trendsQuery, [youthAccountId]);
+
+    // Generate recommendations
+    const recommendations = this.generateChildRecommendations(
+      financialHealthScore,
+      educationalProgress,
+      childInfo.age_tier
+    );
+
+    return {
+      childId: youthAccountId,
+      name: `${childInfo.first_name} ${childInfo.last_name}`,
+      financialHealthScore,
+      educationalProgress,
+      monthlyTrends: trendsResult.rows,
+      recommendations
+    };
+  }
+
+  private calculateChildFinancialHealth(data: any): number {
+    const approvalRate = parseFloat(data.approval_rate) || 0;
+    const goalsEngagement = Math.min((parseInt(data.active_goals) || 0) * 25, 100);
+    const educationProgress = parseFloat(data.avg_education_progress) || 0;
+
+    return Math.round((approvalRate * 0.4 + goalsEngagement * 0.3 + educationProgress * 0.3));
+  }
+
+  private generateChildRecommendations(
+    financialHealth: number,
+    educationProgress: number,
+    ageTier: string
+  ): string[] {
+    const recommendations: string[] = [];
+
+    if (financialHealth < 60) {
+      recommendations.push('Encourage more responsible spending habits');
+      recommendations.push('Consider reducing transaction limits temporarily');
+    }
+
+    if (educationProgress < 50) {
+      recommendations.push('Motivate completion of financial education modules');
+      recommendations.push('Schedule family financial literacy activities');
+    }
+
+    if (ageTier === 'pre_adult' && financialHealth > 80) {
+      recommendations.push('Consider increasing financial independence gradually');
+      recommendations.push('Discuss graduation preparation timeline');
+    }
+
+    if (recommendations.length === 0) {
+      recommendations.push('Excellent progress! Continue current financial habits');
+    }
+
+    return recommendations;
+  }
+
+  private async getUpcomingMilestones(parentUserId: string): Promise<any[]> {
+    const milestonesQuery = `
+      SELECT 
+        ya.id,
+        u.first_name,
+        ysg.goal_name,
+        ysg.target_date,
+        ysg.current_amount,
+        ysg.target_amount
+      FROM youth_savings_goals ysg
+      JOIN youth_accounts ya ON ysg.youth_account_id = ya.id
+      JOIN users u ON ya.user_id = u.id
+      JOIN parental_relationships pr ON ya.id = pr.youth_account_id
+      WHERE pr.parent_user_id = $1
+      AND ysg.status = 'active'
+      AND ysg.target_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '60 days'
+      ORDER BY ysg.target_date
+    `;
+
+    const result = await this.db.query(milestonesQuery, [parentUserId]);
+    return result.rows;
+  }
+
+  private getSuggestedFamilyActivities(): string[] {
+    return [
+      'Family budget planning session',
+      'Visit a bank together to learn about services',
+      'Grocery shopping with budget comparison',
+      'Discuss family financial goals and dreams',
+      'Create a family savings challenge',
+      'Watch age-appropriate financial literacy videos together',
+      'Practice making change and counting money',
+      'Discuss the value of different career paths'
+    ];
+  }
+
+  private generateParentingTips(childrenSummary: any[]): string[] {
+    const tips: string[] = [];
+
+    const avgFinancialHealth = childrenSummary.reduce((sum, child) => 
+      sum + child.financialHealthScore, 0) / childrenSummary.length;
+
+    if (avgFinancialHealth > 80) {
+      tips.push('Your children are developing excellent financial habits! Consider gradually increasing their independence.');
+    } else if (avgFinancialHealth < 60) {
+      tips.push('Focus on consistent financial education and setting clear spending boundaries.');
+    }
+
+    const lowEducationChildren = childrenSummary.filter(child => child.educationalProgress < 50);
+    if (lowEducationChildren.length > 0) {
+      tips.push('Consider creating incentives for completing educational modules.');
+    }
+
+    tips.push('Regular family financial discussions help normalize money conversations.');
+    tips.push('Praise good financial decisions to reinforce positive behavior.');
+    tips.push('Use real-world examples to make financial concepts relatable.');
+
+    return tips;
+  }
+}
+```
+
+## Security and Compliance
+
+### 8. Enhanced Privacy Protection
+
+```typescript
+// src/services/youth/youthPrivacyService.ts
+import { Pool } from 'pg';
+import { logger } from '@/lib/utils/logger';
+
+export class YouthPrivacyService {
+  constructor(private db: Pool) {}
+
+  async handleMinorDataDeletion(youthAccountId: string, parentUserId: string): Promise<void> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Verify parental authority
+      await this.verifyParentalAuthority(client, youthAccountId, parentUserId);
+
+      // Anonymize personal data while preserving essential records
+      await this.anonymizeYouthData(client, youthAccountId);
+
+      // Maintain financial education progress (anonymized)
+      await this.preserveEducationalHistory(client, youthAccountId);
+
+      // Update account status
+      await client.query(
+        'UPDATE youth_accounts SET account_status = $1 WHERE id = $2',
+        ['data_deleted', youthAccountId]
+      );
+
+      await client.query('COMMIT');
+
+      logger.info(`Minor data deletion completed for youth account: ${youthAccountId}`);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error handling minor data deletion:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async exportYouthDataForParent(
+    youthAccountId: string,
+    parentUserId: string
+  ): Promise<{
+    personalData: any;
+    financialHistory: any;
+    educationalProgress: any;
+    parentalInteractions: any;
+  }> {
+    // Verify parental authority
+    await this.verifyParentalAuthority(null, youthAccountId, parentUserId);
+
+    // Export comprehensive youth data
+    const personalData = await this.exportPersonalData(youthAccountId);
+    const financialHistory = await this.exportFinancialHistory(youthAccountId);
+    const educationalProgress = await this.exportEducationalProgress(youthAccountId);
+    const parentalInteractions = await this.exportParentalInteractions(youthAccountId);
+
+    return {
+      personalData,
+      financialHistory,
+      educationalProgress,
+      parentalInteractions
+    };
+  }
+
+  async applyDataRetentionPolicies(): Promise<void> {
+    try {
+      // Delete data for accounts graduated more than 7 years ago
+      const oldGraduatesQuery = `
+        SELECT ya.id, ya.user_id
+        FROM youth_accounts ya
+        JOIN account_graduation_tracking agt ON ya.id = agt.youth_account_id
+        WHERE ya.account_status = 'graduated'
+        AND agt.full_access_granted_at < CURRENT_DATE - INTERVAL '7 years'
+      `;
+
+      const oldGraduates = await this.db.query(oldGraduatesQuery);
+
+      for (const graduate of oldGraduates.rows) {
+        await this.archiveGraduateData(graduate.id);
+      }
+
+      // Archive data for inactive accounts older than 2 years
+      const inactiveAccountsQuery = `
+        SELECT id
+        FROM youth_accounts
+        WHERE account_status = 'active'
+        AND updated_at < CURRENT_DATE - INTERVAL '2 years'
+        AND id NOT IN (
+          SELECT DISTINCT youth_account_id
+          FROM youth_transactions
+          WHERE transaction_date >= CURRENT_DATE - INTERVAL '1 year'
+        )
+      `;
+
+      const inactiveAccounts = await this.db.query(inactiveAccountsQuery);
+
+      for (const account of inactiveAccounts.rows) {
+        await this.archiveInactiveAccount(account.id);
+      }
+
+      logger.info('Data retention policies applied successfully');
+
+    } catch (error) {
+      logger.error('Error applying data retention policies:', error);
+      throw error;
+    }
+  }
+
+  private async verifyParentalAuthority(
+    client: any,
+    youthAccountId: string,
+    parentUserId: string
+  ): Promise<void> {
+    const queryClient = client || this.db;
+    
+    const authQuery = `
+      SELECT id FROM parental_relationships
+      WHERE youth_account_id = $1 
+      AND parent_user_id = $2 
+      AND status = 'active'
+      AND (is_primary_guardian = true OR permissions->>'manage_data' = 'true')
+    `;
+
+    const result = await queryClient.query(authQuery, [youthAccountId, parentUserId]);
+
+    if (result.rows.length === 0) {
+      throw new Error('Insufficient parental authority for this operation');
+    }
+  }
+
+  private async anonymizeYouthData(client: any, youthAccountId: string): Promise<void> {
+    // Anonymize transaction descriptions but preserve amounts and categories for analytics
+    await client.query(`
+      UPDATE youth_transactions 
+      SET 
+        description = '[ANONYMIZED]',
+        merchant_name = '[ANONYMIZED]',
+        learning_notes = '[ANONYMIZED]',
+        parent_notes = '[ANONYMIZED]'
+      WHERE youth_account_id = $1
+    `, [youthAccountId]);
+
+    // Anonymize savings goal details but preserve financial patterns
+    await client.query(`
+      UPDATE youth_savings_goals 
+      SET 
+        goal_name = '[ANONYMIZED]',
+        goal_description = '[ANONYMIZED]',
+        learning_outcome = '[ANONYMIZED]'
+      WHERE youth_account_id = $1
+    `, [youthAccountId]);
+
+    // Anonymize user personal information
+    await client.query(`
+      UPDATE users 
+      SET 
+        email = 'anonymized_' || id || '@deleted.local',
+        phone_number = NULL,
+        first_name = 'Deleted',
+        last_name = 'User'
+      WHERE id = (SELECT user_id FROM youth_accounts WHERE id = $1)
+    `, [youthAccountId]);
+  }
+
+  private async preserveEducationalHistory(client: any, youthAccountId: string): Promise<void> {
+    // Keep educational progress for research purposes (anonymized)
+    await client.query(`
+      UPDATE youth_education_progress 
+      SET 
+        badges_earned = COALESCE(badges_earned, '{}'),
+        -- Keep progress percentage and completion dates for analytics
+        youth_account_id = NULL -- Unlink from account
+      WHERE youth_account_id = $1
+    `, [youthAccountId]);
+  }
+
+  private async exportPersonalData(youthAccountId: string): Promise<any> {
+    const query = `
+      SELECT 
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.phone_number,
+        u.date_of_birth,
+        ya.age_tier,
+        ya.educational_level,
+        ya.school_name,
+        ya.created_at
+      FROM youth_accounts ya
+      JOIN users u ON ya.user_id = u.id
+      WHERE ya.id = $1
+    `;
+
+    const result = await this.db.query(query, [youthAccountId]);
+    return result.rows[0];
+  }
+
+  private async exportFinancialHistory(youthAccountId: string): Promise<any[]> {
+    const query = `
+      SELECT 
+        transaction_type,
+        category,
+        amount,
+        description,
+        transaction_date,
+        status,
+        requires_approval,
+        parental_approval_id IS NOT NULL as was_approved_by_parent
+      FROM youth_transactions
+      WHERE youth_account_id = $1
+      ORDER BY transaction_date DESC
+    `;
+
+    const result = await this.db.query(query, [youthAccountId]);
+    return result.rows;
+  }
+
+  private async exportEducationalProgress(youthAccountId: string): Promise<any[]> {
+    const query = `
+      SELECT 
+        module_name,
+        age_appropriate_level,
+        progress_percentage,
+        quiz_score,
+        started_at,
+        completed_at,
+        badges_earned
+      FROM youth_education_progress
+      WHERE youth_account_id = $1
+      ORDER BY started_at
+    `;
+
+    const result = await this.db.query(query, [youthAccountId]);
+    return result.rows;
+  }
+
+  private async exportParentalInteractions(youthAccountId: string): Promise<any[]> {
+    const query = `
+      SELECT 
+        pa.approval_type,
+        pa.request_details,
+        pa.requested_amount,
+        pa.approval_status,
+        pa.approval_reason,
+        pa.requested_at,
+        pa.responded_at,
+        u.first_name as parent_name
+      FROM parental_approvals pa
+      JOIN users u ON pa.parent_user_id = u.id
+      WHERE pa.youth_account_id = $1
+      ORDER BY pa.requested_at DESC
+    `;
+
+    const result = await this.db.query(query, [youthAccountId]);
+    return result.rows;
+  }
+
+  private async archiveGraduateData(youthAccountId: string): Promise<void> {
+    // Archive old graduate data to cold storage
+    logger.info(`Archiving graduate data for youth account: ${youthAccountId}`);
+    // Implementation would move data to archival storage
+  }
+
+  private async archiveInactiveAccount(youthAccountId: string): Promise<void> {
+    // Archive inactive account data
+    logger.info(`Archiving inactive account: ${youthAccountId}`);
+    // Implementation would archive inactive account data
+  }
+}
+```
 
 ## Next Steps
 
-<Card title="Related Guides" href="/guides/integration-walkthrough">
-  Explore other implementation guides
-</Card>
+<Steps>
+  <Step title="Complete Testing Infrastructure">
+    **Testing Tasks:**
+    - Comprehensive unit tests for all youth account services
+    - Integration tests for parental approval workflows
+    - End-to-end tests for account graduation process
+    - Performance testing for educational content delivery
+  </Step>
+  <Step title="Enhanced Parental Dashboard">
+    **Dashboard Improvements:**
+    - Real-time spending alerts and notifications
+    - Advanced analytics and insights for parents
+    - Customizable parental control settings
+    - Family financial goal setting tools
+  </Step>
+  <Step title="Educational Content Expansion">
+    **Content Development:**
+    - Age-appropriate interactive learning modules
+    - Gamification and achievement systems
+    - Cultural adaptation for SADC markets
+    - Integration with school curricula where possible
+  </Step>
+  <Step title="Advanced Security Implementation">
+    **Security Enhancements:**
+    - Enhanced biometric verification for parents
+    - Advanced fraud detection for youth transactions
+    - Secure communication channels between parents and children
+    - Emergency contact and safety features
+  </Step>
+</Steps>
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card title="Youth Account API Reference" icon="book" href="/api-reference/youth-accounts">
+    Complete API documentation for youth account management and parental controls
+  </Card>
+  <Card title="Educational Content Development" icon="graduation-cap" href="/guides/educational-content">
+    Guide for creating age-appropriate financial education content
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Parental Control Implementation" icon="shield" href="/guides/parental-controls">
+    Detailed implementation guide for parental oversight features
+  </Card>
+  <Card title="Child Privacy Compliance" icon="legal" href="/compliance/child-privacy">
+    Legal compliance requirements for youth financial services
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Graduation Process Guide" icon="adult" href="/guides/account-graduation">
+    Step-by-step guide for transitioning youth accounts to adult status
+  </Card>
+  <Card title="African Youth Financial Education" icon="globe" href="/resources/african-youth-education">
+    Cultural considerations for financial education in African contexts
+  </Card>
+</CardGroup>
+
+---
+
+*This youth accounts setup guide provides comprehensive coverage for implementing AWO Platform's youth financial services, including robust parental controls, age-appropriate education, and smooth transition to adult accounts while maintaining compliance with child protection regulations across SADC markets.*
+
+*Last updated: June 2025*  
+*Next update: As youth financial regulations and educational standards evolve*

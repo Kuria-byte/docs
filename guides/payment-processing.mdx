@@ -1,28 +1,3613 @@
----
-title: "Payment Processing"
-description: "Payment Processing implementation guide"
----
+# Payment Processing Guide
 
-# Payment Processing
-
-## Overview
-
-This guide documentation is coming soon.
+This comprehensive guide covers implementing payment processing for AWO Platform across African markets, including mobile money integration, bank transfers, cross-border payments, and multi-currency support optimized for SADC region financial infrastructure.
 
 <Info>
-This page is under development. Please check back later for complete implementation guide.
+AWO Platform's payment system supports multiple African payment methods including M-Pesa, MTN MoMo, bank transfers, and international remittances, with intelligent routing, currency conversion, and fraud prevention designed for African financial ecosystems.
 </Info>
 
-## Getting Started
+## African Payment Landscape
 
-Step-by-step instructions will be added here.
+### Market Overview
 
-## Examples
+<CardGroup cols={2}>
+  <Card title="Mobile Money Dominance" icon="mobile">
+    **Kenya**: 96% mobile money adoption (M-Pesa)  
+    **Tanzania**: 65% mobile money penetration  
+    **Uganda**: 60% mobile money usage  
+    **Ghana**: 45% mobile money adoption
+  </Card>
+  <Card title="Banking Infrastructure" icon="building">
+    **South Africa**: Advanced banking, card penetration 75%  
+    **Nigeria**: Growing digital banking, card penetration 45%  
+    **Botswana**: Stable banking, moderate card usage  
+    **Zambia**: Developing digital payments infrastructure
+  </Card>
+  <Card title="Cross-Border Flows" icon="globe">
+    **Remittances**: $48B annual inflows to Africa  
+    **Intra-Africa**: 15% of total trade payments  
+    **Diaspora**: $95B in remittances globally  
+    **Costs**: Average 8.2% for African corridors
+  </Card>
+  <Card title="Regulatory Environment" icon="shield">
+    **KYC/AML**: Varying requirements across SADC  
+    **Licensing**: EMI licenses required for money transfers  
+    **Data**: Local data residency requirements  
+    **Compliance**: Multi-jurisdiction regulatory compliance
+  </Card>
+</CardGroup>
 
-Code examples and best practices will be provided.
+### AWO Payment Strategy
 
-## Next Steps
+**Primary Providers:**
+- **Flutterwave**: Pan-African gateway (primary)
+- **Direct Mobile Money**: M-Pesa, MTN MoMo, Airtel Money
+- **Banking Rails**: Direct bank integration where possible
+- **International**: Wise, Western Union for cross-border
 
-<Card title="Related Documentation" href="/api-reference/introduction">
-  Explore other sections of our documentation
-</Card>
+**Currency Support:**
+- **Primary**: ZAR, NGN, KES, GHS, UGX, BWP, NAD, ZMW
+- **International**: USD, EUR, GBP for diaspora
+- **Settlement**: Multi-currency with real-time conversion
+
+## Architecture Overview
+
+### Payment Processing Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                AWO PLATFORM                             │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │         Payment Orchestration Layer                 │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐│ │
+│  │  │   Payment   │ │   Routing   │ │   Currency      ││ │
+│  │  │   Gateway   │ │   Engine    │ │   Conversion    ││ │
+│  │  │   Manager   │ │             │ │   Service       ││ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                           │                             │
+│  ┌─────────────────────────▼─────────────────────────────┐ │
+│  │         Payment Method Handlers                     │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐│ │
+│  │  │Mobile Money │ │Bank Transfer│ │  Card Payment   ││ │
+│  │  │   Handler   │ │   Handler   │ │     Handler     ││ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────┘│ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐│ │
+│  │  │Cross-Border │ │ Cryptocurrency│ │   Wallet       ││ │
+│  │  │   Handler   │ │   Handler   │ │   Transfer      ││ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                           │                             │
+│  ┌─────────────────────────▼─────────────────────────────┐ │
+│  │      Transaction Management Service                 │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐│ │
+│  │  │Transaction  │ │   Fraud     │ │   Settlement    ││ │
+│  │  │  Tracking   │ │ Detection   │ │   Management    ││ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────┘│ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐│ │
+│  │  │ Retry Logic │ │   Webhook   │ │   Compliance    ││ │
+│  │  │   Engine    │ │  Processing │ │    Monitoring   ││ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                           │                             │
+│  ┌─────────────────────────▼─────────────────────────────┐ │
+│  │           AWO Wallet Service                        │ │
+│  │        (User Balance Management)                    │ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+
+External Payment Providers:
+┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐
+│ Flutterwave │ │  M-Pesa     │ │    Bank APIs            │
+│   Gateway   │ │  Direct     │ │  (FNB, GTBank, etc.)    │
+└─────────────┘ └─────────────┘ └─────────────────────────┘
+┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐
+│   Paystack  │ │ MTN MoMo    │ │    Wise/Remitly         │
+│  (Backup)   │ │   Direct    │ │  (Cross-border)         │
+└─────────────┘ └─────────────┘ └─────────────────────────┘
+```
+
+## Database Schema
+
+### Payment Data Models
+
+```sql
+-- payment_providers table (supported payment providers)
+CREATE TABLE payment_providers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    provider_code VARCHAR(30) NOT NULL UNIQUE, -- 'flutterwave', 'mpesa_direct', 'paystack'
+    provider_name VARCHAR(100) NOT NULL,
+    provider_type VARCHAR(20) NOT NULL CHECK (provider_type IN ('gateway', 'mobile_money', 'bank', 'crypto', 'remittance')),
+    countries JSONB NOT NULL, -- Array of supported country codes
+    currencies JSONB NOT NULL, -- Array of supported currencies
+    
+    -- Configuration
+    base_url VARCHAR(500) NOT NULL,
+    sandbox_base_url VARCHAR(500),
+    auth_type VARCHAR(20) NOT NULL CHECK (auth_type IN ('api_key', 'oauth2', 'basic_auth')),
+    
+    -- Capabilities
+    supports_collection BOOLEAN NOT NULL DEFAULT true,
+    supports_disbursement BOOLEAN NOT NULL DEFAULT true,
+    supports_refund BOOLEAN NOT NULL DEFAULT false,
+    supports_webhook BOOLEAN NOT NULL DEFAULT true,
+    supports_tokenization BOOLEAN NOT NULL DEFAULT false,
+    
+    -- Limits and fees
+    min_amount DECIMAL(15,2) DEFAULT 1.00,
+    max_amount DECIMAL(15,2) DEFAULT 1000000.00,
+    fee_structure JSONB, -- Complex fee calculation rules
+    settlement_time_hours INTEGER DEFAULT 24,
+    
+    -- Status and reliability
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'maintenance', 'deprecated')),
+    uptime_percentage DECIMAL(5,2) DEFAULT 99.5,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- payment_methods table (specific payment methods per provider)
+CREATE TABLE payment_methods (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    provider_id UUID NOT NULL REFERENCES payment_providers(id),
+    method_code VARCHAR(30) NOT NULL, -- 'mpesa', 'mtn_momo', 'visa', 'bank_transfer'
+    method_name VARCHAR(100) NOT NULL,
+    method_type VARCHAR(20) NOT NULL CHECK (method_type IN ('mobile_money', 'card', 'bank_transfer', 'crypto', 'cash')),
+    country_code VARCHAR(2) NOT NULL,
+    currency VARCHAR(3) NOT NULL,
+    
+    -- Method-specific configuration
+    requires_phone BOOLEAN NOT NULL DEFAULT false,
+    requires_card_details BOOLEAN NOT NULL DEFAULT false,
+    requires_bank_details BOOLEAN NOT NULL DEFAULT false,
+    requires_kyc BOOLEAN NOT NULL DEFAULT false,
+    
+    -- Display configuration
+    display_name VARCHAR(100) NOT NULL,
+    icon_url VARCHAR(500),
+    color_hex VARCHAR(7), -- Brand color
+    display_order INTEGER DEFAULT 100,
+    is_popular BOOLEAN NOT NULL DEFAULT false,
+    
+    -- Limits
+    min_amount DECIMAL(15,2),
+    max_amount DECIMAL(15,2),
+    daily_limit DECIMAL(15,2),
+    monthly_limit DECIMAL(15,2),
+    
+    -- Processing time
+    typical_processing_minutes INTEGER DEFAULT 5,
+    max_processing_minutes INTEGER DEFAULT 60,
+    
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'maintenance')),
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    UNIQUE(provider_id, method_code, country_code)
+);
+
+-- transactions table (main transaction records)
+CREATE TABLE transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    
+    -- Transaction identification
+    reference VARCHAR(100) NOT NULL UNIQUE, -- AWO-generated reference
+    external_reference VARCHAR(200), -- Provider reference
+    idempotency_key VARCHAR(100) NOT NULL UNIQUE,
+    
+    -- Transaction details
+    transaction_type VARCHAR(20) NOT NULL CHECK (transaction_type IN ('deposit', 'withdrawal', 'transfer', 'refund', 'fee', 'penalty')),
+    amount DECIMAL(15,2) NOT NULL CHECK (amount > 0),
+    currency VARCHAR(3) NOT NULL,
+    
+    -- Fee breakdown
+    fee_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+    tax_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+    total_amount DECIMAL(15,2) NOT NULL, -- amount + fees + taxes
+    
+    -- Payment method details
+    payment_provider_id UUID REFERENCES payment_providers(id),
+    payment_method_id UUID REFERENCES payment_methods(id),
+    payment_details JSONB, -- Method-specific payment details
+    
+    -- Status tracking
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'cancelled', 'refunded')),
+    failure_reason VARCHAR(500),
+    
+    -- Related entities
+    wallet_id UUID REFERENCES user_wallets(id),
+    chama_id UUID REFERENCES chamas(id), -- If Chama-related
+    investment_id UUID REFERENCES investments(id), -- If investment-related
+    
+    -- Processing details
+    initiated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    processed_at TIMESTAMP,
+    settled_at TIMESTAMP,
+    expires_at TIMESTAMP,
+    
+    -- Provider response data
+    provider_response JSONB,
+    webhook_data JSONB,
+    
+    -- Fraud and compliance
+    risk_score DECIMAL(3,2) DEFAULT 0.5,
+    aml_status VARCHAR(20) DEFAULT 'pending' CHECK (aml_status IN ('pending', 'approved', 'flagged', 'rejected')),
+    compliance_data JSONB,
+    
+    -- Audit fields
+    created_by UUID REFERENCES users(id),
+    ip_address INET,
+    user_agent TEXT,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- transaction_logs table (audit trail)
+CREATE TABLE transaction_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    transaction_id UUID NOT NULL REFERENCES transactions(id),
+    
+    -- Log details
+    event_type VARCHAR(30) NOT NULL, -- 'status_change', 'retry_attempt', 'webhook_received'
+    old_status VARCHAR(20),
+    new_status VARCHAR(20),
+    event_data JSONB,
+    
+    -- Context
+    triggered_by VARCHAR(50), -- 'user', 'system', 'webhook', 'cron'
+    source_ip INET,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- user_wallets table (user wallet balances)
+CREATE TABLE user_wallets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    currency VARCHAR(3) NOT NULL,
+    
+    -- Balance tracking
+    available_balance DECIMAL(15,2) NOT NULL DEFAULT 0 CHECK (available_balance >= 0),
+    pending_balance DECIMAL(15,2) NOT NULL DEFAULT 0 CHECK (pending_balance >= 0),
+    reserved_balance DECIMAL(15,2) NOT NULL DEFAULT 0 CHECK (reserved_balance >= 0),
+    total_balance DECIMAL(15,2) GENERATED ALWAYS AS (available_balance + pending_balance + reserved_balance) STORED,
+    
+    -- Limits
+    daily_spend_limit DECIMAL(15,2),
+    monthly_spend_limit DECIMAL(15,2),
+    max_balance DECIMAL(15,2),
+    
+    -- Tracking
+    last_transaction_at TIMESTAMP,
+    last_balance_update TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    -- Status
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'frozen', 'suspended')),
+    freeze_reason VARCHAR(200),
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    UNIQUE(user_id, currency)
+);
+
+-- wallet_transactions table (wallet movement history)
+CREATE TABLE wallet_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    wallet_id UUID NOT NULL REFERENCES user_wallets(id),
+    transaction_id UUID NOT NULL REFERENCES transactions(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    
+    -- Movement details
+    movement_type VARCHAR(20) NOT NULL CHECK (movement_type IN ('credit', 'debit', 'reserve', 'release')),
+    amount DECIMAL(15,2) NOT NULL,
+    currency VARCHAR(3) NOT NULL,
+    
+    -- Balance snapshots
+    balance_before DECIMAL(15,2) NOT NULL,
+    balance_after DECIMAL(15,2) NOT NULL,
+    
+    -- Description
+    description VARCHAR(500) NOT NULL,
+    reference VARCHAR(100),
+    
+    -- Context
+    source_type VARCHAR(30), -- 'deposit', 'chama_contribution', 'investment', 'refund'
+    source_id UUID, -- Reference to source entity
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- exchange_rates table (currency conversion rates)
+CREATE TABLE exchange_rates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    base_currency VARCHAR(3) NOT NULL,
+    target_currency VARCHAR(3) NOT NULL,
+    rate DECIMAL(10,6) NOT NULL CHECK (rate > 0),
+    
+    -- Rate metadata
+    source VARCHAR(50) NOT NULL, -- 'fixer_io', 'bank_api', 'manual'
+    spread_percentage DECIMAL(5,2) DEFAULT 2.5, -- AWO markup
+    effective_rate DECIMAL(10,6) NOT NULL, -- rate + spread
+    
+    -- Validity
+    valid_from TIMESTAMP NOT NULL DEFAULT NOW(),
+    valid_until TIMESTAMP NOT NULL,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    UNIQUE(base_currency, target_currency, valid_from)
+);
+
+-- payment_webhooks table (webhook event tracking)
+CREATE TABLE payment_webhooks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    provider_id UUID NOT NULL REFERENCES payment_providers(id),
+    
+    -- Webhook details
+    webhook_id VARCHAR(200), -- Provider's webhook ID
+    event_type VARCHAR(50) NOT NULL,
+    event_data JSONB NOT NULL,
+    
+    -- Processing
+    status VARCHAR(20) NOT NULL DEFAULT 'received' CHECK (status IN ('received', 'processing', 'processed', 'failed', 'ignored')),
+    processed_at TIMESTAMP,
+    failure_reason TEXT,
+    
+    -- Related transaction
+    transaction_id UUID REFERENCES transactions(id),
+    
+    -- Verification
+    signature VARCHAR(500),
+    signature_valid BOOLEAN,
+    
+    -- Request details
+    source_ip INET,
+    headers JSONB,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX idx_transactions_status ON transactions(status);
+CREATE INDEX idx_transactions_type ON transactions(transaction_type);
+CREATE INDEX idx_transactions_created_at ON transactions(created_at);
+CREATE INDEX idx_transactions_reference ON transactions(reference);
+CREATE INDEX idx_transactions_external_ref ON transactions(external_reference);
+CREATE INDEX idx_transaction_logs_transaction_id ON transaction_logs(transaction_id);
+CREATE INDEX idx_user_wallets_user_id ON user_wallets(user_id);
+CREATE INDEX idx_user_wallets_currency ON user_wallets(currency);
+CREATE INDEX idx_wallet_transactions_wallet_id ON wallet_transactions(wallet_id);
+CREATE INDEX idx_wallet_transactions_created_at ON wallet_transactions(created_at);
+CREATE INDEX idx_exchange_rates_currencies ON exchange_rates(base_currency, target_currency);
+CREATE INDEX idx_exchange_rates_valid_from ON exchange_rates(valid_from);
+CREATE INDEX idx_payment_webhooks_provider ON payment_webhooks(provider_id);
+CREATE INDEX idx_payment_webhooks_status ON payment_webhooks(status);
+
+-- Insert default providers and methods
+INSERT INTO payment_providers (provider_code, provider_name, provider_type, countries, currencies, base_url, auth_type) VALUES
+('flutterwave', 'Flutterwave', 'gateway', '["NG", "KE", "GH", "UG", "ZA", "RW", "TZ"]', '["NGN", "KES", "GHS", "UGX", "ZAR", "RWF", "TZS", "USD"]', 'https://api.flutterwave.com', 'api_key'),
+('paystack', 'Paystack', 'gateway', '["NG", "GH", "ZA", "KE"]', '["NGN", "GHS", "ZAR", "KES", "USD"]', 'https://api.paystack.co', 'api_key'),
+('mpesa_direct', 'M-Pesa Direct', 'mobile_money', '["KE", "TZ"]', '["KES", "TZS"]', 'https://sandbox.safaricom.co.ke', 'oauth2'),
+('mtn_momo', 'MTN MoMo', 'mobile_money', '["UG", "GH", "RW"]', '["UGX", "GHS", "RWF"]', 'https://sandbox.momodeveloper.mtn.com', 'api_key');
+```
+
+## Core Payment Service Implementation
+
+### Payment Orchestration Service
+
+```typescript
+// payment-service.ts
+import { DatabaseService } from './database-service';
+import { FlutterwaveProvider } from './providers/flutterwave-provider';
+import { MPesaProvider } from './providers/mpesa-provider';
+import { WalletService } from './wallet-service';
+import { ExchangeRateService } from './exchange-rate-service';
+import { FraudDetectionService } from './fraud-detection-service';
+import { EventEmitter } from 'events';
+
+export interface PaymentRequest {
+  user_id: string;
+  amount: number;
+  currency: string;
+  payment_method: string;
+  payment_details: any;
+  description: string;
+  callback_url?: string;
+  metadata?: any;
+  idempotency_key?: string;
+}
+
+export interface PaymentResponse {
+  transaction_id: string;
+  reference: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  payment_url?: string;
+  provider_reference?: string;
+  expires_at?: string;
+  estimated_completion?: string;
+}
+
+export interface TransferRequest {
+  sender_id: string;
+  recipient_id?: string;
+  recipient_phone?: string;
+  recipient_bank_account?: any;
+  amount: number;
+  currency: string;
+  transfer_method: 'wallet' | 'mobile_money' | 'bank_transfer';
+  description: string;
+  metadata?: any;
+}
+
+export class PaymentService extends EventEmitter {
+  private providers: Map<string, any> = new Map();
+
+  constructor(
+    private db: DatabaseService,
+    private walletService: WalletService,
+    private exchangeRateService: ExchangeRateService,
+    private fraudDetectionService: FraudDetectionService
+  ) {
+    super();
+    this.initializeProviders();
+  }
+
+  private initializeProviders(): void {
+    // Initialize Flutterwave
+    this.providers.set('flutterwave', new FlutterwaveProvider({
+      publicKey: process.env.FLUTTERWAVE_PUBLIC_KEY!,
+      secretKey: process.env.FLUTTERWAVE_SECRET_KEY!,
+      environment: process.env.NODE_ENV === 'production' ? 'live' : 'sandbox',
+      encryptionKey: process.env.FLUTTERWAVE_ENCRYPTION_KEY!
+    }));
+
+    // Initialize M-Pesa Direct
+    this.providers.set('mpesa_direct', new MPesaProvider({
+      consumerKey: process.env.MPESA_CONSUMER_KEY!,
+      consumerSecret: process.env.MPESA_CONSUMER_SECRET!,
+      environment: process.env.NODE_ENV === 'production' ? 'production' : 'sandbox',
+      shortcode: process.env.MPESA_SHORTCODE!,
+      passkey: process.env.MPESA_PASSKEY!
+    }));
+
+    // Add more providers as needed
+  }
+
+  async initiatePayment(request: PaymentRequest): Promise<PaymentResponse> {
+    // Generate transaction reference
+    const reference = this.generateTransactionReference();
+    const idempotencyKey = request.idempotency_key || this.generateIdempotencyKey();
+
+    try {
+      // Check for duplicate transaction
+      const existingTransaction = await this.checkDuplicateTransaction(idempotencyKey);
+      if (existingTransaction) {
+        return this.formatPaymentResponse(existingTransaction);
+      }
+
+      // Validate payment request
+      await this.validatePaymentRequest(request);
+
+      // Fraud screening
+      const riskScore = await this.fraudDetectionService.assessPaymentRisk(request);
+      if (riskScore > 0.8) {
+        throw new Error('Payment blocked due to high risk score');
+      }
+
+      // Get optimal payment route
+      const route = await this.getOptimalPaymentRoute(request);
+
+      // Calculate fees
+      const feeCalculation = await this.calculateFees(request, route);
+
+      // Create transaction record
+      const transaction = await this.createTransaction({
+        ...request,
+        reference,
+        idempotency_key: idempotencyKey,
+        payment_route: route,
+        fee_calculation: feeCalculation,
+        risk_score: riskScore
+      });
+
+      // Process payment with selected provider
+      const provider = this.providers.get(route.provider_code);
+      if (!provider) {
+        throw new Error(`Provider ${route.provider_code} not available`);
+      }
+
+      const providerResponse = await provider.initiatePayment({
+        ...request,
+        transaction_id: transaction.id,
+        reference,
+        fee_amount: feeCalculation.total_fee,
+        callback_url: `${process.env.AWO_WEBHOOK_BASE_URL}/webhooks/payments/${route.provider_code}`
+      });
+
+      // Update transaction with provider response
+      await this.updateTransactionWithProviderResponse(transaction.id, providerResponse);
+
+      // Log payment initiation
+      await this.logTransactionEvent(transaction.id, 'payment_initiated', {
+        provider: route.provider_code,
+        method: request.payment_method,
+        amount: request.amount,
+        currency: request.currency
+      });
+
+      // Emit event for real-time updates
+      this.emit('paymentInitiated', {
+        transaction_id: transaction.id,
+        user_id: request.user_id,
+        amount: request.amount,
+        currency: request.currency,
+        status: 'pending'
+      });
+
+      return {
+        transaction_id: transaction.id,
+        reference,
+        status: 'pending',
+        payment_url: providerResponse.payment_url,
+        provider_reference: providerResponse.reference,
+        expires_at: providerResponse.expires_at,
+        estimated_completion: this.calculateEstimatedCompletion(route)
+      };
+
+    } catch (error) {
+      // Log error and create failed transaction record
+      await this.handlePaymentError(reference, request, error);
+      throw error;
+    }
+  }
+
+  async processPaymentWebhook(
+    providerCode: string,
+    webhookData: any,
+    signature?: string
+  ): Promise<{ processed: boolean; transaction_id?: string }> {
+    
+    try {
+      // Verify webhook signature
+      const provider = this.providers.get(providerCode);
+      if (provider && signature) {
+        const isValid = await provider.verifyWebhookSignature(webhookData, signature);
+        if (!isValid) {
+          throw new Error('Invalid webhook signature');
+        }
+      }
+
+      // Log webhook receipt
+      const webhookLog = await this.logWebhookEvent(providerCode, webhookData, signature);
+
+      // Find associated transaction
+      const transaction = await this.findTransactionByProviderReference(
+        providerCode,
+        webhookData.reference || webhookData.transaction_id
+      );
+
+      if (!transaction) {
+        console.warn(`Transaction not found for webhook: ${webhookData.reference}`);
+        return { processed: false };
+      }
+
+      // Process webhook based on event type
+      const result = await this.processWebhookEvent(transaction, webhookData);
+
+      // Update webhook log with processing result
+      await this.updateWebhookLog(webhookLog.id, 'processed', result);
+
+      return {
+        processed: true,
+        transaction_id: transaction.id
+      };
+
+    } catch (error) {
+      console.error('Webhook processing error:', error);
+      return { processed: false };
+    }
+  }
+
+  async transferFunds(request: TransferRequest): Promise<PaymentResponse> {
+    const reference = this.generateTransactionReference();
+
+    try {
+      // Validate transfer request
+      await this.validateTransferRequest(request);
+
+      // Check sender wallet balance
+      if (request.transfer_method === 'wallet') {
+        const senderWallet = await this.walletService.getWallet(request.sender_id, request.currency);
+        if (senderWallet.available_balance < request.amount) {
+          throw new Error('Insufficient wallet balance');
+        }
+      }
+
+      // Fraud screening for transfers
+      const riskScore = await this.fraudDetectionService.assessTransferRisk(request);
+      if (riskScore > 0.7) {
+        throw new Error('Transfer blocked due to high risk score');
+      }
+
+      // Create transfer transaction
+      const transaction = await this.createTransferTransaction(request, reference, riskScore);
+
+      // Process transfer based on method
+      let result: PaymentResponse;
+
+      switch (request.transfer_method) {
+        case 'wallet':
+          result = await this.processWalletTransfer(transaction, request);
+          break;
+        case 'mobile_money':
+          result = await this.processMobileMoneyTransfer(transaction, request);
+          break;
+        case 'bank_transfer':
+          result = await this.processBankTransfer(transaction, request);
+          break;
+        default:
+          throw new Error(`Unsupported transfer method: ${request.transfer_method}`);
+      }
+
+      // Emit transfer event
+      this.emit('transferInitiated', {
+        transaction_id: transaction.id,
+        sender_id: request.sender_id,
+        recipient_id: request.recipient_id,
+        amount: request.amount,
+        currency: request.currency,
+        method: request.transfer_method
+      });
+
+      return result;
+
+    } catch (error) {
+      await this.handleTransferError(reference, request, error);
+      throw error;
+    }
+  }
+
+  async getTransactionStatus(transactionId: string, userId: string): Promise<{
+    id: string;
+    reference: string;
+    status: string;
+    amount: number;
+    currency: string;
+    description: string;
+    created_at: string;
+    updated_at: string;
+    provider_reference?: string;
+    estimated_completion?: string;
+    failure_reason?: string;
+  }> {
+    
+    const transaction = await this.db.queryOne(`
+      SELECT 
+        t.*,
+        pp.provider_name,
+        pm.method_name
+      FROM transactions t
+      LEFT JOIN payment_providers pp ON t.payment_provider_id = pp.id
+      LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
+      WHERE t.id = $1 AND t.user_id = $2
+    `, [transactionId, userId]);
+
+    if (!transaction) {
+      throw new Error('Transaction not found');
+    }
+
+    return {
+      id: transaction.id,
+      reference: transaction.reference,
+      status: transaction.status,
+      amount: parseFloat(transaction.amount),
+      currency: transaction.currency,
+      description: transaction.payment_details?.description || 'Payment',
+      created_at: transaction.created_at,
+      updated_at: transaction.updated_at,
+      provider_reference: transaction.external_reference,
+      estimated_completion: this.calculateRemainingTime(transaction),
+      failure_reason: transaction.failure_reason
+    };
+  }
+
+  async getUserTransactionHistory(
+    userId: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      transaction_type?: string;
+      status?: string;
+      date_from?: string;
+      date_to?: string;
+      currency?: string;
+    } = {}
+  ): Promise<{
+    transactions: any[];
+    total_count: number;
+    pagination: any;
+  }> {
+    
+    const {
+      limit = 50,
+      offset = 0,
+      transaction_type,
+      status,
+      date_from,
+      date_to,
+      currency
+    } = options;
+
+    // Build query conditions
+    const conditions = ['t.user_id = $1'];
+    const params = [userId];
+    let paramCount = 1;
+
+    if (transaction_type) {
+      conditions.push(`t.transaction_type = $${++paramCount}`);
+      params.push(transaction_type);
+    }
+
+    if (status) {
+      conditions.push(`t.status = $${++paramCount}`);
+      params.push(status);
+    }
+
+    if (currency) {
+      conditions.push(`t.currency = $${++paramCount}`);
+      params.push(currency);
+    }
+
+    if (date_from) {
+      conditions.push(`t.created_at >= $${++paramCount}`);
+      params.push(date_from);
+    }
+
+    if (date_to) {
+      conditions.push(`t.created_at <= $${++paramCount}`);
+      params.push(date_to);
+    }
+
+    // Get total count
+    const countResult = await this.db.queryOne(`
+      SELECT COUNT(*) as total
+      FROM transactions t
+      WHERE ${conditions.join(' AND ')}
+    `, params);
+
+    // Get transactions
+    const transactions = await this.db.query(`
+      SELECT 
+        t.*,
+        pp.provider_name,
+        pm.method_name,
+        pm.icon_url as method_icon
+      FROM transactions t
+      LEFT JOIN payment_providers pp ON t.payment_provider_id = pp.id
+      LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY t.created_at DESC
+      LIMIT $${++paramCount} OFFSET $${++paramCount}
+    `, [...params, limit, offset]);
+
+    return {
+      transactions: transactions.map(this.formatTransactionForDisplay),
+      total_count: parseInt(countResult.total),
+      pagination: {
+        limit,
+        offset,
+        has_more: offset + limit < parseInt(countResult.total)
+      }
+    };
+  }
+
+  async refundTransaction(
+    transactionId: string,
+    refundAmount: number,
+    reason: string,
+    requestedBy: string
+  ): Promise<{
+    refund_transaction_id: string;
+    refund_reference: string;
+    status: string;
+  }> {
+    
+    const originalTransaction = await this.db.queryOne(`
+      SELECT * FROM transactions WHERE id = $1 AND status = 'completed'
+    `, [transactionId]);
+
+    if (!originalTransaction) {
+      throw new Error('Original transaction not found or not eligible for refund');
+    }
+
+    if (refundAmount > originalTransaction.amount) {
+      throw new Error('Refund amount cannot exceed original transaction amount');
+    }
+
+    const refundReference = this.generateTransactionReference('REF');
+
+    try {
+      // Create refund transaction
+      const refundTransaction = await this.db.queryOne(`
+        INSERT INTO transactions (
+          user_id, reference, transaction_type, amount, currency,
+          payment_provider_id, payment_method_id, status,
+          payment_details, created_by
+        ) VALUES ($1, $2, 'refund', $3, $4, $5, $6, 'processing', $7, $8)
+        RETURNING *
+      `, [
+        originalTransaction.user_id,
+        refundReference,
+        refundAmount,
+        originalTransaction.currency,
+        originalTransaction.payment_provider_id,
+        originalTransaction.payment_method_id,
+        JSON.stringify({
+          original_transaction_id: transactionId,
+          reason,
+          refund_type: 'full'
+        }),
+        requestedBy
+      ]);
+
+      // Process refund with provider
+      const provider = this.providers.get(originalTransaction.provider_code);
+      let refundResult;
+
+      if (provider && provider.processRefund) {
+        refundResult = await provider.processRefund({
+          original_transaction_id: originalTransaction.external_reference,
+          refund_amount: refundAmount,
+          currency: originalTransaction.currency,
+          reason
+        });
+      } else {
+        // Direct wallet credit for unsupported providers
+        refundResult = await this.processManualnRefund(refundTransaction, originalTransaction);
+      }
+
+      // Update refund transaction status
+      await this.db.query(`
+        UPDATE transactions 
+        SET 
+          status = $1,
+          external_reference = $2,
+          provider_response = $3,
+          processed_at = NOW()
+        WHERE id = $4
+      `, [
+        refundResult.status,
+        refundResult.provider_reference,
+        JSON.stringify(refundResult),
+        refundTransaction.id
+      ]);
+
+      // Log refund event
+      await this.logTransactionEvent(refundTransaction.id, 'refund_processed', {
+        original_transaction_id: transactionId,
+        refund_amount: refundAmount,
+        reason
+      });
+
+      // Emit refund event
+      this.emit('refundProcessed', {
+        refund_transaction_id: refundTransaction.id,
+        original_transaction_id: transactionId,
+        user_id: originalTransaction.user_id,
+        amount: refundAmount,
+        status: refundResult.status
+      });
+
+      return {
+        refund_transaction_id: refundTransaction.id,
+        refund_reference: refundReference,
+        status: refundResult.status
+      };
+
+    } catch (error) {
+      // Mark refund as failed
+      await this.db.query(`
+        UPDATE transactions 
+        SET status = 'failed', failure_reason = $1 
+        WHERE reference = $2
+      `, [error.message, refundReference]);
+
+      throw error;
+    }
+  }
+
+  // Currency conversion methods
+  async convertCurrency(
+    amount: number,
+    fromCurrency: string,
+    toCurrency: string
+  ): Promise<{
+    converted_amount: number;
+    exchange_rate: number;
+    effective_rate: number;
+    spread_percentage: number;
+  }> {
+    
+    if (fromCurrency === toCurrency) {
+      return {
+        converted_amount: amount,
+        exchange_rate: 1,
+        effective_rate: 1,
+        spread_percentage: 0
+      };
+    }
+
+    const exchangeRate = await this.exchangeRateService.getCurrentRate(fromCurrency, toCurrency);
+    
+    return {
+      converted_amount: amount * exchangeRate.effective_rate,
+      exchange_rate: exchangeRate.rate,
+      effective_rate: exchangeRate.effective_rate,
+      spread_percentage: exchangeRate.spread_percentage
+    };
+  }
+
+  // Helper methods
+  private async validatePaymentRequest(request: PaymentRequest): Promise<void> {
+    // Validate amount
+    if (request.amount <= 0) {
+      throw new Error('Amount must be greater than 0');
+    }
+
+    // Validate currency
+    const supportedCurrencies = ['ZAR', 'NGN', 'KES', 'GHS', 'UGX', 'BWP', 'NAD', 'ZMW', 'USD'];
+    if (!supportedCurrencies.includes(request.currency)) {
+      throw new Error(`Unsupported currency: ${request.currency}`);
+    }
+
+    // Validate payment method availability
+    const paymentMethod = await this.db.queryOne(`
+      SELECT pm.*, pp.status as provider_status
+      FROM payment_methods pm
+      JOIN payment_providers pp ON pm.provider_id = pp.id
+      WHERE pm.method_code = $1 
+        AND pm.currency = $2
+        AND pm.status = 'active'
+        AND pp.status = 'active'
+    `, [request.payment_method, request.currency]);
+
+    if (!paymentMethod) {
+      throw new Error(`Payment method ${request.payment_method} not available for ${request.currency}`);
+    }
+
+    // Validate amount limits
+    if (request.amount < paymentMethod.min_amount || request.amount > paymentMethod.max_amount) {
+      throw new Error(`Amount must be between ${paymentMethod.min_amount} and ${paymentMethod.max_amount} ${request.currency}`);
+    }
+
+    // Validate user KYC status for large amounts
+    if (request.amount > 10000) { // Large amount threshold
+      const user = await this.db.queryOne(`
+        SELECT kyc_status FROM users WHERE id = $1
+      `, [request.user_id]);
+
+      if (user.kyc_status !== 'verified') {
+        throw new Error('KYC verification required for large transactions');
+      }
+    }
+  }
+
+  private async getOptimalPaymentRoute(request: PaymentRequest): Promise<{
+    provider_code: string;
+    provider_name: string;
+    method_code: string;
+    estimated_fee: number;
+    processing_time: number;
+    success_rate: number;
+  }> {
+    
+    // Get available payment routes
+    const routes = await this.db.query(`
+      SELECT 
+        pp.provider_code,
+        pp.provider_name,
+        pm.method_code,
+        pm.typical_processing_minutes,
+        pp.uptime_percentage,
+        pp.fee_structure
+      FROM payment_methods pm
+      JOIN payment_providers pp ON pm.provider_id = pp.id
+      WHERE pm.method_code = $1 
+        AND pm.currency = $2
+        AND pm.status = 'active'
+        AND pp.status = 'active'
+        AND $3 BETWEEN COALESCE(pm.min_amount, 0) AND COALESCE(pm.max_amount, 999999999)
+      ORDER BY pp.uptime_percentage DESC, pm.typical_processing_minutes ASC
+    `, [request.payment_method, request.currency, request.amount]);
+
+    if (routes.length === 0) {
+      throw new Error('No available payment routes found');
+    }
+
+    // Calculate fees for each route and select optimal one
+    const routeWithFees = await Promise.all(
+      routes.map(async route => {
+        const estimatedFee = await this.calculateProviderFee(request.amount, route.fee_structure);
+        return {
+          ...route,
+          estimated_fee: estimatedFee,
+          processing_time: route.typical_processing_minutes,
+          success_rate: route.uptime_percentage
+        };
+      })
+    );
+
+    // Select route with best overall score (fee + time + reliability)
+    const optimalRoute = routeWithFees.reduce((best, current) => {
+      const bestScore = (100 - best.estimated_fee) + best.success_rate - (best.processing_time * 0.1);
+      const currentScore = (100 - current.estimated_fee) + current.success_rate - (current.processing_time * 0.1);
+      return currentScore > bestScore ? current : best;
+    });
+
+    return optimalRoute;
+  }
+
+  private async calculateFees(request: PaymentRequest, route: any): Promise<{
+    base_fee: number;
+    percentage_fee: number;
+    tax_amount: number;
+    total_fee: number;
+    net_amount: number;
+  }> {
+    
+    const feeStructure = route.fee_structure || {};
+    
+    // Calculate base fee
+    const baseFee = feeStructure.base_fee || 0;
+    
+    // Calculate percentage fee
+    const percentageFeeRate = feeStructure.percentage_fee || 0.025; // Default 2.5%
+    const percentageFee = request.amount * percentageFeeRate;
+    
+    // Calculate tax (VAT where applicable)
+    const taxRate = feeStructure.tax_rate || 0.15; // Default 15% VAT
+    const subtotalFee = baseFee + percentageFee;
+    const taxAmount = subtotalFee * taxRate;
+    
+    const totalFee = baseFee + percentageFee + taxAmount;
+    const netAmount = request.amount - totalFee;
+
+    return {
+      base_fee: baseFee,
+      percentage_fee: percentageFee,
+      tax_amount: taxAmount,
+      total_fee: totalFee,
+      net_amount: netAmount
+    };
+  }
+
+  private generateTransactionReference(prefix: string = 'AWO'): string {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+    return `${prefix}${timestamp}${random}`;
+  }
+
+  private generateIdempotencyKey(): string {
+    return require('crypto').randomBytes(16).toString('hex');
+  }
+
+  private async createTransaction(data: any): Promise<any> {
+    const [transaction] = await this.db.query(`
+      INSERT INTO transactions (
+        user_id, reference, idempotency_key, transaction_type,
+        amount, currency, fee_amount, total_amount,
+        payment_provider_id, payment_method_id, payment_details,
+        status, risk_score, expires_at, ip_address, user_agent
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      RETURNING *
+    `, [
+      data.user_id,
+      data.reference,
+      data.idempotency_key,
+      data.transaction_type || 'deposit',
+      data.amount,
+      data.currency,
+      data.fee_calculation.total_fee,
+      data.amount + data.fee_calculation.total_fee,
+      data.payment_route.provider_id,
+      data.payment_route.method_id,
+      JSON.stringify(data.payment_details),
+      'pending',
+      data.risk_score,
+      new Date(Date.now() + (30 * 60 * 1000)), // 30 minutes expiry
+      data.ip_address,
+      data.user_agent
+    ]);
+
+    return transaction;
+  }
+
+  private formatTransactionForDisplay(transaction: any): any {
+    return {
+      id: transaction.id,
+      reference: transaction.reference,
+      type: transaction.transaction_type,
+      amount: parseFloat(transaction.amount),
+      currency: transaction.currency,
+      fee_amount: parseFloat(transaction.fee_amount || '0'),
+      status: transaction.status,
+      description: transaction.payment_details?.description || '',
+      provider: transaction.provider_name,
+      method: transaction.method_name,
+      method_icon: transaction.method_icon,
+      created_at: transaction.created_at,
+      processed_at: transaction.processed_at,
+      failure_reason: transaction.failure_reason
+    };
+  }
+}
+```
+
+### Mobile Money Implementation
+
+```typescript
+// providers/mpesa-provider.ts
+import axios, { AxiosInstance } from 'axios';
+import { PaymentProvider } from './payment-provider-interface';
+
+export interface MPesaConfig {
+  consumerKey: string;
+  consumerSecret: string;
+  environment: 'sandbox' | 'production';
+  shortcode: string;
+  passkey: string;
+  initiatorName?: string;
+  securityCredential?: string;
+}
+
+export class MPesaProvider implements PaymentProvider {
+  private client: AxiosInstance;
+  private baseURL: string;
+  private accessToken: string | null = null;
+  private tokenExpiry: Date | null = null;
+
+  constructor(private config: MPesaConfig) {
+    this.baseURL = config.environment === 'production'
+      ? 'https://api.safaricom.co.ke'
+      : 'https://sandbox.safaricom.co.ke';
+
+    this.client = axios.create({
+      baseURL: this.baseURL,
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    this.setupInterceptors();
+  }
+
+  async initiatePayment(params: {
+    transaction_id: string;
+    amount: number;
+    currency: string;
+    phone_number: string;
+    reference: string;
+    description: string;
+    callback_url: string;
+  }): Promise<{
+    provider_reference: string;
+    payment_url?: string;
+    status: string;
+    expires_at: string;
+  }> {
+    
+    await this.ensureValidToken();
+
+    // Generate timestamp
+    const timestamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+    
+    // Generate password
+    const password = Buffer.from(`${this.config.shortcode}${this.config.passkey}${timestamp}`).toString('base64');
+
+    // Format phone number (ensure it starts with 254 for Kenya)
+    const formattedPhone = this.formatPhoneNumber(params.phone_number);
+
+    const stkPushRequest = {
+      BusinessShortCode: this.config.shortcode,
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType: 'CustomerPayBillOnline',
+      Amount: Math.round(params.amount), // M-Pesa doesn't support decimals
+      PartyA: formattedPhone,
+      PartyB: this.config.shortcode,
+      PhoneNumber: formattedPhone,
+      CallBackURL: params.callback_url,
+      AccountReference: params.reference,
+      TransactionDesc: params.description
+    };
+
+    try {
+      const response = await this.client.post('/mpesa/stkpush/v1/processrequest', stkPushRequest, {
+        headers: { Authorization: `Bearer ${this.accessToken}` }
+      });
+
+      const data = response.data;
+
+      if (data.ResponseCode === '0') {
+        return {
+          provider_reference: data.CheckoutRequestID,
+          status: 'pending',
+          expires_at: new Date(Date.now() + (5 * 60 * 1000)).toISOString() // 5 minutes
+        };
+      } else {
+        throw new Error(`M-Pesa STK Push failed: ${data.errorMessage || data.ResponseDescription}`);
+      }
+
+    } catch (error) {
+      if (error.response?.data) {
+        throw new Error(`M-Pesa API Error: ${error.response.data.errorMessage || error.response.data.ResponseDescription}`);
+      }
+      throw error;
+    }
+  }
+
+  async disburseFunds(params: {
+    amount: number;
+    currency: string;
+    phone_number: string;
+    reference: string;
+    description: string;
+    callback_url: string;
+  }): Promise<{
+    provider_reference: string;
+    status: string;
+  }> {
+    
+    await this.ensureValidToken();
+
+    const formattedPhone = this.formatPhoneNumber(params.phone_number);
+
+    const b2cRequest = {
+      InitiatorName: this.config.initiatorName,
+      SecurityCredential: this.config.securityCredential,
+      CommandID: 'BusinessPayment',
+      Amount: Math.round(params.amount),
+      PartyA: this.config.shortcode,
+      PartyB: formattedPhone,
+      Remarks: params.description,
+      QueueTimeOutURL: params.callback_url,
+      ResultURL: params.callback_url,
+      Occasion: params.reference
+    };
+
+    try {
+      const response = await this.client.post('/mpesa/b2c/v1/paymentrequest', b2cRequest, {
+        headers: { Authorization: `Bearer ${this.accessToken}` }
+      });
+
+      const data = response.data;
+
+      if (data.ResponseCode === '0') {
+        return {
+          provider_reference: data.ConversationID,
+          status: 'processing'
+        };
+      } else {
+        throw new Error(`M-Pesa B2C failed: ${data.errorMessage || data.ResponseDescription}`);
+      }
+
+    } catch (error) {
+      if (error.response?.data) {
+        throw new Error(`M-Pesa API Error: ${error.response.data.errorMessage || error.response.data.ResponseDescription}`);
+      }
+      throw error;
+    }
+  }
+
+  async checkTransactionStatus(providerReference: string): Promise<{
+    status: 'pending' | 'completed' | 'failed';
+    amount?: number;
+    phone_number?: string;
+    mpesa_reference?: string;
+  }> {
+    
+    await this.ensureValidToken();
+
+    const timestamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+    const password = Buffer.from(`${this.config.shortcode}${this.config.passkey}${timestamp}`).toString('base64');
+
+    const queryRequest = {
+      BusinessShortCode: this.config.shortcode,
+      Password: password,
+      Timestamp: timestamp,
+      CheckoutRequestID: providerReference
+    };
+
+    try {
+      const response = await this.client.post('/mpesa/stkpushquery/v1/query', queryRequest, {
+        headers: { Authorization: `Bearer ${this.accessToken}` }
+      });
+
+      const data = response.data;
+
+      if (data.ResponseCode === '0') {
+        // Parse result code
+        const resultCode = data.ResultCode;
+        
+        if (resultCode === '0') {
+          return {
+            status: 'completed',
+            amount: data.Amount,
+            phone_number: data.PhoneNumber,
+            mpesa_reference: data.MpesaReceiptNumber
+          };
+        } else if (resultCode === '1032') {
+          return { status: 'failed' }; // User cancelled
+        } else {
+          return { status: 'failed' };
+        }
+      } else {
+        return { status: 'pending' };
+      }
+
+    } catch (error) {
+      console.error('M-Pesa status check error:', error);
+      return { status: 'pending' };
+    }
+  }
+
+  async processWebhook(webhookData: any): Promise<{
+    transaction_status: 'completed' | 'failed';
+    provider_reference: string;
+    amount?: number;
+    phone_number?: string;
+    mpesa_reference?: string;
+    failure_reason?: string;
+  }> {
+    
+    const body = webhookData.Body;
+    
+    if (body.stkCallback) {
+      // STK Push callback
+      const callback = body.stkCallback;
+      const resultCode = callback.ResultCode;
+      
+      if (resultCode === 0) {
+        // Success - extract callback metadata
+        const metadata = callback.CallbackMetadata?.Item || [];
+        const getMetadataValue = (name: string) => {
+          const item = metadata.find(item => item.Name === name);
+          return item ? item.Value : null;
+        };
+
+        return {
+          transaction_status: 'completed',
+          provider_reference: callback.CheckoutRequestID,
+          amount: getMetadataValue('Amount'),
+          phone_number: getMetadataValue('PhoneNumber'),
+          mpesa_reference: getMetadataValue('MpesaReceiptNumber')
+        };
+      } else {
+        return {
+          transaction_status: 'failed',
+          provider_reference: callback.CheckoutRequestID,
+          failure_reason: callback.ResultDesc
+        };
+      }
+    } else if (body.Result) {
+      // B2C callback
+      const result = body.Result;
+      const resultCode = result.ResultCode;
+      
+      if (resultCode === 0) {
+        const parameters = result.ResultParameters?.ResultParameter || [];
+        const getParameterValue = (key: string) => {
+          const param = parameters.find(p => p.Key === key);
+          return param ? param.Value : null;
+        };
+
+        return {
+          transaction_status: 'completed',
+          provider_reference: result.ConversationID,
+          amount: getParameterValue('TransactionAmount'),
+          phone_number: getParameterValue('ReceiverPartyPublicName'),
+          mpesa_reference: getParameterValue('TransactionID')
+        };
+      } else {
+        return {
+          transaction_status: 'failed',
+          provider_reference: result.ConversationID,
+          failure_reason: result.ResultDesc
+        };
+      }
+    }
+
+    throw new Error('Unknown M-Pesa webhook format');
+  }
+
+  async verifyWebhookSignature(payload: string, signature: string): Promise<boolean> {
+    // M-Pesa doesn't use webhook signatures, but we can validate the structure
+    try {
+      const data = JSON.parse(payload);
+      return data.Body && (data.Body.stkCallback || data.Body.Result);
+    } catch {
+      return false;
+    }
+  }
+
+  // Private helper methods
+  private async ensureValidToken(): Promise<void> {
+    if (this.accessToken && this.tokenExpiry && new Date() < this.tokenExpiry) {
+      return; // Token still valid
+    }
+
+    await this.refreshAccessToken();
+  }
+
+  private async refreshAccessToken(): Promise<void> {
+    const auth = Buffer.from(`${this.config.consumerKey}:${this.config.consumerSecret}`).toString('base64');
+
+    try {
+      const response = await this.client.get('/oauth/v1/generate?grant_type=client_credentials', {
+        headers: { Authorization: `Basic ${auth}` }
+      });
+
+      this.accessToken = response.data.access_token;
+      this.tokenExpiry = new Date(Date.now() + (parseInt(response.data.expires_in) * 1000));
+
+    } catch (error) {
+      throw new Error(`Failed to get M-Pesa access token: ${error.message}`);
+    }
+  }
+
+  private formatPhoneNumber(phone: string): string {
+    // Remove any non-digit characters
+    let cleaned = phone.replace(/\D/g, '');
+    
+    // Handle Kenyan numbers
+    if (cleaned.startsWith('254')) {
+      return cleaned;
+    } else if (cleaned.startsWith('0')) {
+      return '254' + cleaned.slice(1);
+    } else if (cleaned.length === 9) {
+      return '254' + cleaned;
+    }
+    
+    return cleaned;
+  }
+
+  private setupInterceptors(): void {
+    this.client.interceptors.request.use(
+      (config) => {
+        console.log(`M-Pesa API Request: ${config.method?.toUpperCase()} ${config.url}`);
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        console.error('M-Pesa API Error:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          url: error.config?.url
+        });
+        return Promise.reject(error);
+      }
+    );
+  }
+}
+```
+
+### Flutterwave Provider Implementation
+
+```typescript
+// providers/flutterwave-provider.ts
+import axios, { AxiosInstance } from 'axios';
+import { PaymentProvider } from './payment-provider-interface';
+
+export interface FlutterwaveConfig {
+  publicKey: string;
+  secretKey: string;
+  environment: 'sandbox' | 'live';
+  encryptionKey: string;
+}
+
+export class FlutterwaveProvider implements PaymentProvider {
+  private client: AxiosInstance;
+  private baseURL: string;
+
+  constructor(private config: FlutterwaveConfig) {
+    this.baseURL = config.environment === 'live'
+      ? 'https://api.flutterwave.com'
+      : 'https://api.flutterwave.com'; // Flutterwave uses same URL with different keys
+
+    this.client = axios.create({
+      baseURL: this.baseURL,
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.secretKey}`
+      }
+    });
+
+    this.setupInterceptors();
+  }
+
+  async initiatePayment(params: {
+    transaction_id: string;
+    amount: number;
+    currency: string;
+    phone_number?: string;
+    email: string;
+    reference: string;
+    description: string;
+    callback_url: string;
+    payment_method: string;
+  }): Promise<{
+    provider_reference: string;
+    payment_url?: string;
+    status: string;
+    expires_at: string;
+  }> {
+    
+    const paymentData = {
+      tx_ref: params.reference,
+      amount: params.amount,
+      currency: params.currency,
+      redirect_url: params.callback_url,
+      customer: {
+        email: params.email,
+        phonenumber: params.phone_number,
+        name: 'AWO User'
+      },
+      customizations: {
+        title: 'AWO Platform',
+        description: params.description,
+        logo: 'https://awo-platform.com/logo.png'
+      },
+      meta: {
+        awo_transaction_id: params.transaction_id
+      }
+    };
+
+    // Add payment method specific configurations
+    if (params.payment_method === 'mpesa') {
+      paymentData.payment_options = 'mpesa';
+    } else if (params.payment_method === 'card') {
+      paymentData.payment_options = 'card';
+    } else if (params.payment_method === 'bank_transfer') {
+      paymentData.payment_options = 'banktransfer';
+    } else if (params.payment_method === 'ussd') {
+      paymentData.payment_options = 'ussd';
+    }
+
+    try {
+      const response = await this.client.post('/v3/payments', paymentData);
+      const data = response.data;
+
+      if (data.status === 'success') {
+        return {
+          provider_reference: data.data.id,
+          payment_url: data.data.link,
+          status: 'pending',
+          expires_at: new Date(Date.now() + (15 * 60 * 1000)).toISOString() // 15 minutes
+        };
+      } else {
+        throw new Error(`Flutterwave payment initiation failed: ${data.message}`);
+      }
+
+    } catch (error) {
+      if (error.response?.data) {
+        throw new Error(`Flutterwave API Error: ${error.response.data.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async initiateMobileMoneyPayment(params: {
+    amount: number;
+    currency: string;
+    phone_number: string;
+    network: string; // 'MTN' | 'AIRTEL' | 'VODAFONE' | etc.
+    reference: string;
+    description: string;
+  }): Promise<{
+    provider_reference: string;
+    status: string;
+  }> {
+    
+    const mobileMoneyData = {
+      tx_ref: params.reference,
+      amount: params.amount,
+      currency: params.currency,
+      email: 'user@awo-platform.com', // Required field
+      phone_number: params.phone_number,
+      network: params.network,
+      type: 'mobile_money_ghana' // Adjust based on country
+    };
+
+    try {
+      const response = await this.client.post('/v3/charges?type=mobile_money_ghana', mobileMoneyData);
+      const data = response.data;
+
+      if (data.status === 'success') {
+        return {
+          provider_reference: data.data.id,
+          status: data.data.status === 'successful' ? 'completed' : 'pending'
+        };
+      } else {
+        throw new Error(`Mobile money charge failed: ${data.message}`);
+      }
+
+    } catch (error) {
+      if (error.response?.data) {
+        throw new Error(`Flutterwave Mobile Money Error: ${error.response.data.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async disburseFunds(params: {
+    amount: number;
+    currency: string;
+    bank_code?: string;
+    account_number?: string;
+    phone_number?: string;
+    beneficiary_name: string;
+    reference: string;
+    narration: string;
+    disbursement_type: 'bank' | 'mobile_money';
+  }): Promise<{
+    provider_reference: string;
+    status: string;
+  }> {
+    
+    let transferData: any = {
+      account_bank: params.bank_code,
+      account_number: params.account_number,
+      amount: params.amount,
+      currency: params.currency,
+      beneficiary_name: params.beneficiary_name,
+      reference: params.reference,
+      narration: params.narration,
+      callback_url: `${process.env.AWO_WEBHOOK_BASE_URL}/webhooks/payments/flutterwave/transfer`
+    };
+
+    let endpoint = '/v3/transfers';
+
+    if (params.disbursement_type === 'mobile_money') {
+      // Mobile money transfer
+      transferData = {
+        ...transferData,
+        account_number: params.phone_number,
+        account_bank: 'MPS' // Mobile money code
+      };
+    }
+
+    try {
+      const response = await this.client.post(endpoint, transferData);
+      const data = response.data;
+
+      if (data.status === 'success') {
+        return {
+          provider_reference: data.data.id,
+          status: data.data.status === 'SUCCESSFUL' ? 'completed' : 'processing'
+        };
+      } else {
+        throw new Error(`Transfer failed: ${data.message}`);
+      }
+
+    } catch (error) {
+      if (error.response?.data) {
+        throw new Error(`Flutterwave Transfer Error: ${error.response.data.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async verifyTransaction(transactionId: string): Promise<{
+    status: 'successful' | 'pending' | 'failed';
+    amount: number;
+    currency: string;
+    customer_email: string;
+    tx_ref: string;
+  }> {
+    
+    try {
+      const response = await this.client.get(`/v3/transactions/${transactionId}/verify`);
+      const data = response.data;
+
+      if (data.status === 'success') {
+        return {
+          status: data.data.status,
+          amount: data.data.amount,
+          currency: data.data.currency,
+          customer_email: data.data.customer.email,
+          tx_ref: data.data.tx_ref
+        };
+      } else {
+        throw new Error(`Transaction verification failed: ${data.message}`);
+      }
+
+    } catch (error) {
+      if (error.response?.data) {
+        throw new Error(`Flutterwave Verification Error: ${error.response.data.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async processWebhook(webhookData: any): Promise<{
+    transaction_status: 'completed' | 'failed';
+    provider_reference: string;
+    amount: number;
+    currency: string;
+    tx_ref: string;
+    customer_email?: string;
+  }> {
+    
+    // Verify transaction with Flutterwave
+    const verificationResult = await this.verifyTransaction(webhookData.data.id);
+
+    return {
+      transaction_status: verificationResult.status === 'successful' ? 'completed' : 'failed',
+      provider_reference: webhookData.data.id,
+      amount: verificationResult.amount,
+      currency: verificationResult.currency,
+      tx_ref: verificationResult.tx_ref,
+      customer_email: verificationResult.customer_email
+    };
+  }
+
+  async verifyWebhookSignature(payload: string, signature: string): Promise<boolean> {
+    const crypto = require('crypto');
+    const hash = crypto
+      .createHmac('sha256', process.env.FLUTTERWAVE_WEBHOOK_SECRET!)
+      .update(payload)
+      .digest('hex');
+
+    return signature === hash;
+  }
+
+  async getBanks(currency: string): Promise<Array<{
+    id: string;
+    code: string;
+    name: string;
+  }>> {
+    
+    try {
+      const response = await this.client.get(`/v3/banks/${currency}`);
+      const data = response.data;
+
+      if (data.status === 'success') {
+        return data.data.map(bank => ({
+          id: bank.id,
+          code: bank.code,
+          name: bank.name
+        }));
+      } else {
+        throw new Error(`Failed to get banks: ${data.message}`);
+      }
+
+    } catch (error) {
+      if (error.response?.data) {
+        throw new Error(`Flutterwave Banks Error: ${error.response.data.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async validateBankAccount(params: {
+    account_number: string;
+    account_bank: string;
+  }): Promise<{
+    account_number: string;
+    account_name: string;
+    bank_name: string;
+  }> {
+    
+    try {
+      const response = await this.client.post('/v3/accounts/resolve', {
+        account_number: params.account_number,
+        account_bank: params.account_bank
+      });
+
+      const data = response.data;
+
+      if (data.status === 'success') {
+        return {
+          account_number: data.data.account_number,
+          account_name: data.data.account_name,
+          bank_name: data.data.bank_name
+        };
+      } else {
+        throw new Error(`Account validation failed: ${data.message}`);
+      }
+
+    } catch (error) {
+      if (error.response?.data) {
+        throw new Error(`Flutterwave Account Validation Error: ${error.response.data.message}`);
+      }
+      throw error;
+    }
+  }
+
+  private setupInterceptors(): void {
+    this.client.interceptors.request.use(
+      (config) => {
+        console.log(`Flutterwave API Request: ${config.method?.toUpperCase()} ${config.url}`);
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        console.error('Flutterwave API Error:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          url: error.config?.url
+        });
+        return Promise.reject(error);
+      }
+    );
+  }
+}
+```
+
+## Mobile App Integration Components
+
+### Payment Method Selector
+
+```typescript
+// components/PaymentMethodSelector.tsx
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Image, FlatList, StyleSheet } from 'react-native';
+import { usePaymentMethods } from '../hooks/usePaymentMethods';
+
+interface PaymentMethod {
+  id: string;
+  method_code: string;
+  method_name: string;
+  display_name: string;
+  icon_url: string;
+  color_hex: string;
+  min_amount: number;
+  max_amount: number;
+  is_popular: boolean;
+  typical_processing_minutes: number;
+}
+
+interface PaymentMethodSelectorProps {
+  currency: string;
+  amount: number;
+  selectedMethod: string;
+  onMethodSelect: (methodCode: string) => void;
+}
+
+export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
+  currency,
+  amount,
+  selectedMethod,
+  onMethodSelect
+}) => {
+  const { paymentMethods, loading, error } = usePaymentMethods(currency);
+  const [availableMethods, setAvailableMethods] = useState<PaymentMethod[]>([]);
+
+  useEffect(() => {
+    if (paymentMethods) {
+      // Filter methods based on amount limits
+      const available = paymentMethods.filter(method => 
+        amount >= method.min_amount && amount <= method.max_amount
+      );
+      
+      // Sort by popularity and processing time
+      available.sort((a, b) => {
+        if (a.is_popular && !b.is_popular) return -1;
+        if (!a.is_popular && b.is_popular) return 1;
+        return a.typical_processing_minutes - b.typical_processing_minutes;
+      });
+      
+      setAvailableMethods(available);
+    }
+  }, [paymentMethods, amount]);
+
+  const renderPaymentMethod = ({ item }: { item: PaymentMethod }) => {
+    const isSelected = selectedMethod === item.method_code;
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.methodCard,
+          isSelected && styles.selectedCard,
+          { borderColor: isSelected ? item.color_hex : '#E5E7EB' }
+        ]}
+        onPress={() => onMethodSelect(item.method_code)}
+      >
+        <View style={styles.methodHeader}>
+          <Image source={{ uri: item.icon_url }} style={styles.methodIcon} />
+          <View style={styles.methodInfo}>
+            <Text style={styles.methodName}>{item.display_name}</Text>
+            <Text style={styles.processingTime}>
+              ~{item.typical_processing_minutes} minutes
+            </Text>
+          </View>
+          {item.is_popular && (
+            <View style={styles.popularBadge}>
+              <Text style={styles.popularText}>Popular</Text>
+            </View>
+          )}
+        </View>
+        
+        <View style={styles.methodDetails}>
+          <Text style={styles.limitText}>
+            Limits: {currency} {item.min_amount.toLocaleString()} - {item.max_amount.toLocaleString()}
+          </Text>
+        </View>
+        
+        {isSelected && (
+          <View style={[styles.selectedIndicator, { backgroundColor: item.color_hex }]} />
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading payment methods...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Failed to load payment methods</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.sectionTitle}>Select Payment Method</Text>
+      <FlatList
+        data={availableMethods}
+        renderItem={renderPaymentMethod}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    marginVertical: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  methodCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 2,
+    padding: 16,
+    marginBottom: 12,
+    position: 'relative',
+  },
+  selectedCard: {
+    backgroundColor: '#F0FDF4',
+  },
+  methodHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  methodIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  methodInfo: {
+    flex: 1,
+  },
+  methodName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  processingTime: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  popularBadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  popularText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  methodDetails: {
+    marginTop: 8,
+  },
+  limitText: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  selectedIndicator: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  errorContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 14,
+  },
+});
+```
+
+### Payment Flow Component
+
+```typescript
+// components/PaymentFlow.tsx
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Alert, Modal, StyleSheet } from 'react-native';
+import { usePayment } from '../hooks/usePayment';
+import { PaymentMethodSelector } from './PaymentMethodSelector';
+import { LoadingSpinner } from './LoadingSpinner';
+import { WebView } from 'react-native-webview';
+
+interface PaymentFlowProps {
+  amount: number;
+  currency: string;
+  description: string;
+  onSuccess: (transactionId: string) => void;
+  onCancel: () => void;
+  metadata?: any;
+}
+
+export const PaymentFlow: React.FC<PaymentFlowProps> = ({
+  amount,
+  currency,
+  description,
+  onSuccess,
+  onCancel,
+  metadata
+}) => {
+  const [selectedMethod, setSelectedMethod] = useState('');
+  const [paymentDetails, setPaymentDetails] = useState<any>({});
+  const [showWebView, setShowWebView] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState('');
+  const [step, setStep] = useState<'method' | 'details' | 'processing' | 'completed'>('method');
+
+  const { initiatePayment, checkPaymentStatus, loading, error } = usePayment();
+
+  const handleMethodSelect = (methodCode: string) => {
+    setSelectedMethod(methodCode);
+    setStep('details');
+  };
+
+  const handlePaymentDetailsSubmit = async () => {
+    try {
+      setStep('processing');
+      
+      const paymentRequest = {
+        amount,
+        currency,
+        payment_method: selectedMethod,
+        payment_details: paymentDetails,
+        description,
+        metadata
+      };
+
+      const result = await initiatePayment(paymentRequest);
+
+      if (result.payment_url) {
+        // Redirect payment (cards, some mobile money)
+        setPaymentUrl(result.payment_url);
+        setShowWebView(true);
+      } else if (result.status === 'pending') {
+        // Direct payment (M-Pesa STK push, etc.)
+        pollPaymentStatus(result.transaction_id);
+      } else if (result.status === 'completed') {
+        // Immediate completion
+        setStep('completed');
+        onSuccess(result.transaction_id);
+      }
+
+    } catch (error) {
+      Alert.alert('Payment Error', error.message);
+      setStep('details');
+    }
+  };
+
+  const pollPaymentStatus = async (transactionId: string) => {
+    const maxAttempts = 30; // 5 minutes (10 second intervals)
+    let attempts = 0;
+
+    const checkStatus = async () => {
+      try {
+        const status = await checkPaymentStatus(transactionId);
+        
+        if (status.status === 'completed') {
+          setStep('completed');
+          onSuccess(transactionId);
+          return;
+        } else if (status.status === 'failed') {
+          Alert.alert('Payment Failed', status.failure_reason || 'Payment could not be processed');
+          setStep('details');
+          return;
+        }
+
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(checkStatus, 10000); // Check every 10 seconds
+        } else {
+          Alert.alert('Payment Timeout', 'Payment is taking longer than expected. Please check your transaction history.');
+          setStep('details');
+        }
+      } catch (error) {
+        console.error('Status check error:', error);
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(checkStatus, 10000);
+        }
+      }
+    };
+
+    checkStatus();
+  };
+
+  const handleWebViewNavigation = (navState: any) => {
+    if (navState.url.includes('success') || navState.url.includes('completed')) {
+      setShowWebView(false);
+      setStep('completed');
+      // Extract transaction ID from URL if possible
+      const urlParams = new URLSearchParams(navState.url.split('?')[1]);
+      const transactionId = urlParams.get('transaction_id') || 'unknown';
+      onSuccess(transactionId);
+    } else if (navState.url.includes('failed') || navState.url.includes('cancelled')) {
+      setShowWebView(false);
+      Alert.alert('Payment Failed', 'Payment was cancelled or failed');
+      setStep('details');
+    }
+  };
+
+  const renderPaymentDetails = () => {
+    switch (selectedMethod) {
+      case 'mpesa':
+        return (
+          <View style={styles.detailsContainer}>
+            <Text style={styles.detailsTitle}>M-Pesa Payment</Text>
+            <Text style={styles.instruction}>
+              Enter your M-Pesa phone number to receive STK push
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="254712345678"
+              value={paymentDetails.phone_number || ''}
+              onChangeText={(text) => setPaymentDetails({ ...paymentDetails, phone_number: text })}
+              keyboardType="phone-pad"
+            />
+            <Text style={styles.note}>
+              You will receive a payment request on your phone. Enter your M-Pesa PIN to complete.
+            </Text>
+          </View>
+        );
+      
+      case 'card':
+        return (
+          <View style={styles.detailsContainer}>
+            <Text style={styles.detailsTitle}>Card Payment</Text>
+            <Text style={styles.instruction}>
+              You will be redirected to secure payment page
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Cardholder Email"
+              value={paymentDetails.email || ''}
+              onChangeText={(text) => setPaymentDetails({ ...paymentDetails, email: text })}
+              keyboardType="email-address"
+            />
+          </View>
+        );
+      
+      case 'bank_transfer':
+        return (
+          <View style={styles.detailsContainer}>
+            <Text style={styles.detailsTitle}>Bank Transfer</Text>
+            <Text style={styles.instruction}>
+              You will be redirected to your bank's secure login
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Email for receipt"
+              value={paymentDetails.email || ''}
+              onChangeText={(text) => setPaymentDetails({ ...paymentDetails, email: text })}
+              keyboardType="email-address"
+            />
+          </View>
+        );
+      
+      default:
+        return (
+          <View style={styles.detailsContainer}>
+            <Text style={styles.detailsTitle}>Payment Details</Text>
+            <Text style={styles.instruction}>
+              Complete your payment details
+            </Text>
+          </View>
+        );
+    }
+  };
+
+  if (step === 'method') {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Payment: {currency} {amount.toLocaleString()}</Text>
+        <Text style={styles.description}>{description}</Text>
+        
+        <PaymentMethodSelector
+          currency={currency}
+          amount={amount}
+          selectedMethod={selectedMethod}
+          onMethodSelect={handleMethodSelect}
+        />
+      </View>
+    );
+  }
+
+  if (step === 'details') {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Payment: {currency} {amount.toLocaleString()}</Text>
+        
+        {renderPaymentDetails()}
+        
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.backButton} onPress={() => setStep('method')}>
+            <Text style={styles.backButtonText}>Back</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.payButton} 
+            onPress={handlePaymentDetailsSubmit}
+            disabled={loading}
+          >
+            {loading ? (
+              <LoadingSpinner size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.payButtonText}>Pay Now</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (step === 'processing') {
+    return (
+      <View style={styles.processingContainer}>
+        <LoadingSpinner size="large" />
+        <Text style={styles.processingTitle}>Processing Payment</Text>
+        <Text style={styles.processingText}>
+          {selectedMethod === 'mpesa' 
+            ? 'Check your phone for M-Pesa payment request' 
+            : 'Please wait while we process your payment...'}
+        </Text>
+        
+        <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <Modal visible={showWebView} animationType="slide">
+        <View style={styles.webViewContainer}>
+          <View style={styles.webViewHeader}>
+            <Text style={styles.webViewTitle}>Complete Payment</Text>
+            <TouchableOpacity onPress={() => setShowWebView(false)}>
+              <Text style={styles.closeButton}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <WebView
+            source={{ uri: paymentUrl }}
+            onNavigationStateChange={handleWebViewNavigation}
+            style={styles.webView}
+          />
+        </View>
+      </Modal>
+    </>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#F9FAFB',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  description: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  detailsContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+  },
+  detailsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  instruction: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  note: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    lineHeight: 16,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  payButton: {
+    flex: 2,
+    backgroundColor: '#10B981',
+    paddingVertical: 14,
+    borderRadius: 8,
+  },
+  payButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  processingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#F9FAFB',
+  },
+  processingTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  processingText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 32,
+  },
+  cancelButton: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  webViewContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  webViewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  webViewTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  closeButton: {
+    fontSize: 20,
+    color: '#6B7280',
+    paddingHorizontal: 8,
+  },
+  webView: {
+    flex: 1,
+  },
+});
+```
+
+## Testing & Deployment
+
+### Payment Testing Strategy
+
+```typescript
+// payment-service.test.ts
+import { PaymentService } from '../src/payment-service';
+import { MockDatabase, MockFlutterwaveProvider, MockMPesaProvider } from './mocks';
+
+describe('PaymentService', () => {
+  let paymentService: PaymentService;
+  let mockDb: MockDatabase;
+
+  beforeEach(() => {
+    mockDb = new MockDatabase();
+    paymentService = new PaymentService(mockDb, mockWalletService, mockExchangeService, mockFraudService);
+  });
+
+  describe('Payment Initiation', () => {
+    test('should initiate M-Pesa payment successfully', async () => {
+      const paymentRequest = {
+        user_id: 'user-123',
+        amount: 1000,
+        currency: 'KES',
+        payment_method: 'mpesa',
+        payment_details: { phone_number: '254712345678' },
+        description: 'Test payment'
+      };
+
+      const result = await paymentService.initiatePayment(paymentRequest);
+
+      expect(result.transaction_id).toBeDefined();
+      expect(result.reference).toMatch(/^AWO/);
+      expect(result.status).toBe('pending');
+    });
+
+    test('should handle payment amount validation', async () => {
+      const paymentRequest = {
+        user_id: 'user-123',
+        amount: 0,
+        currency: 'KES',
+        payment_method: 'mpesa',
+        payment_details: { phone_number: '254712345678' },
+        description: 'Invalid payment'
+      };
+
+      await expect(paymentService.initiatePayment(paymentRequest))
+        .rejects.toThrow('Amount must be greater than 0');
+    });
+
+    test('should handle currency validation', async () => {
+      const paymentRequest = {
+        user_id: 'user-123',
+        amount: 1000,
+        currency: 'INVALID',
+        payment_method: 'mpesa',
+        payment_details: { phone_number: '254712345678' },
+        description: 'Invalid currency'
+      };
+
+      await expect(paymentService.initiatePayment(paymentRequest))
+        .rejects.toThrow('Unsupported currency: INVALID');
+    });
+  });
+
+  describe('Webhook Processing', () => {
+    test('should process M-Pesa webhook successfully', async () => {
+      const webhookData = {
+        Body: {
+          stkCallback: {
+            CheckoutRequestID: 'ws_CO_123456789',
+            ResultCode: 0,
+            ResultDesc: 'The service request is processed successfully.',
+            CallbackMetadata: {
+              Item: [
+                { Name: 'Amount', Value: 1000 },
+                { Name: 'MpesaReceiptNumber', Value: 'ABC123' },
+                { Name: 'PhoneNumber', Value: '254712345678' }
+              ]
+            }
+          }
+        }
+      };
+
+      // Pre-create transaction
+      mockDb.createTransaction({
+        external_reference: 'ws_CO_123456789',
+        status: 'pending'
+      });
+
+      const result = await paymentService.processPaymentWebhook('mpesa_direct', webhookData);
+
+      expect(result.processed).toBe(true);
+      expect(result.transaction_id).toBeDefined();
+    });
+
+    test('should handle failed payment webhook', async () => {
+      const webhookData = {
+        Body: {
+          stkCallback: {
+            CheckoutRequestID: 'ws_CO_123456789',
+            ResultCode: 1032,
+            ResultDesc: 'Request cancelled by user'
+          }
+        }
+      };
+
+      // Pre-create transaction
+      mockDb.createTransaction({
+        external_reference: 'ws_CO_123456789',
+        status: 'pending'
+      });
+
+      const result = await paymentService.processPaymentWebhook('mpesa_direct', webhookData);
+
+      expect(result.processed).toBe(true);
+      
+      // Verify transaction status updated to failed
+      const transaction = await mockDb.getTransaction('ws_CO_123456789');
+      expect(transaction.status).toBe('failed');
+      expect(transaction.failure_reason).toBe('Request cancelled by user');
+    });
+  });
+
+  describe('Currency Conversion', () => {
+    test('should convert currency correctly', async () => {
+      // Mock exchange rate
+      mockExchangeService.setRate('USD', 'KES', 150.50);
+
+      const result = await paymentService.convertCurrency(100, 'USD', 'KES');
+
+      expect(result.converted_amount).toBeCloseTo(15050); // 100 * 150.50
+      expect(result.exchange_rate).toBe(150.50);
+    });
+
+    test('should return same amount for same currency', async () => {
+      const result = await paymentService.convertCurrency(1000, 'KES', 'KES');
+
+      expect(result.converted_amount).toBe(1000);
+      expect(result.exchange_rate).toBe(1);
+      expect(result.spread_percentage).toBe(0);
+    });
+  });
+
+  describe('Transaction History', () => {
+    test('should get user transaction history with filters', async () => {
+      const userId = 'user-123';
+      
+      // Create test transactions
+      await mockDb.createTransactions(userId, [
+        { type: 'deposit', amount: 1000, currency: 'KES', status: 'completed' },
+        { type: 'withdrawal', amount: 500, currency: 'KES', status: 'completed' },
+        { type: 'transfer', amount: 200, currency: 'USD', status: 'pending' }
+      ]);
+
+      const result = await paymentService.getUserTransactionHistory(userId, {
+        limit: 10,
+        transaction_type: 'deposit'
+      });
+
+      expect(result.transactions).toHaveLength(1);
+      expect(result.transactions[0].type).toBe('deposit');
+      expect(result.total_count).toBe(1);
+    });
+  });
+
+  describe('Fraud Detection Integration', () => {
+    test('should block high-risk payments', async () => {
+      // Mock high risk score
+      mockFraudService.setRiskScore(0.9); // 90% risk
+
+      const paymentRequest = {
+        user_id: 'user-123',
+        amount: 50000, // Large amount
+        currency: 'KES',
+        payment_method: 'mpesa',
+        payment_details: { phone_number: '254712345678' },
+        description: 'Suspicious payment'
+      };
+
+      await expect(paymentService.initiatePayment(paymentRequest))
+        .rejects.toThrow('Payment blocked due to high risk score');
+    });
+
+    test('should allow low-risk payments', async () => {
+      // Mock low risk score
+      mockFraudService.setRiskScore(0.2); // 20% risk
+
+      const paymentRequest = {
+        user_id: 'user-123',
+        amount: 1000,
+        currency: 'KES',
+        payment_method: 'mpesa',
+        payment_details: { phone_number: '254712345678' },
+        description: 'Normal payment'
+      };
+
+      const result = await paymentService.initiatePayment(paymentRequest);
+      expect(result.transaction_id).toBeDefined();
+    });
+  });
+});
+```
+
+### Integration Testing
+
+```typescript
+// payment-integration.test.ts
+describe('Payment Integration Tests', () => {
+  test('should complete full M-Pesa payment flow', async () => {
+    const user = await testDb.createUser({
+      email: 'test@example.co.ke',
+      phone_number: '254712345678',
+      country_code: 'KE'
+    });
+
+    // Initiate payment
+    const paymentRequest = {
+      user_id: user.id,
+      amount: 1000,
+      currency: 'KES',
+      payment_method: 'mpesa',
+      payment_details: { phone_number: '254712345678' },
+      description: 'Test M-Pesa payment'
+    };
+
+    const payment = await paymentService.initiatePayment(paymentRequest);
+    
+    expect(payment.status).toBe('pending');
+    expect(payment.provider_reference).toBeDefined();
+
+    // Simulate successful webhook
+    const webhookData = {
+      Body: {
+        stkCallback: {
+          CheckoutRequestID: payment.provider_reference,
+          ResultCode: 0,
+          ResultDesc: 'Success',
+          CallbackMetadata: {
+            Item: [
+              { Name: 'Amount', Value: 1000 },
+              { Name: 'MpesaReceiptNumber', Value: 'ABC123DEF' },
+              { Name: 'PhoneNumber', Value: '254712345678' }
+            ]
+          }
+        }
+      }
+    };
+
+    await paymentService.processPaymentWebhook('mpesa_direct', webhookData);
+
+    // Verify transaction completed
+    const finalStatus = await paymentService.getTransactionStatus(payment.transaction_id, user.id);
+    expect(finalStatus.status).toBe('completed');
+
+    // Verify wallet balance updated
+    const wallet = await walletService.getWallet(user.id, 'KES');
+    expect(wallet.available_balance).toBe(1000);
+  });
+
+  test('should handle cross-border payment with currency conversion', async () => {
+    const sender = await testDb.createUser({ country_code: 'ZA' });
+    const recipient = await testDb.createUser({ country_code: 'KE' });
+
+    // Add balance to sender
+    await walletService.creditWallet(sender.id, 1000, 'ZAR');
+
+    // Mock exchange rate
+    exchangeRateService.setRate('ZAR', 'KES', 7.5);
+
+    const transferRequest = {
+      sender_id: sender.id,
+      recipient_id: recipient.id,
+      amount: 100, // ZAR
+      currency: 'ZAR',
+      transfer_method: 'wallet',
+      description: 'Cross-border transfer'
+    };
+
+    const result = await paymentService.transferFunds(transferRequest);
+    expect(result.status).toBe('completed');
+
+    // Verify sender balance deducted
+    const senderWallet = await walletService.getWallet(sender.id, 'ZAR');
+    expect(senderWallet.available_balance).toBe(900);
+
+    // Verify recipient balance credited (converted to KES)
+    const recipientWallet = await walletService.getWallet(recipient.id, 'KES');
+    expect(recipientWallet.available_balance).toBe(750); // 100 * 7.5
+  });
+
+  test('should handle Flutterwave card payment flow', async () => {
+    const user = await testDb.createUser({
+      email: 'test@example.com.ng',
+      country_code: 'NG'
+    });
+
+    const paymentRequest = {
+      user_id: user.id,
+      amount: 5000,
+      currency: 'NGN',
+      payment_method: 'card',
+      payment_details: { 
+        email: 'test@example.com.ng',
+        card_type: 'visa'
+      },
+      description: 'Test card payment'
+    };
+
+    const payment = await paymentService.initiatePayment(paymentRequest);
+    
+    expect(payment.status).toBe('pending');
+    expect(payment.payment_url).toContain('flutterwave');
+
+    // Simulate successful Flutterwave webhook
+    const webhookData = {
+      event: 'charge.completed',
+      data: {
+        id: payment.provider_reference,
+        tx_ref: payment.reference,
+        status: 'successful',
+        amount: 5000,
+        currency: 'NGN',
+        customer: { email: 'test@example.com.ng' }
+      }
+    };
+
+    await paymentService.processPaymentWebhook('flutterwave', webhookData);
+
+    // Verify completion
+    const finalStatus = await paymentService.getTransactionStatus(payment.transaction_id, user.id);
+    expect(finalStatus.status).toBe('completed');
+  });
+});
+```
+
+### Load Testing
+
+```typescript
+// payment-load.test.ts
+import { performance } from 'perf_hooks';
+
+describe('Payment Load Tests', () => {
+  test('should handle concurrent payment initiations', async () => {
+    const numberOfConcurrentPayments = 100;
+    const users = await createTestUsers(numberOfConcurrentPayments);
+    
+    const startTime = performance.now();
+    
+    const paymentPromises = users.map(user => 
+      paymentService.initiatePayment({
+        user_id: user.id,
+        amount: 1000,
+        currency: 'KES',
+        payment_method: 'mpesa',
+        payment_details: { phone_number: `25471234${user.id.slice(-4)}` },
+        description: 'Load test payment'
+      })
+    );
+
+    const results = await Promise.allSettled(paymentPromises);
+    const endTime = performance.now();
+    
+    const successfulPayments = results.filter(r => r.status === 'fulfilled').length;
+    const averageResponseTime = (endTime - startTime) / numberOfConcurrentPayments;
+
+    expect(successfulPayments).toBeGreaterThan(95); // 95% success rate
+    expect(averageResponseTime).toBeLessThan(1000); // Average under 1 second
+  });
+
+  test('should handle webhook processing under load', async () => {
+    const numberOfWebhooks = 1000;
+    const webhooks = generateTestWebhooks(numberOfWebhooks);
+    
+    const startTime = performance.now();
+    
+    const webhookPromises = webhooks.map(webhook =>
+      paymentService.processPaymentWebhook('mpesa_direct', webhook.data, webhook.signature)
+    );
+
+    const results = await Promise.allSettled(webhookPromises);
+    const endTime = performance.now();
+    
+    const successfulWebhooks = results.filter(r => r.status === 'fulfilled').length;
+    const totalTime = endTime - startTime;
+
+    expect(successfulWebhooks).toBeGreaterThan(980); // 98% success rate
+    expect(totalTime).toBeLessThan(10000); // Complete within 10 seconds
+  });
+});
+```
+
+## Monitoring and Analytics
+
+### Payment Analytics Service
+
+```typescript
+// payment-analytics.ts
+export class PaymentAnalyticsService {
+  constructor(private db: DatabaseService) {}
+
+  async generatePaymentReport(period: 'daily' | 'weekly' | 'monthly'): Promise<{
+    transaction_summary: any;
+    provider_performance: any;
+    currency_breakdown: any;
+    failure_analysis: any;
+    growth_metrics: any;
+  }> {
+    const dateRange = this.getDateRange(period);
+    
+    const [
+      transactionSummary,
+      providerPerformance,
+      currencyBreakdown,
+      failureAnalysis,
+      growthMetrics
+    ] = await Promise.all([
+      this.getTransactionSummary(dateRange),
+      this.getProviderPerformance(dateRange),
+      this.getCurrencyBreakdown(dateRange),
+      this.getFailureAnalysis(dateRange),
+      this.getGrowthMetrics(dateRange)
+    ]);
+
+    return {
+      transaction_summary: transactionSummary,
+      provider_performance: providerPerformance,
+      currency_breakdown: currencyBreakdown,
+      failure_analysis: failureAnalysis,
+      growth_metrics: growthMetrics
+    };
+  }
+
+  private async getTransactionSummary(dateRange: { start: Date; end: Date }): Promise<any> {
+    const summary = await this.db.queryOne(`
+      SELECT 
+        COUNT(*) as total_transactions,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as successful_transactions,
+        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_transactions,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_transactions,
+        SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END) as total_volume,
+        AVG(CASE WHEN status = 'completed' THEN amount ELSE NULL END) as average_transaction_amount,
+        COUNT(DISTINCT user_id) as unique_users,
+        SUM(CASE WHEN status = 'completed' THEN fee_amount ELSE 0 END) as total_fees_collected
+      FROM transactions 
+      WHERE created_at BETWEEN $1 AND $2
+    `, [dateRange.start, dateRange.end]);
+
+    const successRate = summary.total_transactions > 0 
+      ? (summary.successful_transactions / summary.total_transactions) * 100 
+      : 0;
+
+    return {
+      ...summary,
+      success_rate: successRate,
+      total_volume: parseFloat(summary.total_volume || '0'),
+      average_transaction_amount: parseFloat(summary.average_transaction_amount || '0'),
+      total_fees_collected: parseFloat(summary.total_fees_collected || '0')
+    };
+  }
+
+  private async getProviderPerformance(dateRange: { start: Date; end: Date }): Promise<any> {
+    const performance = await this.db.query(`
+      SELECT 
+        pp.provider_name,
+        pp.provider_code,
+        COUNT(*) as total_transactions,
+        COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as successful_transactions,
+        COUNT(CASE WHEN t.status = 'failed' THEN 1 END) as failed_transactions,
+        SUM(CASE WHEN t.status = 'completed' THEN t.amount ELSE 0 END) as volume,
+        AVG(CASE 
+          WHEN t.status = 'completed' AND t.processed_at IS NOT NULL 
+          THEN EXTRACT(EPOCH FROM (t.processed_at - t.created_at)) / 60 
+          ELSE NULL 
+        END) as avg_processing_minutes,
+        COUNT(CASE WHEN t.status = 'completed' AND t.processed_at <= t.created_at + INTERVAL '5 minutes' THEN 1 END) as fast_transactions
+      FROM transactions t
+      JOIN payment_providers pp ON t.payment_provider_id = pp.id
+      WHERE t.created_at BETWEEN $1 AND $2
+      GROUP BY pp.id, pp.provider_name, pp.provider_code
+      ORDER BY volume DESC
+    `, [dateRange.start, dateRange.end]);
+
+    return performance.map(p => ({
+      ...p,
+      success_rate: p.total_transactions > 0 ? (p.successful_transactions / p.total_transactions) * 100 : 0,
+      fast_transaction_rate: p.total_transactions > 0 ? (p.fast_transactions / p.total_transactions) * 100 : 0,
+      volume: parseFloat(p.volume || '0'),
+      avg_processing_minutes: parseFloat(p.avg_processing_minutes || '0')
+    }));
+  }
+
+  private async getCurrencyBreakdown(dateRange: { start: Date; end: Date }): Promise<any> {
+    const breakdown = await this.db.query(`
+      SELECT 
+        currency,
+        COUNT(*) as transaction_count,
+        SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END) as volume,
+        AVG(CASE WHEN status = 'completed' THEN amount ELSE NULL END) as avg_amount,
+        COUNT(DISTINCT user_id) as unique_users
+      FROM transactions 
+      WHERE created_at BETWEEN $1 AND $2
+      GROUP BY currency
+      ORDER BY volume DESC
+    `, [dateRange.start, dateRange.end]);
+
+    const totalVolume = breakdown.reduce((sum, curr) => sum + parseFloat(curr.volume || '0'), 0);
+
+    return breakdown.map(b => ({
+      ...b,
+      volume: parseFloat(b.volume || '0'),
+      avg_amount: parseFloat(b.avg_amount || '0'),
+      volume_percentage: totalVolume > 0 ? (parseFloat(b.volume || '0') / totalVolume) * 100 : 0
+    }));
+  }
+
+  private async getFailureAnalysis(dateRange: { start: Date; end: Date }): Promise<any> {
+    const failures = await this.db.query(`
+      SELECT 
+        failure_reason,
+        COUNT(*) as failure_count,
+        pp.provider_name,
+        pm.method_name,
+        AVG(amount) as avg_failed_amount
+      FROM transactions t
+      LEFT JOIN payment_providers pp ON t.payment_provider_id = pp.id
+      LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
+      WHERE t.status = 'failed' 
+        AND t.created_at BETWEEN $1 AND $2
+        AND t.failure_reason IS NOT NULL
+      GROUP BY failure_reason, pp.provider_name, pm.method_name
+      ORDER BY failure_count DESC
+      LIMIT 20
+    `, [dateRange.start, dateRange.end]);
+
+    const commonFailures = await this.db.query(`
+      SELECT 
+        CASE 
+          WHEN failure_reason ILIKE '%insufficient%' THEN 'Insufficient Balance'
+          WHEN failure_reason ILIKE '%cancel%' THEN 'User Cancelled'
+          WHEN failure_reason ILIKE '%timeout%' THEN 'Timeout'
+          WHEN failure_reason ILIKE '%network%' THEN 'Network Error'
+          WHEN failure_reason ILIKE '%invalid%' THEN 'Invalid Details'
+          ELSE 'Other'
+        END as failure_category,
+        COUNT(*) as count
+      FROM transactions 
+      WHERE status = 'failed' 
+        AND created_at BETWEEN $1 AND $2
+        AND failure_reason IS NOT NULL
+      GROUP BY failure_category
+      ORDER BY count DESC
+    `, [dateRange.start, dateRange.end]);
+
+    return {
+      detailed_failures: failures,
+      failure_categories: commonFailures
+    };
+  }
+
+  private async getGrowthMetrics(dateRange: { start: Date; end: Date }): Promise<any> {
+    const growthData = await this.db.query(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as daily_transactions,
+        SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END) as daily_volume,
+        COUNT(DISTINCT user_id) as daily_active_users,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as successful_transactions
+      FROM transactions 
+      WHERE created_at BETWEEN $1 AND $2
+      GROUP BY DATE(created_at)
+      ORDER BY date
+    `, [dateRange.start, dateRange.end]);
+
+    // Calculate growth rates
+    const growthWithRates = growthData.map((day, index) => {
+      const previousDay = growthData[index - 1];
+      const volumeGrowth = previousDay 
+        ? ((day.daily_volume - previousDay.daily_volume) / previousDay.daily_volume) * 100 
+        : 0;
+      const userGrowth = previousDay 
+        ? ((day.daily_active_users - previousDay.daily_active_users) / previousDay.daily_active_users) * 100 
+        : 0;
+
+      return {
+        ...day,
+        daily_volume: parseFloat(day.daily_volume || '0'),
+        volume_growth_percentage: volumeGrowth,
+        user_growth_percentage: userGrowth
+      };
+    });
+
+    return growthWithRates;
+  }
+
+  async getRealtimeMetrics(): Promise<{
+    transactions_last_hour: number;
+    success_rate_last_hour: number;
+    average_response_time: number;
+    pending_transactions: number;
+    failed_transactions_last_hour: number;
+  }> {
+    const oneHourAgo = new Date(Date.now() - (60 * 60 * 1000));
+
+    const metrics = await this.db.queryOne(`
+      SELECT 
+        COUNT(*) as transactions_last_hour,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as successful_last_hour,
+        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_last_hour,
+        AVG(CASE 
+          WHEN status = 'completed' AND processed_at IS NOT NULL 
+          THEN EXTRACT(EPOCH FROM (processed_at - created_at)) 
+          ELSE NULL 
+        END) as avg_response_seconds
+      FROM transactions 
+      WHERE created_at >= $1
+    `, [oneHourAgo]);
+
+    const pendingCount = await this.db.queryOne(`
+      SELECT COUNT(*) as pending_count
+      FROM transactions 
+      WHERE status = 'pending'
+    `);
+
+    const successRate = metrics.transactions_last_hour > 0 
+      ? (metrics.successful_last_hour / metrics.transactions_last_hour) * 100 
+      : 100;
+
+    return {
+      transactions_last_hour: parseInt(metrics.transactions_last_hour),
+      success_rate_last_hour: successRate,
+      average_response_time: parseFloat(metrics.avg_response_seconds || '0'),
+      pending_transactions: parseInt(pendingCount.pending_count),
+      failed_transactions_last_hour: parseInt(metrics.failed_last_hour)
+    };
+  }
+
+  private getDateRange(period: string): { start: Date; end: Date } {
+    const end = new Date();
+    const start = new Date();
+
+    switch (period) {
+      case 'daily':
+        start.setHours(0, 0, 0, 0);
+        break;
+      case 'weekly':
+        start.setDate(start.getDate() - 7);
+        break;
+      case 'monthly':
+        start.setMonth(start.getMonth() - 1);
+        break;
+    }
+
+    return { start, end };
+  }
+}
+```
+
+### Real-Time Monitoring
+
+```typescript
+// payment-monitoring.ts
+export class PaymentMonitoringService {
+  private alerts: Array<{
+    id: string;
+    type: 'error_rate' | 'response_time' | 'volume_drop' | 'provider_down';
+    threshold: number;
+    current_value: number;
+    triggered_at: Date;
+    resolved_at?: Date;
+  }> = [];
+
+  constructor(
+    private db: DatabaseService,
+    private analyticsService: PaymentAnalyticsService,
+    private notificationService: NotificationService
+  ) {}
+
+  async monitorPaymentHealth(): Promise<void> {
+    const metrics = await this.analyticsService.getRealtimeMetrics();
+    
+    // Check error rate threshold
+    if (metrics.success_rate_last_hour < 95) {
+      await this.triggerAlert('error_rate', 95, metrics.success_rate_last_hour, {
+        message: 'Payment success rate below 95%',
+        failed_transactions: metrics.failed_transactions_last_hour,
+        total_transactions: metrics.transactions_last_hour
+      });
+    }
+
+    // Check response time threshold
+    if (metrics.average_response_time > 10) { // 10 seconds
+      await this.triggerAlert('response_time', 10, metrics.average_response_time, {
+        message: 'Average payment response time above 10 seconds'
+      });
+    }
+
+    // Check for pending transaction buildup
+    if (metrics.pending_transactions > 100) {
+      await this.triggerAlert('volume_drop', 100, metrics.pending_transactions, {
+        message: 'High number of pending transactions detected',
+        pending_count: metrics.pending_transactions
+      });
+    }
+
+    // Check provider health
+    await this.checkProviderHealth();
+  }
+
+  private async checkProviderHealth(): Promise<void> {
+    const providers = await this.db.query(`
+      SELECT 
+        pp.provider_code,
+        pp.provider_name,
+        COUNT(t.id) as transactions_last_30min,
+        COUNT(CASE WHEN t.status = 'failed' THEN 1 END) as failed_last_30min
+      FROM payment_providers pp
+      LEFT JOIN transactions t ON pp.id = t.payment_provider_id 
+        AND t.created_at >= NOW() - INTERVAL '30 minutes'
+      WHERE pp.status = 'active'
+      GROUP BY pp.id, pp.provider_code, pp.provider_name
+    `);
+
+    for (const provider of providers) {
+      const errorRate = provider.transactions_last_30min > 0 
+        ? (provider.failed_last_30min / provider.transactions_last_30min) * 100 
+        : 0;
+
+      if (errorRate > 20 && provider.transactions_last_30min > 5) { // 20% error rate with minimum volume
+        await this.triggerAlert('provider_down', 20, errorRate, {
+          message: `High error rate detected for ${provider.provider_name}`,
+          provider: provider.provider_code,
+          failed_transactions: provider.failed_last_30min,
+          total_transactions: provider.transactions_last_30min
+        });
+      }
+    }
+  }
+
+  private async triggerAlert(
+    type: string, 
+    threshold: number, 
+    currentValue: number, 
+    metadata: any
+  ): Promise<void> {
+    // Check if alert already exists and is unresolved
+    const existingAlert = this.alerts.find(a => 
+      a.type === type && !a.resolved_at
+    );
+
+    if (existingAlert) {
+      // Update existing alert
+      existingAlert.current_value = currentValue;
+      return;
+    }
+
+    // Create new alert
+    const alert = {
+      id: this.generateAlertId(),
+      type: type as any,
+      threshold,
+      current_value: currentValue,
+      triggered_at: new Date()
+    };
+
+    this.alerts.push(alert);
+
+    // Send notifications
+    await this.notificationService.sendAlert({
+      type: 'payment_system_alert',
+      severity: this.getAlertSeverity(type),
+      title: `Payment System Alert: ${type.replace('_', ' ').toUpperCase()}`,
+      message: metadata.message,
+      metadata: {
+        ...metadata,
+        alert_id: alert.id,
+        threshold,
+        current_value: currentValue
+      }
+    });
+
+    // Log alert
+    console.error('Payment system alert triggered:', {
+      alert_id: alert.id,
+      type,
+      threshold,
+      current_value: currentValue,
+      metadata
+    });
+  }
+
+  private getAlertSeverity(type: string): 'low' | 'medium' | 'high' | 'critical' {
+    switch (type) {
+      case 'error_rate':
+        return 'critical';
+      case 'provider_down':
+        return 'high';
+      case 'response_time':
+        return 'medium';
+      case 'volume_drop':
+        return 'medium';
+      default:
+        return 'low';
+    }
+  }
+
+  private generateAlertId(): string {
+    return `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  async getActiveAlerts(): Promise<any[]> {
+    return this.alerts.filter(a => !a.resolved_at);
+  }
+
+  async resolveAlert(alertId: string): Promise<void> {
+    const alert = this.alerts.find(a => a.id === alertId);
+    if (alert) {
+      alert.resolved_at = new Date();
+    }
+  }
+}
+```
+
+## Production Deployment
+
+### Environment Configuration
+
+```typescript
+// payment-config.ts
+export const paymentConfig = {
+  providers: {
+    flutterwave: {
+      publicKey: process.env.FLUTTERWAVE_PUBLIC_KEY,
+      secretKey: process.env.FLUTTERWAVE_SECRET_KEY,
+      environment: process.env.FLUTTERWAVE_ENV || 'sandbox',
+      encryptionKey: process.env.FLUTTERWAVE_ENCRYPTION_KEY,
+      webhookSecret: process.env.FLUTTERWAVE_WEBHOOK_SECRET,
+      maxRetries: 3,
+      timeoutMs: 30000
+    },
+    mpesa: {
+      consumerKey: process.env.MPESA_CONSUMER_KEY,
+      consumerSecret: process.env.MPESA_CONSUMER_SECRET,
+      environment: process.env.MPESA_ENV || 'sandbox',
+      shortcode: process.env.MPESA_SHORTCODE,
+      passkey: process.env.MPESA_PASSKEY,
+      initiatorName: process.env.MPESA_INITIATOR_NAME,
+      securityCredential: process.env.MPESA_SECURITY_CREDENTIAL,
+      maxRetries: 5,
+      timeoutMs: 45000
+    },
+    paystack: {
+      publicKey: process.env.PAYSTACK_PUBLIC_KEY,
+      secretKey: process.env.PAYSTACK_SECRET_KEY,
+      environment: process.env.PAYSTACK_ENV || 'test',
+      webhookSecret: process.env.PAYSTACK_WEBHOOK_SECRET,
+      maxRetries: 3,
+      timeoutMs: 30000
+    }
+  },
+  currencies: {
+    default: 'ZAR',
+    supported: ['ZAR', 'NGN', 'KES', 'GHS', 'UGX', 'BWP', 'NAD', 'ZMW', 'USD', 'EUR'],
+    exchangeRateSource: 'fixer_io',
+    exchangeRateApiKey: process.env.EXCHANGE_RATE_API_KEY,
+    defaultSpread: 2.5 // 2.5% markup on exchange rates
+  },
+  limits: {
+    maxTransactionAmount: {
+      KES: 1000000, // 1M KES
+      NGN: 5000000, // 5M NGN
+      ZAR: 100000,  // 100K ZAR
+      GHS: 50000,   // 50K GHS
+      USD: 10000    // 10K USD
+    },
+    dailyLimits: {
+      unverified_user: 10000, // Local currency equivalent
+      verified_user: 100000,
+      premium_user: 1000000
+    },
+    rateLimits: {
+      payment_initiation: { windowMs: 60000, max: 10 }, // 10 per minute
+      webhook_processing: { windowMs: 1000, max: 100 }, // 100 per second
+      status_check: { windowMs: 60000, max: 30 } // 30 per minute
+    }
+  },
+  fraud: {
+    enabled: true,
+    maxRiskScore: 0.8,
+    velocityLimits: {
+      transactions_per_hour: 20,
+      amount_per_hour: 50000,
+      unique_recipients_per_day: 10
+    },
+    suspiciousPatterns: {
+      roundNumberThreshold: 0.9, // Flag if >90% of transactions are round numbers
+      nightTimeHours: [0, 6], // Transactions between midnight and 6am
+      maxAmountIncrease: 10 // Flag if transaction amount >10x user's average
+    }
+  },
+  monitoring: {
+    alertThresholds: {
+      errorRate: 5, // 5%
+      responseTime: 10, // 10 seconds
+      pendingTransactions: 100,
+      providerErrorRate: 20 // 20%
+    },
+    healthCheckInterval: 60000, // 1 minute
+    reportingInterval: 300000, // 5 minutes
+    retentionDays: 90
+  },
+  security: {
+    encryptionAlgorithm: 'aes-256-gcm',
+    keyRotationDays: 90,
+    webhookTimeoutSeconds: 30,
+    maxWebhookRetries: 5,
+    ipWhitelist: process.env.PAYMENT_IP_WHITELIST?.split(',') || [],
+    requireHttps: process.env.NODE_ENV === 'production'
+  }
+};
+```
+
+### Production Checklist
+
+<Steps>
+  <Step title="Provider Configuration">
+    ✅ All payment provider production credentials configured  
+    ✅ Webhook endpoints publicly accessible and tested  
+    ✅ SSL certificates valid and auto-renewal configured  
+    ✅ Provider rate limits understood and implemented  
+    ✅ Fallback providers configured for redundancy
+  </Step>
+  <Step title="Security Validation">
+    ✅ All sensitive data encrypted at rest and in transit  
+    ✅ Webhook signature verification working for all providers  
+    ✅ API rate limiting enabled and tested  
+    ✅ Fraud detection rules configured and tested  
+    ✅ IP whitelisting for webhook endpoints  
+    ✅ PCI DSS compliance verified for card payments
+  </Step>
+  <Step title="Monitoring Setup">
+    ✅ Real-time payment monitoring enabled  
+    ✅ Alert thresholds configured for error rates and response times  
+    ✅ Provider health monitoring active  
+    ✅ Transaction volume and success rate tracking  
+    ✅ Fraud detection alerts configured  
+    ✅ Financial reconciliation monitoring
+  </Step>
+  <Step title="Performance Testing">
+    ✅ Load testing completed for expected peak traffic  
+    ✅ Webhook processing tested under high volume  
+    ✅ Database performance optimized for payment queries  
+    ✅ Concurrent payment handling tested  
+    ✅ Provider failover scenarios tested
+  </Step>
+  <Step title="Compliance Verification">
+    ✅ KYC/AML procedures integrated with payment flows  
+    ✅ Transaction limits enforced based on verification levels  
+    ✅ Audit logging enabled for all financial transactions  
+    ✅ Data retention policies implemented  
+    ✅ Regulatory reporting capabilities tested  
+    ✅ Cross-border compliance verified for each corridor
+  </Step>
+</Steps>
+
+### Disaster Recovery Plan
+
+<CardGroup cols={2}>
+  <Card title="Provider Failover" icon="server">
+    **Primary Failure**: Automatic routing to backup providers  
+    **Configuration**: Weighted routing based on success rates  
+    **Monitoring**: Real-time provider health checks  
+    **Recovery**: Automatic restoration when primary recovers
+  </Card>
+  <Card title="Database Recovery" icon="database">
+    **Backups**: Hourly automated backups with 30-day retention  
+    **Replication**: Multi-region database replication  
+    **Recovery Time**: &lt;1 hour for complete restoration  
+    **Testing**: Monthly disaster recovery drills
+  </Card>
+  <Card title="Webhook Recovery" icon="webhook">
+    **Queue**: Failed webhooks queued for retry  
+    **Exponential Backoff**: Progressive retry intervals  
+    **Manual Reconciliation**: Daily reconciliation processes  
+    **Alerting**: Immediate alerts for webhook failures
+  </Card>
+  <Card title="Transaction Reconciliation" icon="bolt">
+    **Real-time**: Continuous transaction matching  
+    **Batch Processing**: Daily provider reconciliation  
+    **Discrepancy Resolution**: Automated discrepancy detection  
+    **Reporting**: Daily reconciliation reports
+  </Card>
+</CardGroup>
+
+### Performance Optimization
+
+```typescript
+// payment-optimization.ts
+export class PaymentOptimizationService {
+  constructor(private db: DatabaseService, private redis: RedisClient) {}
+
+  // Cache frequently accessed payment methods
+  async getCachedPaymentMethods(currency: string, country: string): Promise<any[]> {
+    const cacheKey = `payment_methods:${currency}:${country}`;
+    const cached = await this.redis.get(cacheKey);
+    
+    if (cached) {
+      return JSON.parse(cached);
+    }
+
+    const methods = await this.db.query(`
+      SELECT pm.*, pp.provider_name, pp.uptime_percentage
+      FROM payment_methods pm
+      JOIN payment_providers pp ON pm.provider_id = pp.id
+      WHERE pm.currency = $1 
+        AND (pm.country_code = $2 OR pm.country_code = 'ALL')
+        AND pm.status = 'active'
+        AND pp.status = 'active'
+      ORDER BY pp.uptime_percentage DESC, pm.display_order ASC
+    `, [currency, country]);
+
+    // Cache for 1 hour
+    await this.redis.setex(cacheKey, 3600, JSON.stringify(methods));
+    
+    return methods;
+  }
+
+  // Optimize provider selection with real-time performance data
+  async getOptimalProvider(
+    paymentMethod: string, 
+    currency: string, 
+    amount: number
+  ): Promise<string> {
+    const cacheKey = `optimal_provider:${paymentMethod}:${currency}`;
+    
+    // Get recent performance data
+    const performanceData = await this.redis.hgetall(`provider_performance:${paymentMethod}`);
+    
+    if (!performanceData || Object.keys(performanceData).length === 0) {
+      // Fallback to database query
+      return this.getProviderFromDatabase(paymentMethod, currency, amount);
+    }
+
+    // Calculate optimal provider based on success rate, response time, and cost
+    const providers = Object.entries(performanceData).map(([provider, data]) => {
+      const metrics = JSON.parse(data as string);
+      const score = this.calculateProviderScore(metrics, amount);
+      return { provider, score, metrics };
+    });
+
+    providers.sort((a, b) => b.score - a.score);
+    
+    return providers.length > 0 ? providers[0].provider : 'flutterwave'; // Default fallback
+  }
+
+  private calculateProviderScore(metrics: any, amount: number): number {
+    const {
+      success_rate = 95,
+      avg_response_time = 5,
+      cost_percentage = 2.5,
+      uptime = 99
+    } = metrics;
+
+    // Weight factors: success rate (40%), response time (25%), cost (20%), uptime (15%)
+    const successScore = (success_rate / 100) * 40;
+    const responseScore = Math.max(0, (10 - avg_response_time) / 10) * 25;
+    const costScore = Math.max(0, (5 - cost_percentage) / 5) * 20;
+    const uptimeScore = (uptime / 100) * 15;
+
+    return successScore + responseScore + costScore + uptimeScore;
+  }
+
+  // Connection pooling for database optimization
+  async optimizeDbConnections(): Promise<void> {
+    const stats = await this.db.pool.getPoolStats();
+    
+    if (stats.waitingCount > 10) {
+      console.warn('High database connection wait count:', stats.waitingCount);
+      // Consider scaling up pool size or optimizing queries
+    }
+
+    if (stats.usedCount / stats.totalCount > 0.8) {
+      console.warn('Database connection pool utilization high:', 
+        `${stats.usedCount}/${stats.totalCount}`);
+    }
+  }
+
+  // Batch processing optimization for webhooks
+  async processBatchWebhooks(webhooks: any[]): Promise<void> {
+    const batchSize = 50;
+    const batches = this.chunkArray(webhooks, batchSize);
+
+    for (const batch of batches) {
+      await Promise.all(
+        batch.map(webhook => this.processWebhookOptimized(webhook))
+      );
+    }
+  }
+
+  private chunkArray<T>(array: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
+  }
+
+  private async processWebhookOptimized(webhook: any): Promise<void> {
+    // Optimized webhook processing with connection reuse
+    // Implementation depends on specific webhook structure
+  }
+}
+```
+
+---
+
+*This Payment Processing Guide provides comprehensive coverage of implementing robust, scalable payment processing for African markets, including mobile money integration, multi-currency support, fraud prevention, and real-time monitoring optimized for SADC region financial infrastructure.*
+
+*For additional implementation details, refer to the [Bank Integration Guide](/guides/bank-integration), [Security Best Practices](/security-practices/development-guidelines), and [Testing Strategies](/guides/testing-strategies).*

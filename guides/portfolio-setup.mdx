@@ -1,52 +1,1830 @@
----
-title: "Portfolio Setup"
-description: "AWO Platform portfolio setup implementation guide"
----
+# Portfolio Setup Guide
 
-# Portfolio Setup
-
-## Overview
+This comprehensive guide walks you through implementing AWO Platform's tiered investment portfolio system, designed to match African women with appropriate investment opportunities based on their DIVA scores and risk tolerance.
 
 <Info>
-This comprehensive guide covers portfolio setup for the AWO Platform.
+AWO's portfolio system automatically assigns users to Bronze, Silver, Gold, or Platinum tiers based on their DIVA score and RTSM assessment, ensuring investment opportunities align with financial capacity and risk tolerance while supporting women-led SME growth across SADC markets.
 </Info>
 
-## Step-by-Step Implementation
+## Portfolio System Overview
 
-<Steps>
-  <Step title="Planning">
-    Plan your implementation approach
-  </Step>
-  <Step title="Setup">
-    Set up required components
-  </Step>
-  <Step title="Implementation">
-    Implement the feature
-  </Step>
-  <Step title="Testing">
-    Test your implementation
-  </Step>
-  <Step title="Deployment">
-    Deploy to production
-  </Step>
-</Steps>
+### Portfolio Tier Structure
 
-## Code Examples
+<CardGroup cols={2}>
+  <Card title="Bronze Portfolio (0-399)" icon="award" style="border-color: #cd7f32;">
+    **Target Users**: New savers, limited financial history  
+    **Max Investment**: R10,000 per product  
+    **Products**: Savings accounts, T-Bills, money market funds  
+    **Risk Level**: Very Low (0-20%)
+  </Card>
+  <Card title="Silver Portfolio (400-649)" icon="award" style="border-color: #c0c0c0;">
+    **Target Users**: Consistent savers, stable income  
+    **Max Investment**: R50,000 per product  
+    **Products**: Index funds, T-Bonds, conservative ETFs  
+    **Risk Level**: Low to Moderate (20-40%)
+  </Card>
+</CardGroup>
 
-Implementation examples will be provided here.
+<CardGroup cols={2}>
+  <Card title="Gold Portfolio (650-849)" icon="award" style="border-color: #ffd700;">
+    **Target Users**: Advanced savers, diversified income  
+    **Max Investment**: R200,000 per product  
+    **Products**: Diversified ETFs, SME debt (limited), REITs  
+    **Risk Level**: Moderate to High (40-70%)
+  </Card>
+  <Card title="Platinum Portfolio (850-1000)" icon="award" style="border-color: #e5e4e2;">
+    **Target Users**: Sophisticated investors, high net worth  
+    **Max Investment**: No platform limits  
+    **Products**: Full investment access, premium SME debt  
+    **Risk Level**: All levels (0-100%)
+  </Card>
+</CardGroup>
 
-## Best Practices
+## Prerequisites
 
-Implementation best practices will be documented here.
+### Development Environment Setup
 
-## Common Pitfalls
+<CardGroup cols={2}>
+  <Card title="Backend Requirements" icon="server">
+    **Express.js**: Portfolio service implementation  
+    **PostgreSQL**: Investment data and performance tracking  
+    **Redis**: Real-time portfolio updates and caching  
+    **TypeScript**: Type-safe portfolio calculations
+  </Card>
+  <Card title="External Integrations" icon="link">
+    **Market Data**: Real-time pricing feeds  
+    **Brokerage APIs**: Order execution and settlement  
+    **Compliance**: KYC/AML verification for investment tiers  
+    **SME Platform**: Women-led business debt marketplace
+  </Card>
+</CardGroup>
 
-<Warning>
-Common mistakes and how to avoid them will be listed here.
-</Warning>
+### Regulatory Considerations
+
+<CardGroup cols={2}>
+  <Card title="SADC Compliance" icon="shield">
+    **South Africa**: FSB/FSCA investment regulations  
+    **Botswana**: NBFIRA compliance requirements  
+    **Namibia**: NAMFISA regulatory alignment  
+    **Regional**: Cross-border investment facilitation
+  </Card>
+  <Card title="Investment Standards" icon="check">
+    **Suitability**: Ensure appropriate risk matching  
+    **Disclosure**: Clear fee and risk communication  
+    **Documentation**: Comprehensive investment records  
+    **Reporting**: Regulatory and tax reporting automation
+  </Card>
+</CardGroup>
+
+## Database Schema Implementation
+
+### 1. Portfolio Database Models
+
+```sql
+-- Portfolio Tiers Configuration
+CREATE TABLE portfolio_tiers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(20) NOT NULL, -- Bronze, Silver, Gold, Platinum
+    min_diva_score INTEGER NOT NULL,
+    max_diva_score INTEGER NOT NULL,
+    max_investment_per_product DECIMAL(15,2),
+    max_total_portfolio DECIMAL(15,2),
+    risk_tolerance_min DECIMAL(3,2), -- 0.00 to 1.00
+    risk_tolerance_max DECIMAL(3,2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Investment Products Catalog
+CREATE TABLE investment_products (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(50) NOT NULL, -- savings, money_market, etf, bond, sme_debt
+    category VARCHAR(50) NOT NULL, -- conservative, moderate, aggressive
+    risk_level DECIMAL(3,2) NOT NULL, -- 0.00 to 1.00
+    min_investment DECIMAL(15,2) NOT NULL,
+    max_investment DECIMAL(15,2),
+    expected_return DECIMAL(5,2), -- Annual percentage
+    liquidity_period INTEGER, -- Days to liquidate
+    currency CHAR(3) DEFAULT 'ZAR',
+    provider VARCHAR(255),
+    provider_product_id VARCHAR(255),
+    fees JSONB, -- Management fees, transaction fees
+    available_to_tiers TEXT[], -- Array of tier names
+    is_active BOOLEAN DEFAULT true,
+    regulatory_info JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User Portfolios
+CREATE TABLE user_portfolios (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    tier_id UUID NOT NULL REFERENCES portfolio_tiers(id),
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_rebalanced TIMESTAMP,
+    total_value DECIMAL(15,2) DEFAULT 0,
+    total_invested DECIMAL(15,2) DEFAULT 0,
+    total_returns DECIMAL(15,2) DEFAULT 0,
+    risk_score DECIMAL(3,2), -- Current portfolio risk
+    performance_ytd DECIMAL(5,2), -- Year-to-date performance
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Investment Holdings
+CREATE TABLE investment_holdings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    portfolio_id UUID NOT NULL REFERENCES user_portfolios(id),
+    product_id UUID NOT NULL REFERENCES investment_products(id),
+    units DECIMAL(15,6) NOT NULL,
+    purchase_price DECIMAL(15,2) NOT NULL,
+    current_price DECIMAL(15,2),
+    total_invested DECIMAL(15,2) NOT NULL,
+    current_value DECIMAL(15,2),
+    unrealized_gain_loss DECIMAL(15,2),
+    purchase_date TIMESTAMP NOT NULL,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT true
+);
+
+-- Investment Transactions
+CREATE TABLE investment_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    portfolio_id UUID NOT NULL REFERENCES user_portfolios(id),
+    product_id UUID NOT NULL REFERENCES investment_products(id),
+    transaction_type VARCHAR(20) NOT NULL, -- buy, sell, dividend, fee
+    units DECIMAL(15,6) NOT NULL,
+    price_per_unit DECIMAL(15,2) NOT NULL,
+    total_amount DECIMAL(15,2) NOT NULL,
+    fees DECIMAL(15,2) DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'pending', -- pending, executed, cancelled, failed
+    external_transaction_id VARCHAR(255),
+    settlement_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- SME Investment Opportunities
+CREATE TABLE sme_opportunities (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_name VARCHAR(255) NOT NULL,
+    business_owner VARCHAR(255) NOT NULL,
+    business_sector VARCHAR(100),
+    country CHAR(2) NOT NULL,
+    funding_required DECIMAL(15,2) NOT NULL,
+    funding_raised DECIMAL(15,2) DEFAULT 0,
+    minimum_investment DECIMAL(15,2) NOT NULL,
+    maximum_investment DECIMAL(15,2),
+    expected_return DECIMAL(5,2) NOT NULL,
+    investment_period INTEGER NOT NULL, -- Months
+    risk_rating VARCHAR(20), -- low, medium, high
+    available_to_tiers TEXT[], -- Gold, Platinum only
+    business_plan_url VARCHAR(500),
+    due_diligence_report JSONB,
+    funding_deadline DATE,
+    status VARCHAR(20) DEFAULT 'active', -- active, funded, closed, defaulted
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- SME Investments
+CREATE TABLE sme_investments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    opportunity_id UUID NOT NULL REFERENCES sme_opportunities(id),
+    investment_amount DECIMAL(15,2) NOT NULL,
+    expected_return DECIMAL(15,2),
+    investment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    maturity_date DATE,
+    status VARCHAR(20) DEFAULT 'active', -- active, matured, defaulted
+    returns_paid DECIMAL(15,2) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Portfolio Performance Tracking
+CREATE TABLE portfolio_performance (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    portfolio_id UUID NOT NULL REFERENCES user_portfolios(id),
+    date DATE NOT NULL,
+    total_value DECIMAL(15,2) NOT NULL,
+    total_invested DECIMAL(15,2) NOT NULL,
+    daily_return DECIMAL(5,4), -- Percentage
+    cumulative_return DECIMAL(5,4), -- Percentage
+    benchmark_return DECIMAL(5,4), -- Comparison benchmark
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    UNIQUE(portfolio_id, date)
+);
+
+-- Create indexes for performance
+CREATE INDEX idx_user_portfolios_user_id ON user_portfolios(user_id);
+CREATE INDEX idx_investment_holdings_portfolio_id ON investment_holdings(portfolio_id);
+CREATE INDEX idx_investment_transactions_portfolio_id ON investment_transactions(portfolio_id);
+CREATE INDEX idx_portfolio_performance_portfolio_date ON portfolio_performance(portfolio_id, date);
+CREATE INDEX idx_sme_opportunities_status ON sme_opportunities(status) WHERE status = 'active';
+CREATE INDEX idx_investment_products_tier_active ON investment_products(available_to_tiers) WHERE is_active = true;
+```
+
+### 2. Portfolio Service Implementation
+
+```typescript
+// src/services/portfolio/portfolioService.ts
+import { Pool } from 'pg';
+import { DivaScore, PortfolioTier, InvestmentProduct, UserPortfolio } from '@/types/portfolio';
+import { logger } from '@/lib/utils/logger';
+
+export class PortfolioService {
+  constructor(private db: Pool) {}
+
+  async assignPortfolioTier(userId: string, divaScore: DivaScore): Promise<PortfolioTier> {
+    try {
+      // Determine tier based on DIVA score
+      const tier = await this.determineTierFromScore(divaScore.overallScore);
+      
+      // Check if user already has a portfolio
+      const existingPortfolio = await this.getUserPortfolio(userId);
+      
+      if (existingPortfolio) {
+        // Update existing portfolio tier if changed
+        if (existingPortfolio.tier.name !== tier.name) {
+          await this.updatePortfolioTier(existingPortfolio.id, tier.id);
+          logger.info(`Portfolio tier updated for user ${userId}: ${existingPortfolio.tier.name} → ${tier.name}`);
+        }
+      } else {
+        // Create new portfolio
+        await this.createUserPortfolio(userId, tier.id, divaScore.riskTolerance);
+        logger.info(`New portfolio created for user ${userId} with tier: ${tier.name}`);
+      }
+
+      return tier;
+    } catch (error) {
+      logger.error('Error assigning portfolio tier:', error);
+      throw new Error('Failed to assign portfolio tier');
+    }
+  }
+
+  private async determineTierFromScore(divaScore: number): Promise<PortfolioTier> {
+    const query = `
+      SELECT * FROM portfolio_tiers 
+      WHERE $1 >= min_diva_score AND $1 <= max_diva_score
+      ORDER BY min_diva_score DESC
+      LIMIT 1
+    `;
+    
+    const result = await this.db.query(query, [divaScore]);
+    
+    if (result.rows.length === 0) {
+      throw new Error('No portfolio tier found for DIVA score');
+    }
+
+    return result.rows[0];
+  }
+
+  async getUserPortfolio(userId: string): Promise<UserPortfolio | null> {
+    const query = `
+      SELECT 
+        up.*,
+        pt.name as tier_name,
+        pt.max_investment_per_product,
+        pt.max_total_portfolio,
+        pt.risk_tolerance_min,
+        pt.risk_tolerance_max
+      FROM user_portfolios up
+      JOIN portfolio_tiers pt ON up.tier_id = pt.id
+      WHERE up.user_id = $1 AND up.is_active = true
+    `;
+    
+    const result = await this.db.query(query, [userId]);
+    return result.rows[0] || null;
+  }
+
+  async getAvailableProducts(tierName: string, riskTolerance: number): Promise<InvestmentProduct[]> {
+    const query = `
+      SELECT * FROM investment_products 
+      WHERE $1 = ANY(available_to_tiers)
+      AND risk_level <= $2
+      AND is_active = true
+      ORDER BY risk_level ASC, expected_return DESC
+    `;
+    
+    const result = await this.db.query(query, [tierName, riskTolerance]);
+    return result.rows;
+  }
+
+  async createInvestmentOrder(
+    portfolioId: string,
+    productId: string,
+    amount: number,
+    orderType: 'buy' | 'sell'
+  ): Promise<string> {
+    const client = await this.db.connect();
+    
+    try {
+      await client.query('BEGIN');
+
+      // Validate investment limits
+      await this.validateInvestmentLimits(portfolioId, productId, amount);
+
+      // Get current product price
+      const currentPrice = await this.getCurrentProductPrice(productId);
+      const units = amount / currentPrice;
+
+      // Create transaction record
+      const insertQuery = `
+        INSERT INTO investment_transactions 
+        (portfolio_id, product_id, transaction_type, units, price_per_unit, total_amount, status)
+        VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+        RETURNING id
+      `;
+      
+      const result = await client.query(insertQuery, [
+        portfolioId, productId, orderType, units, currentPrice, amount
+      ]);
+
+      const transactionId = result.rows[0].id;
+
+      // Submit order to external broker/platform
+      await this.submitExternalOrder(transactionId, productId, units, orderType);
+
+      await client.query('COMMIT');
+      return transactionId;
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error creating investment order:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async validateInvestmentLimits(
+    portfolioId: string,
+    productId: string,
+    amount: number
+  ): Promise<void> {
+    // Get portfolio and tier information
+    const portfolioQuery = `
+      SELECT up.*, pt.max_investment_per_product, pt.max_total_portfolio
+      FROM user_portfolios up
+      JOIN portfolio_tiers pt ON up.tier_id = pt.id
+      WHERE up.id = $1
+    `;
+    
+    const portfolioResult = await this.db.query(portfolioQuery, [portfolioId]);
+    const portfolio = portfolioResult.rows[0];
+
+    if (!portfolio) {
+      throw new Error('Portfolio not found');
+    }
+
+    // Check per-product limit
+    if (portfolio.max_investment_per_product && amount > portfolio.max_investment_per_product) {
+      throw new Error(`Investment amount exceeds per-product limit of ${portfolio.max_investment_per_product}`);
+    }
+
+    // Check total portfolio limit
+    const newTotal = portfolio.total_invested + amount;
+    if (portfolio.max_total_portfolio && newTotal > portfolio.max_total_portfolio) {
+      throw new Error(`Investment would exceed total portfolio limit of ${portfolio.max_total_portfolio}`);
+    }
+
+    // Get product information
+    const productQuery = `SELECT * FROM investment_products WHERE id = $1`;
+    const productResult = await this.db.query(productQuery, [productId]);
+    const product = productResult.rows[0];
+
+    if (!product) {
+      throw new Error('Investment product not found');
+    }
+
+    // Check minimum investment
+    if (amount < product.min_investment) {
+      throw new Error(`Investment amount below minimum of ${product.min_investment}`);
+    }
+
+    // Check maximum investment (if specified)
+    if (product.max_investment && amount > product.max_investment) {
+      throw new Error(`Investment amount exceeds maximum of ${product.max_investment}`);
+    }
+  }
+
+  async calculatePortfolioPerformance(portfolioId: string): Promise<{
+    totalValue: number;
+    totalInvested: number;
+    totalReturns: number;
+    returnPercentage: number;
+    dayChange: number;
+    dayChangePercentage: number;
+  }> {
+    const query = `
+      SELECT 
+        ih.product_id,
+        ih.units,
+        ih.total_invested,
+        ih.current_value,
+        ih.unrealized_gain_loss,
+        ip.name as product_name,
+        ip.type as product_type
+      FROM investment_holdings ih
+      JOIN investment_products ip ON ih.product_id = ip.id
+      WHERE ih.portfolio_id = $1 AND ih.is_active = true
+    `;
+
+    const result = await this.db.query(query, [portfolioId]);
+    const holdings = result.rows;
+
+    let totalValue = 0;
+    let totalInvested = 0;
+    let totalReturns = 0;
+
+    for (const holding of holdings) {
+      totalInvested += parseFloat(holding.total_invested);
+      totalValue += parseFloat(holding.current_value) || parseFloat(holding.total_invested);
+      totalReturns += parseFloat(holding.unrealized_gain_loss) || 0;
+    }
+
+    const returnPercentage = totalInvested > 0 ? (totalReturns / totalInvested) * 100 : 0;
+
+    // Calculate day change (simplified - would need historical data)
+    const dayChange = 0; // TODO: Implement based on previous day's value
+    const dayChangePercentage = 0; // TODO: Implement based on previous day's value
+
+    // Update portfolio summary
+    await this.updatePortfolioSummary(portfolioId, totalValue, totalInvested, totalReturns);
+
+    return {
+      totalValue,
+      totalInvested,
+      totalReturns,
+      returnPercentage,
+      dayChange,
+      dayChangePercentage
+    };
+  }
+
+  private async updatePortfolioSummary(
+    portfolioId: string,
+    totalValue: number,
+    totalInvested: number,
+    totalReturns: number
+  ): Promise<void> {
+    const query = `
+      UPDATE user_portfolios 
+      SET 
+        total_value = $1,
+        total_invested = $2,
+        total_returns = $3,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $4
+    `;
+
+    await this.db.query(query, [totalValue, totalInvested, totalReturns, portfolioId]);
+  }
+
+  private async getCurrentProductPrice(productId: string): Promise<number> {
+    // This would integrate with market data providers
+    // For now, return a mock price
+    return 100.00; // TODO: Implement real-time price fetching
+  }
+
+  private async submitExternalOrder(
+    transactionId: string,
+    productId: string,
+    units: number,
+    orderType: 'buy' | 'sell'
+  ): Promise<void> {
+    // This would integrate with brokerage APIs
+    // For now, simulate order submission
+    logger.info(`Submitting ${orderType} order: ${units} units of product ${productId}`);
+    
+    // Update transaction status to executed (in real implementation, this would be done via webhook)
+    setTimeout(async () => {
+      await this.updateTransactionStatus(transactionId, 'executed');
+    }, 1000);
+  }
+
+  private async updateTransactionStatus(transactionId: string, status: string): Promise<void> {
+    const query = `
+      UPDATE investment_transactions 
+      SET status = $1, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = $2
+    `;
+    
+    await this.db.query(query, [status, transactionId]);
+  }
+
+  private async createUserPortfolio(userId: string, tierId: string, riskScore: number): Promise<string> {
+    const query = `
+      INSERT INTO user_portfolios (user_id, tier_id, risk_score)
+      VALUES ($1, $2, $3)
+      RETURNING id
+    `;
+    
+    const result = await this.db.query(query, [userId, tierId, riskScore]);
+    return result.rows[0].id;
+  }
+
+  private async updatePortfolioTier(portfolioId: string, newTierId: string): Promise<void> {
+    const query = `
+      UPDATE user_portfolios 
+      SET tier_id = $1, assigned_at = CURRENT_TIMESTAMP 
+      WHERE id = $2
+    `;
+    
+    await this.db.query(query, [newTierId, portfolioId]);
+  }
+}
+```
+
+## SME Marketplace Implementation
+
+### 3. SME Investment Service
+
+```typescript
+// src/services/sme/smeService.ts
+import { Pool } from 'pg';
+import { SMEOpportunity, SMEInvestment, SMEBusinessProfile } from '@/types/sme';
+import { logger } from '@/lib/utils/logger';
+
+export class SMEService {
+  constructor(private db: Pool) {}
+
+  async getAvailableOpportunities(
+    tierName: string,
+    country?: string,
+    sector?: string,
+    maxInvestment?: number
+  ): Promise<SMEOpportunity[]> {
+    let query = `
+      SELECT 
+        so.*,
+        (so.funding_required - so.funding_raised) as remaining_funding,
+        CASE 
+          WHEN so.funding_deadline < CURRENT_DATE THEN 'expired'
+          WHEN so.funding_raised >= so.funding_required THEN 'fully_funded'
+          ELSE so.status
+        END as current_status
+      FROM sme_opportunities so
+      WHERE so.status = 'active'
+      AND $1 = ANY(so.available_to_tiers)
+      AND so.funding_deadline > CURRENT_DATE
+      AND so.funding_raised < so.funding_required
+    `;
+
+    const params: any[] = [tierName];
+    let paramIndex = 2;
+
+    if (country) {
+      query += ` AND so.country = $${paramIndex}`;
+      params.push(country);
+      paramIndex++;
+    }
+
+    if (sector) {
+      query += ` AND so.business_sector = $${paramIndex}`;
+      params.push(sector);
+      paramIndex++;
+    }
+
+    if (maxInvestment) {
+      query += ` AND so.minimum_investment <= $${paramIndex}`;
+      params.push(maxInvestment);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY so.expected_return DESC, so.funding_deadline ASC`;
+
+    const result = await this.db.query(query, params);
+    return result.rows;
+  }
+
+  async getOpportunityDetails(opportunityId: string): Promise<SMEOpportunity | null> {
+    const query = `
+      SELECT 
+        so.*,
+        (so.funding_required - so.funding_raised) as remaining_funding,
+        COUNT(si.id) as investor_count,
+        AVG(si.investment_amount) as average_investment
+      FROM sme_opportunities so
+      LEFT JOIN sme_investments si ON so.id = si.opportunity_id
+      WHERE so.id = $1
+      GROUP BY so.id
+    `;
+
+    const result = await this.db.query(query, [opportunityId]);
+    return result.rows[0] || null;
+  }
+
+  async investInSME(
+    userId: string,
+    opportunityId: string,
+    investmentAmount: number
+  ): Promise<string> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Validate investment
+      await this.validateSMEInvestment(userId, opportunityId, investmentAmount);
+
+      // Create investment record
+      const investmentQuery = `
+        INSERT INTO sme_investments 
+        (user_id, opportunity_id, investment_amount, expected_return, maturity_date)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
+      `;
+
+      // Calculate expected return and maturity date
+      const opportunity = await this.getOpportunityDetails(opportunityId);
+      if (!opportunity) {
+        throw new Error('SME opportunity not found');
+      }
+
+      const expectedReturn = (investmentAmount * opportunity.expected_return) / 100;
+      const maturityDate = new Date();
+      maturityDate.setMonth(maturityDate.getMonth() + opportunity.investment_period);
+
+      const investmentResult = await client.query(investmentQuery, [
+        userId,
+        opportunityId,
+        investmentAmount,
+        expectedReturn,
+        maturityDate
+      ]);
+
+      const investmentId = investmentResult.rows[0].id;
+
+      // Update opportunity funding
+      const updateQuery = `
+        UPDATE sme_opportunities 
+        SET 
+          funding_raised = funding_raised + $1,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      `;
+
+      await client.query(updateQuery, [investmentAmount, opportunityId]);
+
+      // Check if fully funded
+      const updatedOpportunity = await this.getOpportunityDetails(opportunityId);
+      if (updatedOpportunity && updatedOpportunity.funding_raised >= updatedOpportunity.funding_required) {
+        await this.markOpportunityAsFunded(opportunityId);
+      }
+
+      await client.query('COMMIT');
+
+      // Send notifications
+      await this.notifySuccessfulInvestment(userId, opportunityId, investmentAmount);
+
+      return investmentId;
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error processing SME investment:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async validateSMEInvestment(
+    userId: string,
+    opportunityId: string,
+    investmentAmount: number
+  ): Promise<void> {
+    // Check user's current SME investments count
+    const currentInvestmentsQuery = `
+      SELECT COUNT(*) as count 
+      FROM sme_investments 
+      WHERE user_id = $1 AND status = 'active'
+    `;
+
+    const currentResult = await this.db.query(currentInvestmentsQuery, [userId]);
+    const currentCount = parseInt(currentResult.rows[0].count);
+
+    if (currentCount >= 3) {
+      throw new Error('Maximum of 3 concurrent SME investments allowed');
+    }
+
+    // Check opportunity details
+    const opportunity = await this.getOpportunityDetails(opportunityId);
+    if (!opportunity) {
+      throw new Error('SME opportunity not found');
+    }
+
+    if (opportunity.status !== 'active') {
+      throw new Error('SME opportunity is not active');
+    }
+
+    if (new Date(opportunity.funding_deadline) < new Date()) {
+      throw new Error('SME opportunity funding deadline has passed');
+    }
+
+    if (investmentAmount < opportunity.minimum_investment) {
+      throw new Error(`Minimum investment is ${opportunity.minimum_investment}`);
+    }
+
+    if (opportunity.maximum_investment && investmentAmount > opportunity.maximum_investment) {
+      throw new Error(`Maximum investment is ${opportunity.maximum_investment}`);
+    }
+
+    const remainingFunding = opportunity.funding_required - opportunity.funding_raised;
+    if (investmentAmount > remainingFunding) {
+      throw new Error(`Only ${remainingFunding} remaining for this opportunity`);
+    }
+
+    // Check if user already invested in this opportunity
+    const existingInvestmentQuery = `
+      SELECT id FROM sme_investments 
+      WHERE user_id = $1 AND opportunity_id = $2 AND status = 'active'
+    `;
+
+    const existingResult = await this.db.query(existingInvestmentQuery, [userId, opportunityId]);
+    if (existingResult.rows.length > 0) {
+      throw new Error('You have already invested in this opportunity');
+    }
+  }
+
+  async getUserSMEInvestments(userId: string): Promise<SMEInvestment[]> {
+    const query = `
+      SELECT 
+        si.*,
+        so.business_name,
+        so.business_owner,
+        so.business_sector,
+        so.country,
+        so.expected_return as opportunity_return,
+        so.investment_period
+      FROM sme_investments si
+      JOIN sme_opportunities so ON si.opportunity_id = so.id
+      WHERE si.user_id = $1
+      ORDER BY si.investment_date DESC
+    `;
+
+    const result = await this.db.query(query, [userId]);
+    return result.rows;
+  }
+
+  async processSMEReturns(investmentId: string, returnAmount: number): Promise<void> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Update investment with return
+      const updateQuery = `
+        UPDATE sme_investments 
+        SET 
+          returns_paid = returns_paid + $1,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      `;
+
+      await client.query(updateQuery, [returnAmount, investmentId]);
+
+      // Check if investment is fully returned
+      const checkQuery = `
+        SELECT si.*, so.investment_period
+        FROM sme_investments si
+        JOIN sme_opportunities so ON si.opportunity_id = so.id
+        WHERE si.id = $1
+      `;
+
+      const result = await client.query(checkQuery, [investmentId]);
+      const investment = result.rows[0];
+
+      if (investment.returns_paid >= investment.expected_return) {
+        // Mark as matured
+        await client.query(
+          'UPDATE sme_investments SET status = $1 WHERE id = $2',
+          ['matured', investmentId]
+        );
+      }
+
+      await client.query('COMMIT');
+
+      // Notify user of return
+      await this.notifyReturn(investment.user_id, returnAmount);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error processing SME return:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async markOpportunityAsFunded(opportunityId: string): Promise<void> {
+    const query = `
+      UPDATE sme_opportunities 
+      SET status = 'funded', updated_at = CURRENT_TIMESTAMP 
+      WHERE id = $1
+    `;
+    
+    await this.db.query(query, [opportunityId]);
+  }
+
+  private async notifySuccessfulInvestment(
+    userId: string,
+    opportunityId: string,
+    amount: number
+  ): Promise<void> {
+    // Implementation would send notifications via email, SMS, push
+    logger.info(`User ${userId} invested ${amount} in SME opportunity ${opportunityId}`);
+  }
+
+  private async notifyReturn(userId: string, returnAmount: number): Promise<void> {
+    // Implementation would send return notifications
+    logger.info(`User ${userId} received SME return of ${returnAmount}`);
+  }
+}
+```
+
+## Real-Time Portfolio Updates
+
+### 4. WebSocket Integration for Live Updates
+
+```typescript
+// src/services/realtime/portfolioUpdates.ts
+import { Server as SocketServer } from 'socket.io';
+import { PortfolioService } from '../portfolio/portfolioService';
+import { logger } from '@/lib/utils/logger';
+
+export class PortfolioRealtimeService {
+  constructor(
+    private io: SocketServer,
+    private portfolioService: PortfolioService
+  ) {
+    this.setupEventHandlers();
+  }
+
+  private setupEventHandlers(): void {
+    this.io.on('connection', (socket) => {
+      logger.info(`Portfolio client connected: ${socket.id}`);
+
+      socket.on('subscribe_portfolio', async (userId: string) => {
+        try {
+          const portfolio = await this.portfolioService.getUserPortfolio(userId);
+          if (portfolio) {
+            socket.join(`portfolio_${portfolio.id}`);
+            
+            // Send initial portfolio data
+            const performance = await this.portfolioService.calculatePortfolioPerformance(portfolio.id);
+            socket.emit('portfolio_update', {
+              portfolioId: portfolio.id,
+              ...performance,
+              timestamp: new Date()
+            });
+          }
+        } catch (error) {
+          logger.error('Error subscribing to portfolio updates:', error);
+          socket.emit('error', { message: 'Failed to subscribe to portfolio updates' });
+        }
+      });
+
+      socket.on('unsubscribe_portfolio', (portfolioId: string) => {
+        socket.leave(`portfolio_${portfolioId}`);
+      });
+
+      socket.on('disconnect', () => {
+        logger.info(`Portfolio client disconnected: ${socket.id}`);
+      });
+    });
+  }
+
+  async broadcastPortfolioUpdate(portfolioId: string): Promise<void> {
+    try {
+      const performance = await this.portfolioService.calculatePortfolioPerformance(portfolioId);
+      
+      this.io.to(`portfolio_${portfolioId}`).emit('portfolio_update', {
+        portfolioId,
+        ...performance,
+        timestamp: new Date()
+      });
+    } catch (error) {
+      logger.error('Error broadcasting portfolio update:', error);
+    }
+  }
+
+  async broadcastMarketUpdate(updates: Array<{ productId: string; price: number }>): Promise<void> {
+    this.io.emit('market_update', {
+      updates,
+      timestamp: new Date()
+    });
+  }
+
+  async broadcastSMEUpdate(opportunityId: string, update: any): Promise<void> {
+    this.io.emit('sme_update', {
+      opportunityId,
+      ...update,
+      timestamp: new Date()
+    });
+  }
+}
+
+// Market data integration service
+export class MarketDataService {
+  constructor(private realtimeService: PortfolioRealtimeService) {
+    this.startMarketDataStream();
+  }
+
+  private startMarketDataStream(): void {
+    // Simulate market data updates every 30 seconds
+    setInterval(() => {
+      this.fetchAndBroadcastMarketData();
+    }, 30000);
+  }
+
+  private async fetchAndBroadcastMarketData(): Promise<void> {
+    try {
+      // In real implementation, fetch from market data providers
+      const mockUpdates = [
+        { productId: 'etf-001', price: 125.67 },
+        { productId: 'bond-001', price: 98.45 },
+        { productId: 'fund-001', price: 15.23 }
+      ];
+
+      await this.realtimeService.broadcastMarketUpdate(mockUpdates);
+    } catch (error) {
+      logger.error('Error fetching market data:', error);
+    }
+  }
+}
+```
+
+## Frontend Implementation
+
+### 5. Portfolio Dashboard Components
+
+```typescript
+// src/components/portfolio/PortfolioDashboard.tsx
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { TrendingUp, TrendingDown, DollarSign, PieChart, Target } from 'lucide-react';
+import { PortfolioAllocation } from './PortfolioAllocation';
+import { PerformanceChart } from './PerformanceChart';
+import { InvestmentOpportunities } from './InvestmentOpportunities';
+import { SMEMarketplace } from './SMEMarketplace';
+import { usePortfolioStore } from '@/store/portfolio';
+import { useRealtimePortfolio } from '@/hooks/useRealtimePortfolio';
+import { formatCurrency } from '@/lib/utils/currency';
+
+interface PortfolioDashboardProps {
+  userId: string;
+}
+
+export function PortfolioDashboard({ userId }: PortfolioDashboardProps) {
+  const { 
+    portfolio, 
+    performance, 
+    holdings, 
+    isLoading, 
+    fetchPortfolio,
+    fetchPerformance 
+  } = usePortfolioStore();
+  
+  const { isConnected } = useRealtimePortfolio(portfolio?.id);
+
+  useEffect(() => {
+    fetchPortfolio(userId);
+    if (portfolio?.id) {
+      fetchPerformance(portfolio.id);
+    }
+  }, [userId, portfolio?.id, fetchPortfolio, fetchPerformance]);
+
+  if (isLoading) {
+    return &lt;div className="flex items-center justify-center h-64">Loading portfolio...&lt;/div>;
+  }
+
+  if (!portfolio) {
+    return &lt;div className="text-center py-8">No portfolio found. Please complete your DIVA assessment.&lt;/div>;
+  }
+
+  return (
+    &lt;div className="space-y-8">
+      {/* Portfolio Overview */}
+      &lt;div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Total Value */}
+        &lt;Card>
+          &lt;CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            &lt;CardTitle className="text-sm font-medium">Total Portfolio Value&lt;/CardTitle>
+            &lt;DollarSign className="h-4 w-4 text-muted-foreground" />
+          &lt;/CardHeader>
+          &lt;CardContent>
+            &lt;div className="text-2xl font-bold">
+              {formatCurrency(performance?.totalValue || 0, 'ZAR')}
+            &lt;/div>
+            &lt;div className="flex items-center text-xs text-muted-foreground">
+              {performance?.dayChangePercentage && performance.dayChangePercentage > 0 ? (
+                &lt;TrendingUp className="h-3 w-3 text-green-500 mr-1" />
+              ) : (
+                &lt;TrendingDown className="h-3 w-3 text-red-500 mr-1" />
+              )}
+              {performance?.dayChangePercentage?.toFixed(2)}% today
+            &lt;/div>
+          &lt;/CardContent>
+        &lt;/Card>
+
+        {/* Total Returns */}
+        &lt;Card>
+          &lt;CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            &lt;CardTitle className="text-sm font-medium">Total Returns&lt;/CardTitle>
+            &lt;TrendingUp className="h-4 w-4 text-muted-foreground" />
+          &lt;/CardHeader>
+          &lt;CardContent>
+            &lt;div className="text-2xl font-bold">
+              {formatCurrency(performance?.totalReturns || 0, 'ZAR')}
+            &lt;/div>
+            &lt;div className="text-xs text-muted-foreground">
+              {performance?.returnPercentage?.toFixed(2)}% return
+            &lt;/div>
+          &lt;/CardContent>
+        &lt;/Card>
+
+        {/* Portfolio Tier */}
+        &lt;Card>
+          &lt;CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            &lt;CardTitle className="text-sm font-medium">Portfolio Tier&lt;/CardTitle>
+            &lt;Target className="h-4 w-4 text-muted-foreground" />
+          &lt;/CardHeader>
+          &lt;CardContent>
+            &lt;div className="flex items-center space-x-2">
+              &lt;Badge 
+                variant={getTierVariant(portfolio.tier.name)}
+                className="text-lg px-3 py-1"
+              >
+                {portfolio.tier.name}
+              &lt;/Badge>
+              {!isConnected && (
+                &lt;span className="text-xs text-orange-500">Offline&lt;/span>
+              )}
+            &lt;/div>
+            &lt;div className="text-xs text-muted-foreground mt-1">
+              Max investment: {formatCurrency(portfolio.tier.maxInvestmentPerProduct, 'ZAR')}
+            &lt;/div>
+          &lt;/CardContent>
+        &lt;/Card>
+      &lt;/div>
+
+      {/* Portfolio Allocation and Performance */}
+      &lt;div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        &lt;PortfolioAllocation holdings={holdings} />
+        &lt;PerformanceChart portfolioId={portfolio.id} />
+      &lt;/div>
+
+      {/* Investment Opportunities */}
+      &lt;div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        &lt;InvestmentOpportunities 
+          tierName={portfolio.tier.name}
+          maxInvestment={portfolio.tier.maxInvestmentPerProduct}
+        />
+        
+        {(portfolio.tier.name === 'Gold' || portfolio.tier.name === 'Platinum') && (
+          &lt;SMEMarketplace 
+            tierName={portfolio.tier.name}
+            userId={userId}
+          />
+        )}
+      &lt;/div>
+    &lt;/div>
+  );
+}
+
+function getTierVariant(tierName: string): "default" | "secondary" | "destructive" | "outline" {
+  switch (tierName) {
+    case 'Bronze': return 'outline';
+    case 'Silver': return 'secondary';
+    case 'Gold': return 'default';
+    case 'Platinum': return 'default';
+    default: return 'outline';
+  }
+}
+```
+
+### 6. SME Marketplace Component
+
+```typescript
+// src/components/portfolio/SMEMarketplace.tsx
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Building2, MapPin, Calendar, TrendingUp, Users } from 'lucide-react';
+import { useSMEStore } from '@/store/sme';
+import { SMEOpportunity } from '@/types/sme';
+import { formatCurrency } from '@/lib/utils/currency';
+import { toast } from 'sonner';
+
+interface SMEMarketplaceProps {
+  tierName: string;
+  userId: string;
+}
+
+export function SMEMarketplace({ tierName, userId }: SMEMarketplaceProps) {
+  const [selectedOpportunity, setSelectedOpportunity] = useState&lt;SMEOpportunity | null>(null);
+  const [investmentAmount, setInvestmentAmount] = useState('');
+  const [isInvesting, setIsInvesting] = useState(false);
+  
+  const { 
+    opportunities, 
+    isLoading, 
+    fetchOpportunities, 
+    investInSME 
+  } = useSMEStore();
+
+  useEffect(() => {
+    fetchOpportunities(tierName);
+  }, [tierName, fetchOpportunities]);
+
+  const handleInvestment = async () => {
+    if (!selectedOpportunity || !investmentAmount) return;
+
+    setIsInvesting(true);
+    try {
+      await investInSME(userId, selectedOpportunity.id, parseFloat(investmentAmount));
+      toast.success('Investment successful!');
+      setSelectedOpportunity(null);
+      setInvestmentAmount('');
+      fetchOpportunities(tierName); // Refresh opportunities
+    } catch (error) {
+      toast.error('Investment failed. Please try again.');
+    } finally {
+      setIsInvesting(false);
+    }
+  };
+
+  const getFundingProgress = (opportunity: SMEOpportunity) => {
+    return (opportunity.funding_raised / opportunity.funding_required) * 100;
+  };
+
+  if (isLoading) {
+    return (
+      &lt;Card>
+        &lt;CardHeader>
+          &lt;CardTitle className="flex items-center gap-2">
+            &lt;Building2 className="h-5 w-5" />
+            SME Investment Opportunities
+          &lt;/CardTitle>
+        &lt;/CardHeader>
+        &lt;CardContent>
+          &lt;div className="flex items-center justify-center h-32">
+            Loading opportunities...
+          &lt;/div>
+        &lt;/CardContent>
+      &lt;/Card>
+    );
+  }
+
+  return (
+    &lt;Card>
+      &lt;CardHeader>
+        &lt;CardTitle className="flex items-center gap-2">
+          &lt;Building2 className="h-5 w-5" />
+          SME Investment Opportunities
+        &lt;/CardTitle>
+        &lt;p className="text-sm text-muted-foreground">
+          Support women-led businesses across SADC
+        &lt;/p>
+      &lt;/CardHeader>
+      &lt;CardContent className="space-y-4">
+        {opportunities.length === 0 ? (
+          &lt;div className="text-center py-8 text-muted-foreground">
+            No SME opportunities available for your tier
+          &lt;/div>
+        ) : (
+          opportunities.slice(0, 3).map((opportunity) => (
+            &lt;div key={opportunity.id} className="border rounded-lg p-4 space-y-3">
+              &lt;div className="flex justify-between items-start">
+                &lt;div>
+                  &lt;h4 className="font-semibold">{opportunity.business_name}&lt;/h4>
+                  &lt;p className="text-sm text-muted-foreground">
+                    by {opportunity.business_owner}
+                  &lt;/p>
+                &lt;/div>
+                &lt;Badge variant="outline" className="ml-2">
+                  {opportunity.expected_return}% return
+                &lt;/Badge>
+              &lt;/div>
+
+              &lt;div className="flex items-center gap-4 text-sm text-muted-foreground">
+                &lt;div className="flex items-center gap-1">
+                  &lt;MapPin className="h-3 w-3" />
+                  {opportunity.country}
+                &lt;/div>
+                &lt;div className="flex items-center gap-1">
+                  &lt;Building2 className="h-3 w-3" />
+                  {opportunity.business_sector}
+                &lt;/div>
+                &lt;div className="flex items-center gap-1">
+                  &lt;Calendar className="h-3 w-3" />
+                  {opportunity.investment_period} months
+                &lt;/div>
+              &lt;/div>
+
+              &lt;div className="space-y-2">
+                &lt;div className="flex justify-between text-sm">
+                  &lt;span>Funding Progress&lt;/span>
+                  &lt;span>
+                    {formatCurrency(opportunity.funding_raised, 'ZAR')} / {formatCurrency(opportunity.funding_required, 'ZAR')}
+                  &lt;/span>
+                &lt;/div>
+                &lt;Progress value={getFundingProgress(opportunity)} className="h-2" />
+              &lt;/div>
+
+              &lt;div className="flex justify-between items-center">
+                &lt;div className="text-sm">
+                  &lt;span className="text-muted-foreground">Min: &lt;/span>
+                  {formatCurrency(opportunity.minimum_investment, 'ZAR')}
+                &lt;/div>
+                
+                &lt;Dialog>
+                  &lt;DialogTrigger asChild>
+                    &lt;Button
+                      size="sm"
+                      onClick={() => setSelectedOpportunity(opportunity)}
+                    >
+                      Invest Now
+                    &lt;/Button>
+                  &lt;/DialogTrigger>
+                  &lt;DialogContent className="sm:max-w-[425px]">
+                    &lt;DialogHeader>
+                      &lt;DialogTitle>Invest in {selectedOpportunity?.business_name}&lt;/DialogTitle>
+                    &lt;/DialogHeader>
+                    &lt;div className="space-y-4 py-4">
+                      &lt;div className="space-y-2">
+                        &lt;Label htmlFor="amount">Investment Amount (ZAR)&lt;/Label>
+                        &lt;Input
+                          id="amount"
+                          type="number"
+                          placeholder={`Minimum: ${selectedOpportunity?.minimum_investment}`}
+                          value={investmentAmount}
+                          onChange={(e) => setInvestmentAmount(e.target.value)}
+                        />
+                      &lt;/div>
+                      
+                      {selectedOpportunity && (
+                        &lt;div className="space-y-2 text-sm">
+                          &lt;div className="flex justify-between">
+                            &lt;span>Expected Return:&lt;/span>
+                            &lt;span className="font-semibold text-green-600">
+                              {selectedOpportunity.expected_return}% annual
+                            &lt;/span>
+                          &lt;/div>
+                          &lt;div className="flex justify-between">
+                            &lt;span>Investment Period:&lt;/span>
+                            &lt;span>{selectedOpportunity.investment_period} months&lt;/span>
+                          &lt;/div>
+                          &lt;div className="flex justify-between">
+                            &lt;span>Risk Level:&lt;/span>
+                            &lt;span className="capitalize">{selectedOpportunity.risk_rating}&lt;/span>
+                          &lt;/div>
+                        &lt;/div>
+                      )}
+                      
+                      &lt;div className="flex gap-3">
+                        &lt;Button 
+                          variant="outline" 
+                          className="flex-1"
+                          onClick={() => setSelectedOpportunity(null)}
+                        >
+                          Cancel
+                        &lt;/Button>
+                        &lt;Button 
+                          className="flex-1"
+                          onClick={handleInvestment}
+                          disabled={!investmentAmount || isInvesting}
+                        >
+                          {isInvesting ? 'Processing...' : 'Confirm Investment'}
+                        &lt;/Button>
+                      &lt;/div>
+                    &lt;/div>
+                  &lt;/DialogContent>
+                &lt;/Dialog>
+              &lt;/div>
+            &lt;/div>
+          ))
+        )}
+        
+        {opportunities.length > 3 && (
+          &lt;Button variant="outline" className="w-full">
+            View All Opportunities
+          &lt;/Button>
+        )}
+      &lt;/CardContent>
+    &lt;/Card>
+  );
+}
+```
+
+## Performance Monitoring
+
+### 7. Portfolio Analytics Service
+
+```typescript
+// src/services/analytics/portfolioAnalytics.ts
+import { Pool } from 'pg';
+import { logger } from '@/lib/utils/logger';
+
+export class PortfolioAnalyticsService {
+  constructor(private db: Pool) {}
+
+  async recordDailyPerformance(): Promise<void> {
+    try {
+      // Get all active portfolios
+      const portfoliosQuery = `
+        SELECT id FROM user_portfolios WHERE is_active = true
+      `;
+      
+      const portfolios = await this.db.query(portfoliosQuery);
+      
+      for (const portfolio of portfolios.rows) {
+        await this.calculateAndRecordDailyPerformance(portfolio.id);
+      }
+      
+      logger.info(`Recorded daily performance for ${portfolios.rows.length} portfolios`);
+    } catch (error) {
+      logger.error('Error recording daily performance:', error);
+    }
+  }
+
+  private async calculateAndRecordDailyPerformance(portfolioId: string): Promise<void> {
+    const client = await this.db.connect();
+    
+    try {
+      await client.query('BEGIN');
+
+      // Calculate current portfolio value
+      const holdingsQuery = `
+        SELECT 
+          SUM(ih.current_value) as total_value,
+          SUM(ih.total_invested) as total_invested
+        FROM investment_holdings ih
+        WHERE ih.portfolio_id = $1 AND ih.is_active = true
+      `;
+      
+      const holdingsResult = await client.query(holdingsQuery, [portfolioId]);
+      const holdings = holdingsResult.rows[0];
+
+      const totalValue = parseFloat(holdings.total_value) || 0;
+      const totalInvested = parseFloat(holdings.total_invested) || 0;
+
+      // Get previous day's value for daily return calculation
+      const previousDayQuery = `
+        SELECT total_value FROM portfolio_performance
+        WHERE portfolio_id = $1 AND date = CURRENT_DATE - INTERVAL '1 day'
+        LIMIT 1
+      `;
+      
+      const previousResult = await client.query(previousDayQuery, [portfolioId]);
+      const previousValue = previousResult.rows.length > 0 
+        ? parseFloat(previousResult.rows[0].total_value) 
+        : totalInvested;
+
+      // Calculate returns
+      const dailyReturn = previousValue > 0 
+        ? ((totalValue - previousValue) / previousValue) * 100 
+        : 0;
+      
+      const cumulativeReturn = totalInvested > 0 
+        ? ((totalValue - totalInvested) / totalInvested) * 100 
+        : 0;
+
+      // Insert performance record
+      const insertQuery = `
+        INSERT INTO portfolio_performance 
+        (portfolio_id, date, total_value, total_invested, daily_return, cumulative_return)
+        VALUES ($1, CURRENT_DATE, $2, $3, $4, $5)
+        ON CONFLICT (portfolio_id, date) DO UPDATE SET
+          total_value = EXCLUDED.total_value,
+          total_invested = EXCLUDED.total_invested,
+          daily_return = EXCLUDED.daily_return,
+          cumulative_return = EXCLUDED.cumulative_return
+      `;
+      
+      await client.query(insertQuery, [
+        portfolioId,
+        totalValue,
+        totalInvested,
+        dailyReturn,
+        cumulativeReturn
+      ]);
+
+      await client.query('COMMIT');
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error(`Error calculating performance for portfolio ${portfolioId}:`, error);
+    } finally {
+      client.release();
+    }
+  }
+
+  async getPortfolioAnalytics(portfolioId: string, days: number = 30): Promise<{
+    performance: any[];
+    volatility: number;
+    sharpeRatio: number;
+    maxDrawdown: number;
+    benchmarkComparison: number;
+  }> {
+    // Get performance data
+    const performanceQuery = `
+      SELECT * FROM portfolio_performance
+      WHERE portfolio_id = $1 AND date >= CURRENT_DATE - INTERVAL '${days} days'
+      ORDER BY date ASC
+    `;
+    
+    const performanceResult = await this.db.query(performanceQuery, [portfolioId]);
+    const performance = performanceResult.rows;
+
+    // Calculate analytics
+    const dailyReturns = performance.map(p => parseFloat(p.daily_return) || 0);
+    
+    const volatility = this.calculateVolatility(dailyReturns);
+    const sharpeRatio = this.calculateSharpeRatio(dailyReturns);
+    const maxDrawdown = this.calculateMaxDrawdown(performance.map(p => parseFloat(p.total_value)));
+    const benchmarkComparison = 0; // TODO: Implement benchmark comparison
+
+    return {
+      performance,
+      volatility,
+      sharpeRatio,
+      maxDrawdown,
+      benchmarkComparison
+    };
+  }
+
+  private calculateVolatility(returns: number[]): number {
+    if (returns.length < 2) return 0;
+    
+    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+    const variance = returns.reduce((acc, ret) => acc + Math.pow(ret - mean, 2), 0) / (returns.length - 1);
+    
+    return Math.sqrt(variance * 252); // Annualized volatility
+  }
+
+  private calculateSharpeRatio(returns: number[], riskFreeRate: number = 0.05): number {
+    if (returns.length === 0) return 0;
+    
+    const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
+    const volatility = this.calculateVolatility(returns);
+    
+    return volatility > 0 ? (avgReturn * 252 - riskFreeRate) / volatility : 0;
+  }
+
+  private calculateMaxDrawdown(values: number[]): number {
+    if (values.length < 2) return 0;
+    
+    let maxDrawdown = 0;
+    let peak = values[0];
+    
+    for (const value of values) {
+      if (value > peak) {
+        peak = value;
+      }
+      
+      const drawdown = (peak - value) / peak;
+      maxDrawdown = Math.max(maxDrawdown, drawdown);
+    }
+    
+    return maxDrawdown * 100; // Return as percentage
+  }
+}
+```
+
+## Testing Implementation
+
+### 8. Portfolio Service Tests
+
+```typescript
+// src/services/__tests__/portfolioService.test.ts
+import { PortfolioService } from '../portfolio/portfolioService';
+import { mockDB } from '../../__mocks__/database';
+import { DivaScore } from '@/types/portfolio';
+
+describe('PortfolioService', () => {
+  let portfolioService: PortfolioService;
+
+  beforeEach(() => {
+    portfolioService = new PortfolioService(mockDB);
+    jest.clearAllMocks();
+  });
+
+  describe('assignPortfolioTier', () => {
+    it('should assign Bronze tier for DIVA score 300', async () => {
+      const mockDivaScore: DivaScore = {
+        overallScore: 300,
+        components: {
+          discipline: 0.6,
+          income: 0.5,
+          velocity: 0.4,
+          assets: 0.3
+        },
+        portfolioTier: 'Bronze',
+        riskTolerance: 0.2,
+        calculatedAt: new Date(),
+        nextUpdateDue: new Date()
+      };
+
+      mockDB.query
+        .mockResolvedValueOnce({ rows: [{ id: 'tier-1', name: 'Bronze', min_diva_score: 0, max_diva_score: 399 }] })
+        .mockResolvedValueOnce({ rows: [] }) // No existing portfolio
+        .mockResolvedValueOnce({ rows: [{ id: 'portfolio-1' }] }); // Create portfolio
+
+      const tier = await portfolioService.assignPortfolioTier('user-1', mockDivaScore);
+
+      expect(tier.name).toBe('Bronze');
+      expect(mockDB.query).toHaveBeenCalledTimes(3);
+    });
+
+    it('should update existing portfolio tier when DIVA score changes', async () => {
+      const mockDivaScore: DivaScore = {
+        overallScore: 700,
+        components: {
+          discipline: 0.8,
+          income: 0.7,
+          velocity: 0.8,
+          assets: 0.6
+        },
+        portfolioTier: 'Gold',
+        riskTolerance: 0.6,
+        calculatedAt: new Date(),
+        nextUpdateDue: new Date()
+      };
+
+      const existingPortfolio = {
+        id: 'portfolio-1',
+        tier: { name: 'Silver' }
+      };
+
+      mockDB.query
+        .mockResolvedValueOnce({ rows: [{ id: 'tier-3', name: 'Gold', min_diva_score: 650, max_diva_score: 849 }] })
+        .mockResolvedValueOnce({ rows: [existingPortfolio] })
+        .mockResolvedValueOnce({ rows: [] }); // Update tier
+
+      const tier = await portfolioService.assignPortfolioTier('user-1', mockDivaScore);
+
+      expect(tier.name).toBe('Gold');
+      expect(mockDB.query).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE user_portfolios'),
+        expect.any(Array)
+      );
+    });
+  });
+
+  describe('validateInvestmentLimits', () => {
+    it('should throw error if investment exceeds per-product limit', async () => {
+      const mockPortfolio = {
+        max_investment_per_product: 10000,
+        max_total_portfolio: 50000,
+        total_invested: 5000
+      };
+
+      const mockProduct = {
+        min_investment: 100,
+        max_investment: null
+      };
+
+      mockDB.query
+        .mockResolvedValueOnce({ rows: [mockPortfolio] })
+        .mockResolvedValueOnce({ rows: [mockProduct] });
+
+      await expect(
+        portfolioService['validateInvestmentLimits']('portfolio-1', 'product-1', 15000)
+      ).rejects.toThrow('Investment amount exceeds per-product limit');
+    });
+
+    it('should allow valid investment within limits', async () => {
+      const mockPortfolio = {
+        max_investment_per_product: 10000,
+        max_total_portfolio: 50000,
+        total_invested: 5000
+      };
+
+      const mockProduct = {
+        min_investment: 100,
+        max_investment: null
+      };
+
+      mockDB.query
+        .mockResolvedValueOnce({ rows: [mockPortfolio] })
+        .mockResolvedValueOnce({ rows: [mockProduct] });
+
+      await expect(
+        portfolioService['validateInvestmentLimits']('portfolio-1', 'product-1', 5000)
+      ).resolves.not.toThrow();
+    });
+  });
+
+  describe('calculatePortfolioPerformance', () => {
+    it('should calculate correct portfolio performance metrics', async () => {
+      const mockHoldings = [
+        {
+          total_invested: '5000',
+          current_value: '5500',
+          unrealized_gain_loss: '500'
+        },
+        {
+          total_invested: '3000',
+          current_value: '2800',
+          unrealized_gain_loss: '-200'
+        }
+      ];
+
+      mockDB.query
+        .mockResolvedValueOnce({ rows: mockHoldings })
+        .mockResolvedValueOnce({ rows: [] }); // Update portfolio summary
+
+      const performance = await portfolioService.calculatePortfolioPerformance('portfolio-1');
+
+      expect(performance.totalInvested).toBe(8000);
+      expect(performance.totalValue).toBe(8300);
+      expect(performance.totalReturns).toBe(300);
+      expect(performance.returnPercentage).toBe(3.75);
+    });
+  });
+});
+```
+
+## Deployment and Monitoring
+
+### 9. Production Deployment Configuration
+
+```yaml
+# docker-compose.portfolio.yml
+version: '3.8'
+services:
+  portfolio-service:
+    build: 
+      context: .
+      dockerfile: Dockerfile.portfolio
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - MARKET_DATA_API_KEY=${MARKET_DATA_API_KEY}
+      - BROKER_API_KEY=${BROKER_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - awo-network
+
+  portfolio-analytics:
+    build:
+      context: .
+      dockerfile: Dockerfile.analytics
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+    depends_on:
+      - postgres
+    networks:
+      - awo-network
+    command: ["node", "dist/services/analytics/portfolioAnalytics.js"]
+
+  portfolio-cron:
+    build:
+      context: .
+      dockerfile: Dockerfile.cron
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+    depends_on:
+      - postgres
+    networks:
+      - awo-network
+    command: ["node", "dist/cron/portfolioUpdates.js"]
+
+networks:
+  awo-network:
+    external: true
+```
+
+### 10. Monitoring and Alerting
+
+```typescript
+// src/monitoring/portfolioMonitoring.ts
+import { logger } from '@/lib/utils/logger';
+import { PortfolioService } from '@/services/portfolio/portfolioService';
+
+export class PortfolioMonitoring {
+  constructor(private portfolioService: PortfolioService) {}
+
+  async monitorPortfolioHealth(): Promise<void> {
+    try {
+      // Monitor for unusual portfolio performance
+      const alerts = await this.checkPerformanceAlerts();
+      
+      for (const alert of alerts) {
+        await this.sendAlert(alert);
+      }
+
+      // Monitor SME investment defaults
+      await this.monitorSMEDefaults();
+
+      // Check for tier assignment anomalies
+      await this.checkTierAssignmentAnomalies();
+
+    } catch (error) {
+      logger.error('Portfolio monitoring error:', error);
+    }
+  }
+
+  private async checkPerformanceAlerts(): Promise<any[]> {
+    // Implementation for performance monitoring
+    return [];
+  }
+
+  private async monitorSMEDefaults(): Promise<void> {
+    // Implementation for SME default monitoring
+  }
+
+  private async checkTierAssignmentAnomalies(): Promise<void> {
+    // Implementation for tier assignment monitoring
+  }
+
+  private async sendAlert(alert: any): Promise<void> {
+    logger.warn('Portfolio alert:', alert);
+    // Send to monitoring service (e.g., Slack, email, PagerDuty)
+  }
+}
+```
 
 ## Next Steps
 
-<Card title="Related Guides" href="/guides/integration-walkthrough">
-  Explore other implementation guides
-</Card>
+<Steps>
+  <Step title="Complete Integration Testing">
+    **Testing Tasks:**
+    - End-to-end portfolio flow testing
+    - SME investment workflow validation
+    - Performance calculation accuracy testing
+    - Real-time update functionality verification
+  </Step>
+  <Step title="Regulatory Compliance Setup">
+    **Compliance Tasks:**
+    - SADC financial regulations mapping
+    - Investment suitability assessment implementation
+    - Regulatory reporting automation
+    - Audit trail comprehensive logging
+  </Step>
+  <Step title="Market Data Integration">
+    **Integration Tasks:**
+    - Real-time market data feed setup
+    - Brokerage API integration completion
+    - Price update automation
+    - Performance benchmarking implementation
+  </Step>
+  <Step title="African Market Customization">
+    **Localization Tasks:**
+    - Multi-currency portfolio support
+    - Country-specific investment products
+    - Regional SME opportunity sourcing
+    - Local market maker integrations
+  </Step>
+</Steps>
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card title="Portfolio API Reference" icon="book" href="/api-reference/investments">
+    Complete API documentation for portfolio and investment endpoints
+  </Card>
+  <Card title="DIVA Score Integration" icon="link" href="/guides/diva-score-implementation">
+    Guide for integrating DIVA scoring with portfolio assignment
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="SME Platform Documentation" icon="building" href="/advanced-features/sme-marketplace">
+    Detailed documentation for the SME investment marketplace
+  </Card>
+  <Card title="Financial Compliance Guide" icon="shield" href="/compliance/financial-compliance">
+    SADC regulatory compliance requirements for investment platforms
+  </Card>
+</CardGroup>
+
+---
+
+*This portfolio setup guide provides comprehensive coverage for implementing AWO Platform's tiered investment system, SME marketplace, and performance tracking infrastructure. The implementation ensures regulatory compliance while providing appropriate investment opportunities matched to user financial capacity and risk tolerance.*
+
+*Last updated: June 2025*  
+*Next update: As investment regulations and market conditions evolve*

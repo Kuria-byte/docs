@@ -1,28 +1,1259 @@
----
-title: "Mobile App Setup"
-description: "Mobile App Setup implementation guide"
----
+# Mobile App Setup Guide
 
-# Mobile App Setup
-
-## Overview
-
-This guide documentation is coming soon.
+This comprehensive guide walks you through setting up the AWO Platform mobile application using React Native with Expo, specifically optimized for African markets and SADC region deployment.
 
 <Info>
-This page is under development. Please check back later for complete implementation guide.
+AWO's mobile app is built with React Native and Expo managed workflow to ensure cross-platform compatibility, offline-first functionality, and optimal performance on mid-range Android devices prevalent across Africa.
 </Info>
 
-## Getting Started
+## Prerequisites
 
-Step-by-step instructions will be added here.
+Before starting, ensure you have the following installed and configured:
 
-## Examples
+### Development Environment Requirements
 
-Code examples and best practices will be provided.
+<CardGroup cols={2}>
+  <Card title="Node.js & Package Manager" icon="node">
+    **Node.js**: Version 18.0 or higher  
+    **Package Manager**: npm 8+ or yarn 3+  
+    **Verification**: `node --version && npm --version`
+  </Card>
+  <Card title="Mobile Development Tools" icon="mobile">
+    **Expo CLI**: Latest version via `npm install -g @expo/cli`  
+    **EAS CLI**: `npm install -g eas-cli`  
+    **Expo Go App**: Install on physical devices for testing
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Git & Version Control" icon="git">
+    **Git**: Version 2.30 or higher  
+    **GitHub Access**: SSH key configured for AWO repositories  
+    **Git LFS**: For handling large binary assets
+  </Card>
+  <Card title="Code Editor Setup" icon="code">
+    **VS Code**: Recommended with React Native extensions  
+    **Extensions**: ES7+ React/Redux snippets, Expo Tools  
+    **TypeScript**: Built-in support with proper configuration
+  </Card>
+</CardGroup>
+
+### Platform-Specific Setup
+
+<Accordion title="Android Development Setup">
+
+**Android Studio Installation:**
+```bash
+# Download and install Android Studio
+# Configure Android SDK with API levels 30, 31, 32, 33, 34
+
+# Set environment variables (add to ~/.bashrc or ~/.zshrc)
+export ANDROID_HOME=$HOME/Library/Android/sdk
+export PATH=$PATH:$ANDROID_HOME/emulator
+export PATH=$PATH:$ANDROID_HOME/tools
+export PATH=$PATH:$ANDROID_HOME/tools/bin
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+```
+
+**Android Virtual Device Setup:**
+- Create AVD with API level 30+ (Android 11+)
+- Configure for mid-range device specs (2GB RAM, ARM64)
+- Enable hardware acceleration for better performance
+
+</Accordion>
+
+<Accordion title="iOS Development Setup (macOS only)">
+
+**Xcode Installation:**
+```bash
+# Install Xcode from App Store (latest stable version)
+# Install Xcode Command Line Tools
+xcode-select --install
+
+# Install iOS Simulator
+# Configure for iPhone 12/13 or iPhone SE for testing
+```
+
+**iOS Simulator Configuration:**
+- Configure simulators for iPhone SE, 12, and 14
+- Test on both newer and older iOS versions (iOS 13+)
+- Ensure sufficient disk space for iOS simulator data
+
+</Accordion>
+
+## Project Setup
+
+### 1. Repository Clone and Setup
+
+<Steps>
+  <Step title="Clone AWO Mobile Repository">
+    ```bash
+    # Clone the main repository
+    git clone git@github.com:awo-platform/awo-mobile.git
+    cd awo-mobile
+    
+    # Verify repository structure
+    ls -la
+    # Should show: src/, assets/, app.json, package.json, etc.
+    ```
+  </Step>
+  <Step title="Install Dependencies">
+    ```bash
+    # Install all project dependencies
+    npm install
+    
+    # Verify critical packages are installed
+    npm list expo react-native zustand @tanstack/react-query
+    
+    # Install iOS dependencies (macOS only)
+    cd ios && pod install && cd ..
+    ```
+  </Step>
+  <Step title="Environment Configuration">
+    ```bash
+    # Copy environment template
+    cp .env.example .env.local
+    
+    # Edit environment variables
+    nano .env.local
+    ```
+    
+    **Required Environment Variables:**
+    ```env
+    # API Configuration
+    EXPO_PUBLIC_API_URL=https://api-dev.awo-platform.com
+    EXPO_PUBLIC_WS_URL=wss://ws-dev.awo-platform.com
+    
+    # Authentication
+    EXPO_PUBLIC_JWT_SECRET=your-jwt-secret-key
+    
+    # African Payment Gateways
+    EXPO_PUBLIC_FLUTTERWAVE_PUBLIC_KEY=your-flutterwave-key
+    EXPO_PUBLIC_STITCH_CLIENT_ID=your-stitch-client-id
+    
+    # Notification Services
+    EXPO_PUBLIC_EXPO_PROJECT_ID=your-expo-project-id
+    
+    # Feature Flags
+    EXPO_PUBLIC_ENABLE_OFFLINE_MODE=true
+    EXPO_PUBLIC_ENABLE_USSD_FALLBACK=true
+    ```
+  </Step>
+  <Step title="Verify Installation">
+    ```bash
+    # Start development server
+    npx expo start
+    
+    # Check for any dependency or configuration issues
+    npx expo doctor
+    
+    # Verify TypeScript compilation
+    npx tsc --noEmit
+    ```
+  </Step>
+</Steps>
+
+### 2. Project Structure Overview
+
+Understanding AWO's mobile app architecture:
+
+```
+awo-mobile/
+├── src/
+│   ├── components/          # Reusable UI components
+│   │   ├── common/         # General-purpose components
+│   │   ├── forms/          # Form components with validation
+│   │   ├── charts/         # Financial data visualization
+│   │   └── african/        # Africa-specific UI patterns
+│   ├── screens/            # Screen components
+│   │   ├── auth/           # Authentication flows
+│   │   ├── dashboard/      # Main dashboard screens
+│   │   ├── diva/          # DIVA scoring interface
+│   │   ├── chama/         # Chama management screens
+│   │   ├── investments/    # Investment platform UI
+│   │   └── profile/       # User profile management
+│   ├── services/          # API and business logic
+│   │   ├── api/           # API client and endpoints
+│   │   ├── auth/          # Authentication services
+│   │   ├── payments/      # Payment processing
+│   │   ├── offline/       # Offline data management
+│   │   └── notifications/ # Push notification handling
+│   ├── store/             # State management (Zustand)
+│   │   ├── auth.ts        # Authentication state
+│   │   ├── diva.ts        # DIVA score state
+│   │   ├── chama.ts       # Chama management state
+│   │   └── wallet.ts      # Wallet and transactions state
+│   ├── hooks/             # Custom React hooks
+│   │   ├── useAuth.ts     # Authentication hooks
+│   │   ├── useOffline.ts  # Offline functionality
+│   │   └── useRealtime.ts # Socket.io real-time updates
+│   ├── utils/             # Utility functions
+│   │   ├── currency.ts    # Multi-currency formatting
+│   │   ├── validation.ts  # Form validation schemas
+│   │   ├── encryption.ts  # Client-side encryption
+│   │   └── african.ts     # Africa-specific utilities
+│   ├── constants/         # App constants and configuration
+│   │   ├── countries.ts   # SADC country configurations
+│   │   ├── currencies.ts  # African currencies setup
+│   │   └── endpoints.ts   # API endpoint definitions
+│   └── types/             # TypeScript type definitions
+│       ├── api.ts         # API response types
+│       ├── user.ts        # User and profile types
+│       └── financial.ts   # Financial data types
+├── assets/                # Static assets
+│   ├── images/           # App images and icons
+│   ├── fonts/            # Custom fonts
+│   └── sounds/           # Notification sounds
+├── app.json              # Expo configuration
+├── babel.config.js       # Babel configuration
+├── metro.config.js       # Metro bundler configuration
+└── tsconfig.json         # TypeScript configuration
+```
+
+## Core Configuration
+
+### 3. Expo Configuration Setup
+
+Configure `app.json` for AWO Platform requirements:
+
+```json
+{
+  "expo": {
+    "name": "AWO Platform",
+    "slug": "awo-platform",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#bc9b25"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.awoplatform.mobile",
+      "buildNumber": "1.0.0",
+      "infoPlist": {
+        "NSCameraUsageDescription": "AWO needs camera access for KYC document verification",
+        "NSMicrophoneUsageDescription": "AWO needs microphone access for coaching sessions",
+        "NSLocationWhenInUseUsageDescription": "AWO needs location for regulatory compliance and local services"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#bc9b25"
+      },
+      "package": "com.awoplatform.mobile",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ],
+      "allowBackup": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-notifications",
+      "expo-camera",
+      "expo-location",
+      "@react-native-async-storage/async-storage",
+      [
+        "expo-document-picker",
+        {
+          "iCloudContainerEnvironment": "Production"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "your-expo-project-id"
+      }
+    }
+  }
+}
+```
+
+### 4. TypeScript Configuration
+
+Configure `tsconfig.json` for AWO's TypeScript setup:
+
+```json
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"],
+      "@/components/*": ["src/components/*"],
+      "@/screens/*": ["src/screens/*"],
+      "@/services/*": ["src/services/*"],
+      "@/store/*": ["src/store/*"],
+      "@/utils/*": ["src/utils/*"],
+      "@/types/*": ["src/types/*"],
+      "@/constants/*": ["src/constants/*"]
+    },
+    "types": ["expo/types"]
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
+```
+
+## Authentication Implementation
+
+### 5. Authentication Service Setup
+
+Create the core authentication service:
+
+```typescript
+// src/services/auth/authService.ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiClient } from '../api/client';
+import { AuthTokens, LoginRequest, RegisterRequest, User } from '@/types/auth';
+
+class AuthService {
+  private static readonly ACCESS_TOKEN_KEY = 'awo_access_token';
+  private static readonly REFRESH_TOKEN_KEY = 'awo_refresh_token';
+  private static readonly USER_KEY = 'awo_user';
+
+  async login(credentials: LoginRequest): Promise&lt;AuthTokens & { user: User }> {
+    try {
+      const response = await apiClient.post('/auth/login', credentials);
+      const { accessToken, refreshToken, user } = response.data;
+
+      // Store tokens securely
+      await this.storeTokens(accessToken, refreshToken);
+      await AsyncStorage.setItem(this.USER_KEY, JSON.stringify(user));
+
+      return { accessToken, refreshToken, user };
+    } catch (error) {
+      throw new Error('Login failed. Please check your credentials.');
+    }
+  }
+
+  async register(userData: RegisterRequest): Promise&lt;AuthTokens & { user: User }> {
+    try {
+      const response = await apiClient.post('/auth/register', userData);
+      const { accessToken, refreshToken, user } = response.data;
+
+      await this.storeTokens(accessToken, refreshToken);
+      await AsyncStorage.setItem(this.USER_KEY, JSON.stringify(user));
+
+      return { accessToken, refreshToken, user };
+    } catch (error) {
+      throw new Error('Registration failed. Please try again.');
+    }
+  }
+
+  async refreshToken(): Promise&lt;string | null> {
+    try {
+      const refreshToken = await AsyncStorage.getItem(this.REFRESH_TOKEN_KEY);
+      if (!refreshToken) return null;
+
+      const response = await apiClient.post('/auth/refresh', { refreshToken });
+      const { accessToken } = response.data;
+
+      await AsyncStorage.setItem(this.ACCESS_TOKEN_KEY, accessToken);
+      return accessToken;
+    } catch (error) {
+      await this.logout();
+      return null;
+    }
+  }
+
+  async logout(): Promise&lt;void> {
+    await AsyncStorage.multiRemove([
+      this.ACCESS_TOKEN_KEY,
+      this.REFRESH_TOKEN_KEY,
+      this.USER_KEY
+    ]);
+  }
+
+  async getStoredUser(): Promise&lt;User | null> {
+    try {
+      const userJson = await AsyncStorage.getItem(this.USER_KEY);
+      return userJson ? JSON.parse(userJson) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async getAccessToken(): Promise&lt;string | null> {
+    return AsyncStorage.getItem(this.ACCESS_TOKEN_KEY);
+  }
+
+  private async storeTokens(accessToken: string, refreshToken: string): Promise&lt;void> {
+    await AsyncStorage.multiSet([
+      [this.ACCESS_TOKEN_KEY, accessToken],
+      [this.REFRESH_TOKEN_KEY, refreshToken]
+    ]);
+  }
+}
+
+export const authService = new AuthService();
+```
+
+### 6. State Management with Zustand
+
+Set up authentication state management:
+
+```typescript
+// src/store/auth.ts
+import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { User } from '@/types/auth';
+import { authService } from '@/services/auth/authService';
+
+interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+  
+  // Actions
+  login: (email: string, password: string) => Promise&lt;void>;
+  register: (userData: RegisterRequest) => Promise&lt;void>;
+  logout: () => Promise&lt;void>;
+  refreshAuth: () => Promise&lt;void>;
+  clearError: () => void;
+}
+
+export const useAuthStore = create&lt;AuthState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+
+      login: async (email: string, password: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { user } = await authService.login({ email, password });
+          set({ user, isAuthenticated: true, isLoading: false });
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Login failed',
+            isLoading: false 
+          });
+        }
+      },
+
+      register: async (userData) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { user } = await authService.register(userData);
+          set({ user, isAuthenticated: true, isLoading: false });
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Registration failed',
+            isLoading: false 
+          });
+        }
+      },
+
+      logout: async () => {
+        await authService.logout();
+        set({ user: null, isAuthenticated: false, error: null });
+      },
+
+      refreshAuth: async () => {
+        const user = await authService.getStoredUser();
+        if (user) {
+          set({ user, isAuthenticated: true });
+        }
+      },
+
+      clearError: () => set({ error: null })
+    }),
+    {
+      name: 'awo-auth-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ 
+        user: state.user, 
+        isAuthenticated: state.isAuthenticated 
+      })
+    }
+  )
+);
+```
+
+## DIVA Score Integration
+
+### 7. DIVA Score Service Implementation
+
+```typescript
+// src/services/diva/divaService.ts
+import { apiClient } from '../api/client';
+import { DivaScore, DivaInsights, RTSMAssessment } from '@/types/diva';
+
+class DivaService {
+  async getCurrentScore(): Promise&lt;DivaScore> {
+    const response = await apiClient.get('/diva/score');
+    return response.data;
+  }
+
+  async getScoreHistory(months: number = 12): Promise&lt;DivaScore[]> {
+    const response = await apiClient.get(`/diva/history?months=${months}`);
+    return response.data;
+  }
+
+  async getInsights(): Promise&lt;DivaInsights> {
+    const response = await apiClient.get('/diva/insights');
+    return response.data;
+  }
+
+  async refreshScore(): Promise&lt;DivaScore> {
+    const response = await apiClient.post('/diva/refresh');
+    return response.data;
+  }
+
+  async submitRTSMAssessment(answers: RTSMAssessment): Promise&lt;DivaScore> {
+    const response = await apiClient.post('/diva/rtsm', answers);
+    return response.data;
+  }
+
+  async scheduleQuarterlyUpdate(): Promise&lt;void> {
+    await apiClient.post('/diva/schedule-update');
+  }
+}
+
+export const divaService = new DivaService();
+```
+
+### 8. DIVA State Management
+
+```typescript
+// src/store/diva.ts
+import { create } from 'zustand';
+import { DivaScore, DivaInsights, PortfolioTier } from '@/types/diva';
+import { divaService } from '@/services/diva/divaService';
+
+interface DivaState {
+  currentScore: DivaScore | null;
+  scoreHistory: DivaScore[];
+  insights: DivaInsights | null;
+  portfolioTier: PortfolioTier | null;
+  isLoading: boolean;
+  error: string | null;
+  lastUpdated: Date | null;
+  
+  // Actions
+  fetchCurrentScore: () => Promise&lt;void>;
+  fetchScoreHistory: (months?: number) => Promise&lt;void>;
+  fetchInsights: () => Promise&lt;void>;
+  refreshScore: () => Promise&lt;void>;
+  clearError: () => void;
+}
+
+export const useDivaStore = create&lt;DivaState>((set, get) => ({
+  currentScore: null,
+  scoreHistory: [],
+  insights: null,
+  portfolioTier: null,
+  isLoading: false,
+  error: null,
+  lastUpdated: null,
+
+  fetchCurrentScore: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const score = await divaService.getCurrentScore();
+      set({ 
+        currentScore: score, 
+        portfolioTier: score.portfolioTier,
+        isLoading: false,
+        lastUpdated: new Date()
+      });
+    } catch (error) {
+      set({ 
+        error: 'Failed to fetch DIVA score',
+        isLoading: false 
+      });
+    }
+  },
+
+  fetchScoreHistory: async (months = 12) => {
+    try {
+      const history = await divaService.getScoreHistory(months);
+      set({ scoreHistory: history });
+    } catch (error) {
+      set({ error: 'Failed to fetch score history' });
+    }
+  },
+
+  fetchInsights: async () => {
+    try {
+      const insights = await divaService.getInsights();
+      set({ insights });
+    } catch (error) {
+      set({ error: 'Failed to fetch insights' });
+    }
+  },
+
+  refreshScore: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const score = await divaService.refreshScore();
+      set({ 
+        currentScore: score,
+        portfolioTier: score.portfolioTier,
+        isLoading: false,
+        lastUpdated: new Date()
+      });
+    } catch (error) {
+      set({ 
+        error: 'Failed to refresh DIVA score',
+        isLoading: false 
+      });
+    }
+  },
+
+  clearError: () => set({ error: null })
+}));
+```
+
+## Offline Functionality
+
+### 9. Offline Data Management
+
+```typescript
+// src/services/offline/offlineManager.ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-netinfo/src';
+import { apiClient } from '../api/client';
+
+interface QueuedRequest {
+  id: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  url: string;
+  data?: any;
+  timestamp: number;
+  retryCount: number;
+}
+
+class OfflineManager {
+  private static readonly QUEUE_KEY = 'awo_offline_queue';
+  private static readonly CACHE_KEY = 'awo_offline_cache';
+  private maxRetries = 3;
+  private isOnline = true;
+
+  constructor() {
+    this.initializeNetworkListener();
+  }
+
+  private initializeNetworkListener(): void {
+    NetInfo.addEventListener(state => {
+      const wasOffline = !this.isOnline;
+      this.isOnline = state.isConnected ?? false;
+      
+      // Process queue when coming back online
+      if (wasOffline && this.isOnline) {
+        this.processQueue();
+      }
+    });
+  }
+
+  async queueRequest(request: Omit&lt;QueuedRequest, 'id' | 'timestamp' | 'retryCount'>): Promise&lt;void> {
+    const queuedRequest: QueuedRequest = {
+      ...request,
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      retryCount: 0
+    };
+
+    const queue = await this.getQueue();
+    queue.push(queuedRequest);
+    await AsyncStorage.setItem(this.QUEUE_KEY, JSON.stringify(queue));
+  }
+
+  async processQueue(): Promise&lt;void> {
+    if (!this.isOnline) return;
+
+    const queue = await this.getQueue();
+    const processedIds: string[] = [];
+
+    for (const request of queue) {
+      try {
+        await this.executeRequest(request);
+        processedIds.push(request.id);
+      } catch (error) {
+        request.retryCount++;
+        if (request.retryCount >= this.maxRetries) {
+          processedIds.push(request.id); // Remove after max retries
+        }
+      }
+    }
+
+    // Remove processed requests from queue
+    const remainingQueue = queue.filter(req => !processedIds.includes(req.id));
+    await AsyncStorage.setItem(this.QUEUE_KEY, JSON.stringify(remainingQueue));
+  }
+
+  private async executeRequest(request: QueuedRequest): Promise&lt;any> {
+    const { method, url, data } = request;
+    
+    switch (method) {
+      case 'GET':
+        return apiClient.get(url);
+      case 'POST':
+        return apiClient.post(url, data);
+      case 'PUT':
+        return apiClient.put(url, data);
+      case 'DELETE':
+        return apiClient.delete(url);
+      default:
+        throw new Error(`Unsupported method: ${method}`);
+    }
+  }
+
+  async cacheData(key: string, data: any): Promise&lt;void> {
+    const cache = await this.getCache();
+    cache[key] = {
+      data,
+      timestamp: Date.now()
+    };
+    await AsyncStorage.setItem(this.CACHE_KEY, JSON.stringify(cache));
+  }
+
+  async getCachedData(key: string, maxAge: number = 3600000): Promise&lt;any | null> {
+    const cache = await this.getCache();
+    const cached = cache[key];
+    
+    if (!cached) return null;
+    
+    const isExpired = Date.now() - cached.timestamp > maxAge;
+    return isExpired ? null : cached.data;
+  }
+
+  private async getQueue(): Promise&lt;QueuedRequest[]> {
+    try {
+      const queueJson = await AsyncStorage.getItem(this.QUEUE_KEY);
+      return queueJson ? JSON.parse(queueJson) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private async getCache(): Promise&lt;Record&lt;string, any>> {
+    try {
+      const cacheJson = await AsyncStorage.getItem(this.CACHE_KEY);
+      return cacheJson ? JSON.parse(cacheJson) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  isDeviceOnline(): boolean {
+    return this.isOnline;
+  }
+}
+
+export const offlineManager = new OfflineManager();
+```
+
+### 10. Offline-Aware Hook
+
+```typescript
+// src/hooks/useOffline.ts
+import { useEffect, useState } from 'react';
+import { offlineManager } from '@/services/offline/offlineManager';
+import NetInfo from '@react-native-netinfo/src';
+
+export function useOffline() {
+  const [isOnline, setIsOnline] = useState(true);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected ?? false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const executeOfflineAction = async (
+    action: () => Promise&lt;any>,
+    fallbackData?: any
+  ) => {
+    if (isOnline) {
+      try {
+        return await action();
+      } catch (error) {
+        if (fallbackData) {
+          return fallbackData;
+        }
+        throw error;
+      }
+    } else {
+      if (fallbackData) {
+        return fallbackData;
+      }
+      throw new Error('No internet connection and no cached data available');
+    }
+  };
+
+  return {
+    isOnline,
+    pendingRequestsCount,
+    executeOfflineAction,
+    offlineManager
+  };
+}
+```
+
+## Real-Time Features
+
+### 11. Socket.io Integration
+
+```typescript
+// src/services/realtime/socketService.ts
+import { io, Socket } from 'socket.io-client';
+import { authService } from '../auth/authService';
+
+class SocketService {
+  private socket: Socket | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+
+  async connect(): Promise&lt;void> {
+    const token = await authService.getAccessToken();
+    if (!token) return;
+
+    this.socket = io(process.env.EXPO_PUBLIC_WS_URL!, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      timeout: 10000,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: this.maxReconnectAttempts
+    });
+
+    this.setupEventHandlers();
+  }
+
+  private setupEventHandlers(): void {
+    if (!this.socket) return;
+
+    this.socket.on('connect', () => {
+      console.log('Connected to AWO real-time server');
+      this.reconnectAttempts = 0;
+    });
+
+    this.socket.on('disconnect', (reason) => {
+      console.log('Disconnected from AWO server:', reason);
+    });
+
+    this.socket.on('connect_error', (error) => {
+      console.error('Connection error:', error);
+      this.reconnectAttempts++;
+      
+      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        console.log('Max reconnection attempts reached');
+      }
+    });
+
+    // DIVA score updates
+    this.socket.on('diva_score_updated', (data) => {
+      // Handle DIVA score updates
+      console.log('DIVA score updated:', data);
+    });
+
+    // Chama notifications
+    this.socket.on('chama_activity', (data) => {
+      // Handle Chama activities
+      console.log('Chama activity:', data);
+    });
+
+    // Payment notifications
+    this.socket.on('payment_status', (data) => {
+      // Handle payment status updates
+      console.log('Payment update:', data);
+    });
+  }
+
+  joinRoom(roomId: string): void {
+    this.socket?.emit('join_room', roomId);
+  }
+
+  leaveRoom(roomId: string): void {
+    this.socket?.emit('leave_room', roomId);
+  }
+
+  subscribeToUpdates(userId: string): void {
+    this.socket?.emit('subscribe_user_updates', userId);
+  }
+
+  disconnect(): void {
+    this.socket?.disconnect();
+    this.socket = null;
+  }
+
+  isConnected(): boolean {
+    return this.socket?.connected ?? false;
+  }
+}
+
+export const socketService = new SocketService();
+```
+
+## Testing Setup
+
+### 12. Testing Configuration
+
+```typescript
+// src/__tests__/setup.ts
+import mockAsyncStorage from '@react-native-async-storage/async-storage/jest/async-storage-mock';
+
+// Mock AsyncStorage
+jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage);
+
+// Mock Expo modules
+jest.mock('expo-constants', () => ({
+  manifest: {},
+  expoConfig: {
+    extra: {
+      apiUrl: 'http://localhost:3000'
+    }
+  }
+}));
+
+jest.mock('expo-notifications', () => ({
+  getPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
+  requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
+  scheduleNotificationAsync: jest.fn(),
+  cancelNotificationAsync: jest.fn()
+}));
+
+// Mock React Native modules
+jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
+
+// Mock Socket.io
+jest.mock('socket.io-client', () => ({
+  io: jest.fn(() => ({
+    on: jest.fn(),
+    emit: jest.fn(),
+    disconnect: jest.fn(),
+    connected: true
+  }))
+}));
+
+// Global test utilities
+global.fetch = jest.fn();
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+```
+
+### 13. Example Component Test
+
+```typescript
+// src/components/__tests__/DivaScoreCard.test.tsx
+import React from 'react';
+import { render, screen } from '@testing-library/react-native';
+import { DivaScoreCard } from '../DivaScoreCard';
+
+const mockDivaScore = {
+  overallScore: 750,
+  components: {
+    discipline: 0.8,
+    income: 0.7,
+    velocity: 0.75,
+    assets: 0.7
+  },
+  portfolioTier: 'Gold' as const,
+  calculatedAt: new Date(),
+  nextUpdateDue: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+};
+
+describe('DivaScoreCard', () => {
+  it('renders DIVA score correctly', () => {
+    render(&lt;DivaScoreCard score={mockDivaScore} />);
+    
+    expect(screen.getByText('750')).toBeTruthy();
+    expect(screen.getByText('Gold Portfolio')).toBeTruthy();
+  });
+
+  it('displays all DIVA components', () => {
+    render(&lt;DivaScoreCard score={mockDivaScore} />);
+    
+    expect(screen.getByText('Discipline')).toBeTruthy();
+    expect(screen.getByText('Income')).toBeTruthy();
+    expect(screen.getByText('Velocity')).toBeTruthy();
+    expect(screen.getByText('Assets')).toBeTruthy();
+  });
+
+  it('shows next update due date', () => {
+    render(&lt;DivaScoreCard score={mockDivaScore} />);
+    
+    expect(screen.getByText(/Next update due/)).toBeTruthy();
+  });
+});
+```
+
+## Production Build Setup
+
+### 14. EAS Build Configuration
+
+Create `eas.json` for production builds:
+
+```json
+{
+  "cli": {
+    "version": ">= 3.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api-dev.awo-platform.com"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api-staging.awo-platform.com"
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.awo-platform.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
+```
+
+### 15. Build Commands
+
+```bash
+# Development build
+eas build --profile development --platform all
+
+# Preview build for testing
+eas build --profile preview --platform all
+
+# Production build
+eas build --profile production --platform all
+
+# Submit to app stores
+eas submit --platform all
+```
+
+## Performance Optimization
+
+### 16. React Native Performance Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Bundle Size Optimization" icon="compress">
+    **Tree Shaking**: Remove unused code  
+    **Lazy Loading**: Implement screen-level code splitting  
+    **Asset Optimization**: Compress images and use WebP format  
+    **Bundle Analysis**: Use Metro bundle analyzer
+  </Card>
+  <Card title="Runtime Performance" icon="bolt">
+    **FlatList Optimization**: Use getItemLayout for large lists  
+    **Image Caching**: Implement proper image caching strategy  
+    **Memory Management**: Avoid memory leaks in timers and listeners  
+    **Navigation**: Use React Navigation 6 with proper screen options
+  </Card>
+</CardGroup>
+
+### 17. African Market Optimizations
+
+```typescript
+// src/utils/performance.ts
+import { Platform } from 'react-native';
+
+// Device capability detection for African markets
+export const DeviceCapabilities = {
+  isLowEndDevice(): boolean {
+    // Detect low-end devices common in African markets
+    if (Platform.OS === 'android') {
+      return Platform.constants.Release &lt; '8.0';
+    }
+    return false;
+  },
+
+  getOptimalImageQuality(): 'low' | 'medium' | 'high' {
+    if (this.isLowEndDevice()) {
+      return 'low';
+    }
+    return 'high';
+  },
+
+  shouldEnableAdvancedAnimations(): boolean {
+    return !this.isLowEndDevice();
+  }
+};
+
+// Network-aware API requests
+export class NetworkOptimizer {
+  static async makeRequest(
+    requestFn: () => Promise&lt;any>,
+    fallbackData?: any,
+    timeout: number = 10000
+  ) {
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Request timeout')), timeout)
+    );
+
+    try {
+      return await Promise.race([requestFn(), timeoutPromise]);
+    } catch (error) {
+      if (fallbackData) {
+        return fallbackData;
+      }
+      throw error;
+    }
+  }
+}
+```
+
+## Troubleshooting
+
+### 18. Common Issues and Solutions
+
+<Accordion title="Expo/React Native Issues">
+
+**Metro bundler issues:**
+```bash
+# Clear Metro cache
+npx react-native start --reset-cache
+
+# Clear Expo cache
+expo start --clear
+
+# Clear node modules and reinstall
+rm -rf node_modules && npm install
+```
+
+**Android build issues:**
+```bash
+# Clean Android build
+cd android && ./gradlew clean && cd ..
+
+# Reset Android SDK
+export ANDROID_HOME=$HOME/Library/Android/sdk
+
+# Check Java version (should be Java 11)
+java -version
+```
+
+</Accordion>
+
+<Accordion title="AWO-Specific Issues">
+
+**Authentication issues:**
+- Verify environment variables are correctly set
+- Check JWT token expiry and refresh mechanism
+- Ensure API endpoints are accessible from mobile device
+
+**DIVA score not updating:**
+- Verify real-time Socket.io connection
+- Check if user has completed required KYC steps
+- Ensure sufficient transaction data for scoring
+
+**Offline functionality not working:**
+- Verify AsyncStorage permissions
+- Check network status detection
+- Ensure offline queue is properly configured
+
+</Accordion>
 
 ## Next Steps
 
-<Card title="Related Documentation" href="/api-reference/introduction">
-  Explore other sections of our documentation
-</Card>
+<Steps>
+  <Step title="Complete Core Features">
+    **Integration Tasks:**
+    - Implement Chama management screens
+    - Set up investment platform UI
+    - Configure wealth coaching features
+    - Add gamification elements
+  </Step>
+  <Step title="African Market Customization">
+    **Localization Tasks:**
+    - Add multi-language support (English, Afrikaans, Portuguese)
+    - Implement SADC currency formatting
+    - Configure country-specific features
+    - Set up agent network integration
+  </Step>
+  <Step title="Testing & Optimization">
+    **Quality Assurance:**
+    - Comprehensive testing on African devices
+    - Performance optimization for low-end devices
+    - Network resilience testing
+    - User acceptance testing in target markets
+  </Step>
+  <Step title="Production Deployment">
+    **Go-Live Preparation:**
+    - App store submission and approval
+    - Production monitoring setup
+    - User onboarding flow optimization
+    - Customer support system integration
+  </Step>
+</Steps>
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card title="AWO Mobile Repository" icon="github" href="https://github.com/awo-platform/awo-mobile">
+    Access the complete AWO mobile application source code and documentation
+  </Card>
+  <Card title="React Native Documentation" icon="react" href="https://reactnative.dev/">
+    Official React Native documentation for additional development guidance
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Expo Documentation" icon="clipboard" href="https://docs.expo.dev/">
+    Comprehensive Expo documentation for mobile app development
+  </Card>
+  <Card title="African Development Resources" icon="globe" href="/resources/african-development">
+    Resources specific to African mobile app development and market considerations
+  </Card>
+</CardGroup>
+
+---
+
+*This mobile app setup guide provides the foundation for developing and deploying AWO Platform's React Native application across SADC markets. For additional support, consult the troubleshooting section or reach out to the AWO development team.*
+
+*Last updated: June 2025*  
+*Next update: As React Native and Expo versions evolve*

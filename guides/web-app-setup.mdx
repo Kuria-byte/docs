@@ -1,28 +1,1545 @@
----
-title: "Web App Setup"
-description: "Web App Setup implementation guide"
----
+# Web App Setup Guide
 
-# Web App Setup
-
-## Overview
-
-This guide documentation is coming soon.
+This comprehensive guide walks you through setting up AWO Platform's web application, designed to complement the mobile experience and provide full-featured access via web browsers across SADC markets.
 
 <Info>
-This page is under development. Please check back later for complete implementation guide.
+AWO's web application is built as a Progressive Web App (PWA) using Next.js 14 with TypeScript, optimized for African internet infrastructure and providing offline capabilities for reliable access across varying connectivity conditions.
 </Info>
 
-## Getting Started
+## Prerequisites
 
-Step-by-step instructions will be added here.
+Before starting the web application setup, ensure you have the required development environment:
 
-## Examples
+### Development Environment Requirements
 
-Code examples and best practices will be provided.
+<CardGroup cols={2}>
+  <Card title="Node.js & Package Management" icon="node">
+    **Node.js**: Version 18.17 or higher  
+    **Package Manager**: npm 9+ or pnpm 8+ (recommended)  
+    **Verification**: `node --version && npm --version`
+  </Card>
+  <Card title="Development Tools" icon="code">
+    **Next.js**: Version 14.0 or higher  
+    **TypeScript**: Version 5.0 or higher  
+    **Git**: Version 2.30 or higher with SSH configured
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Browser Development" icon="chrome">
+    **Chrome/Edge**: Latest version with dev tools  
+    **Firefox**: Latest version for cross-browser testing  
+    **Safari**: For macOS testing (if available)  
+    **Mobile browsers**: Chrome Mobile, Safari Mobile testing
+  </Card>
+  <Card title="Code Editor Setup" icon="react">
+    **VS Code**: Recommended with Next.js and TypeScript extensions  
+    **Extensions**: ES7+ React snippets, Tailwind CSS IntelliSense  
+    **Prettier**: Code formatting with AWO configuration
+  </Card>
+</CardGroup>
+
+### African Market Considerations
+
+<CardGroup cols={2}>
+  <Card title="Performance Requirements" icon="chart-bar">
+    **Load Time**: &lt;3 seconds on 3G networks  
+    **Bundle Size**: &lt;1MB initial load  
+    **Offline Support**: Core features work without internet  
+    **Device Support**: Works on entry-level smartphones
+  </Card>
+  <Card title="Connectivity Optimization" icon="wifi">
+    **Progressive Enhancement**: Works on slow connections  
+    **Data Efficiency**: Minimal data usage patterns  
+    **Offline-First**: Local storage and sync capabilities  
+    **Graceful Degradation**: Fallbacks for poor connectivity
+  </Card>
+</CardGroup>
+
+## Project Setup
+
+### 1. Repository Setup and Installation
+
+<Steps>
+  <Step title="Clone AWO Web Repository">
+    ```bash
+    # Clone the web application repository
+    git clone git@github.com:awo-platform/awo-web.git
+    cd awo-web
+    
+    # Verify repository structure
+    ls -la
+    # Should show: src/, public/, next.config.js, package.json, etc.
+    ```
+  </Step>
+  <Step title="Install Dependencies">
+    ```bash
+    # Install project dependencies (using pnpm for better performance)
+    pnpm install
+    
+    # Alternatively with npm
+    npm install
+    
+    # Verify critical packages
+    pnpm list next react zustand @tanstack/react-query tailwindcss
+    ```
+  </Step>
+  <Step title="Environment Configuration">
+    ```bash
+    # Copy environment template
+    cp .env.example .env.local
+    
+    # Edit environment variables for local development
+    nano .env.local
+    ```
+    
+    **Required Environment Variables:**
+    ```env
+    # Application Configuration
+    NEXT_PUBLIC_APP_URL=http://localhost:3000
+    NEXT_PUBLIC_API_URL=https://api-dev.awo-platform.com
+    NEXT_PUBLIC_WS_URL=wss://ws-dev.awo-platform.com
+    
+    # Authentication
+    NEXTAUTH_SECRET=your-nextauth-secret-key
+    NEXTAUTH_URL=http://localhost:3000
+    
+    # African Financial Services
+    NEXT_PUBLIC_FLUTTERWAVE_PUBLIC_KEY=your-flutterwave-key
+    NEXT_PUBLIC_STITCH_CLIENT_ID=your-stitch-client-id
+    NEXT_PUBLIC_MONO_PUBLIC_KEY=your-mono-public-key
+    
+    # PWA Configuration
+    NEXT_PUBLIC_PWA_ENABLED=true
+    NEXT_PUBLIC_OFFLINE_ENABLED=true
+    
+    # Analytics and Monitoring
+    NEXT_PUBLIC_GOOGLE_ANALYTICS=your-ga-measurement-id
+    NEXT_PUBLIC_SENTRY_DSN=your-sentry-dsn
+    
+    # Feature Flags
+    NEXT_PUBLIC_ENABLE_USSD_INTEGRATION=true
+    NEXT_PUBLIC_ENABLE_WHATSAPP_BANKING=true
+    NEXT_PUBLIC_ENABLE_AGENT_NETWORK=true
+    ```
+  </Step>
+  <Step title="Development Server Startup">
+    ```bash
+    # Start development server
+    pnpm dev
+    
+    # Verify TypeScript compilation
+    pnpm type-check
+    
+    # Run linting and formatting
+    pnpm lint
+    pnpm format
+    
+    # Access application at http://localhost:3000
+    ```
+  </Step>
+</Steps>
+
+### 2. Project Architecture Overview
+
+AWO's web application follows a modern, scalable architecture:
+
+```
+awo-web/
+├── src/
+│   ├── app/                    # Next.js 14 App Router
+│   │   ├── (auth)/            # Authentication layouts
+│   │   │   ├── login/         # Login page
+│   │   │   ├── register/      # Registration flow
+│   │   │   └── kyc/           # KYC verification
+│   │   ├── (dashboard)/       # Main application
+│   │   │   ├── dashboard/     # User dashboard
+│   │   │   ├── diva/         # DIVA score interface
+│   │   │   ├── chama/        # Chama management
+│   │   │   ├── investments/   # Investment platform
+│   │   │   ├── wallet/       # Digital wallet
+│   │   │   └── coaching/     # Wealth coaching
+│   │   ├── (public)/         # Public pages
+│   │   │   ├── about/        # About AWO Platform
+│   │   │   ├── features/     # Feature showcase
+│   │   │   └── contact/      # Contact information
+│   │   ├── api/              # API routes (server-side)
+│   │   │   ├── auth/         # Authentication endpoints
+│   │   │   ├── webhooks/     # Payment and external webhooks
+│   │   │   └── cron/         # Scheduled tasks
+│   │   ├── globals.css       # Global styles with Tailwind
+│   │   ├── layout.tsx        # Root layout component
+│   │   ├── loading.tsx       # Global loading UI
+│   │   ├── error.tsx         # Error boundary
+│   │   └── not-found.tsx     # 404 page
+│   ├── components/           # Reusable UI components
+│   │   ├── ui/              # Base UI components (shadcn/ui)
+│   │   ├── layout/          # Layout components
+│   │   ├── forms/           # Form components with validation
+│   │   ├── charts/          # Financial data visualization
+│   │   ├── africa/          # Africa-specific components
+│   │   └── features/        # Feature-specific components
+│   ├── lib/                 # Utility libraries
+│   │   ├── api/            # API client and utilities
+│   │   ├── auth/           # Authentication logic
+│   │   ├── utils/          # General utilities
+│   │   ├── validation/     # Form validation schemas
+│   │   ├── constants/      # Application constants
+│   │   └── hooks/          # Custom React hooks
+│   ├── store/              # State management (Zustand)
+│   │   ├── auth.ts         # Authentication state
+│   │   ├── diva.ts         # DIVA score state
+│   │   ├── chama.ts        # Chama management state
+│   │   ├── wallet.ts       # Wallet and transaction state
+│   │   └── ui.ts           # UI state (modals, notifications)
+│   ├── styles/             # Styling
+│   │   ├── globals.css     # Global styles
+│   │   ├── components.css  # Component-specific styles
+│   │   └── african.css     # Africa-themed styling
+│   └── types/              # TypeScript definitions
+│       ├── api.ts          # API response types
+│       ├── user.ts         # User and profile types
+│       ├── financial.ts    # Financial data types
+│       └── african.ts      # Africa-specific types
+├── public/                 # Static assets
+│   ├── icons/             # PWA icons and favicons
+│   ├── images/            # Application images
+│   ├── locales/           # Internationalization files
+│   ├── manifest.json      # PWA manifest
+│   └── sw.js              # Service worker
+├── tailwind.config.js     # Tailwind CSS configuration
+├── next.config.js         # Next.js configuration
+├── tsconfig.json          # TypeScript configuration
+└── package.json           # Dependencies and scripts
+```
+
+## Core Configuration
+
+### 3. Next.js Configuration for African Markets
+
+Configure `next.config.js` with African market optimizations:
+
+```javascript
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    typedRoutes: true,
+    optimizePackageImports: ['@heroicons/react', 'date-fns', 'recharts'],
+  },
+  
+  // PWA Configuration
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+    ];
+  },
+
+  // Image optimization for African bandwidth
+  images: {
+    deviceSizes: [640, 750, 828, 1080, 1200],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    formats: ['image/webp', 'image/avif'],
+    minimumCacheTTL: 86400, // 24 hours
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+  },
+
+  // Compression and optimization
+  compress: true,
+  poweredByHeader: false,
+  
+  // Environment-specific redirects
+  async redirects() {
+    return [
+      {
+        source: '/app',
+        destination: '/dashboard',
+        permanent: true,
+      },
+    ];
+  },
+
+  // Bundle analyzer (development only)
+  ...(process.env.ANALYZE === 'true' && {
+    webpack: (config) => {
+      config.plugins.push(
+        new (require('@next/bundle-analyzer'))({
+          enabled: true,
+        })
+      );
+      return config;
+    },
+  }),
+};
+
+module.exports = nextConfig;
+```
+
+### 4. Tailwind CSS Configuration
+
+```javascript
+// tailwind.config.js
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  darkMode: ['class'],
+  content: [
+    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {
+      colors: {
+        // AWO Brand Colors
+        awo: {
+          primary: '#bc9b25',
+          secondary: '#f4f1e8',
+          accent: '#8b7355',
+          dark: '#2d2d2d',
+          light: '#fafafa',
+        },
+        // African-themed colors
+        african: {
+          gold: '#ffd700',
+          sunset: '#ff6b35',
+          earth: '#8b4513',
+          sky: '#87ceeb',
+          forest: '#228b22',
+        },
+        // Financial status colors
+        financial: {
+          bronze: '#cd7f32',
+          silver: '#c0c0c0',
+          gold: '#ffd700',
+          platinum: '#e5e4e2',
+          success: '#10b981',
+          warning: '#f59e0b',
+          danger: '#ef4444',
+        },
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Poppins', 'system-ui', 'sans-serif'],
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.5s ease-in-out',
+        'slide-up': 'slideUp 0.3s ease-out',
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+      },
+      screens: {
+        'xs': '475px',
+        '3xl': '1600px',
+      },
+    },
+  },
+  plugins: [
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'),
+    require('@tailwindcss/aspect-ratio'),
+  ],
+};
+```
+
+### 5. Progressive Web App (PWA) Setup
+
+Configure PWA for offline-first African market needs:
+
+```json
+// public/manifest.json
+{
+  "name": "AWO Platform",
+  "short_name": "AWO",
+  "description": "Financial empowerment platform for African women",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#bc9b25",
+  "theme_color": "#bc9b25",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "categories": ["finance", "productivity", "business"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "scope": "/",
+  "shortcuts": [
+    {
+      "name": "DIVA Score",
+      "short_name": "DIVA",
+      "description": "Check your financial health score",
+      "url": "/diva",
+      "icons": [
+        {
+          "src": "/icons/diva-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "My Chama",
+      "short_name": "Chama",
+      "description": "Manage your savings group",
+      "url": "/chama",
+      "icons": [
+        {
+          "src": "/icons/chama-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Investments",
+      "short_name": "Invest",
+      "description": "View investment portfolio",
+      "url": "/investments",
+      "icons": [
+        {
+          "src": "/icons/invest-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Authentication Implementation
+
+### 6. NextAuth.js Configuration
+
+```typescript
+// src/lib/auth/auth.config.ts
+import { NextAuthConfig } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import { LoginSchema } from '@/lib/validation/auth';
+import { authService } from '@/lib/api/auth';
+
+export const authConfig: NextAuthConfig = {
+  providers: [
+    CredentialsProvider({
+      name: 'credentials',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
+      },
+      async authorize(credentials) {
+        const validatedFields = LoginSchema.safeParse(credentials);
+
+        if (validatedFields.success) {
+          const { email, password } = validatedFields.data;
+          
+          try {
+            const user = await authService.login(email, password);
+            return user;
+          } catch (error) {
+            return null;
+          }
+        }
+
+        return null;
+      },
+    }),
+  ],
+  pages: {
+    signIn: '/login',
+    signUp: '/register',
+    error: '/auth/error',
+  },
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.accessToken = user.accessToken;
+        token.refreshToken = user.refreshToken;
+        token.id = user.id;
+        token.divaScore = user.divaScore;
+        token.portfolioTier = user.portfolioTier;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      session.user.id = token.id as string;
+      session.user.divaScore = token.divaScore as number;
+      session.user.portfolioTier = token.portfolioTier as string;
+      session.accessToken = token.accessToken as string;
+      return session;
+    },
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+};
+```
+
+### 7. Authentication API Routes
+
+```typescript
+// src/app/api/auth/[...nextauth]/route.ts
+import NextAuth from 'next-auth';
+import { authConfig } from '@/lib/auth/auth.config';
+
+const handler = NextAuth(authConfig);
+
+export { handler as GET, handler as POST };
+
+// src/app/api/auth/register/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { RegisterSchema } from '@/lib/validation/auth';
+import { authService } from '@/lib/api/auth';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const validatedFields = RegisterSchema.safeParse(body);
+
+    if (!validatedFields.success) {
+      return NextResponse.json(
+        { error: 'Invalid fields', details: validatedFields.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { email, password, firstName, lastName, phoneNumber, country } = validatedFields.data;
+
+    const user = await authService.register({
+      email,
+      password,
+      firstName,
+      lastName,
+      phoneNumber,
+      country,
+    });
+
+    return NextResponse.json({ user }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Registration failed' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## DIVA Score Dashboard Implementation
+
+### 8. DIVA Score Components
+
+```typescript
+// src/components/features/diva/DivaScoreCard.tsx
+'use client';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface DivaScoreCardProps {
+  score: {
+    overallScore: number;
+    components: {
+      discipline: number;
+      income: number;
+      velocity: number;
+      assets: number;
+    };
+    portfolioTier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+    trend: 'up' | 'down' | 'stable';
+    lastUpdated: Date;
+    nextUpdateDue: Date;
+  };
+}
+
+export function DivaScoreCard({ score }: DivaScoreCardProps) {
+  const getTierColor = (tier: string) => {
+    switch (tier) {
+      case 'Bronze': return 'bg-gradient-to-r from-amber-600 to-amber-700';
+      case 'Silver': return 'bg-gradient-to-r from-gray-400 to-gray-500';
+      case 'Gold': return 'bg-gradient-to-r from-yellow-400 to-yellow-500';
+      case 'Platinum': return 'bg-gradient-to-r from-slate-300 to-slate-400';
+      default: return 'bg-gradient-to-r from-gray-400 to-gray-500';
+    }
+  };
+
+  const getTrendIcon = () => {
+    switch (score.trend) {
+      case 'up': return &lt;TrendingUp className="h-4 w-4 text-green-500" />;
+      case 'down': return &lt;TrendingDown className="h-4 w-4 text-red-500" />;
+      case 'stable': return &lt;Minus className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  return (
+    &lt;Card className="w-full">
+      &lt;CardHeader className="pb-3">
+        &lt;div className="flex items-center justify-between">
+          &lt;CardTitle className="text-2xl font-bold">DIVA Score&lt;/CardTitle>
+          {getTrendIcon()}
+        &lt;/div>
+        &lt;Badge 
+          className={cn(
+            'w-fit text-white font-semibold',
+            getTierColor(score.portfolioTier)
+          )}
+        >
+          {score.portfolioTier} Portfolio
+        &lt;/Badge>
+      &lt;/CardHeader>
+      
+      &lt;CardContent className="space-y-6">
+        {/* Overall Score Display */}
+        &lt;div className="text-center">
+          &lt;div className="text-5xl font-bold text-awo-primary mb-2">
+            {score.overallScore}
+          &lt;/div>
+          &lt;div className="text-sm text-gray-500">
+            out of 1000
+          &lt;/div>
+        &lt;/div>
+
+        {/* Component Breakdown */}
+        &lt;div className="space-y-4">
+          {Object.entries(score.components).map(([component, value]) => (
+            &lt;div key={component} className="space-y-2">
+              &lt;div className="flex justify-between text-sm">
+                &lt;span className="capitalize font-medium">{component}&lt;/span>
+                &lt;span className="text-gray-600">{Math.round(value * 100)}%&lt;/span>
+              &lt;/div>
+              &lt;Progress 
+                value={value * 100} 
+                className="h-2"
+              />
+            &lt;/div>
+          ))}
+        &lt;/div>
+
+        {/* Update Information */}
+        &lt;div className="pt-4 border-t text-sm text-gray-500">
+          &lt;div>Last updated: {score.lastUpdated.toLocaleDateString()}&lt;/div>
+          &lt;div>Next update due: {score.nextUpdateDue.toLocaleDateString()}&lt;/div>
+        &lt;/div>
+      &lt;/CardContent>
+    &lt;/Card>
+  );
+}
+```
+
+### 9. DIVA Score Page Implementation
+
+```typescript
+// src/app/(dashboard)/diva/page.tsx
+import { Suspense } from 'react';
+import { DivaScoreCard } from '@/components/features/diva/DivaScoreCard';
+import { DivaInsights } from '@/components/features/diva/DivaInsights';
+import { DivaHistory } from '@/components/features/diva/DivaHistory';
+import { DivaActions } from '@/components/features/diva/DivaActions';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'DIVA Score | AWO Platform',
+  description: 'View your financial health score and get personalized insights',
+};
+
+export default function DivaPage() {
+  return (
+    &lt;div className="container mx-auto px-4 py-8 space-y-8">
+      {/* Page Header */}
+      &lt;div className="text-center space-y-2">
+        &lt;h1 className="text-4xl font-bold text-gray-900">
+          Your DIVA Score
+        &lt;/h1>
+        &lt;p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          Track your financial health across Discipline, Income, Velocity, and Assets. 
+          Your score determines your investment portfolio tier and available opportunities.
+        &lt;/p>
+      &lt;/div>
+
+      {/* Main Content Grid */}
+      &lt;div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* DIVA Score Card */}
+        &lt;div className="lg:col-span-1">
+          &lt;Suspense fallback={&lt;LoadingSpinner />}>
+            &lt;DivaScoreCard />
+          &lt;/Suspense>
+        &lt;/div>
+
+        {/* Insights and Actions */}
+        &lt;div className="lg:col-span-2 space-y-8">
+          &lt;Suspense fallback={&lt;LoadingSpinner />}>
+            &lt;DivaInsights />
+          &lt;/Suspense>
+          
+          &lt;Suspense fallback={&lt;LoadingSpinner />}>
+            &lt;DivaActions />
+          &lt;/Suspense>
+        &lt;/div>
+      &lt;/div>
+
+      {/* Score History */}
+      &lt;div className="mt-12">
+        &lt;Suspense fallback={&lt;LoadingSpinner />}>
+          &lt;DivaHistory />
+        &lt;/Suspense>
+      &lt;/div>
+    &lt;/div>
+  );
+}
+```
+
+## State Management Implementation
+
+### 10. Zustand Store Configuration
+
+```typescript
+// src/store/auth.ts
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { User, AuthTokens } from '@/types/auth';
+
+interface AuthState {
+  user: User | null;
+  tokens: AuthTokens | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+
+  // Actions
+  setUser: (user: User) => void;
+  setTokens: (tokens: AuthTokens) => void;
+  logout: () => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+  clearError: () => void;
+}
+
+export const useAuthStore = create&lt;AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      tokens: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+
+      setUser: (user) => set({ user, isAuthenticated: true }),
+      setTokens: (tokens) => set({ tokens }),
+      logout: () => set({ 
+        user: null, 
+        tokens: null, 
+        isAuthenticated: false,
+        error: null 
+      }),
+      setLoading: (isLoading) => set({ isLoading }),
+      setError: (error) => set({ error }),
+      clearError: () => set({ error: null }),
+    }),
+    {
+      name: 'awo-auth-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        user: state.user,
+        tokens: state.tokens,
+        isAuthenticated: state.isAuthenticated,
+      }),
+    }
+  )
+);
+
+// src/store/diva.ts
+import { create } from 'zustand';
+import { DivaScore, DivaInsights, PortfolioTier } from '@/types/diva';
+
+interface DivaState {
+  currentScore: DivaScore | null;
+  scoreHistory: DivaScore[];
+  insights: DivaInsights | null;
+  portfolioTier: PortfolioTier | null;
+  isLoading: boolean;
+  error: string | null;
+  lastUpdated: Date | null;
+
+  // Actions
+  setCurrentScore: (score: DivaScore) => void;
+  setScoreHistory: (history: DivaScore[]) => void;
+  setInsights: (insights: DivaInsights) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+  clearError: () => void;
+}
+
+export const useDivaStore = create&lt;DivaState>((set) => ({
+  currentScore: null,
+  scoreHistory: [],
+  insights: null,
+  portfolioTier: null,
+  isLoading: false,
+  error: null,
+  lastUpdated: null,
+
+  setCurrentScore: (currentScore) => set({ 
+    currentScore, 
+    portfolioTier: currentScore.portfolioTier,
+    lastUpdated: new Date()
+  }),
+  setScoreHistory: (scoreHistory) => set({ scoreHistory }),
+  setInsights: (insights) => set({ insights }),
+  setLoading: (isLoading) => set({ isLoading }),
+  setError: (error) => set({ error }),
+  clearError: () => set({ error: null }),
+}));
+```
+
+## Offline Capabilities Implementation
+
+### 11. Service Worker for Offline Support
+
+```javascript
+// public/sw.js
+const CACHE_NAME = 'awo-web-v1';
+const STATIC_CACHE = 'awo-static-v1';
+const DYNAMIC_CACHE = 'awo-dynamic-v1';
+
+// Assets to cache on install
+const STATIC_ASSETS = [
+  '/',
+  '/dashboard',
+  '/diva',
+  '/chama',
+  '/investments',
+  '/wallet',
+  '/_next/static/css/app/layout.css',
+  '/_next/static/chunks/webpack.js',
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png',
+];
+
+// API endpoints to cache
+const API_CACHE_PATTERNS = [
+  '/api/diva/score',
+  '/api/wallet/balance',
+  '/api/chama/list',
+];
+
+// Install event - cache static assets
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(STATIC_CACHE)
+      .then(cache => cache.addAll(STATIC_ASSETS))
+      .then(() => self.skipWaiting())
+  );
+});
+
+// Activate event - clean up old caches
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then(cacheNames => {
+        return Promise.all(
+          cacheNames.map(cacheName => {
+            if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      })
+      .then(() => self.clients.claim())
+  );
+});
+
+// Fetch event - serve from cache with network fallback
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Handle API requests
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      caches.open(DYNAMIC_CACHE)
+        .then(cache => {
+          return fetch(request)
+            .then(response => {
+              // Cache successful API responses
+              if (response.status === 200) {
+                cache.put(request, response.clone());
+              }
+              return response;
+            })
+            .catch(() => {
+              // Return cached response if network fails
+              return cache.match(request)
+                .then(cachedResponse => {
+                  if (cachedResponse) {
+                    return cachedResponse;
+                  }
+                  // Return offline fallback for critical endpoints
+                  if (API_CACHE_PATTERNS.some(pattern => url.pathname.includes(pattern))) {
+                    return new Response(
+                      JSON.stringify({ offline: true, message: 'Currently offline' }),
+                      { headers: { 'Content-Type': 'application/json' } }
+                    );
+                  }
+                  throw new Error('Network error and no cache available');
+                });
+            });
+        })
+    );
+    return;
+  }
+
+  // Handle static assets and pages
+  event.respondWith(
+    caches.match(request)
+      .then(cachedResponse => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+
+        return fetch(request)
+          .then(response => {
+            // Cache successful responses
+            if (response.status === 200) {
+              const responseClone = response.clone();
+              caches.open(DYNAMIC_CACHE)
+                .then(cache => cache.put(request, responseClone));
+            }
+            return response;
+          });
+      })
+      .catch(() => {
+        // Return offline page for navigation requests
+        if (request.mode === 'navigate') {
+          return caches.match('/offline.html') || 
+                 new Response('You are currently offline', {
+                   status: 200,
+                   headers: { 'Content-Type': 'text/html' }
+                 });
+        }
+      })
+  );
+});
+
+// Background sync for offline actions
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'background-sync') {
+    event.waitUntil(syncOfflineActions());
+  }
+});
+
+async function syncOfflineActions() {
+  try {
+    // Retrieve queued actions from IndexedDB
+    const offlineActions = await getOfflineActions();
+    
+    for (const action of offlineActions) {
+      try {
+        await fetch(action.url, {
+          method: action.method,
+          headers: action.headers,
+          body: action.body
+        });
+        
+        // Remove successful action from queue
+        await removeOfflineAction(action.id);
+      } catch (error) {
+        console.log('Failed to sync action:', action.id);
+      }
+    }
+  } catch (error) {
+    console.log('Background sync failed:', error);
+  }
+}
+```
+
+### 12. Offline Hook Implementation
+
+```typescript
+// src/hooks/useOffline.ts
+'use client';
+
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+
+interface OfflineAction {
+  id: string;
+  type: 'transaction' | 'chama_contribution' | 'profile_update';
+  data: any;
+  timestamp: number;
+}
+
+export function useOffline() {
+  const [isOnline, setIsOnline] = useState(true);
+  const [offlineActions, setOfflineActions] = useState&lt;OfflineAction[]>([]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success('Connection restored! Syncing data...');
+      processOfflineActions();
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.warning('You are now offline. Actions will be queued for later.');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Check initial connection status
+    setIsOnline(navigator.onLine);
+
+    // Load queued actions from storage
+    loadOfflineActions();
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const queueOfflineAction = (action: Omit&lt;OfflineAction, 'id' | 'timestamp'>) => {
+    const queuedAction: OfflineAction = {
+      ...action,
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+    };
+
+    const updatedActions = [...offlineActions, queuedAction];
+    setOfflineActions(updatedActions);
+    saveOfflineActions(updatedActions);
+
+    toast.info('Action queued for when you\'re back online');
+  };
+
+  const processOfflineActions = async () => {
+    if (!isOnline || offlineActions.length === 0) return;
+
+    const processedIds: string[] = [];
+
+    for (const action of offlineActions) {
+      try {
+        await executeOfflineAction(action);
+        processedIds.push(action.id);
+        toast.success(`Synced ${action.type}`);
+      } catch (error) {
+        console.error('Failed to process offline action:', error);
+      }
+    }
+
+    const remainingActions = offlineActions.filter(
+      action => !processedIds.includes(action.id)
+    );
+    
+    setOfflineActions(remainingActions);
+    saveOfflineActions(remainingActions);
+  };
+
+  const executeOfflineAction = async (action: OfflineAction) => {
+    switch (action.type) {
+      case 'transaction':
+        return await fetch('/api/wallet/transfer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(action.data),
+        });
+      
+      case 'chama_contribution':
+        return await fetch('/api/chama/contribute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(action.data),
+        });
+      
+      case 'profile_update':
+        return await fetch('/api/user/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(action.data),
+        });
+      
+      default:
+        throw new Error(`Unknown action type: ${action.type}`);
+    }
+  };
+
+  const loadOfflineActions = () => {
+    try {
+      const stored = localStorage.getItem('awo-offline-actions');
+      if (stored) {
+        setOfflineActions(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Failed to load offline actions:', error);
+    }
+  };
+
+  const saveOfflineActions = (actions: OfflineAction[]) => {
+    try {
+      localStorage.setItem('awo-offline-actions', JSON.stringify(actions));
+    } catch (error) {
+      console.error('Failed to save offline actions:', error);
+    }
+  };
+
+  return {
+    isOnline,
+    offlineActions,
+    queueOfflineAction,
+    processOfflineActions,
+  };
+}
+```
+
+## Performance Optimization
+
+### 13. African Market Performance Optimizations
+
+```typescript
+// src/lib/performance/african-optimizations.ts
+export class AfricanPerformanceOptimizer {
+  private static connectionSpeed: 'slow' | 'medium' | 'fast' = 'medium';
+  
+  static detectConnectionSpeed(): Promise&lt;'slow' | 'medium' | 'fast'> {
+    return new Promise((resolve) => {
+      const connection = (navigator as any).connection;
+      
+      if (connection) {
+        const { effectiveType, downlink } = connection;
+        
+        if (effectiveType === '2g' || downlink &lt; 1) {
+          this.connectionSpeed = 'slow';
+        } else if (effectiveType === '3g' || downlink &lt; 5) {
+          this.connectionSpeed = 'medium';
+        } else {
+          this.connectionSpeed = 'fast';
+        }
+      }
+      
+      resolve(this.connectionSpeed);
+    });
+  }
+
+  static getOptimalImageQuality(): 'low' | 'medium' | 'high' {
+    switch (this.connectionSpeed) {
+      case 'slow': return 'low';
+      case 'medium': return 'medium';
+      case 'fast': return 'high';
+      default: return 'medium';
+    }
+  }
+
+  static shouldPreloadData(): boolean {
+    return this.connectionSpeed !== 'slow';
+  }
+
+  static getOptimalPageSize(): number {
+    switch (this.connectionSpeed) {
+      case 'slow': return 10;
+      case 'medium': return 20;
+      case 'fast': return 50;
+      default: return 20;
+    }
+  }
+
+  static async optimizedFetch(
+    url: string, 
+    options: RequestInit = {},
+    timeout: number = 10000
+  ): Promise&lt;Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  }
+}
+
+// Connection-aware image component
+export function OptimizedImage({
+  src,
+  alt,
+  ...props
+}: React.ImgHTMLAttributes&lt;HTMLImageElement>) {
+  const [imageSrc, setImageSrc] = useState(src);
+  
+  useEffect(() => {
+    AfricanPerformanceOptimizer.detectConnectionSpeed().then((speed) => {
+      if (speed === 'slow' && src) {
+        // Convert to low quality version
+        const lowQualitySrc = src.replace(/\.jpg|\.png/, '_low$&');
+        setImageSrc(lowQualitySrc);
+      }
+    });
+  }, [src]);
+
+  return &lt;img src={imageSrc} alt={alt} {...props} />;
+}
+```
+
+## Testing Setup
+
+### 14. Jest and Testing Library Configuration
+
+```javascript
+// jest.config.js
+const nextJest = require('next/jest');
+
+const createJestConfig = nextJest({
+  dir: './',
+});
+
+const customJestConfig = {
+  setupFilesAfterEnv: ['&lt;rootDir>/jest.setup.js'],
+  testEnvironment: 'jest-environment-jsdom',
+  moduleNameMapping: {
+    '^@/(.*)$': '&lt;rootDir>/src/$1',
+  },
+  collectCoverageFrom: [
+    'src/**/*.{js,jsx,ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/**/*.stories.{js,jsx,ts,tsx}',
+  ],
+  testPathIgnorePatterns: [
+    '&lt;rootDir>/.next/',
+    '&lt;rootDir>/node_modules/',
+  ],
+  transform: {
+    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
+  },
+  transformIgnorePatterns: [
+    '/node_modules/',
+    '^.+\\.module\\.(css|sass|scss)$',
+  ],
+};
+
+module.exports = createJestConfig(customJestConfig);
+```
+
+### 15. Component Testing Example
+
+```typescript
+// src/components/__tests__/DivaScoreCard.test.tsx
+import { render, screen } from '@testing-library/react';
+import { DivaScoreCard } from '../features/diva/DivaScoreCard';
+
+const mockDivaScore = {
+  overallScore: 750,
+  components: {
+    discipline: 0.8,
+    income: 0.7,
+    velocity: 0.75,
+    assets: 0.7,
+  },
+  portfolioTier: 'Gold' as const,
+  trend: 'up' as const,
+  lastUpdated: new Date('2025-01-01'),
+  nextUpdateDue: new Date('2025-04-01'),
+};
+
+describe('DivaScoreCard', () => {
+  it('renders the overall DIVA score correctly', () => {
+    render(&lt;DivaScoreCard score={mockDivaScore} />);
+    
+    expect(screen.getByText('750')).toBeInTheDocument();
+    expect(screen.getByText('out of 1000')).toBeInTheDocument();
+  });
+
+  it('displays the correct portfolio tier', () => {
+    render(&lt;DivaScoreCard score={mockDivaScore} />);
+    
+    expect(screen.getByText('Gold Portfolio')).toBeInTheDocument();
+  });
+
+  it('shows all DIVA components with correct percentages', () => {
+    render(&lt;DivaScoreCard score={mockDivaScore} />);
+    
+    expect(screen.getByText('discipline')).toBeInTheDocument();
+    expect(screen.getByText('80%')).toBeInTheDocument();
+    expect(screen.getByText('income')).toBeInTheDocument();
+    expect(screen.getByText('70%')).toBeInTheDocument();
+  });
+
+  it('displays trend indicator correctly', () => {
+    render(&lt;DivaScoreCard score={mockDivaScore} />);
+    
+    const trendIcon = screen.getByTestId('trend-icon');
+    expect(trendIcon).toHaveClass('text-green-500');
+  });
+});
+```
+
+## Production Deployment
+
+### 16. Build and Deployment Configuration
+
+```bash
+# Production build commands
+#!/bin/bash
+
+# Build for production
+pnpm build
+
+# Type checking
+pnpm type-check
+
+# Linting
+pnpm lint
+
+# Security audit
+pnpm audit
+
+# Bundle analysis (optional)
+ANALYZE=true pnpm build
+
+# Start production server
+pnpm start
+```
+
+### 17. Environment Configuration for African Deployment
+
+```dockerfile
+# Dockerfile for African market deployment
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml* ./
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Build with African market optimizations
+ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV production
+
+RUN npm install -g pnpm && pnpm build
+
+# Production image
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+
+# Set the correct permission for prerender cache
+RUN mkdir .next
+RUN chown nextjs:nodejs .next
+
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT 3000
+ENV HOSTNAME "0.0.0.0"
+
+CMD ["node", "server.js"]
+```
+
+## Monitoring and Analytics
+
+### 18. Performance Monitoring Setup
+
+```typescript
+// src/lib/monitoring/performance.ts
+export class PerformanceMonitor {
+  private static instance: PerformanceMonitor;
+  
+  static getInstance(): PerformanceMonitor {
+    if (!this.instance) {
+      this.instance = new PerformanceMonitor();
+    }
+    return this.instance;
+  }
+
+  trackPageLoad(pageName: string): void {
+    if (typeof window !== 'undefined' && 'performance' in window) {
+      const loadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
+      
+      // Send to analytics
+      gtag('event', 'page_load_time', {
+        event_category: 'Performance',
+        event_label: pageName,
+        value: Math.round(loadTime),
+        custom_map: { metric1: 'load_time' }
+      });
+
+      // Log slow page loads
+      if (loadTime > 3000) {
+        console.warn(`Slow page load detected: ${pageName} took ${loadTime}ms`);
+      }
+    }
+  }
+
+  trackAPICall(endpoint: string, duration: number): void {
+    gtag('event', 'api_call_duration', {
+      event_category: 'API Performance',
+      event_label: endpoint,
+      value: Math.round(duration),
+    });
+  }
+
+  trackOfflineEvent(action: string): void {
+    gtag('event', 'offline_action', {
+      event_category: 'Offline Usage',
+      event_label: action,
+    });
+  }
+
+  trackDivaScoreViewed(): void {
+    gtag('event', 'diva_score_viewed', {
+      event_category: 'User Engagement',
+      event_label: 'DIVA Score',
+    });
+  }
+}
+```
 
 ## Next Steps
 
-<Card title="Related Documentation" href="/api-reference/introduction">
-  Explore other sections of our documentation
-</Card>
+<Steps>
+  <Step title="Complete Feature Implementation">
+    **Development Tasks:**
+    - Implement remaining dashboard pages (Chama, Investments, Wallet)
+    - Set up real-time WebSocket connections
+    - Configure payment integration components
+    - Add comprehensive error boundaries
+  </Step>
+  <Step title="African Market Customization">
+    **Localization Tasks:**
+    - Implement multi-language support (English, Afrikaans, Portuguese, French)
+    - Add SADC currency formatting and conversion
+    - Configure country-specific payment methods
+    - Optimize for African internet infrastructure
+  </Step>
+  <Step title="PWA Enhancement">
+    **Mobile Web Optimization:**
+    - Implement app-like navigation patterns
+    - Add offline data synchronization
+    - Configure push notifications for web
+    - Optimize for add-to-homescreen experience
+  </Step>
+  <Step title="Performance & Security">
+    **Production Readiness:**
+    - Implement comprehensive security headers
+    - Set up performance monitoring and alerts
+    - Configure CDN for African edge locations
+    - Add comprehensive error tracking and logging
+  </Step>
+</Steps>
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card title="AWO Web Repository" icon="github" href="https://github.com/awo-platform/awo-web">
+    Access the complete AWO web application source code and documentation
+  </Card>
+  <Card title="Next.js Documentation" icon="clipboard" href="https://nextjs.org/docs">
+    Official Next.js 14 documentation for web development guidance
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="PWA Best Practices" icon="google" href="https://web.dev/progressive-web-apps/">
+    Google's comprehensive guide to Progressive Web App development
+  </Card>
+  <Card title="African Web Performance" icon="globe" href="/resources/african-web-optimization">
+    Resources for optimizing web applications for African markets and infrastructure
+  </Card>
+</CardGroup>
+
+---
+
+*This web app setup guide provides comprehensive coverage for developing and deploying AWO Platform's Progressive Web App across SADC markets. The implementation focuses on offline-first architecture, African market optimizations, and seamless integration with the mobile application experience.*
+
+*Last updated: June 2025*  
+*Next update: As Next.js and web standards evolve*

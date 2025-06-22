@@ -1,52 +1,3289 @@
----
-title: "Wealth Coaching Setup"
-description: "AWO Platform wealth coaching setup implementation guide"
----
+# Wealth Coaching Setup Guide
 
-# Wealth Coaching Setup
-
-## Overview
+This comprehensive guide walks you through implementing AWO Platform's wealth coaching and advisory system, designed to provide personalized financial guidance to African women through expert coaches, automated matching, and scalable session management.
 
 <Info>
-This comprehensive guide covers wealth coaching setup for the AWO Platform.
+AWO's wealth coaching platform connects users with certified financial coaches across SADC markets, featuring algorithm-based matching, integrated video conferencing, progress tracking, and culturally-aware financial guidance tailored to African women's unique financial journeys.
 </Info>
 
-## Step-by-Step Implementation
+## Coaching System Overview
 
-<Steps>
-  <Step title="Planning">
-    Plan your implementation approach
-  </Step>
-  <Step title="Setup">
-    Set up required components
-  </Step>
-  <Step title="Implementation">
-    Implement the feature
-  </Step>
-  <Step title="Testing">
-    Test your implementation
-  </Step>
-  <Step title="Deployment">
-    Deploy to production
-  </Step>
-</Steps>
+### Service Types and Structure
 
-## Code Examples
+<CardGroup cols={2}>
+  <Card title="One-on-One Coaching" icon="user">
+    **Personal Sessions**: Individual coaching via video or phone  
+    **Duration**: 30, 60, or 90-minute sessions  
+    **Focus Areas**: Budgeting, investing, debt management, business planning  
+    **Pricing**: Tiered based on coach expertise and session length
+  </Card>
+  <Card title="Group Masterclasses" icon="users">
+    **Capacity**: 10-50 participants per session  
+    **Topics**: Investment basics, retirement planning, SME funding  
+    **Format**: Interactive webinars with Q&A segments  
+    **Accessibility**: Multiple languages and time zones
+  </Card>
+</CardGroup>
 
-Implementation examples will be provided here.
+<CardGroup cols={2}>
+  <Card title="Progress Tracking" icon="trending-up">
+    **Goal Setting**: Collaborative financial goal definition  
+    **Milestone Tracking**: Regular progress check-ins  
+    **Action Plans**: Structured follow-up tasks  
+    **Performance Metrics**: Quantifiable improvement measurements
+  </Card>
+  <Card title="Content Library" icon="book">
+    **Educational Resources**: Coach-created learning materials  
+    **Templates**: Budget spreadsheets, investment calculators  
+    **Cultural Content**: Africa-specific financial guidance  
+    **Multi-Language**: English, Afrikaans, Portuguese, French
+  </Card>
+</CardGroup>
 
-## Best Practices
+## Prerequisites
 
-Implementation best practices will be documented here.
+### Development Environment Requirements
 
-## Common Pitfalls
+<CardGroup cols={2}>
+  <Card title="Backend Infrastructure" icon="server">
+    **Express.js**: Coaching service and API endpoints  
+    **PostgreSQL**: Coach profiles, sessions, and progress data  
+    **Redis**: Real-time session management and caching  
+    **Socket.io**: Live coaching session communications
+  </Card>
+  <Card title="Integration Services" icon="link">
+    **Video Platform**: Zoom SDK or custom WebRTC solution  
+    **Payment Processing**: Coach commission and session fees  
+    **Calendar Integration**: Google Calendar, Outlook sync  
+    **Notification Services**: SMS, email, and push notifications
+  </Card>
+</CardGroup>
 
-<Warning>
-Common mistakes and how to avoid them will be listed here.
-</Warning>
+### African Market Considerations
+
+<CardGroup cols={2}>
+  <Card title="Cultural Sensitivity" icon="globe">
+    **Language Support**: Multi-language coaching sessions  
+    **Cultural Awareness**: Understanding of African financial practices  
+    **Religious Considerations**: Islamic finance principles where applicable  
+    **Community Focus**: Family and community financial planning
+  </Card>
+  <Card title="Accessibility Requirements" icon="accessibility">
+    **Connectivity**: Low-bandwidth video options  
+    **Device Support**: Works on entry-level smartphones  
+    **Offline Resources**: Downloadable coaching materials  
+    **Alternative Access**: Phone-only coaching options
+  </Card>
+</CardGroup>
+
+## Database Schema Implementation
+
+### 1. Coaching Database Models
+
+```sql
+-- Coach Profiles and Certifications
+CREATE TABLE coaches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    coach_code VARCHAR(20) UNIQUE NOT NULL,
+    display_name VARCHAR(255) NOT NULL,
+    bio TEXT,
+    profile_image_url VARCHAR(500),
+    experience_years INTEGER NOT NULL DEFAULT 0,
+    languages TEXT[] NOT NULL DEFAULT '{"English"}',
+    countries_served TEXT[] NOT NULL,
+    timezone VARCHAR(50) NOT NULL,
+    hourly_rate_30min DECIMAL(10,2) NOT NULL,
+    hourly_rate_60min DECIMAL(10,2) NOT NULL,
+    hourly_rate_90min DECIMAL(10,2) NOT NULL,
+    commission_rate DECIMAL(5,2) DEFAULT 15.00, -- Platform commission percentage
+    is_active BOOLEAN DEFAULT true,
+    is_verified BOOLEAN DEFAULT false,
+    rating_average DECIMAL(3,2) DEFAULT 0,
+    total_sessions INTEGER DEFAULT 0,
+    total_earnings DECIMAL(15,2) DEFAULT 0,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Coach Specializations and Expertise Areas
+CREATE TABLE coach_specializations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    coach_id UUID NOT NULL REFERENCES coaches(id),
+    specialization VARCHAR(100) NOT NULL, -- budgeting, investing, retirement, sme_funding, debt_management
+    proficiency_level VARCHAR(20) NOT NULL, -- beginner, intermediate, advanced, expert
+    years_experience INTEGER DEFAULT 0,
+    certification_name VARCHAR(255),
+    certification_body VARCHAR(255),
+    certification_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Coach Availability Schedule
+CREATE TABLE coach_availability (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    coach_id UUID NOT NULL REFERENCES coaches(id),
+    day_of_week INTEGER NOT NULL, -- 0 = Sunday, 1 = Monday, etc.
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    timezone VARCHAR(50) NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    UNIQUE(coach_id, day_of_week, start_time)
+);
+
+-- Coaching Sessions
+CREATE TABLE coaching_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_code VARCHAR(20) UNIQUE NOT NULL,
+    coach_id UUID NOT NULL REFERENCES coaches(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    session_type VARCHAR(20) NOT NULL, -- one_on_one, masterclass
+    topic VARCHAR(255) NOT NULL,
+    description TEXT,
+    duration_minutes INTEGER NOT NULL, -- 30, 60, 90
+    scheduled_at TIMESTAMP NOT NULL,
+    started_at TIMESTAMP,
+    ended_at TIMESTAMP,
+    status VARCHAR(20) DEFAULT 'scheduled', -- scheduled, in_progress, completed, cancelled, no_show
+    session_fee DECIMAL(10,2) NOT NULL,
+    coach_earnings DECIMAL(10,2) NOT NULL,
+    platform_fee DECIMAL(10,2) NOT NULL,
+    meeting_url VARCHAR(500),
+    meeting_id VARCHAR(100),
+    meeting_password VARCHAR(50),
+    notes TEXT,
+    coach_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Session Goals and Objectives
+CREATE TABLE session_goals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID NOT NULL REFERENCES coaching_sessions(id),
+    goal_title VARCHAR(255) NOT NULL,
+    goal_description TEXT,
+    target_amount DECIMAL(15,2),
+    target_date DATE,
+    is_achieved BOOLEAN DEFAULT false,
+    achieved_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Session Action Items and Follow-ups
+CREATE TABLE session_action_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID NOT NULL REFERENCES coaching_sessions(id),
+    action_title VARCHAR(255) NOT NULL,
+    action_description TEXT,
+    due_date DATE,
+    priority VARCHAR(20) DEFAULT 'medium', -- low, medium, high, urgent
+    status VARCHAR(20) DEFAULT 'pending', -- pending, in_progress, completed, cancelled
+    completed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User Progress Tracking
+CREATE TABLE user_progress (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    coach_id UUID NOT NULL REFERENCES coaches(id),
+    progress_type VARCHAR(50) NOT NULL, -- financial_goal, diva_improvement, savings_rate
+    baseline_value DECIMAL(15,2),
+    current_value DECIMAL(15,2),
+    target_value DECIMAL(15,2),
+    measurement_unit VARCHAR(20), -- currency, percentage, score
+    progress_percentage DECIMAL(5,2),
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Session Ratings and Reviews
+CREATE TABLE session_reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID NOT NULL REFERENCES coaching_sessions(id),
+    reviewer_id UUID NOT NULL REFERENCES users(id),
+    reviewer_type VARCHAR(20) NOT NULL, -- user, coach
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    review_text TEXT,
+    would_recommend BOOLEAN,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Masterclass Events
+CREATE TABLE masterclasses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    coach_id UUID NOT NULL REFERENCES coaches(id),
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    topic_category VARCHAR(100) NOT NULL,
+    max_participants INTEGER NOT NULL DEFAULT 50,
+    current_participants INTEGER DEFAULT 0,
+    scheduled_at TIMESTAMP NOT NULL,
+    duration_minutes INTEGER NOT NULL DEFAULT 60,
+    fee_per_participant DECIMAL(10,2) NOT NULL,
+    status VARCHAR(20) DEFAULT 'upcoming', -- upcoming, live, completed, cancelled
+    meeting_url VARCHAR(500),
+    recording_url VARCHAR(500),
+    is_recorded BOOLEAN DEFAULT true,
+    language VARCHAR(10) DEFAULT 'en',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Masterclass Registrations
+CREATE TABLE masterclass_registrations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    masterclass_id UUID NOT NULL REFERENCES masterclasses(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    registration_fee DECIMAL(10,2) NOT NULL,
+    payment_status VARCHAR(20) DEFAULT 'pending', -- pending, paid, failed, refunded
+    attended BOOLEAN DEFAULT false,
+    feedback_rating INTEGER CHECK (feedback_rating >= 1 AND feedback_rating <= 5),
+    feedback_text TEXT,
+    registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    UNIQUE(masterclass_id, user_id)
+);
+
+-- Coach Content Library
+CREATE TABLE coach_content (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    coach_id UUID NOT NULL REFERENCES coaches(id),
+    title VARCHAR(255) NOT NULL,
+    content_type VARCHAR(50) NOT NULL, -- article, video, template, calculator
+    description TEXT,
+    content_url VARCHAR(500),
+    file_size INTEGER, -- In bytes
+    duration_seconds INTEGER, -- For videos
+    language VARCHAR(10) DEFAULT 'en',
+    category VARCHAR(100) NOT NULL,
+    tags TEXT[],
+    is_premium BOOLEAN DEFAULT false,
+    access_price DECIMAL(10,2) DEFAULT 0,
+    download_count INTEGER DEFAULT 0,
+    rating_average DECIMAL(3,2) DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User Content Access
+CREATE TABLE user_content_access (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    content_id UUID NOT NULL REFERENCES coach_content(id),
+    access_granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    access_expires_at TIMESTAMP,
+    download_count INTEGER DEFAULT 0,
+    last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    UNIQUE(user_id, content_id)
+);
+
+-- Create indexes for performance
+CREATE INDEX idx_coaches_active_verified ON coaches(is_active, is_verified) WHERE is_active = true;
+CREATE INDEX idx_coach_availability_day_time ON coach_availability(day_of_week, start_time, end_time) WHERE is_active = true;
+CREATE INDEX idx_coaching_sessions_coach_date ON coaching_sessions(coach_id, scheduled_at);
+CREATE INDEX idx_coaching_sessions_user_status ON coaching_sessions(user_id, status);
+CREATE INDEX idx_masterclasses_scheduled ON masterclasses(scheduled_at, status) WHERE status = 'upcoming';
+CREATE INDEX idx_session_reviews_rating ON session_reviews(rating, created_at);
+CREATE INDEX idx_user_progress_user_coach ON user_progress(user_id, coach_id);
+```
+
+### 2. Coach Matching Service Implementation
+
+```typescript
+// src/services/coaching/coachMatchingService.ts
+import { Pool } from 'pg';
+import { CoachProfile, UserPreferences, MatchingResult } from '@/types/coaching';
+import { logger } from '@/lib/utils/logger';
+
+export class CoachMatchingService {
+  constructor(private db: Pool) {}
+
+  async findBestMatches(
+    userId: string,
+    preferences: UserPreferences,
+    maxResults: number = 5
+  ): Promise<MatchingResult[]> {
+    try {
+      const user = await this.getUserProfile(userId);
+      if (!user) {
+        throw new Error('User profile not found');
+      }
+
+      // Get available coaches based on preferences
+      const coaches = await this.getAvailableCoaches(preferences);
+      
+      // Calculate matching scores
+      const matches = coaches.map(coach => ({
+        coach,
+        score: this.calculateMatchingScore(user, coach, preferences),
+        reasons: this.getMatchingReasons(user, coach, preferences)
+      }));
+
+      // Sort by score and return top matches
+      return matches
+        .sort((a, b) => b.score - a.score)
+        .slice(0, maxResults);
+
+    } catch (error) {
+      logger.error('Error finding coach matches:', error);
+      throw new Error('Failed to find coach matches');
+    }
+  }
+
+  private async getUserProfile(userId: string): Promise<any> {
+    const query = `
+      SELECT 
+        u.*,
+        up.tier_name as portfolio_tier,
+        ds.overall_score as diva_score,
+        ds.risk_tolerance
+      FROM users u
+      LEFT JOIN user_portfolios up ON u.id = up.user_id
+      LEFT JOIN diva_scores ds ON u.id = ds.user_id
+      WHERE u.id = $1
+    `;
+    
+    const result = await this.db.query(query, [userId]);
+    return result.rows[0];
+  }
+
+  private async getAvailableCoaches(preferences: UserPreferences): Promise<CoachProfile[]> {
+    let query = `
+      SELECT 
+        c.*,
+        array_agg(DISTINCT cs.specialization) as specializations,
+        array_agg(DISTINCT cs.proficiency_level) as proficiency_levels,
+        COUNT(DISTINCT sess.id) as completed_sessions,
+        AVG(sr.rating) as average_rating
+      FROM coaches c
+      LEFT JOIN coach_specializations cs ON c.id = cs.coach_id
+      LEFT JOIN coaching_sessions sess ON c.id = sess.coach_id AND sess.status = 'completed'
+      LEFT JOIN session_reviews sr ON sess.id = sr.session_id AND sr.reviewer_type = 'user'
+      WHERE c.is_active = true AND c.is_verified = true
+    `;
+
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    // Filter by language preference
+    if (preferences.language) {
+      query += ` AND $${paramIndex} = ANY(c.languages)`;
+      params.push(preferences.language);
+      paramIndex++;
+    }
+
+    // Filter by country/region
+    if (preferences.country) {
+      query += ` AND $${paramIndex} = ANY(c.countries_served)`;
+      params.push(preferences.country);
+      paramIndex++;
+    }
+
+    // Filter by specialization
+    if (preferences.specialization) {
+      query += ` AND EXISTS (
+        SELECT 1 FROM coach_specializations cs2 
+        WHERE cs2.coach_id = c.id AND cs2.specialization = $${paramIndex}
+      )`;
+      params.push(preferences.specialization);
+      paramIndex++;
+    }
+
+    // Filter by budget range
+    if (preferences.maxHourlyRate) {
+      query += ` AND c.hourly_rate_60min <= $${paramIndex}`;
+      params.push(preferences.maxHourlyRate);
+      paramIndex++;
+    }
+
+    query += `
+      GROUP BY c.id
+      HAVING COUNT(DISTINCT sess.id) >= 0
+      ORDER BY c.rating_average DESC, c.total_sessions DESC
+      LIMIT 20
+    `;
+
+    const result = await this.db.query(query, params);
+    return result.rows;
+  }
+
+  private calculateMatchingScore(
+    user: any,
+    coach: CoachProfile,
+    preferences: UserPreferences
+  ): number {
+    let score = 0;
+    let maxScore = 0;
+
+    // Language match (20% weight)
+    maxScore += 20;
+    if (coach.languages.includes(preferences.language || user.preferred_language || 'English')) {
+      score += 20;
+    }
+
+    // Country/Region match (15% weight)
+    maxScore += 15;
+    if (coach.countries_served.includes(user.country)) {
+      score += 15;
+    }
+
+    // Specialization match (25% weight)
+    maxScore += 25;
+    if (preferences.specialization && coach.specializations.includes(preferences.specialization)) {
+      score += 25;
+    } else if (!preferences.specialization && coach.specializations.includes('general')) {
+      score += 15; // Partial match for general coaches
+    }
+
+    // Experience level match (15% weight)
+    maxScore += 15;
+    const userTierExperience = this.getTierExperienceRequirement(user.portfolio_tier);
+    if (coach.experience_years >= userTierExperience) {
+      score += 15;
+    } else {
+      score += Math.max(0, (coach.experience_years / userTierExperience) * 15);
+    }
+
+    // Rating and reviews (15% weight)
+    maxScore += 15;
+    if (coach.average_rating >= 4.5) {
+      score += 15;
+    } else if (coach.average_rating >= 4.0) {
+      score += 12;
+    } else if (coach.average_rating >= 3.5) {
+      score += 8;
+    }
+
+    // Availability match (10% weight)
+    maxScore += 10;
+    if (preferences.preferredTimeSlots) {
+      const availabilityMatch = this.checkAvailabilityMatch(coach, preferences.preferredTimeSlots);
+      score += availabilityMatch * 10;
+    } else {
+      score += 5; // Default partial score if no preference specified
+    }
+
+    // Return percentage score (0-100)
+    return maxScore > 0 ? (score / maxScore) * 100 : 0;
+  }
+
+  private getTierExperienceRequirement(tier: string): number {
+    switch (tier) {
+      case 'Bronze': return 1;
+      case 'Silver': return 2;
+      case 'Gold': return 3;
+      case 'Platinum': return 5;
+      default: return 1;
+    }
+  }
+
+  private checkAvailabilityMatch(coach: CoachProfile, preferredSlots: string[]): number {
+    // Simplified availability check - in real implementation, 
+    // this would check actual availability data
+    return 1.0; // 100% match for now
+  }
+
+  private getMatchingReasons(
+    user: any,
+    coach: CoachProfile,
+    preferences: UserPreferences
+  ): string[] {
+    const reasons: string[] = [];
+
+    if (coach.languages.includes(preferences.language || user.preferred_language)) {
+      reasons.push(`Speaks ${preferences.language || user.preferred_language}`);
+    }
+
+    if (coach.countries_served.includes(user.country)) {
+      reasons.push(`Serves ${user.country} market`);
+    }
+
+    if (preferences.specialization && coach.specializations.includes(preferences.specialization)) {
+      reasons.push(`Specializes in ${preferences.specialization}`);
+    }
+
+    if (coach.experience_years >= 5) {
+      reasons.push(`${coach.experience_years}+ years of experience`);
+    }
+
+    if (coach.average_rating >= 4.5) {
+      reasons.push(`Highly rated (${coach.average_rating.toFixed(1)}/5)`);
+    }
+
+    if (coach.total_sessions >= 100) {
+      reasons.push(`${coach.total_sessions}+ successful sessions`);
+    }
+
+    return reasons;
+  }
+
+  async bookCoachingSession(
+    userId: string,
+    coachId: string,
+    sessionDetails: {
+      scheduledAt: Date;
+      duration: number;
+      topic: string;
+      description?: string;
+    }
+  ): Promise<string> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Validate booking
+      await this.validateSessionBooking(userId, coachId, sessionDetails);
+
+      // Get coach rates
+      const coach = await this.getCoachById(coachId);
+      const sessionFee = this.calculateSessionFee(coach, sessionDetails.duration);
+      const coachEarnings = sessionFee * (1 - (coach.commission_rate / 100));
+      const platformFee = sessionFee - coachEarnings;
+
+      // Create session record
+      const sessionCode = await this.generateSessionCode();
+      const insertQuery = `
+        INSERT INTO coaching_sessions 
+        (session_code, coach_id, user_id, session_type, topic, description, 
+         duration_minutes, scheduled_at, session_fee, coach_earnings, platform_fee, status)
+        VALUES ($1, $2, $3, 'one_on_one', $4, $5, $6, $7, $8, $9, $10, 'scheduled')
+        RETURNING id
+      `;
+
+      const result = await client.query(insertQuery, [
+        sessionCode,
+        coachId,
+        userId,
+        sessionDetails.topic,
+        sessionDetails.description,
+        sessionDetails.duration,
+        sessionDetails.scheduledAt,
+        sessionFee,
+        coachEarnings,
+        platformFee
+      ]);
+
+      const sessionId = result.rows[0].id;
+
+      // Create meeting room
+      const meetingDetails = await this.createMeetingRoom(sessionId, sessionDetails.scheduledAt);
+      
+      // Update session with meeting details
+      await client.query(
+        'UPDATE coaching_sessions SET meeting_url = $1, meeting_id = $2, meeting_password = $3 WHERE id = $4',
+        [meetingDetails.url, meetingDetails.id, meetingDetails.password, sessionId]
+      );
+
+      // Process payment
+      await this.processSessionPayment(userId, sessionFee);
+
+      await client.query('COMMIT');
+
+      // Send notifications
+      await this.sendSessionConfirmation(userId, coachId, sessionId);
+
+      return sessionId;
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error booking coaching session:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async validateSessionBooking(
+    userId: string,
+    coachId: string,
+    sessionDetails: any
+  ): Promise<void> {
+    // Check coach availability
+    const availability = await this.checkCoachAvailability(coachId, sessionDetails.scheduledAt);
+    if (!availability.isAvailable) {
+      throw new Error('Coach is not available at the requested time');
+    }
+
+    // Check for existing sessions at the same time
+    const conflictQuery = `
+      SELECT id FROM coaching_sessions 
+      WHERE (coach_id = $1 OR user_id = $2) 
+      AND scheduled_at = $3 
+      AND status IN ('scheduled', 'in_progress')
+    `;
+
+    const conflicts = await this.db.query(conflictQuery, [
+      coachId, userId, sessionDetails.scheduledAt
+    ]);
+
+    if (conflicts.rows.length > 0) {
+      throw new Error('Time slot is already booked');
+    }
+
+    // Validate session timing (not in the past)
+    if (new Date(sessionDetails.scheduledAt) <= new Date()) {
+      throw new Error('Cannot book sessions in the past');
+    }
+
+    // Validate duration
+    const validDurations = [30, 60, 90];
+    if (!validDurations.includes(sessionDetails.duration)) {
+      throw new Error('Invalid session duration');
+    }
+  }
+
+  private async checkCoachAvailability(coachId: string, scheduledAt: Date): Promise<{
+    isAvailable: boolean;
+    reason?: string;
+  }> {
+    const dayOfWeek = scheduledAt.getDay();
+    const timeOfDay = scheduledAt.toTimeString().slice(0, 5); // HH:MM format
+
+    const query = `
+      SELECT * FROM coach_availability 
+      WHERE coach_id = $1 
+      AND day_of_week = $2 
+      AND start_time <= $3 
+      AND end_time > $3 
+      AND is_active = true
+    `;
+
+    const result = await this.db.query(query, [coachId, dayOfWeek, timeOfDay]);
+
+    if (result.rows.length === 0) {
+      return { isAvailable: false, reason: 'Coach not available at this time' };
+    }
+
+    return { isAvailable: true };
+  }
+
+  private calculateSessionFee(coach: CoachProfile, duration: number): number {
+    switch (duration) {
+      case 30: return coach.hourly_rate_30min;
+      case 60: return coach.hourly_rate_60min;
+      case 90: return coach.hourly_rate_90min;
+      default: throw new Error('Invalid session duration');
+    }
+  }
+
+  private async generateSessionCode(): Promise<string> {
+    const prefix = 'CS';
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `${prefix}${timestamp}${random}`;
+  }
+
+  private async createMeetingRoom(sessionId: string, scheduledAt: Date): Promise<{
+    url: string;
+    id: string;
+    password: string;
+  }> {
+    // This would integrate with Zoom SDK or custom WebRTC solution
+    // For now, return mock meeting details
+    const meetingId = `AWO-${sessionId.slice(0, 8)}`;
+    const password = Math.random().toString(36).substring(2, 8);
+    
+    return {
+      url: `https://meet.awo-platform.com/room/${meetingId}`,
+      id: meetingId,
+      password: password
+    };
+  }
+
+  private async processSessionPayment(userId: string, amount: number): Promise<void> {
+    // This would integrate with payment processing
+    // For now, simulate payment processing
+    logger.info(`Processing payment for user ${userId}: ${amount}`);
+  }
+
+  private async sendSessionConfirmation(
+    userId: string,
+    coachId: string,
+    sessionId: string
+  ): Promise<void> {
+    // Send confirmation emails/SMS to both user and coach
+    logger.info(`Sending session confirmation for session ${sessionId}`);
+  }
+
+  private async getCoachById(coachId: string): Promise<CoachProfile> {
+    const query = 'SELECT * FROM coaches WHERE id = $1';
+    const result = await this.db.query(query, [coachId]);
+    
+    if (result.rows.length === 0) {
+      throw new Error('Coach not found');
+    }
+
+    return result.rows[0];
+  }
+}
+```
+
+## Session Management Implementation
+
+### 3. Session Lifecycle Service
+
+```typescript
+// src/services/coaching/sessionManagementService.ts
+import { Pool } from 'pg';
+import { SessionStatus, SessionUpdate } from '@/types/coaching';
+import { logger } from '@/lib/utils/logger';
+import { SocketService } from '../realtime/socketService';
+
+export class SessionManagementService {
+  constructor(
+    private db: Pool,
+    private socketService: SocketService
+  ) {}
+
+  async startSession(sessionId: string, startedBy: 'coach' | 'user'): Promise<void> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Update session status
+      const updateQuery = `
+        UPDATE coaching_sessions 
+        SET 
+          status = 'in_progress',
+          started_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1 AND status = 'scheduled'
+        RETURNING *
+      `;
+
+      const result = await client.query(updateQuery, [sessionId]);
+      
+      if (result.rows.length === 0) {
+        throw new Error('Session not found or cannot be started');
+      }
+
+      const session = result.rows[0];
+
+      await client.query('COMMIT');
+
+      // Notify participants via WebSocket
+      await this.notifySessionUpdate(session, 'session_started');
+
+      logger.info(`Session ${sessionId} started by ${startedBy}`);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error starting session:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async endSession(sessionId: string, endedBy: 'coach' | 'user', notes?: string): Promise<void> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Calculate actual duration
+      const sessionQuery = `
+        SELECT *, 
+          EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at))/60 as actual_duration_minutes
+        FROM coaching_sessions 
+        WHERE id = $1
+      `;
+
+      const sessionResult = await client.query(sessionQuery, [sessionId]);
+      const session = sessionResult.rows[0];
+
+      if (!session) {
+        throw new Error('Session not found');
+      }
+
+      // Update session status
+      const updateQuery = `
+        UPDATE coaching_sessions 
+        SET 
+          status = 'completed',
+          ended_at = CURRENT_TIMESTAMP,
+          notes = COALESCE($2, notes),
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING *
+      `;
+
+      const result = await client.query(updateQuery, [sessionId, notes]);
+      const completedSession = result.rows[0];
+
+      // Update coach statistics
+      await this.updateCoachStats(session.coach_id, session.coach_earnings);
+
+      await client.query('COMMIT');
+
+      // Notify participants
+      await this.notifySessionUpdate(completedSession, 'session_ended');
+
+      // Send follow-up tasks
+      await this.sendSessionFollowUp(sessionId);
+
+      logger.info(`Session ${sessionId} ended by ${endedBy}`);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error ending session:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async addSessionGoals(sessionId: string, goals: Array<{
+    title: string;
+    description: string;
+    targetAmount?: number;
+    targetDate?: Date;
+  }>): Promise<void> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      for (const goal of goals) {
+        const insertQuery = `
+          INSERT INTO session_goals 
+          (session_id, goal_title, goal_description, target_amount, target_date)
+          VALUES ($1, $2, $3, $4, $5)
+        `;
+
+        await client.query(insertQuery, [
+          sessionId,
+          goal.title,
+          goal.description,
+          goal.targetAmount,
+          goal.targetDate
+        ]);
+      }
+
+      await client.query('COMMIT');
+
+      // Notify user of new goals
+      await this.notifyGoalsAdded(sessionId, goals);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error adding session goals:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async addActionItems(sessionId: string, actionItems: Array<{
+    title: string;
+    description: string;
+    dueDate?: Date;
+    priority: 'low' | 'medium' | 'high' | 'urgent';
+  }>): Promise<void> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      for (const item of actionItems) {
+        const insertQuery = `
+          INSERT INTO session_action_items 
+          (session_id, action_title, action_description, due_date, priority)
+          VALUES ($1, $2, $3, $4, $5)
+        `;
+
+        await client.query(insertQuery, [
+          sessionId,
+          item.title,
+          item.description,
+          item.dueDate,
+          item.priority
+        ]);
+      }
+
+      await client.query('COMMIT');
+
+      // Schedule reminder notifications
+      await this.scheduleActionItemReminders(sessionId, actionItems);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error adding action items:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async submitSessionReview(
+    sessionId: string,
+    reviewerId: string,
+    reviewerType: 'user' | 'coach',
+    review: {
+      rating: number;
+      reviewText: string;
+      wouldRecommend: boolean;
+    }
+  ): Promise<void> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Insert review
+      const insertQuery = `
+        INSERT INTO session_reviews 
+        (session_id, reviewer_id, reviewer_type, rating, review_text, would_recommend)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `;
+
+      await client.query(insertQuery, [
+        sessionId,
+        reviewerId,
+        reviewerType,
+        review.rating,
+        review.reviewText,
+        review.wouldRecommend
+      ]);
+
+      // Update coach average rating if review is from user
+      if (reviewerType === 'user') {
+        await this.updateCoachRating(sessionId);
+      }
+
+      await client.query('COMMIT');
+
+      logger.info(`Review submitted for session ${sessionId} by ${reviewerType} ${reviewerId}`);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error submitting session review:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async rescheduleSession(
+    sessionId: string,
+    newScheduledAt: Date,
+    requestedBy: 'user' | 'coach',
+    reason?: string
+  ): Promise<void> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Validate new time slot
+      const session = await this.getSessionById(sessionId);
+      if (!session) {
+        throw new Error('Session not found');
+      }
+
+      await this.validateReschedule(session, newScheduledAt, requestedBy);
+
+      // Update session time
+      const updateQuery = `
+        UPDATE coaching_sessions 
+        SET 
+          scheduled_at = $1,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+        RETURNING *
+      `;
+
+      const result = await client.query(updateQuery, [newScheduledAt, sessionId]);
+      const updatedSession = result.rows[0];
+
+      // Update meeting room if needed
+      await this.updateMeetingRoom(sessionId, newScheduledAt);
+
+      await client.query('COMMIT');
+
+      // Notify both parties
+      await this.notifyReschedule(updatedSession, requestedBy, reason);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error rescheduling session:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  private async updateCoachStats(coachId: string, earnings: number): Promise<void> {
+    const updateQuery = `
+      UPDATE coaches 
+      SET 
+        total_sessions = total_sessions + 1,
+        total_earnings = total_earnings + $1,
+        last_active = CURRENT_TIMESTAMP
+      WHERE id = $2
+    `;
+
+    await this.db.query(updateQuery, [earnings, coachId]);
+  }
+
+  private async updateCoachRating(sessionId: string): Promise<void> {
+    const query = `
+      UPDATE coaches 
+      SET rating_average = (
+        SELECT AVG(sr.rating)::DECIMAL(3,2)
+        FROM session_reviews sr
+        JOIN coaching_sessions cs ON sr.session_id = cs.id
+        WHERE cs.coach_id = coaches.id 
+        AND sr.reviewer_type = 'user'
+      )
+      WHERE id = (
+        SELECT coach_id FROM coaching_sessions WHERE id = $1
+      )
+    `;
+
+    await this.db.query(query, [sessionId]);
+  }
+
+  private async notifySessionUpdate(session: any, eventType: string): Promise<void> {
+    // Send real-time updates via WebSocket
+    this.socketService.emitToUser(session.user_id, 'session_update', {
+      sessionId: session.id,
+      eventType,
+      session
+    });
+
+    this.socketService.emitToUser(session.coach_id, 'session_update', {
+      sessionId: session.id,
+      eventType,
+      session
+    });
+  }
+
+  private async sendSessionFollowUp(sessionId: string): Promise<void> {
+    // Send follow-up emails with session summary and action items
+    logger.info(`Sending session follow-up for ${sessionId}`);
+  }
+
+  private async notifyGoalsAdded(sessionId: string, goals: any[]): Promise<void> {
+    logger.info(`Goals added to session ${sessionId}:`, goals.length);
+  }
+
+  private async scheduleActionItemReminders(sessionId: string, actionItems: any[]): Promise<void> {
+    // Schedule reminder notifications for action items
+    logger.info(`Scheduled ${actionItems.length} action item reminders for session ${sessionId}`);
+  }
+
+  private async getSessionById(sessionId: string): Promise<any> {
+    const query = 'SELECT * FROM coaching_sessions WHERE id = $1';
+    const result = await this.db.query(query, [sessionId]);
+    return result.rows[0];
+  }
+
+  private async validateReschedule(
+    session: any,
+    newTime: Date,
+    requestedBy: string
+  ): Promise<void> {
+    // Validate reschedule rules (e.g., minimum notice period)
+    const currentTime = new Date();
+    const originalTime = new Date(session.scheduled_at);
+    const timeDiff = originalTime.getTime() - currentTime.getTime();
+    const hoursUntilSession = timeDiff / (1000 * 60 * 60);
+
+    if (hoursUntilSession < 24) {
+      throw new Error('Cannot reschedule sessions with less than 24 hours notice');
+    }
+
+    // Check new time slot availability
+    const availability = await this.checkTimeSlotAvailability(
+      session.coach_id,
+      session.user_id,
+      newTime
+    );
+
+    if (!availability.isAvailable) {
+      throw new Error('New time slot is not available');
+    }
+  }
+
+  private async checkTimeSlotAvailability(
+    coachId: string,
+    userId: string,
+    scheduledAt: Date
+  ): Promise<{ isAvailable: boolean }> {
+    const query = `
+      SELECT id FROM coaching_sessions 
+      WHERE (coach_id = $1 OR user_id = $2) 
+      AND scheduled_at = $3 
+      AND status IN ('scheduled', 'in_progress')
+    `;
+
+    const result = await this.db.query(query, [coachId, userId, scheduledAt]);
+    return { isAvailable: result.rows.length === 0 };
+  }
+
+  private async updateMeetingRoom(sessionId: string, newTime: Date): Promise<void> {
+    // Update meeting room booking for new time
+    logger.info(`Updating meeting room for session ${sessionId} to ${newTime}`);
+  }
+
+  private async notifyReschedule(session: any, requestedBy: string, reason?: string): Promise<void> {
+    // Send reschedule notifications
+    logger.info(`Session ${session.id} rescheduled by ${requestedBy}`);
+  }
+}
+```
+
+## Masterclass Implementation
+
+### 4. Masterclass Management Service
+
+```typescript
+// src/services/coaching/masterclassService.ts
+import { Pool } from 'pg';
+import { MasterclassEvent, Registration } from '@/types/coaching';
+import { logger } from '@/lib/utils/logger';
+
+export class MasterclassService {
+  constructor(private db: Pool) {}
+
+  async createMasterclass(
+    coachId: string,
+    masterclassData: {
+      title: string;
+      description: string;
+      topic: string;
+      scheduledAt: Date;
+      duration: number;
+      maxParticipants: number;
+      feePerParticipant: number;
+      language: string;
+    }
+  ): Promise<string> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Validate coach permissions
+      await this.validateCoachMasterclassPermissions(coachId);
+
+      // Create masterclass
+      const insertQuery = `
+        INSERT INTO masterclasses 
+        (coach_id, title, description, topic_category, scheduled_at, 
+         duration_minutes, max_participants, fee_per_participant, language)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING id
+      `;
+
+      const result = await client.query(insertQuery, [
+        coachId,
+        masterclassData.title,
+        masterclassData.description,
+        masterclassData.topic,
+        masterclassData.scheduledAt,
+        masterclassData.duration,
+        masterclassData.maxParticipants,
+        masterclassData.feePerParticipant,
+        masterclassData.language
+      ]);
+
+      const masterclassId = result.rows[0].id;
+
+      // Create meeting room for masterclass
+      await this.createMasterclassMeeting(masterclassId, masterclassData.scheduledAt);
+
+      await client.query('COMMIT');
+
+      // Send creation confirmation
+      await this.sendMasterclassCreationConfirmation(coachId, masterclassId);
+
+      return masterclassId;
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error creating masterclass:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async registerForMasterclass(
+    userId: string,
+    masterclassId: string
+  ): Promise<string> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Validate registration
+      await this.validateMasterclassRegistration(userId, masterclassId);
+
+      // Get masterclass details
+      const masterclass = await this.getMasterclassById(masterclassId);
+      if (!masterclass) {
+        throw new Error('Masterclass not found');
+      }
+
+      // Check capacity
+      if (masterclass.current_participants >= masterclass.max_participants) {
+        throw new Error('Masterclass is full');
+      }
+
+      // Create registration
+      const insertQuery = `
+        INSERT INTO masterclass_registrations 
+        (masterclass_id, user_id, registration_fee, payment_status)
+        VALUES ($1, $2, $3, 'pending')
+        RETURNING id
+      `;
+
+      const result = await client.query(insertQuery, [
+        masterclassId,
+        userId,
+        masterclass.fee_per_participant
+      ]);
+
+      const registrationId = result.rows[0].id;
+
+      // Process payment
+      await this.processMasterclassPayment(userId, masterclass.fee_per_participant);
+
+      // Update payment status
+      await client.query(
+        'UPDATE masterclass_registrations SET payment_status = $1 WHERE id = $2',
+        ['paid', registrationId]
+      );
+
+      // Update participant count
+      await client.query(
+        'UPDATE masterclasses SET current_participants = current_participants + 1 WHERE id = $1',
+        [masterclassId]
+      );
+
+      await client.query('COMMIT');
+
+      // Send confirmation
+      await this.sendRegistrationConfirmation(userId, masterclassId);
+
+      return registrationId;
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error registering for masterclass:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getUpcomingMasterclasses(
+    filters?: {
+      topic?: string;
+      language?: string;
+      maxFee?: number;
+      coachId?: string;
+    }
+  ): Promise<MasterclassEvent[]> {
+    let query = `
+      SELECT 
+        m.*,
+        c.display_name as coach_name,
+        c.profile_image_url as coach_image,
+        c.rating_average as coach_rating,
+        (m.max_participants - m.current_participants) as available_spots
+      FROM masterclasses m
+      JOIN coaches c ON m.coach_id = c.id
+      WHERE m.status = 'upcoming' 
+      AND m.scheduled_at > CURRENT_TIMESTAMP
+    `;
+
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (filters?.topic) {
+      query += ` AND m.topic_category ILIKE $${paramIndex}`;
+      params.push(`%${filters.topic}%`);
+      paramIndex++;
+    }
+
+    if (filters?.language) {
+      query += ` AND m.language = $${paramIndex}`;
+      params.push(filters.language);
+      paramIndex++;
+    }
+
+    if (filters?.maxFee) {
+      query += ` AND m.fee_per_participant <= $${paramIndex}`;
+      params.push(filters.maxFee);
+      paramIndex++;
+    }
+
+    if (filters?.coachId) {
+      query += ` AND m.coach_id = $${paramIndex}`;
+      params.push(filters.coachId);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY m.scheduled_at ASC, m.fee_per_participant ASC`;
+
+    const result = await this.db.query(query, params);
+    return result.rows;
+  }
+
+  async startMasterclass(masterclassId: string): Promise<void> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Update status to live
+      const updateQuery = `
+        UPDATE masterclasses 
+        SET status = 'live', updated_at = CURRENT_TIMESTAMP 
+        WHERE id = $1 AND status = 'upcoming'
+        RETURNING *
+      `;
+
+      const result = await client.query(updateQuery, [masterclassId]);
+      
+      if (result.rows.length === 0) {
+        throw new Error('Masterclass not found or cannot be started');
+      }
+
+      const masterclass = result.rows[0];
+
+      await client.query('COMMIT');
+
+      // Notify all registered participants
+      await this.notifyMasterclassStart(masterclassId);
+
+      logger.info(`Masterclass ${masterclassId} started`);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error starting masterclass:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async endMasterclass(
+    masterclassId: string,
+    recordingUrl?: string
+  ): Promise<void> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Update status to completed
+      const updateQuery = `
+        UPDATE masterclasses 
+        SET 
+          status = 'completed',
+          recording_url = $2,
+          updated_at = CURRENT_TIMESTAMP 
+        WHERE id = $1 AND status = 'live'
+        RETURNING *
+      `;
+
+      const result = await client.query(updateQuery, [masterclassId, recordingUrl]);
+      const masterclass = result.rows[0];
+
+      if (!masterclass) {
+        throw new Error('Masterclass not found or not currently live');
+      }
+
+      // Calculate coach earnings
+      const totalRevenue = masterclass.current_participants * masterclass.fee_per_participant;
+      const coachEarnings = totalRevenue * 0.85; // 85% to coach, 15% platform fee
+
+      // Update coach earnings
+      await client.query(
+        'UPDATE coaches SET total_earnings = total_earnings + $1 WHERE id = $2',
+        [coachEarnings, masterclass.coach_id]
+      );
+
+      await client.query('COMMIT');
+
+      // Send completion notifications
+      await this.sendMasterclassCompletion(masterclassId, recordingUrl);
+
+      logger.info(`Masterclass ${masterclassId} completed`);
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error ending masterclass:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async submitMasterclassFeedback(
+    registrationId: string,
+    feedback: {
+      rating: number;
+      feedbackText: string;
+      attended: boolean;
+    }
+  ): Promise<void> {
+    const updateQuery = `
+      UPDATE masterclass_registrations 
+      SET 
+        feedback_rating = $1,
+        feedback_text = $2,
+        attended = $3
+      WHERE id = $4
+    `;
+
+    await this.db.query(updateQuery, [
+      feedback.rating,
+      feedback.feedbackText,
+      feedback.attended,
+      registrationId
+    ]);
+
+    logger.info(`Feedback submitted for registration ${registrationId}`);
+  }
+
+  private async validateCoachMasterclassPermissions(coachId: string): Promise<void> {
+    const query = `
+      SELECT is_active, is_verified, experience_years 
+      FROM coaches 
+      WHERE id = $1
+    `;
+
+    const result = await this.db.query(query, [coachId]);
+    const coach = result.rows[0];
+
+    if (!coach) {
+      throw new Error('Coach not found');
+    }
+
+    if (!coach.is_active || !coach.is_verified) {
+      throw new Error('Coach must be active and verified to create masterclasses');
+    }
+
+    if (coach.experience_years < 2) {
+      throw new Error('Coach must have at least 2 years of experience to create masterclasses');
+    }
+  }
+
+  private async validateMasterclassRegistration(
+    userId: string,
+    masterclassId: string
+  ): Promise<void> {
+    // Check if user already registered
+    const existingQuery = `
+      SELECT id FROM masterclass_registrations 
+      WHERE user_id = $1 AND masterclass_id = $2
+    `;
+
+    const existing = await this.db.query(existingQuery, [userId, masterclassId]);
+    if (existing.rows.length > 0) {
+      throw new Error('User already registered for this masterclass');
+    }
+
+    // Check if masterclass is still upcoming
+    const masterclassQuery = `
+      SELECT status, scheduled_at FROM masterclasses WHERE id = $1
+    `;
+
+    const masterclassResult = await this.db.query(masterclassQuery, [masterclassId]);
+    const masterclass = masterclassResult.rows[0];
+
+    if (!masterclass) {
+      throw new Error('Masterclass not found');
+    }
+
+    if (masterclass.status !== 'upcoming') {
+      throw new Error('Masterclass is no longer accepting registrations');
+    }
+
+    if (new Date(masterclass.scheduled_at) <= new Date()) {
+      throw new Error('Cannot register for past masterclasses');
+    }
+  }
+
+  private async getMasterclassById(masterclassId: string): Promise<any> {
+    const query = 'SELECT * FROM masterclasses WHERE id = $1';
+    const result = await this.db.query(query, [masterclassId]);
+    return result.rows[0];
+  }
+
+  private async createMasterclassMeeting(
+    masterclassId: string,
+    scheduledAt: Date
+  ): Promise<void> {
+    // Create large meeting room for masterclass
+    const meetingId = `AWO-MC-${masterclassId.slice(0, 8)}`;
+    const meetingUrl = `https://meet.awo-platform.com/masterclass/${meetingId}`;
+
+    await this.db.query(
+      'UPDATE masterclasses SET meeting_url = $1 WHERE id = $2',
+      [meetingUrl, masterclassId]
+    );
+  }
+
+  private async processMasterclassPayment(
+    userId: string,
+    amount: number
+  ): Promise<void> {
+    // Process payment for masterclass registration
+    logger.info(`Processing masterclass payment for user ${userId}: ${amount}`);
+  }
+
+  private async sendRegistrationConfirmation(
+    userId: string,
+    masterclassId: string
+  ): Promise<void> {
+    // Send registration confirmation
+    logger.info(`Sending registration confirmation for masterclass ${masterclassId} to user ${userId}`);
+  }
+
+  private async sendMasterclassCreationConfirmation(
+    coachId: string,
+    masterclassId: string
+  ): Promise<void> {
+    // Send creation confirmation to coach
+    logger.info(`Masterclass ${masterclassId} created by coach ${coachId}`);
+  }
+
+  private async notifyMasterclassStart(masterclassId: string): Promise<void> {
+    // Get all registered participants
+    const participantsQuery = `
+      SELECT mr.user_id 
+      FROM masterclass_registrations mr 
+      WHERE mr.masterclass_id = $1 AND mr.payment_status = 'paid'
+    `;
+
+    const participants = await this.db.query(participantsQuery, [masterclassId]);
+
+    // Send start notifications to all participants
+    for (const participant of participants.rows) {
+      // Send notification (email, SMS, push)
+      logger.info(`Notifying user ${participant.user_id} of masterclass start`);
+    }
+  }
+
+  private async sendMasterclassCompletion(
+    masterclassId: string,
+    recordingUrl?: string
+  ): Promise<void> {
+    // Send completion notifications with recording link
+    logger.info(`Masterclass ${masterclassId} completed. Recording: ${recordingUrl}`);
+  }
+}
+```
+
+## Frontend Implementation
+
+### 5. Coach Discovery and Booking Components
+
+```typescript
+// src/components/coaching/CoachDiscovery.tsx
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar, Clock, Star, Users, Globe, MessageCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useCoachingStore } from '@/store/coaching';
+import { CoachProfile, UserPreferences } from '@/types/coaching';
+import { formatCurrency } from '@/lib/utils/currency';
+
+interface CoachDiscoveryProps {
+  userId: string;
+}
+
+export function CoachDiscovery({ userId }: CoachDiscoveryProps) {
+  const [selectedCoach, setSelectedCoach] = useState&lt;CoachProfile | null>(null);
+  const [preferences, setPreferences] = useState&lt;UserPreferences>({
+    language: 'English',
+    specialization: '',
+    maxHourlyRate: 1000,
+    country: 'ZA'
+  });
+
+  const { 
+    coaches, 
+    isLoading, 
+    findCoaches, 
+    bookSession 
+  } = useCoachingStore();
+
+  useEffect(() => {
+    findCoaches(preferences);
+  }, [preferences, findCoaches]);
+
+  const handleSearch = () => {
+    findCoaches(preferences);
+  };
+
+  const handleBooking = async (coachId: string, sessionDetails: any) => {
+    try {
+      await bookSession(userId, coachId, sessionDetails);
+      setSelectedCoach(null);
+    } catch (error) {
+      console.error('Booking failed:', error);
+    }
+  };
+
+  return (
+    &lt;div className="space-y-6">
+      {/* Search Filters */}
+      &lt;Card>
+        &lt;CardHeader>
+          &lt;CardTitle>Find Your Perfect Coach&lt;/CardTitle>
+          &lt;p className="text-sm text-muted-foreground">
+            Get personalized financial guidance from certified coaches across Africa
+          &lt;/p>
+        &lt;/CardHeader>
+        &lt;CardContent className="space-y-4">
+          &lt;div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            &lt;Select 
+              value={preferences.specialization} 
+              onValueChange={(value) => setPreferences({...preferences, specialization: value})}
+            >
+              &lt;SelectTrigger>
+                &lt;SelectValue placeholder="Specialization" />
+              &lt;/SelectTrigger>
+              &lt;SelectContent>
+                &lt;SelectItem value="">All Specializations&lt;/SelectItem>
+                &lt;SelectItem value="budgeting">Budgeting&lt;/SelectItem>
+                &lt;SelectItem value="investing">Investing&lt;/SelectItem>
+                &lt;SelectItem value="retirement">Retirement Planning&lt;/SelectItem>
+                &lt;SelectItem value="sme_funding">SME Funding&lt;/SelectItem>
+                &lt;SelectItem value="debt_management">Debt Management&lt;/SelectItem>
+              &lt;/SelectContent>
+            &lt;/Select>
+
+            &lt;Select 
+              value={preferences.language} 
+              onValueChange={(value) => setPreferences({...preferences, language: value})}
+            >
+              &lt;SelectTrigger>
+                &lt;SelectValue placeholder="Language" />
+              &lt;/SelectTrigger>
+              &lt;SelectContent>
+                &lt;SelectItem value="English">English&lt;/SelectItem>
+                &lt;SelectItem value="Afrikaans">Afrikaans&lt;/SelectItem>
+                &lt;SelectItem value="Portuguese">Portuguese&lt;/SelectItem>
+                &lt;SelectItem value="French">French&lt;/SelectItem>
+              &lt;/SelectContent>
+            &lt;/Select>
+
+            &lt;Input
+              type="number"
+              placeholder="Max hourly rate (ZAR)"
+              value={preferences.maxHourlyRate}
+              onChange={(e) => setPreferences({...preferences, maxHourlyRate: parseInt(e.target.value)})}
+            />
+
+            &lt;Button onClick={handleSearch} className="w-full">
+              Search Coaches
+            &lt;/Button>
+          &lt;/div>
+        &lt;/CardContent>
+      &lt;/Card>
+
+      {/* Coach Results */}
+      {isLoading ? (
+        &lt;div className="flex items-center justify-center h-32">
+          Loading coaches...
+        &lt;/div>
+      ) : (
+        &lt;div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {coaches.map((match) => (
+            &lt;Card key={match.coach.id} className="hover:shadow-lg transition-shadow">
+              &lt;CardHeader className="pb-4">
+                &lt;div className="flex items-center space-x-4">
+                  &lt;Avatar className="h-12 w-12">
+                    &lt;AvatarImage src={match.coach.profile_image_url} />
+                    &lt;AvatarFallback>
+                      {match.coach.display_name.split(' ').map(n => n[0]).join('')}
+                    &lt;/AvatarFallback>
+                  &lt;/Avatar>
+                  &lt;div className="flex-1">
+                    &lt;h3 className="font-semibold">{match.coach.display_name}&lt;/h3>
+                    &lt;div className="flex items-center text-sm text-muted-foreground">
+                      &lt;Star className="h-3 w-3 fill-yellow-400 text-yellow-400 mr-1" />
+                      {match.coach.rating_average.toFixed(1)} ({match.coach.total_sessions} sessions)
+                    &lt;/div>
+                  &lt;/div>
+                &lt;/div>
+                
+                &lt;div className="flex items-center justify-between text-sm">
+                  &lt;div className="flex items-center text-muted-foreground">
+                    &lt;Globe className="h-3 w-3 mr-1" />
+                    {match.coach.languages.join(', ')}
+                  &lt;/div>
+                  &lt;Badge variant="outline" className="text-xs">
+                    {Math.round(match.score)}% match
+                  &lt;/Badge>
+                &lt;/div>
+              &lt;/CardHeader>
+
+              &lt;CardContent className="space-y-4">
+                &lt;p className="text-sm text-muted-foreground line-clamp-3">
+                  {match.coach.bio}
+                &lt;/p>
+
+                &lt;div className="space-y-2">
+                  &lt;div className="flex flex-wrap gap-1">
+                    {match.coach.specializations.slice(0, 3).map((spec, index) => (
+                      &lt;Badge key={index} variant="secondary" className="text-xs">
+                        {spec}
+                      &lt;/Badge>
+                    ))}
+                  &lt;/div>
+
+                  &lt;div className="text-sm">
+                    &lt;span className="text-muted-foreground">From: &lt;/span>
+                    &lt;span className="font-medium">
+                      {formatCurrency(match.coach.hourly_rate_30min, 'ZAR')}/30min
+                    &lt;/span>
+                  &lt;/div>
+                &lt;/div>
+
+                &lt;div className="space-y-2">
+                  &lt;h4 className="text-sm font-medium">Why this match:&lt;/h4>
+                  &lt;ul className="text-xs text-muted-foreground space-y-1">
+                    {match.reasons.slice(0, 3).map((reason, index) => (
+                      &lt;li key={index}>• {reason}&lt;/li>
+                    ))}
+                  &lt;/ul>
+                &lt;/div>
+
+                &lt;Dialog>
+                  &lt;DialogTrigger asChild>
+                    &lt;Button 
+                      className="w-full" 
+                      onClick={() => setSelectedCoach(match.coach)}
+                    >
+                      Book Session
+                    &lt;/Button>
+                  &lt;/DialogTrigger>
+                  &lt;DialogContent className="sm:max-w-[500px]">
+                    &lt;DialogHeader>
+                      &lt;DialogTitle>Book Session with {selectedCoach?.display_name}&lt;/DialogTitle>
+                    &lt;/DialogHeader>
+                    {selectedCoach && (
+                      &lt;SessionBookingForm 
+                        coach={selectedCoach}
+                        onBook={handleBooking}
+                        onCancel={() => setSelectedCoach(null)}
+                      />
+                    )}
+                  &lt;/DialogContent>
+                &lt;/Dialog>
+              &lt;/CardContent>
+            &lt;/Card>
+          ))}
+        &lt;/div>
+      )}
+
+      {coaches.length === 0 && !isLoading && (
+        &lt;Card>
+          &lt;CardContent className="text-center py-8">
+            &lt;Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            &lt;h3 className="text-lg font-semibold mb-2">No coaches found&lt;/h3>
+            &lt;p className="text-muted-foreground mb-4">
+              Try adjusting your search criteria to find more coaches
+            &lt;/p>
+            &lt;Button variant="outline" onClick={() => setPreferences({
+              language: 'English',
+              specialization: '',
+              maxHourlyRate: 1000,
+              country: 'ZA'
+            })}>
+              Reset Filters
+            &lt;/Button>
+          &lt;/CardContent>
+        &lt;/Card>
+      )}
+    &lt;/div>
+  );
+}
+
+// Session Booking Form Component
+interface SessionBookingFormProps {
+  coach: CoachProfile;
+  onBook: (coachId: string, details: any) => void;
+  onCancel: () => void;
+}
+
+function SessionBookingForm({ coach, onBook, onCancel }: SessionBookingFormProps) {
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedTime, setSelectedTime] = useState('');
+  const [duration, setDuration] = useState(60);
+  const [topic, setTopic] = useState('');
+  const [description, setDescription] = useState('');
+
+  const sessionFee = duration === 30 ? coach.hourly_rate_30min :
+                   duration === 60 ? coach.hourly_rate_60min :
+                   coach.hourly_rate_90min;
+
+  const handleSubmit = () => {
+    const scheduledAt = new Date(`${selectedDate}T${selectedTime}`);
+    
+    onBook(coach.id, {
+      scheduledAt,
+      duration,
+      topic,
+      description
+    });
+  };
+
+  return (
+    &lt;div className="space-y-4 py-4">
+      &lt;div className="grid grid-cols-2 gap-4">
+        &lt;div>
+          &lt;label className="text-sm font-medium">Date&lt;/label>
+          &lt;Input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            min={new Date().toISOString().split('T')[0]}
+          />
+        &lt;/div>
+        &lt;div>
+          &lt;label className="text-sm font-medium">Time&lt;/label>
+          &lt;Input
+            type="time"
+            value={selectedTime}
+            onChange={(e) => setSelectedTime(e.target.value)}
+          />
+        &lt;/div>
+      &lt;/div>
+
+      &lt;div>
+        &lt;label className="text-sm font-medium">Duration&lt;/label>
+        &lt;Select value={duration.toString()} onValueChange={(value) => setDuration(parseInt(value))}>
+          &lt;SelectTrigger>
+            &lt;SelectValue />
+          &lt;/SelectTrigger>
+          &lt;SelectContent>
+            &lt;SelectItem value="30">30 minutes - {formatCurrency(coach.hourly_rate_30min, 'ZAR')}&lt;/SelectItem>
+            &lt;SelectItem value="60">60 minutes - {formatCurrency(coach.hourly_rate_60min, 'ZAR')}&lt;/SelectItem>
+            &lt;SelectItem value="90">90 minutes - {formatCurrency(coach.hourly_rate_90min, 'ZAR')}&lt;/SelectItem>
+          &lt;/SelectContent>
+        &lt;/Select>
+      &lt;/div>
+
+      &lt;div>
+        &lt;label className="text-sm font-medium">Session Topic&lt;/label>
+        &lt;Input
+          placeholder="What would you like to focus on?"
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+        />
+      &lt;/div>
+
+      &lt;div>
+        &lt;label className="text-sm font-medium">Additional Details&lt;/label>
+        &lt;textarea
+          className="w-full p-2 border rounded-md resize-none"
+          rows={3}
+          placeholder="Any specific goals or questions you'd like to discuss?"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      &lt;/div>
+
+      &lt;div className="border-t pt-4">
+        &lt;div className="flex justify-between items-center mb-4">
+          &lt;span className="font-medium">Session Fee:&lt;/span>
+          &lt;span className="text-lg font-bold">{formatCurrency(sessionFee, 'ZAR')}&lt;/span>
+        &lt;/div>
+        
+        &lt;div className="flex gap-3">
+          &lt;Button variant="outline" onClick={onCancel} className="flex-1">
+            Cancel
+          &lt;/Button>
+          &lt;Button 
+            onClick={handleSubmit} 
+            className="flex-1"
+            disabled={!selectedDate || !selectedTime || !topic}
+          >
+            Book Session
+          &lt;/Button>
+        &lt;/div>
+      &lt;/div>
+    &lt;/div>
+  );
+}
+```
+
+## Testing Implementation
+
+### 6. Coaching Service Tests
+
+```typescript
+// src/services/__tests__/coachMatchingService.test.ts
+import { CoachMatchingService } from '../coaching/coachMatchingService';
+import { mockDB } from '../../__mocks__/database';
+import { UserPreferences } from '@/types/coaching';
+
+describe('CoachMatchingService', () => {
+  let coachMatchingService: CoachMatchingService;
+
+  beforeEach(() => {
+    coachMatchingService = new CoachMatchingService(mockDB);
+    jest.clearAllMocks();
+  });
+
+  describe('findBestMatches', () => {
+    it('should find coaches matching user preferences', async () => {
+      const mockUser = {
+        id: 'user-1',
+        country: 'ZA',
+        preferred_language: 'English',
+        portfolio_tier: 'Gold',
+        diva_score: 700
+      };
+
+      const mockCoaches = [
+        {
+          id: 'coach-1',
+          display_name: 'Sarah Johnson',
+          languages: ['English', 'Afrikaans'],
+          countries_served: ['ZA', 'BW'],
+          specializations: ['investing', 'retirement'],
+          experience_years: 5,
+          rating_average: 4.8,
+          hourly_rate_60min: 500
+        }
+      ];
+
+      const preferences: UserPreferences = {
+        language: 'English',
+        country: 'ZA',
+        specialization: 'investing',
+        maxHourlyRate: 600
+      };
+
+      mockDB.query
+        .mockResolvedValueOnce({ rows: [mockUser] }) // getUserProfile
+        .mockResolvedValueOnce({ rows: mockCoaches }); // getAvailableCoaches
+
+      const matches = await coachMatchingService.findBestMatches('user-1', preferences, 5);
+
+      expect(matches).toHaveLength(1);
+      expect(matches[0].coach.id).toBe('coach-1');
+      expect(matches[0].score).toBeGreaterThan(80); // High match score
+      expect(matches[0].reasons).toContain('Speaks English');
+      expect(matches[0].reasons).toContain('Serves ZA market');
+    });
+
+    it('should prioritize coaches by matching score', async () => {
+      const mockUser = {
+        id: 'user-1',
+        country: 'ZA',
+        preferred_language: 'English',
+        portfolio_tier: 'Silver'
+      };
+
+      const mockCoaches = [
+        {
+          id: 'coach-1',
+          languages: ['English'],
+          countries_served: ['ZA'],
+          specializations: ['budgeting'],
+          experience_years: 2,
+          rating_average: 4.0
+        },
+        {
+          id: 'coach-2',
+          languages: ['English', 'Afrikaans'],
+          countries_served: ['ZA', 'BW'],
+          specializations: ['investing', 'budgeting'],
+          experience_years: 8,
+          rating_average: 4.9
+        }
+      ];
+
+      const preferences: UserPreferences = {
+        language: 'English',
+        country: 'ZA',
+        specialization: 'investing'
+      };
+
+      mockDB.query
+        .mockResolvedValueOnce({ rows: [mockUser] })
+        .mockResolvedValueOnce({ rows: mockCoaches });
+
+      const matches = await coachMatchingService.findBestMatches('user-1', preferences, 5);
+
+      expect(matches).toHaveLength(2);
+      expect(matches[0].coach.id).toBe('coach-2'); // Higher scoring coach first
+      expect(matches[0].score).toBeGreaterThan(matches[1].score);
+    });
+  });
+
+  describe('bookCoachingSession', () => {
+    it('should successfully book a coaching session', async () => {
+      const sessionDetails = {
+        scheduledAt: new Date('2025-02-01T14:00:00Z'),
+        duration: 60,
+        topic: 'Investment Planning',
+        description: 'Need help with portfolio diversification'
+      };
+
+      const mockCoach = {
+        id: 'coach-1',
+        hourly_rate_60min: 500,
+        commission_rate: 15
+      };
+
+      // Mock all the database calls
+      mockDB.query
+        .mockResolvedValueOnce({ rows: [] }) // validateSessionBooking - no conflicts
+        .mockResolvedValueOnce({ rows: [{ isAvailable: true }] }) // checkCoachAvailability
+        .mockResolvedValueOnce({ rows: [mockCoach] }) // getCoachById
+        .mockResolvedValueOnce({ rows: [{ id: 'session-1' }] }); // insertSession
+
+      const sessionId = await coachMatchingService.bookCoachingSession(
+        'user-1',
+        'coach-1',
+        sessionDetails
+      );
+
+      expect(sessionId).toBe('session-1');
+      expect(mockDB.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO coaching_sessions'),
+        expect.arrayContaining(['coach-1', 'user-1'])
+      );
+    });
+
+    it('should throw error for double booking', async () => {
+      const sessionDetails = {
+        scheduledAt: new Date('2025-02-01T14:00:00Z'),
+        duration: 60,
+        topic: 'Investment Planning'
+      };
+
+      // Mock conflict detection
+      mockDB.query
+        .mockResolvedValueOnce({ rows: [{ id: 'existing-session' }] }); // Conflict found
+
+      await expect(
+        coachMatchingService.bookCoachingSession('user-1', 'coach-1', sessionDetails)
+      ).rejects.toThrow('Time slot is already booked');
+    });
+  });
+});
+```
+
+## Monitoring and Analytics
+
+### 7. Coaching Analytics Service
+
+```typescript
+// src/services/analytics/coachingAnalytics.ts
+import { Pool } from 'pg';
+import { logger } from '@/lib/utils/logger';
+
+export class CoachingAnalyticsService {
+  constructor(private db: Pool) {}
+
+  async generateCoachPerformanceReport(
+    coachId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<{
+    sessionCount: number;
+    totalEarnings: number;
+    averageRating: number;
+    completionRate: number;
+    popularTopics: Array<{ topic: string; count: number }>;
+    monthlyTrends: Array<{ month: string; sessions: number; earnings: number }>;
+  }> {
+    try {
+      // Get session statistics
+      const sessionStatsQuery = `
+        SELECT 
+          COUNT(*) as total_sessions,
+          COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_sessions,
+          SUM(coach_earnings) as total_earnings,
+          AVG(CASE WHEN sr.rating IS NOT NULL THEN sr.rating END) as avg_rating
+        FROM coaching_sessions cs
+        LEFT JOIN session_reviews sr ON cs.id = sr.session_id AND sr.reviewer_type = 'user'
+        WHERE cs.coach_id = $1 
+        AND cs.scheduled_at BETWEEN $2 AND $3
+      `;
+
+      const sessionStats = await this.db.query(sessionStatsQuery, [coachId, startDate, endDate]);
+      const stats = sessionStats.rows[0];
+
+      // Get popular topics
+      const topicsQuery = `
+        SELECT topic, COUNT(*) as count
+        FROM coaching_sessions
+        WHERE coach_id = $1 
+        AND scheduled_at BETWEEN $2 AND $3
+        AND status = 'completed'
+        GROUP BY topic
+        ORDER BY count DESC
+        LIMIT 5
+      `;
+
+      const topicsResult = await this.db.query(topicsQuery, [coachId, startDate, endDate]);
+
+      // Get monthly trends
+      const trendsQuery = `
+        SELECT 
+          TO_CHAR(scheduled_at, 'YYYY-MM') as month,
+          COUNT(*) as sessions,
+          SUM(coach_earnings) as earnings
+        FROM coaching_sessions
+        WHERE coach_id = $1 
+        AND scheduled_at BETWEEN $2 AND $3
+        AND status = 'completed'
+        GROUP BY TO_CHAR(scheduled_at, 'YYYY-MM')
+        ORDER BY month
+      `;
+
+      const trendsResult = await this.db.query(trendsQuery, [coachId, startDate, endDate]);
+
+      return {
+        sessionCount: parseInt(stats.total_sessions) || 0,
+        totalEarnings: parseFloat(stats.total_earnings) || 0,
+        averageRating: parseFloat(stats.avg_rating) || 0,
+        completionRate: stats.total_sessions > 0 
+          ? (parseInt(stats.completed_sessions) / parseInt(stats.total_sessions)) * 100 
+          : 0,
+        popularTopics: topicsResult.rows,
+        monthlyTrends: trendsResult.rows
+      };
+
+    } catch (error) {
+      logger.error('Error generating coach performance report:', error);
+      throw new Error('Failed to generate performance report');
+    }
+  }
+
+  async getPlatformCoachingMetrics(
+    startDate: Date,
+    endDate: Date
+  ): Promise<{
+    totalSessions: number;
+    totalCoaches: number;
+    averageSessionRating: number;
+    totalRevenue: number;
+    popularSpecializations: Array<{ specialization: string; sessionCount: number }>;
+    userSatisfactionTrends: Array<{ month: string; averageRating: number }>;
+  }> {
+    try {
+      // Platform-wide metrics
+      const platformQuery = `
+        SELECT 
+          COUNT(DISTINCT cs.id) as total_sessions,
+          COUNT(DISTINCT cs.coach_id) as active_coaches,
+          AVG(sr.rating) as avg_rating,
+          SUM(cs.session_fee) as total_revenue
+        FROM coaching_sessions cs
+        LEFT JOIN session_reviews sr ON cs.id = sr.session_id AND sr.reviewer_type = 'user'
+        WHERE cs.scheduled_at BETWEEN $1 AND $2
+        AND cs.status = 'completed'
+      `;
+
+      const platformResult = await this.db.query(platformQuery, [startDate, endDate]);
+      const metrics = platformResult.rows[0];
+
+      // Popular specializations
+      const specializationsQuery = `
+        SELECT 
+          cs.specialization,
+          COUNT(*) as session_count
+        FROM coach_specializations cs
+        JOIN coaching_sessions sess ON cs.coach_id = sess.coach_id
+        WHERE sess.scheduled_at BETWEEN $1 AND $2
+        AND sess.status = 'completed'
+        GROUP BY cs.specialization
+        ORDER BY session_count DESC
+        LIMIT 10
+      `;
+
+      const specializationsResult = await this.db.query(specializationsQuery, [startDate, endDate]);
+
+      // Satisfaction trends
+      const satisfactionQuery = `
+        SELECT 
+          TO_CHAR(cs.scheduled_at, 'YYYY-MM') as month,
+          AVG(sr.rating) as average_rating
+        FROM coaching_sessions cs
+        JOIN session_reviews sr ON cs.id = sr.session_id AND sr.reviewer_type = 'user'
+        WHERE cs.scheduled_at BETWEEN $1 AND $2
+        AND cs.status = 'completed'
+        GROUP BY TO_CHAR(cs.scheduled_at, 'YYYY-MM')
+        ORDER BY month
+      `;
+
+      const satisfactionResult = await this.db.query(satisfactionQuery, [startDate, endDate]);
+
+      return {
+        totalSessions: parseInt(metrics.total_sessions) || 0,
+        totalCoaches: parseInt(metrics.active_coaches) || 0,
+        averageSessionRating: parseFloat(metrics.avg_rating) || 0,
+        totalRevenue: parseFloat(metrics.total_revenue) || 0,
+        popularSpecializations: specializationsResult.rows,
+        userSatisfactionTrends: satisfactionResult.rows
+      };
+
+    } catch (error) {
+      logger.error('Error getting platform coaching metrics:', error);
+      throw new Error('Failed to get platform metrics');
+    }
+  }
+
+  async trackUserProgressMetrics(userId: string): Promise<{
+    totalSessions: number;
+    goalsAchieved: number;
+    actionItemsCompleted: number;
+    averageCoachRating: number;
+    progressTrends: Array<{ metric: string; improvement: number }>;
+  }> {
+    try {
+      // User's coaching history
+      const userStatsQuery = `
+        SELECT 
+          COUNT(DISTINCT cs.id) as total_sessions,
+          AVG(sr.rating) as avg_coach_rating
+        FROM coaching_sessions cs
+        LEFT JOIN session_reviews sr ON cs.id = sr.session_id AND sr.reviewer_id = $1 AND sr.reviewer_type = 'coach'
+        WHERE cs.user_id = $1
+        AND cs.status = 'completed'
+      `;
+
+      const userStats = await this.db.query(userStatsQuery, [userId]);
+      const stats = userStats.rows[0];
+
+      // Goals and action items
+      const progressQuery = `
+        SELECT 
+          COUNT(DISTINCT sg.id) FILTER (WHERE sg.is_achieved = true) as goals_achieved,
+          COUNT(DISTINCT sai.id) FILTER (WHERE sai.status = 'completed') as action_items_completed
+        FROM coaching_sessions cs
+        LEFT JOIN session_goals sg ON cs.id = sg.session_id
+        LEFT JOIN session_action_items sai ON cs.id = sai.session_id
+        WHERE cs.user_id = $1
+      `;
+
+      const progressResult = await this.db.query(progressQuery, [userId]);
+      const progress = progressResult.rows[0];
+
+      // Progress trends (simplified)
+      const trendsQuery = `
+        SELECT 
+          progress_type as metric,
+          ((current_value - baseline_value) / NULLIF(baseline_value, 0)) * 100 as improvement
+        FROM user_progress
+        WHERE user_id = $1
+        AND baseline_value IS NOT NULL
+        AND current_value IS NOT NULL
+      `;
+
+      const trendsResult = await this.db.query(trendsQuery, [userId]);
+
+      return {
+        totalSessions: parseInt(stats.total_sessions) || 0,
+        goalsAchieved: parseInt(progress.goals_achieved) || 0,
+        actionItemsCompleted: parseInt(progress.action_items_completed) || 0,
+        averageCoachRating: parseFloat(stats.avg_coach_rating) || 0,
+        progressTrends: trendsResult.rows
+      };
+
+    } catch (error) {
+      logger.error('Error tracking user progress metrics:', error);
+      throw new Error('Failed to track user progress');
+    }
+  }
+}
+```
 
 ## Next Steps
 
-<Card title="Related Guides" href="/guides/integration-walkthrough">
-  Explore other implementation guides
-</Card>
+<Steps>
+  <Step title="Complete Video Integration">
+    **Integration Tasks:**
+    - Implement Zoom SDK or WebRTC solution
+    - Set up screen sharing and recording capabilities
+    - Configure mobile video optimization
+    - Add breakout room functionality for group sessions
+  </Step>
+  <Step title="Enhanced Coach Onboarding">
+    **Coach Management:**
+    - Implement coach application and verification process
+    - Create coach training and certification tracking
+    - Set up performance monitoring and quality assurance
+    - Add coach community and resource sharing
+  </Step>
+  <Step title="Cultural Localization">
+    **African Market Adaptation:**
+    - Multi-language coaching session support
+    - Cultural sensitivity training for coaches
+    - Islamic finance coaching options where applicable
+    - Family and community-focused financial planning approaches
+  </Step>
+  <Step title="Advanced Features Implementation">
+    **Enhanced Capabilities:**
+    - AI-powered coach matching refinement
+    - Automated progress tracking with DIVA score integration
+    - Group coaching and peer learning circles
+    - Mobile-optimized coaching for low-bandwidth environments
+  </Step>
+</Steps>
+
+## Production Deployment
+
+### 8. Coaching Platform Configuration
+
+```yaml
+# docker-compose.coaching.yml
+version: '3.8'
+services:
+  coaching-service:
+    build: 
+      context: .
+      dockerfile: Dockerfile.coaching
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - ZOOM_API_KEY=${ZOOM_API_KEY}
+      - ZOOM_API_SECRET=${ZOOM_API_SECRET}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "3001:3000"
+    networks:
+      - awo-network
+
+  video-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.video
+    environment:
+      - NODE_ENV=production
+      - WEBRTC_STUN_SERVERS=${WEBRTC_STUN_SERVERS}
+      - WEBRTC_TURN_SERVERS=${WEBRTC_TURN_SERVERS}
+    ports:
+      - "3002:3000"
+    networks:
+      - awo-network
+
+  coaching-notifications:
+    build:
+      context: .
+      dockerfile: Dockerfile.notifications
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+    depends_on:
+      - postgres
+    networks:
+      - awo-network
+
+networks:
+  awo-network:
+    external: true
+```
+
+### 9. Monitoring and Performance
+
+```typescript
+// src/monitoring/coachingMonitoring.ts
+import { logger } from '@/lib/utils/logger';
+import { CoachingAnalyticsService } from '@/services/analytics/coachingAnalytics';
+
+export class CoachingMonitoring {
+  constructor(private analyticsService: CoachingAnalyticsService) {}
+
+  async monitorCoachingHealth(): Promise<void> {
+    try {
+      // Monitor session completion rates
+      await this.checkSessionCompletionRates();
+
+      // Monitor coach response times
+      await this.monitorCoachResponseTimes();
+
+      // Check video call quality
+      await this.monitorVideoCallQuality();
+
+      // Monitor user satisfaction
+      await this.checkUserSatisfactionTrends();
+
+      // Alert on booking anomalies
+      await this.detectBookingAnomalies();
+
+    } catch (error) {
+      logger.error('Coaching platform monitoring error:', error);
+    }
+  }
+
+  private async checkSessionCompletionRates(): Promise<void> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7); // Last 7 days
+    
+    const metrics = await this.analyticsService.getPlatformCoachingMetrics(
+      startDate, 
+      new Date()
+    );
+
+    // Alert if completion rate drops below 85%
+    if (metrics.averageSessionRating < 4.0) {
+      await this.sendAlert({
+        type: 'quality_alert',
+        message: `Session rating dropped to ${metrics.averageSessionRating}`,
+        severity: 'medium'
+      });
+    }
+  }
+
+  private async monitorCoachResponseTimes(): Promise<void> {
+    // Monitor coach response times to booking requests
+    const slowResponseQuery = `
+      SELECT coach_id, AVG(response_time_hours) as avg_response_time
+      FROM coach_response_metrics
+      WHERE created_at >= NOW() - INTERVAL '24 hours'
+      GROUP BY coach_id
+      HAVING AVG(response_time_hours) > 4
+    `;
+
+    // Implementation would check and alert on slow responses
+  }
+
+  private async monitorVideoCallQuality(): Promise<void> {
+    // Monitor video call connection quality and failures
+    const connectionIssuesQuery = `
+      SELECT COUNT(*) as failed_calls
+      FROM coaching_sessions
+      WHERE status = 'cancelled'
+      AND cancellation_reason = 'technical_issues'
+      AND scheduled_at >= NOW() - INTERVAL '24 hours'
+    `;
+
+    // Alert if technical failures exceed threshold
+  }
+
+  private async checkUserSatisfactionTrends(): Promise<void> {
+    // Monitor trending satisfaction scores
+    const satisfactionQuery = `
+      SELECT 
+        DATE_TRUNC('day', cs.scheduled_at) as date,
+        AVG(sr.rating) as avg_rating
+      FROM coaching_sessions cs
+      JOIN session_reviews sr ON cs.id = sr.session_id
+      WHERE sr.reviewer_type = 'user'
+      AND cs.scheduled_at >= NOW() - INTERVAL '30 days'
+      GROUP BY DATE_TRUNC('day', cs.scheduled_at)
+      ORDER BY date DESC
+    `;
+
+    // Detect downward trends and alert
+  }
+
+  private async detectBookingAnomalies(): Promise<void> {
+    // Detect unusual booking patterns that might indicate issues
+    const bookingAnomalies = [
+      'High cancellation rates',
+      'Unusual booking spikes',
+      'Coach availability gaps',
+      'Payment processing failures'
+    ];
+
+    // Implementation would check for these patterns
+  }
+
+  private async sendAlert(alert: {
+    type: string;
+    message: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+  }): Promise<void> {
+    logger.warn(`Coaching platform alert [${alert.severity}]: ${alert.message}`);
+    
+    // Send to monitoring service (Slack, PagerDuty, etc.)
+    if (alert.severity === 'critical') {
+      // Immediate notification for critical issues
+    }
+  }
+}
+```
+
+### 10. African Market Optimization
+
+```typescript
+// src/services/coaching/africanOptimizations.ts
+export class AfricanCoachingOptimizations {
+  
+  static getOptimalVideoSettings(connectionType: 'slow' | 'medium' | 'fast'): {
+    videoQuality: string;
+    audioQuality: string;
+    bandwidth: number;
+  } {
+    switch (connectionType) {
+      case 'slow':
+        return {
+          videoQuality: '240p',
+          audioQuality: '16kbps',
+          bandwidth: 128 // kbps
+        };
+      case 'medium':
+        return {
+          videoQuality: '360p',
+          audioQuality: '32kbps',
+          bandwidth: 512 // kbps
+        };
+      case 'fast':
+        return {
+          videoQuality: '720p',
+          audioQuality: '64kbps',
+          bandwidth: 2048 // kbps
+        };
+      default:
+        return {
+          videoQuality: '360p',
+          audioQuality: '32kbps',
+          bandwidth: 512
+        };
+    }
+  }
+
+  static getCulturalCoachingPreferences(country: string): {
+    preferredLanguages: string[];
+    culturalConsiderations: string[];
+    religiousConsiderations: string[];
+    familyFocusLevel: 'individual' | 'family' | 'community';
+  } {
+    const preferences: { [key: string]: any } = {
+      'ZA': {
+        preferredLanguages: ['English', 'Afrikaans', 'Zulu', 'Xhosa'],
+        culturalConsiderations: ['Ubuntu philosophy', 'Extended family financial responsibilities'],
+        religiousConsiderations: ['Christian financial principles'],
+        familyFocusLevel: 'family'
+      },
+      'BW': {
+        preferredLanguages: ['English', 'Setswana'],
+        culturalConsiderations: ['Community-based financial decisions'],
+        religiousConsiderations: ['Christian financial principles'],
+        familyFocusLevel: 'community'
+      },
+      'NA': {
+        preferredLanguages: ['English', 'Afrikaans', 'German'],
+        culturalConsiderations: ['Mixed cultural backgrounds'],
+        religiousConsiderations: ['Christian financial principles'],
+        familyFocusLevel: 'family'
+      },
+      'ZM': {
+        preferredLanguages: ['English', 'Bemba', 'Nyanja'],
+        culturalConsiderations: ['Extended family support systems'],
+        religiousConsiderations: ['Christian financial principles'],
+        familyFocusLevel: 'community'
+      }
+    };
+
+    return preferences[country] || preferences['ZA'];
+  }
+
+  static getAffordableCoachingOptions(userTier: string, monthlyIncome: number): {
+    recommendedSessionFrequency: string;
+    subsidyEligible: boolean;
+    groupSessionPreference: boolean;
+    flexiblePaymentOptions: string[];
+  } {
+    if (userTier === 'Bronze' || monthlyIncome < 5000) {
+      return {
+        recommendedSessionFrequency: 'monthly',
+        subsidyEligible: true,
+        groupSessionPreference: true,
+        flexiblePaymentOptions: ['pay-as-you-go', 'mobile-money', 'installments']
+      };
+    } else if (userTier === 'Silver' || monthlyIncome < 15000) {
+      return {
+        recommendedSessionFrequency: 'bi-weekly',
+        subsidyEligible: false,
+        groupSessionPreference: false,
+        flexiblePaymentOptions: ['monthly-subscription', 'mobile-money', 'bank-transfer']
+      };
+    } else {
+      return {
+        recommendedSessionFrequency: 'weekly',
+        subsidyEligible: false,
+        groupSessionPreference: false,
+        flexiblePaymentOptions: ['monthly-subscription', 'annual-discount', 'premium-features']
+      };
+    }
+  }
+
+  static getConnectivityFallbackOptions(): {
+    videoUnavailable: string[];
+    audioOnly: string[];
+    textBased: string[];
+    offlineResources: string[];
+  } {
+    return {
+      videoUnavailable: [
+        'Audio-only coaching calls',
+        'WhatsApp voice messages',
+        'Pre-recorded video sessions'
+      ],
+      audioOnly: [
+        'Phone-based coaching',
+        'Voice message exchanges',
+        'Audio course materials'
+      ],
+      textBased: [
+        'SMS coaching support',
+        'WhatsApp text guidance',
+        'Email-based financial plans'
+      ],
+      offlineResources: [
+        'Downloadable financial templates',
+        'Offline budget calculators',
+        'Printed financial guides'
+      ]
+    };
+  }
+}
+```
+
+## Security and Compliance
+
+### 11. Data Privacy and Protection
+
+```typescript
+// src/services/coaching/privacyService.ts
+import { Pool } from 'pg';
+import { logger } from '@/lib/utils/logger';
+
+export class CoachingPrivacyService {
+  constructor(private db: Pool) {}
+
+  async anonymizeSessionData(sessionId: string): Promise<void> {
+    try {
+      // Remove personally identifiable information from session notes
+      const updateQuery = `
+        UPDATE coaching_sessions 
+        SET 
+          notes = regexp_replace(notes, '\\b\\d{13}\\b', '[PHONE_REDACTED]', 'g'),
+          notes = regexp_replace(notes, '\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b', '[EMAIL_REDACTED]', 'g'),
+          coach_notes = regexp_replace(coach_notes, '\\b\\d{13}\\b', '[PHONE_REDACTED]', 'g'),
+          coach_notes = regexp_replace(coach_notes, '\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b', '[EMAIL_REDACTED]', 'g')
+        WHERE id = $1
+      `;
+
+      await this.db.query(updateQuery, [sessionId]);
+      
+      logger.info(`Session data anonymized for session: ${sessionId}`);
+    } catch (error) {
+      logger.error('Error anonymizing session data:', error);
+      throw error;
+    }
+  }
+
+  async handleDataDeletionRequest(userId: string): Promise<void> {
+    const client = await this.db.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Archive sessions instead of deleting (for coach payment records)
+      await client.query(
+        'UPDATE coaching_sessions SET status = $1 WHERE user_id = $2',
+        ['archived', userId]
+      );
+
+      // Remove personal data from session content
+      await client.query(`
+        UPDATE coaching_sessions 
+        SET 
+          notes = '[DATA_DELETED]',
+          description = '[DATA_DELETED]'
+        WHERE user_id = $1
+      `, [userId]);
+
+      // Delete user progress data
+      await client.query(
+        'DELETE FROM user_progress WHERE user_id = $1',
+        [userId]
+      );
+
+      // Delete content access records
+      await client.query(
+        'DELETE FROM user_content_access WHERE user_id = $1',
+        [userId]
+      );
+
+      await client.query('COMMIT');
+
+      logger.info(`Data deletion completed for user: ${userId}`);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error handling data deletion request:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async exportUserCoachingData(userId: string): Promise<{
+    sessions: any[];
+    progress: any[];
+    reviews: any[];
+    goals: any[];
+    actionItems: any[];
+  }> {
+    try {
+      // Export all user coaching data for GDPR compliance
+      const sessionsQuery = `
+        SELECT 
+          cs.session_code,
+          cs.topic,
+          cs.description,
+          cs.scheduled_at,
+          cs.duration_minutes,
+          cs.status,
+          c.display_name as coach_name
+        FROM coaching_sessions cs
+        JOIN coaches c ON cs.coach_id = c.id
+        WHERE cs.user_id = $1
+        ORDER BY cs.scheduled_at DESC
+      `;
+
+      const progressQuery = `
+        SELECT 
+          progress_type,
+          baseline_value,
+          current_value,
+          target_value,
+          progress_percentage,
+          last_updated
+        FROM user_progress
+        WHERE user_id = $1
+      `;
+
+      const reviewsQuery = `
+        SELECT 
+          sr.rating,
+          sr.review_text,
+          sr.would_recommend,
+          sr.created_at
+        FROM session_reviews sr
+        JOIN coaching_sessions cs ON sr.session_id = cs.id
+        WHERE cs.user_id = $1 AND sr.reviewer_type = 'user'
+      `;
+
+      const goalsQuery = `
+        SELECT 
+          sg.goal_title,
+          sg.goal_description,
+          sg.target_amount,
+          sg.target_date,
+          sg.is_achieved,
+          sg.achieved_at
+        FROM session_goals sg
+        JOIN coaching_sessions cs ON sg.session_id = cs.id
+        WHERE cs.user_id = $1
+      `;
+
+      const actionItemsQuery = `
+        SELECT 
+          sai.action_title,
+          sai.action_description,
+          sai.due_date,
+          sai.priority,
+          sai.status,
+          sai.completed_at
+        FROM session_action_items sai
+        JOIN coaching_sessions cs ON sai.session_id = cs.id
+        WHERE cs.user_id = $1
+      `;
+
+      const [sessions, progress, reviews, goals, actionItems] = await Promise.all([
+        this.db.query(sessionsQuery, [userId]),
+        this.db.query(progressQuery, [userId]),
+        this.db.query(reviewsQuery, [userId]),
+        this.db.query(goalsQuery, [userId]),
+        this.db.query(actionItemsQuery, [userId])
+      ]);
+
+      return {
+        sessions: sessions.rows,
+        progress: progress.rows,
+        reviews: reviews.rows,
+        goals: goals.rows,
+        actionItems: actionItems.rows
+      };
+    } catch (error) {
+      logger.error('Error exporting user coaching data:', error);
+      throw error;
+    }
+  }
+
+  async encryptSensitiveSessionData(sessionId: string, encryptionKey: string): Promise<void> {
+    // Implementation would encrypt sensitive session data
+    // This is a placeholder for encryption logic
+    logger.info(`Encrypting sensitive data for session: ${sessionId}`);
+  }
+}
+```
+
+## Success Metrics and KPIs
+
+### 12. Coaching Platform Analytics
+
+```typescript
+// src/analytics/coachingKPIs.ts
+export interface CoachingKPIs {
+  // User Engagement Metrics
+  monthlyActiveCoaches: number;
+  monthlyActiveUsers: number;
+  sessionBookingRate: number;
+  sessionCompletionRate: number;
+  userRetentionRate: number;
+
+  // Quality Metrics
+  averageSessionRating: number;
+  coachSatisfactionScore: number;
+  sessionCancellationRate: number;
+  technicalIssueRate: number;
+
+  // Business Metrics
+  totalRevenueGenerated: number;
+  averageRevenuePerUser: number;
+  coachEarnings: number;
+  platformCommission: number;
+
+  // Impact Metrics
+  goalsAchievedPercentage: number;
+  actionItemCompletionRate: number;
+  financialImprovementScore: number;
+  divaScoreImprovementCorrelation: number;
+
+  // African Market Specific
+  multiLanguageUsageRate: number;
+  mobileOnlyUsagePercentage: number;
+  lowBandwidthSessionSuccess: number;
+  ruralUserEngagement: number;
+}
+
+export class CoachingKPITracker {
+  constructor(private db: Pool) {}
+
+  async calculateMonthlyKPIs(month: string, year: string): Promise<CoachingKPIs> {
+    const startDate = new Date(`${year}-${month}-01`);
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 1);
+
+    // Engagement Metrics
+    const engagementQuery = `
+      SELECT 
+        COUNT(DISTINCT coach_id) as active_coaches,
+        COUNT(DISTINCT user_id) as active_users,
+        COUNT(*) as total_sessions,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_sessions,
+        COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_sessions
+      FROM coaching_sessions
+      WHERE scheduled_at >= $1 AND scheduled_at < $2
+    `;
+
+    const engagementResult = await this.db.query(engagementQuery, [startDate, endDate]);
+    const engagement = engagementResult.rows[0];
+
+    // Quality Metrics
+    const qualityQuery = `
+      SELECT 
+        AVG(sr.rating) as avg_session_rating,
+        COUNT(CASE WHEN cs.cancellation_reason = 'technical_issues' THEN 1 END) as technical_issues
+      FROM coaching_sessions cs
+      LEFT JOIN session_reviews sr ON cs.id = sr.session_id AND sr.reviewer_type = 'user'
+      WHERE cs.scheduled_at >= $1 AND cs.scheduled_at < $2
+    `;
+
+    const qualityResult = await this.db.query(qualityQuery, [startDate, endDate]);
+    const quality = qualityResult.rows[0];
+
+    // Business Metrics
+    const businessQuery = `
+      SELECT 
+        SUM(session_fee) as total_revenue,
+        SUM(coach_earnings) as total_coach_earnings,
+        SUM(platform_fee) as total_platform_commission,
+        AVG(session_fee) as avg_revenue_per_session
+      FROM coaching_sessions
+      WHERE scheduled_at >= $1 AND scheduled_at < $2
+      AND status = 'completed'
+    `;
+
+    const businessResult = await this.db.query(businessQuery, [startDate, endDate]);
+    const business = businessResult.rows[0];
+
+    // Impact Metrics
+    const impactQuery = `
+      SELECT 
+        COUNT(CASE WHEN sg.is_achieved = true THEN 1 END) as goals_achieved,
+        COUNT(sg.id) as total_goals,
+        COUNT(CASE WHEN sai.status = 'completed' THEN 1 END) as action_items_completed,
+        COUNT(sai.id) as total_action_items
+      FROM coaching_sessions cs
+      LEFT JOIN session_goals sg ON cs.id = sg.session_id
+      LEFT JOIN session_action_items sai ON cs.id = sai.session_id
+      WHERE cs.scheduled_at >= $1 AND cs.scheduled_at < $2
+    `;
+
+    const impactResult = await this.db.query(impactQuery, [startDate, endDate]);
+    const impact = impactResult.rows[0];
+
+    // Calculate derived metrics
+    const sessionCompletionRate = engagement.total_sessions > 0 
+      ? (engagement.completed_sessions / engagement.total_sessions) * 100 
+      : 0;
+
+    const sessionCancellationRate = engagement.total_sessions > 0 
+      ? (engagement.cancelled_sessions / engagement.total_sessions) * 100 
+      : 0;
+
+    const goalsAchievedPercentage = impact.total_goals > 0 
+      ? (impact.goals_achieved / impact.total_goals) * 100 
+      : 0;
+
+    const actionItemCompletionRate = impact.total_action_items > 0 
+      ? (impact.action_items_completed / impact.total_action_items) * 100 
+      : 0;
+
+    const technicalIssueRate = engagement.total_sessions > 0 
+      ? (quality.technical_issues / engagement.total_sessions) * 100 
+      : 0;
+
+    return {
+      monthlyActiveCoaches: parseInt(engagement.active_coaches) || 0,
+      monthlyActiveUsers: parseInt(engagement.active_users) || 0,
+      sessionBookingRate: 0, // Would need additional query for booking vs completed ratio
+      sessionCompletionRate,
+      userRetentionRate: 0, // Would need user retention calculation
+
+      averageSessionRating: parseFloat(quality.avg_session_rating) || 0,
+      coachSatisfactionScore: 0, // Would need coach feedback data
+      sessionCancellationRate,
+      technicalIssueRate,
+
+      totalRevenueGenerated: parseFloat(business.total_revenue) || 0,
+      averageRevenuePerUser: engagement.active_users > 0 
+        ? (parseFloat(business.total_revenue) || 0) / engagement.active_users 
+        : 0,
+      coachEarnings: parseFloat(business.total_coach_earnings) || 0,
+      platformCommission: parseFloat(business.total_platform_commission) || 0,
+
+      goalsAchievedPercentage,
+      actionItemCompletionRate,
+      financialImprovementScore: 0, // Would correlate with DIVA score improvements
+      divaScoreImprovementCorrelation: 0, // Statistical correlation analysis needed
+
+      multiLanguageUsageRate: 0, // Would need language usage data
+      mobileOnlyUsagePercentage: 0, // Would need device usage data
+      lowBandwidthSessionSuccess: 0, // Would need connection quality data
+      ruralUserEngagement: 0 // Would need geographic user data
+    };
+  }
+
+  async generateCoachingInsights(kpis: CoachingKPIs): Promise<{
+    strengths: string[];
+    improvements: string[];
+    recommendations: string[];
+  }> {
+    const insights = {
+      strengths: [] as string[],
+      improvements: [] as string[],
+      recommendations: [] as string[]
+    };
+
+    // Analyze strengths
+    if (kpis.averageSessionRating >= 4.5) {
+      insights.strengths.push('Excellent session quality with high user satisfaction');
+    }
+    
+    if (kpis.sessionCompletionRate >= 90) {
+      insights.strengths.push('High session completion rate indicates strong engagement');
+    }
+
+    if (kpis.goalsAchievedPercentage >= 70) {
+      insights.strengths.push('Users are successfully achieving their financial goals');
+    }
+
+    // Identify improvement areas
+    if (kpis.sessionCancellationRate > 15) {
+      insights.improvements.push('High cancellation rate needs investigation');
+      insights.recommendations.push('Implement reminder system and flexible rescheduling');
+    }
+
+    if (kpis.technicalIssueRate > 5) {
+      insights.improvements.push('Technical issues affecting session quality');
+      insights.recommendations.push('Invest in better video infrastructure and African connectivity optimization');
+    }
+
+    if (kpis.actionItemCompletionRate < 60) {
+      insights.improvements.push('Low action item completion rate');
+      insights.recommendations.push('Enhance follow-up mechanisms and gamify action item completion');
+    }
+
+    // Business recommendations
+    if (kpis.averageRevenuePerUser < 500) {
+      insights.recommendations.push('Consider value-added services to increase revenue per user');
+    }
+
+    return insights;
+  }
+}
+```
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card title="Coaching API Reference" icon="book" href="/api-reference/coaching">
+    Complete API documentation for coaching and advisory endpoints
+  </Card>
+  <Card title="Video Integration Guide" icon="video" href="/integration/video-conferencing">
+    Step-by-step guide for integrating video conferencing solutions
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Coach Onboarding Process" icon="user-check" href="/guides/coach-onboarding">
+    Comprehensive guide for onboarding and managing financial coaches
+  </Card>
+  <Card title="African Cultural Guidelines" icon="globe" href="/resources/african-cultural-coaching">
+    Cultural sensitivity and localization guidelines for African markets
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Progress Tracking Implementation" icon="trending-up" href="/guides/progress-tracking">
+    Guide for implementing user progress tracking and goal management
+  </Card>
+  <Card title="Compliance Requirements" icon="shield" href="/compliance/coaching-regulations">
+    Regulatory compliance for financial coaching across SADC markets
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+<Accordion title="Video Call Quality Issues">
+
+**Problem**: Poor video quality or connection drops during coaching sessions
+
+**Solutions**:
+```typescript
+// Implement adaptive video quality
+const adaptVideoQuality = (connectionSpeed: number) => {
+  if (connectionSpeed < 500) return '240p';
+  if (connectionSpeed < 1000) return '360p';
+  return '720p';
+};
+
+// Fallback to audio-only
+const enableAudioFallback = (sessionId: string) => {
+  // Switch to audio-only mode
+  // Send notification to participants
+  // Continue session without video
+};
+```
+
+**Prevention**:
+- Implement connection quality detection
+- Provide audio-only fallback options
+- Optimize for African network conditions
+
+</Accordion>
+
+<Accordion title="Coach Matching Algorithm Issues">
+
+**Problem**: Poor coach-user matches leading to low satisfaction
+
+**Solutions**:
+```typescript
+// Improve matching algorithm
+const enhancedMatching = (user: User, preferences: UserPreferences) => {
+  // Add more weight to cultural compatibility
+  // Include previous session feedback
+  // Consider time zone compatibility
+  // Factor in communication style preferences
+};
+```
+
+**Prevention**:
+- Regular algorithm performance review
+- Collect detailed feedback on matches
+- A/B test matching criteria
+- Allow user preference updates
+
+</Accordion>
+
+<Accordion title="Session Scheduling Conflicts">
+
+**Problem**: Double bookings or availability sync issues
+
+**Solutions**:
+```typescript
+// Implement robust conflict detection
+const preventDoubleBooking = async (coachId: string, time: Date) => {
+  const conflicts = await checkAllConflicts(coachId, time);
+  if (conflicts.length > 0) {
+    throw new ConflictError('Time slot unavailable');
+  }
+  // Lock time slot during booking process
+};
+```
+
+**Prevention**:
+- Real-time availability updates
+- Booking confirmation workflows
+- Buffer time between sessions
+- Automated conflict resolution
+
+</Accordion>
+
+<Accordion title="Payment Processing Issues">
+
+**Problem**: Failed payments for coaching sessions
+
+**Solutions**:
+```typescript
+// Implement retry mechanisms
+const retryPayment = async (paymentId: string, maxRetries: number = 3) => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await processPayment(paymentId);
+      return; // Success
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      await delay(attempt * 1000); // Exponential backoff
+    }
+  }
+};
+```
+
+**Prevention**:
+- Multiple payment method options
+- Payment method validation
+- Clear payment error messages
+- Alternative payment flows for African markets
+
+</Accordion>
+
+## Performance Optimization
+
+### African Market Specific Optimizations
+
+```typescript
+// src/optimizations/africanCoachingOptimizations.ts
+export class AfricanCoachingOptimizations {
+  
+  // Optimize for low-bandwidth environments
+  static optimizeForLowBandwidth(): {
+    videoSettings: any;
+    audioSettings: any;
+    dataUsageSettings: any;
+  } {
+    return {
+      videoSettings: {
+        maxResolution: '360p',
+        frameRate: 15,
+        bitrate: 256000, // 256 kbps
+        codec: 'H.264'
+      },
+      audioSettings: {
+        bitrate: 32000, // 32 kbps
+        sampleRate: 22050,
+        channels: 1 // Mono
+      },
+      dataUsageSettings: {
+        disableVideoByDefault: true,
+        enableDataSaver: true,
+        preloadMinimal: true,
+        cacheAgressively: true
+      }
+    };
+  }
+
+  // Mobile-first session interface
+  static getMobileOptimizedInterface(): {
+    layout: string;
+    controls: string[];
+    gestures: any;
+  } {
+    return {
+      layout: 'vertical-stack',
+      controls: ['mute', 'camera', 'end-call', 'chat'],
+      gestures: {
+        swipeUp: 'show-chat',
+        swipeDown: 'hide-controls',
+        doubleTap: 'toggle-camera'
+      }
+    };
+  }
+
+  // Offline coaching resources
+  static getOfflineResources(): {
+    downloadableContent: string[];
+    offlineCapabilities: string[];
+    syncStrategies: string[];
+  } {
+    return {
+      downloadableContent: [
+        'Session recordings',
+        'Action item templates',
+        'Financial planning worksheets',
+        'Goal tracking forms'
+      ],
+      offlineCapabilities: [
+        'View session history',
+        'Complete action items',
+        'Update progress tracking',
+        'Access educational content'
+      ],
+      syncStrategies: [
+        'Progressive sync on connection',
+        'Priority sync for urgent items',
+        'Background sync for large files',
+        'Conflict resolution for concurrent edits'
+      ]
+    };
+  }
+}
+```
+
+---
+
+*This wealth coaching setup guide provides comprehensive coverage for implementing AWO Platform's coaching and advisory system, with specific optimizations for African markets including cultural sensitivity, connectivity challenges, and mobile-first design principles.*
+
+*Last updated: June 2025*  
+*Next update: As coaching technologies and African market needs evolve*
