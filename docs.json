@@ -464,5 +464,6 @@
   "modeToggle": {
     "default": "dark"
   },
+  
   "backgroundImage": "/images/background.png"
 }

@@ -1,52 +1,1509 @@
----
-title: "Mobile Money"
-description: "AWO Platform mobile money integration guide"
----
+# Mobile Money Integration Guide
 
-# Mobile Money
+This guide provides comprehensive instructions for integrating mobile money payment services into AWO Platform across African markets.
 
 ## Overview
 
 <Info>
-This guide covers mobile money integration with the AWO Platform.
+Mobile money is the primary payment method for millions of Africans, with over 400 million registered accounts across the continent. AWO Platform integrates with major mobile money providers to enable seamless payments and transfers for our users.
 </Info>
 
-## Prerequisites
+### Mobile Money Importance for AWO
 
-Integration requirements will be listed here.
+<CardGroup cols={2}>
+  <Card title="Market Penetration" icon="globe-africa">
+    **Kenya**: 85% of adults use mobile money  
+    **Ghana**: 75% adoption rate  
+    **Uganda**: 70% penetration  
+    **Tanzania**: 65% usage rate
+  </Card>
+  <Card title="Use Cases in AWO" icon="smartphone">
+    **Wallet Funding**: Deposit money into AWO accounts  
+    **Chama Contributions**: Group savings payments  
+    **Investment Purchases**: Buy investment products  
+    **Withdrawals**: Cash out from AWO platform
+  </Card>
+</CardGroup>
 
-## Setup Instructions
+<CardGroup cols={2}>
+  <Card title="Key Benefits" icon="check-circle">
+    **Financial Inclusion**: Serve unbanked populations  
+    **Instant Payments**: Real-time transaction processing  
+    **Low Costs**: Affordable transaction fees  
+    **Wide Acceptance**: Ubiquitous across Africa
+  </Card>
+  <Card title="Technical Advantages" icon="bolt">
+    **USSD Support**: Works on feature phones  
+    **Offline Capability**: No internet required  
+    **High Reliability**: Telecom-grade infrastructure  
+    **Simple UX**: Familiar user interface
+  </Card>
+</CardGroup>
 
-<Steps>
-  <Step title="API Configuration">
-    Configure API credentials and endpoints
-  </Step>
-  <Step title="Webhook Setup">
-    Set up webhooks for real-time updates
-  </Step>
-  <Step title="Testing">
-    Test the integration in sandbox environment
-  </Step>
-</Steps>
+## Supported Mobile Money Providers
 
-## Code Examples
+### East Africa
+
+#### Kenya - M-Pesa (Safaricom)
+```typescript
+const MPESA_CONFIG = {
+  provider: 'MPESA',
+  country: 'KE',
+  currency: 'KES',
+  shortCode: '174379', // AWO's paybill number
+  passkey: process.env.MPESA_PASSKEY,
+  consumerKey: process.env.MPESA_CONSUMER_KEY,
+  consumerSecret: process.env.MPESA_CONSUMER_SECRET,
+  environment: process.env.NODE_ENV === 'production' ? 'live' : 'sandbox',
+  baseUrl: process.env.NODE_ENV === 'production' 
+    ? 'https://api.safaricom.co.ke' 
+    : 'https://sandbox.safaricom.co.ke',
+};
+```
+
+#### Uganda - MTN MoMo & Airtel Money
+```typescript
+const UGANDA_MOMO_CONFIG = {
+  MTN: {
+    provider: 'MTN_UGANDA',
+    country: 'UG',
+    currency: 'UGX',
+    apiKey: process.env.MTN_UG_API_KEY,
+    userId: process.env.MTN_UG_USER_ID,
+    subscriptionKey: process.env.MTN_UG_SUBSCRIPTION_KEY,
+    baseUrl: 'https://sandbox.momodeveloper.mtn.com',
+  },
+  AIRTEL: {
+    provider: 'AIRTEL_UGANDA',
+    country: 'UG',
+    currency: 'UGX',
+    clientId: process.env.AIRTEL_UG_CLIENT_ID,
+    clientSecret: process.env.AIRTEL_UG_CLIENT_SECRET,
+    baseUrl: 'https://openapi.airtel.africa',
+  },
+};
+```
+
+### West Africa
+
+#### Ghana - MTN MoMo, Vodafone Cash, AirtelTigo Money
+```typescript
+const GHANA_MOMO_CONFIG = {
+  MTN: {
+    provider: 'MTN_GHANA',
+    country: 'GH',
+    currency: 'GHS',
+    merchantId: process.env.MTN_GH_MERCHANT_ID,
+    apiKey: process.env.MTN_GH_API_KEY,
+    baseUrl: 'https://api.mtn.com/v1/mm',
+  },
+  VODAFONE: {
+    provider: 'VODAFONE_GHANA',
+    country: 'GH',
+    currency: 'GHS',
+    merchantCode: process.env.VDF_GH_MERCHANT_CODE,
+    apiKey: process.env.VDF_GH_API_KEY,
+    baseUrl: 'https://api.vodafone.com.gh',
+  },
+};
+```
+
+#### Nigeria - Opay, PalmPay, Kuda
+```typescript
+const NIGERIA_WALLETS_CONFIG = {
+  OPAY: {
+    provider: 'OPAY',
+    country: 'NG',
+    currency: 'NGN',
+    merchantId: process.env.OPAY_MERCHANT_ID,
+    publicKey: process.env.OPAY_PUBLIC_KEY,
+    privateKey: process.env.OPAY_PRIVATE_KEY,
+    baseUrl: 'https://api.opay.africa',
+  },
+  PALMPAY: {
+    provider: 'PALMPAY',
+    country: 'NG',
+    currency: 'NGN',
+    merchantId: process.env.PALMPAY_MERCHANT_ID,
+    apiKey: process.env.PALMPAY_API_KEY,
+    baseUrl: 'https://api.palmpay.com',
+  },
+};
+```
+
+## Integration Architecture
+
+### Multi-Provider Framework
 
 ```typescript
-// Integration example
-import { MobileMoneyClient } from '@awo-platform/integrations';
+interface MobileMoneyProvider {
+  name: string;
+  country: string;
+  currency: string;
+  capabilities: ('payments' | 'transfers' | 'balance' | 'status')[];
+  rateLimit: {
+    requestsPerMinute: number;
+    burstLimit: number;
+  };
+}
 
-const client = new MobileMoneyClient({
-  apiKey: process.env.API_KEY,
-  environment: 'sandbox'
+interface MobileMoneyTransaction {
+  id: string;
+  provider: string;
+  type: 'payment' | 'transfer' | 'withdrawal';
+  amount: number;
+  currency: string;
+  phoneNumber: string;
+  reference: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  metadata?: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+abstract class MobileMoneyAdapter {
+  protected config: any;
+  protected rateLimiter: RateLimiter;
+
+  constructor(config: any) {
+    this.config = config;
+    this.rateLimiter = new RateLimiter(config.rateLimit);
+  }
+
+  abstract initiatePayment(request: PaymentRequest): Promise<PaymentResponse>;
+  abstract checkStatus(transactionId: string): Promise<TransactionStatus>;
+  abstract initiateTransfer(request: TransferRequest): Promise<TransferResponse>;
+  abstract getBalance(): Promise<BalanceResponse>;
+}
+
+class MobileMoneyService {
+  private adapters: Map<string, MobileMoneyAdapter> = new Map();
+
+  registerAdapter(provider: string, adapter: MobileMoneyAdapter): void {
+    this.adapters.set(provider, adapter);
+  }
+
+  getAdapter(provider: string): MobileMoneyAdapter {
+    const adapter = this.adapters.get(provider);
+    if (!adapter) {
+      throw new Error(`Mobile money provider ${provider} not supported`);
+    }
+    return adapter;
+  }
+
+  async processPayment(
+    provider: string,
+    request: PaymentRequest
+  ): Promise<PaymentResponse> {
+    const adapter = this.getAdapter(provider);
+    return await adapter.initiatePayment(request);
+  }
+}
+
+export const mobileMoneyService = new MobileMoneyService();
+```
+
+## M-Pesa Integration (Kenya)
+
+### M-Pesa STK Push Implementation
+
+```typescript
+import axios from 'axios';
+import { createHmac } from 'crypto';
+
+class MPesaAdapter extends MobileMoneyAdapter {
+  private accessToken: string | null = null;
+  private tokenExpiry: number = 0;
+
+  async getAccessToken(): Promise<string> {
+    if (this.accessToken && Date.now() < this.tokenExpiry) {
+      return this.accessToken;
+    }
+
+    const auth = Buffer.from(
+      `${this.config.consumerKey}:${this.config.consumerSecret}`
+    ).toString('base64');
+
+    try {
+      const response = await axios.get(
+        `${this.config.baseUrl}/oauth/v1/generate?grant_type=client_credentials`,
+        {
+          headers: {
+            Authorization: `Basic ${auth}`,
+          },
+        }
+      );
+
+      this.accessToken = response.data.access_token;
+      this.tokenExpiry = Date.now() + (parseInt(response.data.expires_in) * 1000) - 60000; // 1 minute buffer
+
+      return this.accessToken;
+    } catch (error) {
+      console.error('M-Pesa token generation failed:', error);
+      throw new Error('Failed to get M-Pesa access token');
+    }
+  }
+
+  private generatePassword(): string {
+    const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+    const shortCode = this.config.shortCode;
+    const passkey = this.config.passkey;
+    
+    return Buffer.from(`${shortCode}${passkey}${timestamp}`).toString('base64');
+  }
+
+  private generateTimestamp(): string {
+    return new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+  }
+
+  async initiatePayment(request: PaymentRequest): Promise<PaymentResponse> {
+    const accessToken = await this.getAccessToken();
+    const timestamp = this.generateTimestamp();
+    const password = this.generatePassword();
+
+    const stkPushRequest = {
+      BusinessShortCode: this.config.shortCode,
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType: 'CustomerPayBillOnline',
+      Amount: Math.round(request.amount),
+      PartyA: request.phoneNumber,
+      PartyB: this.config.shortCode,
+      PhoneNumber: request.phoneNumber,
+      CallBackURL: `${process.env.AWO_BASE_URL}/webhooks/mpesa/callback`,
+      AccountReference: `AWO-${request.userId}`,
+      TransactionDesc: request.description || 'AWO Platform Payment',
+    };
+
+    try {
+      const response = await axios.post(
+        `${this.config.baseUrl}/mpesa/stkpush/v1/processrequest`,
+        stkPushRequest,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return {
+        transactionId: response.data.CheckoutRequestID,
+        status: 'pending',
+        reference: request.reference,
+        message: response.data.ResponseDescription,
+        provider: 'MPESA',
+      };
+    } catch (error) {
+      console.error('M-Pesa STK push failed:', error);
+      throw new Error('Failed to initiate M-Pesa payment');
+    }
+  }
+
+  async checkStatus(checkoutRequestId: string): Promise<TransactionStatus> {
+    const accessToken = await this.getAccessToken();
+    const timestamp = this.generateTimestamp();
+    const password = this.generatePassword();
+
+    const queryRequest = {
+      BusinessShortCode: this.config.shortCode,
+      Password: password,
+      Timestamp: timestamp,
+      CheckoutRequestID: checkoutRequestId,
+    };
+
+    try {
+      const response = await axios.post(
+        `${this.config.baseUrl}/mpesa/stkpushquery/v1/query`,
+        queryRequest,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return {
+        transactionId: checkoutRequestId,
+        status: this.mapMpesaStatus(response.data.ResultCode),
+        amount: response.data.Amount,
+        phoneNumber: response.data.PhoneNumber,
+        mpesaReceiptNumber: response.data.MpesaReceiptNumber,
+        resultDescription: response.data.ResultDesc,
+      };
+    } catch (error) {
+      console.error('M-Pesa status check failed:', error);
+      throw new Error('Failed to check M-Pesa payment status');
+    }
+  }
+
+  private mapMpesaStatus(resultCode: string): string {
+    switch (resultCode) {
+      case '0':
+        return 'completed';
+      case '1032':
+        return 'cancelled';
+      case '1037':
+        return 'timeout';
+      case '1':
+        return 'insufficient_funds';
+      default:
+        return 'failed';
+    }
+  }
+
+  async initiateTransfer(request: TransferRequest): Promise<TransferResponse> {
+    const accessToken = await this.getAccessToken();
+
+    const transferRequest = {
+      InitiatorName: 'AWO_API_USER',
+      SecurityCredential: this.generateSecurityCredential(),
+      CommandID: 'BusinessPayment',
+      Amount: Math.round(request.amount),
+      PartyA: this.config.shortCode,
+      PartyB: request.phoneNumber,
+      Remarks: request.narration,
+      QueueTimeOutURL: `${process.env.AWO_BASE_URL}/webhooks/mpesa/timeout`,
+      ResultURL: `${process.env.AWO_BASE_URL}/webhooks/mpesa/result`,
+      Occasion: 'AWO_WITHDRAWAL',
+    };
+
+    try {
+      const response = await axios.post(
+        `${this.config.baseUrl}/mpesa/b2c/v1/paymentrequest`,
+        transferRequest,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return {
+        transactionId: response.data.ConversationID,
+        status: 'processing',
+        reference: request.reference,
+        message: response.data.ResponseDescription,
+        provider: 'MPESA',
+      };
+    } catch (error) {
+      console.error('M-Pesa transfer failed:', error);
+      throw new Error('Failed to initiate M-Pesa transfer');
+    }
+  }
+
+  private generateSecurityCredential(): string {
+    // This would use M-Pesa's public certificate to encrypt the initiator password
+    // Implementation would involve using the node-forge library or similar
+    return 'ENCRYPTED_PASSWORD_PLACEHOLDER';
+  }
+
+  async getBalance(): Promise<BalanceResponse> {
+    // Implementation for M-Pesa account balance inquiry
+    const accessToken = await this.getAccessToken();
+    
+    const balanceRequest = {
+      Initiator: 'AWO_API_USER',
+      SecurityCredential: this.generateSecurityCredential(),
+      CommandID: 'AccountBalance',
+      PartyA: this.config.shortCode,
+      IdentifierType: '4',
+      Remarks: 'Balance Inquiry',
+      QueueTimeOutURL: `${process.env.AWO_BASE_URL}/webhooks/mpesa/timeout`,
+      ResultURL: `${process.env.AWO_BASE_URL}/webhooks/mpesa/balance-result`,
+    };
+
+    try {
+      const response = await axios.post(
+        `${this.config.baseUrl}/mpesa/accountbalance/v1/query`,
+        balanceRequest,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return {
+        provider: 'MPESA',
+        currency: 'KES',
+        balance: 0, // Will be updated via result callback
+        status: 'pending',
+        reference: response.data.ConversationID,
+      };
+    } catch (error) {
+      console.error('M-Pesa balance inquiry failed:', error);
+      throw new Error('Failed to get M-Pesa balance');
+    }
+  }
+}
+```
+
+### M-Pesa Callback Handling
+
+```typescript
+import { Request, Response } from 'express';
+
+export async function handleMpesaCallback(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const callbackData = req.body;
+
+    if (callbackData.Body && callbackData.Body.stkCallback) {
+      await handleStkCallback(callbackData.Body.stkCallback);
+    } else if (callbackData.Result) {
+      await handleTransferResult(callbackData.Result);
+    }
+
+    res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
+  } catch (error) {
+    console.error('M-Pesa callback processing error:', error);
+    res.status(500).json({ ResultCode: 1, ResultDesc: 'Error' });
+  }
+}
+
+async function handleStkCallback(stkCallback: any): Promise<void> {
+  const checkoutRequestId = stkCallback.CheckoutRequestID;
+  const resultCode = stkCallback.ResultCode;
+  const resultDesc = stkCallback.ResultDesc;
+
+  if (resultCode === 0) {
+    // Successful payment
+    const callbackMetadata = stkCallback.CallbackMetadata;
+    const items = callbackMetadata.Item;
+
+    const amount = items.find((item: any) => item.Name === 'Amount')?.Value;
+    const mpesaReceiptNumber = items.find((item: any) => item.Name === 'MpesaReceiptNumber')?.Value;
+    const phoneNumber = items.find((item: any) => item.Name === 'PhoneNumber')?.Value;
+    const transactionDate = items.find((item: any) => item.Name === 'TransactionDate')?.Value;
+
+    // Update transaction in database
+    await updateMobileMoneyTransaction(checkoutRequestId, {
+      status: 'completed',
+      amount,
+      mpesaReceiptNumber,
+      phoneNumber,
+      transactionDate,
+      resultDescription: resultDesc,
+    });
+
+    // Process successful payment
+    await processSuccessfulPayment(checkoutRequestId, {
+      amount,
+      currency: 'KES',
+      provider: 'MPESA',
+      phoneNumber,
+      receiptNumber: mpesaReceiptNumber,
+    });
+  } else {
+    // Failed payment
+    await updateMobileMoneyTransaction(checkoutRequestId, {
+      status: 'failed',
+      resultDescription: resultDesc,
+      resultCode,
+    });
+
+    await processFailedPayment(checkoutRequestId, {
+      reason: resultDesc,
+      code: resultCode,
+    });
+  }
+}
+
+async function handleTransferResult(result: any): Promise<void> {
+  const conversationId = result.ConversationID;
+  const resultCode = result.ResultCode;
+  const resultDesc = result.ResultDesc;
+
+  if (resultCode === 0) {
+    // Successful transfer
+    const resultParameters = result.ResultParameters?.ResultParameter || [];
+    
+    const transactionId = resultParameters.find(
+      (param: any) => param.Key === 'TransactionID'
+    )?.Value;
+    
+    const amount = resultParameters.find(
+      (param: any) => param.Key === 'TransactionAmount'
+    )?.Value;
+
+    await updateMobileMoneyTransaction(conversationId, {
+      status: 'completed',
+      transactionId,
+      amount,
+      resultDescription: resultDesc,
+    });
+
+    await processSuccessfulTransfer(conversationId, {
+      transactionId,
+      amount,
+      currency: 'KES',
+      provider: 'MPESA',
+    });
+  } else {
+    // Failed transfer
+    await updateMobileMoneyTransaction(conversationId, {
+      status: 'failed',
+      resultDescription: resultDesc,
+      resultCode,
+    });
+
+    await processFailedTransfer(conversationId, {
+      reason: resultDesc,
+      code: resultCode,
+    });
+  }
+}
+```
+
+## MTN MoMo Integration
+
+### MTN MoMo API Implementation
+
+```typescript
+class MTNMoMoAdapter extends MobileMoneyAdapter {
+  private accessToken: string | null = null;
+  private tokenExpiry: number = 0;
+
+  async getAccessToken(): Promise<string> {
+    if (this.accessToken && Date.now() < this.tokenExpiry) {
+      return this.accessToken;
+    }
+
+    try {
+      const response = await axios.post(
+        `${this.config.baseUrl}/collection/token/`,
+        {},
+        {
+          headers: {
+            'Ocp-Apim-Subscription-Key': this.config.subscriptionKey,
+            Authorization: `Basic ${Buffer.from(
+              `${this.config.userId}:${this.config.apiKey}`
+            ).toString('base64')}`,
+          },
+        }
+      );
+
+      this.accessToken = response.data.access_token;
+      this.tokenExpiry = Date.now() + (parseInt(response.data.expires_in) * 1000) - 60000;
+
+      return this.accessToken;
+    } catch (error) {
+      console.error('MTN MoMo token generation failed:', error);
+      throw new Error('Failed to get MTN MoMo access token');
+    }
+  }
+
+  async initiatePayment(request: PaymentRequest): Promise<PaymentResponse> {
+    const accessToken = await this.getAccessToken();
+    const referenceId = `awo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const paymentRequest = {
+      amount: Math.round(request.amount).toString(),
+      currency: this.config.currency,
+      externalId: request.reference,
+      payer: {
+        partyIdType: 'MSISDN',
+        partyId: request.phoneNumber.replace(/^\+/, ''),
+      },
+      payerMessage: request.description || 'AWO Platform Payment',
+      payeeNote: `Payment for AWO user ${request.userId}`,
+    };
+
+    try {
+      const response = await axios.post(
+        `${this.config.baseUrl}/collection/v1_0/requesttopay`,
+        paymentRequest,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'X-Reference-Id': referenceId,
+            'X-Target-Environment': this.config.environment,
+            'Ocp-Apim-Subscription-Key': this.config.subscriptionKey,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return {
+        transactionId: referenceId,
+        status: 'pending',
+        reference: request.reference,
+        message: 'Payment request sent to customer',
+        provider: 'MTN_MOMO',
+      };
+    } catch (error) {
+      console.error('MTN MoMo payment request failed:', error);
+      throw new Error('Failed to initiate MTN MoMo payment');
+    }
+  }
+
+  async checkStatus(referenceId: string): Promise<TransactionStatus> {
+    const accessToken = await this.getAccessToken();
+
+    try {
+      const response = await axios.get(
+        `${this.config.baseUrl}/collection/v1_0/requesttopay/${referenceId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'X-Target-Environment': this.config.environment,
+            'Ocp-Apim-Subscription-Key': this.config.subscriptionKey,
+          },
+        }
+      );
+
+      return {
+        transactionId: referenceId,
+        status: this.mapMtnStatus(response.data.status),
+        amount: parseFloat(response.data.amount),
+        currency: response.data.currency,
+        phoneNumber: response.data.payer.partyId,
+        financialTransactionId: response.data.financialTransactionId,
+        reason: response.data.reason,
+      };
+    } catch (error) {
+      console.error('MTN MoMo status check failed:', error);
+      throw new Error('Failed to check MTN MoMo payment status');
+    }
+  }
+
+  private mapMtnStatus(status: string): string {
+    switch (status.toUpperCase()) {
+      case 'SUCCESSFUL':
+        return 'completed';
+      case 'PENDING':
+        return 'processing';
+      case 'FAILED':
+        return 'failed';
+      case 'REJECTED':
+        return 'cancelled';
+      default:
+        return 'unknown';
+    }
+  }
+
+  async initiateTransfer(request: TransferRequest): Promise<TransferResponse> {
+    const accessToken = await this.getAccessToken();
+    const referenceId = `awo-transfer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const transferRequest = {
+      amount: Math.round(request.amount).toString(),
+      currency: this.config.currency,
+      externalId: request.reference,
+      payee: {
+        partyIdType: 'MSISDN',
+        partyId: request.phoneNumber.replace(/^\+/, ''),
+      },
+      payerMessage: request.narration || 'AWO Platform Transfer',
+      payeeNote: 'Transfer from AWO Platform',
+    };
+
+    try {
+      await axios.post(
+        `${this.config.baseUrl}/disbursement/v1_0/transfer`,
+        transferRequest,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'X-Reference-Id': referenceId,
+            'X-Target-Environment': this.config.environment,
+            'Ocp-Apim-Subscription-Key': this.config.subscriptionKey,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return {
+        transactionId: referenceId,
+        status: 'processing',
+        reference: request.reference,
+        message: 'Transfer initiated successfully',
+        provider: 'MTN_MOMO',
+      };
+    } catch (error) {
+      console.error('MTN MoMo transfer failed:', error);
+      throw new Error('Failed to initiate MTN MoMo transfer');
+    }
+  }
+
+  async getBalance(): Promise<BalanceResponse> {
+    const accessToken = await this.getAccessToken();
+
+    try {
+      const response = await axios.get(
+        `${this.config.baseUrl}/collection/v1_0/account/balance`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'X-Target-Environment': this.config.environment,
+            'Ocp-Apim-Subscription-Key': this.config.subscriptionKey,
+          },
+        }
+      );
+
+      return {
+        provider: 'MTN_MOMO',
+        currency: response.data.currency,
+        balance: parseFloat(response.data.availableBalance),
+        status: 'completed',
+        reference: `balance-${Date.now()}`,
+      };
+    } catch (error) {
+      console.error('MTN MoMo balance inquiry failed:', error);
+      throw new Error('Failed to get MTN MoMo balance');
+    }
+  }
+}
+```
+
+## Unified Mobile Money Service
+
+### Service Implementation
+
+```typescript
+interface MobileMoneyPaymentRequest {
+  provider: string;
+  phoneNumber: string;
+  amount: number;
+  currency: string;
+  userId: string;
+  reference: string;
+  description?: string;
+}
+
+interface MobileMoneyTransferRequest {
+  provider: string;
+  phoneNumber: string;
+  amount: number;
+  currency: string;
+  reference: string;
+  narration?: string;
+}
+
+class UnifiedMobileMoneyService {
+  private adapters: Map<string, MobileMoneyAdapter> = new Map();
+
+  constructor() {
+    this.initializeAdapters();
+  }
+
+  private initializeAdapters(): void {
+    // Initialize M-Pesa adapter
+    if (MPESA_CONFIG.consumerKey) {
+      this.adapters.set('MPESA', new MPesaAdapter(MPESA_CONFIG));
+    }
+
+    // Initialize MTN MoMo adapters
+    if (UGANDA_MOMO_CONFIG.MTN.apiKey) {
+      this.adapters.set('MTN_UGANDA', new MTNMoMoAdapter(UGANDA_MOMO_CONFIG.MTN));
+    }
+
+    if (GHANA_MOMO_CONFIG.MTN.apiKey) {
+      this.adapters.set('MTN_GHANA', new MTNMoMoAdapter(GHANA_MOMO_CONFIG.MTN));
+    }
+
+    // Add other adapters as needed
+  }
+
+  async detectProvider(
+    phoneNumber: string,
+    country: string
+  ): Promise<string[]> {
+    const providers: string[] = [];
+    
+    // Remove country code and clean phone number
+    const cleanNumber = phoneNumber.replace(/^\+\d{1,3}/, '').replace(/\D/g, '');
+    
+    switch (country.toUpperCase()) {
+      case 'KE':
+        if (cleanNumber.startsWith('7')) {
+          providers.push('MPESA');
+        }
+        break;
+        
+      case 'GH':
+        if (cleanNumber.startsWith('24') || cleanNumber.startsWith('54') || cleanNumber.startsWith('55')) {
+          providers.push('MTN_GHANA');
+        }
+        if (cleanNumber.startsWith('20') || cleanNumber.startsWith('50')) {
+          providers.push('VODAFONE_GHANA');
+        }
+        break;
+        
+      case 'UG':
+        if (cleanNumber.startsWith('77') || cleanNumber.startsWith('78')) {
+          providers.push('MTN_UGANDA');
+        }
+        if (cleanNumber.startsWith('70') || cleanNumber.startsWith('75')) {
+          providers.push('AIRTEL_UGANDA');
+        }
+        break;
+        
+      case 'NG':
+        // Nigeria uses bank-based mobile wallets
+        providers.push('OPAY', 'PALMPAY', 'KUDA');
+        break;
+    }
+    
+    return providers;
+  }
+
+  async initiatePayment(
+    request: MobileMoneyPaymentRequest
+  ): Promise<PaymentResponse> {
+    const adapter = this.adapters.get(request.provider);
+    if (!adapter) {
+      throw new Error(`Mobile money provider ${request.provider} not supported`);
+    }
+
+    try {
+      // Store transaction in database
+      const transaction = await this.storeTransaction({
+        provider: request.provider,
+        type: 'payment',
+        phoneNumber: request.phoneNumber,
+        amount: request.amount,
+        currency: request.currency,
+        reference: request.reference,
+        status: 'initiated',
+        userId: request.userId,
+      });
+
+      // Initiate payment with provider
+      const response = await adapter.initiatePayment({
+        phoneNumber: request.phoneNumber,
+        amount: request.amount,
+        currency: request.currency,
+        reference: request.reference,
+        description: request.description,
+        userId: request.userId,
+      });
+
+      // Update transaction with provider response
+      await this.updateTransaction(transaction.id, {
+        providerTransactionId: response.transactionId,
+        status: response.status,
+        providerResponse: response,
+      });
+
+      return response;
+    } catch (error) {
+      console.error(`Mobile money payment failed for ${request.provider}:`, error);
+      throw error;
+    }
+  }
+
+  async checkPaymentStatus(
+    transactionId: string,
+    provider: string
+  ): Promise<TransactionStatus> {
+    const adapter = this.adapters.get(provider);
+    if (!adapter) {
+      throw new Error(`Mobile money provider ${provider} not supported`);
+    }
+
+    try {
+      const status = await adapter.checkStatus(transactionId);
+      
+      // Update transaction status in database
+      await this.updateTransactionStatus(transactionId, status.status, status);
+      
+      return status;
+    } catch (error) {
+      console.error(`Status check failed for ${provider}:`, error);
+      throw error;
+    }
+  }
+
+  async initiateTransfer(
+    request: MobileMoneyTransferRequest
+  ): Promise<TransferResponse> {
+    const adapter = this.adapters.get(request.provider);
+    if (!adapter) {
+      throw new Error(`Mobile money provider ${request.provider} not supported`);
+    }
+
+    try {
+      // Store transfer in database
+      const transfer = await this.storeTransaction({
+        provider: request.provider,
+        type: 'transfer',
+        phoneNumber: request.phoneNumber,
+        amount: request.amount,
+        currency: request.currency,
+        reference: request.reference,
+        status: 'initiated',
+      });
+
+      // Initiate transfer with provider
+      const response = await adapter.initiateTransfer(request);
+
+      // Update transfer with provider response
+      await this.updateTransaction(transfer.id, {
+        providerTransactionId: response.transactionId,
+        status: response.status,
+        providerResponse: response,
+      });
+
+      return response;
+    } catch (error) {
+      console.error(`Mobile money transfer failed for ${request.provider}:`, error);
+      throw error;
+    }
+  }
+
+  private async storeTransaction(transaction: any): Promise<any> {
+    // Implementation to store transaction in database
+    return await database.query(`
+      INSERT INTO mobile_money_transactions (
+        provider, type, phone_number, amount, currency, 
+        reference, status, user_id, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+      RETURNING *
+    `, [
+      transaction.provider,
+      transaction.type,
+      transaction.phoneNumber,
+      transaction.amount,
+      transaction.currency,
+      transaction.reference,
+      transaction.status,
+      transaction.userId,
+    ]);
+  }
+
+  private async updateTransaction(id: string, updates: any): Promise<void> {
+    const setClause = Object.keys(updates)
+      .map((key, index) => `${key} = $${index + 2}`)
+      .join(', ');
+
+    await database.query(`
+      UPDATE mobile_money_transactions 
+      SET ${setClause}, updated_at = NOW()
+      WHERE id = $1
+    `, [id, ...Object.values(updates)]);
+  }
+
+  private async updateTransactionStatus(
+    providerTransactionId: string,
+    status: string,
+    statusData: any
+  ): Promise<void> {
+    await database.query(`
+      UPDATE mobile_money_transactions 
+      SET status = $2, status_data = $3, updated_at = NOW()
+      WHERE provider_transaction_id = $1
+    `, [providerTransactionId, status, JSON.stringify(statusData)]);
+  }
+}
+
+export const mobileMoneyService = new UnifiedMobileMoneyService();
+```
+
+## Frontend Integration
+
+### React Native Component
+
+```typescript
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+
+interface MobileMoneyPaymentProps {
+  amount: number;
+  currency: string;
+  userId: string;
+  onSuccess: (transaction: any) => void;
+  onError: (error: any) => void;
+}
+
+export const MobileMoneyPayment: React.FC<MobileMoneyPaymentProps> = ({
+  amount,
+  currency,
+  userId,
+  onSuccess,
+  onError,
+}) => {
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [selectedProvider, setSelectedProvider] = useState('');
+  const [availableProviders, setAvailableProviders] = useState<string[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [country, setCountry] = useState('KE'); // Default to Kenya
+
+  useEffect(() => {
+    detectProviders();
+  }, [phoneNumber, country]);
+
+  const detectProviders = async () => {
+    if (phoneNumber.length >= 9) {
+      try {
+        const providers = await mobileMoneyAPI.detectProvider(phoneNumber, country);
+        setAvailableProviders(providers);
+        if (providers.length === 1) {
+          setSelectedProvider(providers[0]);
+        }
+      } catch (error) {
+        console.error('Provider detection failed:', error);
+      }
+    }
+  };
+
+  const handlePayment = async () => {
+    if (!selectedProvider || !phoneNumber) {
+      Alert.alert('Error', 'Please select a payment method and enter phone number');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const paymentRequest = {
+        provider: selectedProvider,
+        phoneNumber,
+        amount,
+        currency,
+        userId,
+        reference: `AWO_${Date.now()}`,
+        description: `AWO Platform Payment - ${currency} ${amount}`,
+      };
+
+      const response = await mobileMoneyAPI.initiatePayment(paymentRequest);
+
+      if (response.status === 'pending') {
+        // Show instructions to user
+        Alert.alert(
+          'Payment Initiated',
+          getPaymentInstructions(selectedProvider, phoneNumber),
+          [{ text: 'OK', onPress: () => pollPaymentStatus(response.transactionId) }]
+        );
+      } else {
+        onSuccess(response);
+      }
+    } catch (error) {
+      console.error('Payment initiation failed:', error);
+      onError(error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const pollPaymentStatus = async (transactionId: string) => {
+    const maxAttempts = 30; // 5 minutes with 10-second intervals
+    let attempts = 0;
+
+    const checkStatus = async () => {
+      try {
+        const status = await mobileMoneyAPI.checkStatus(transactionId, selectedProvider);
+        
+        if (status.status === 'completed') {
+          onSuccess(status);
+          return;
+        } else if (status.status === 'failed' || status.status === 'cancelled') {
+          onError(new Error(status.reason || 'Payment failed'));
+          return;
+        }
+
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(checkStatus, 10000); // Check again in 10 seconds
+        } else {
+          onError(new Error('Payment timeout'));
+        }
+      } catch (error) {
+        console.error('Status check failed:', error);
+        if (attempts < maxAttempts) {
+          attempts++;
+          setTimeout(checkStatus, 10000);
+        } else {
+          onError(error);
+        }
+      }
+    };
+
+    checkStatus();
+  };
+
+  const getPaymentInstructions = (provider: string, phone: string): string => {
+    switch (provider) {
+      case 'MPESA':
+        return `Please check your phone ${phone} for M-Pesa STK push notification and enter your PIN to complete the payment.`;
+      case 'MTN_GHANA':
+      case 'MTN_UGANDA':
+        return `Please dial *170# on ${phone} and follow the prompts to complete your MTN MoMo payment.`;
+      case 'VODAFONE_GHANA':
+        return `Please dial *110# on ${phone} and follow the prompts to complete your Vodafone Cash payment.`;
+      default:
+        return `Please check your phone ${phone} for payment instructions.`;
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Mobile Money Payment</Text>
+      <Text style={styles.amount}>{currency} {amount.toFixed(2)}</Text>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Country</Text>
+        <Picker
+          selectedValue={country}
+          onValueChange={setCountry}
+          style={styles.picker}
+        >
+          <Picker.Item label="Kenya" value="KE" />
+          <Picker.Item label="Ghana" value="GH" />
+          <Picker.Item label="Uganda" value="UG" />
+          <Picker.Item label="Nigeria" value="NG" />
+        </Picker>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Phone Number</Text>
+        <TextInput
+          style={styles.textInput}
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
+          placeholder="Enter mobile money number"
+          keyboardType="phone-pad"
+        />
+      </View>
+
+      {availableProviders.length > 0 && (
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Payment Method</Text>
+          <Picker
+            selectedValue={selectedProvider}
+            onValueChange={setSelectedProvider}
+            style={styles.picker}
+          >
+            <Picker.Item label="Select Provider" value="" />
+            {availableProviders.map(provider => (
+              <Picker.Item
+                key={provider}
+                label={getProviderDisplayName(provider)}
+                value={provider}
+              />
+            ))}
+          </Picker>
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={[styles.payButton, isProcessing && styles.disabledButton]}
+        onPress={handlePayment}
+        disabled={isProcessing || !selectedProvider}
+      >
+        <Text style={styles.payButtonText}>
+          {isProcessing ? 'Processing...' : 'Pay Now'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const getProviderDisplayName = (provider: string): string => {
+  const names: Record<string, string> = {
+    'MPESA': 'M-Pesa',
+    'MTN_GHANA': 'MTN MoMo Ghana',
+    'MTN_UGANDA': 'MTN MoMo Uganda',
+    'VODAFONE_GHANA': 'Vodafone Cash',
+    'AIRTEL_UGANDA': 'Airtel Money',
+    'OPAY': 'OPay',
+    'PALMPAY': 'PalmPay',
+    'KUDA': 'Kuda',
+  };
+  
+  return names[provider] || provider;
+};
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 20,
+    backgroundColor: '#fff',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  amount: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#bc9b25',
+    marginBottom: 30,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#333',
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+  },
+  picker: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+  },
+  payButton: {
+    backgroundColor: '#bc9b25',
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  payButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
 });
 ```
 
-## Webhooks
+## Testing & Mock Data
 
-Webhook configuration and handling will be documented here.
+### Test Phone Numbers
 
-## Troubleshooting
+```typescript
+export const TEST_MOBILE_MONEY_NUMBERS = {
+  MPESA: {
+    SUCCESS: '+254708374149',
+    INSUFFICIENT_FUNDS: '+254708374150',
+    INVALID_PIN: '+254708374151',
+    TIMEOUT: '+254708374152',
+  },
+  MTN_GHANA: {
+    SUCCESS: '+233540000001',
+    INSUFFICIENT_FUNDS: '+233540000002',
+    REJECTED: '+233540000003',
+  },
+  MTN_UGANDA: {
+    SUCCESS: '+256772000001',
+    INSUFFICIENT_FUNDS: '+256772000002',
+    REJECTED: '+256772000003',
+  },
+};
 
-<Accordion title="Common Integration Issues">
-Common problems and solutions will be provided here.
-</Accordion>
+export const TEST_SCENARIOS = {
+  successful_payment: {
+    phoneNumber: '+254708374149',
+    provider: 'MPESA',
+    amount: 100,
+    currency: 'KES',
+    expectedStatus: 'completed',
+    responseTime: 30000, // 30 seconds
+  },
+  insufficient_funds: {
+    phoneNumber: '+254708374150',
+    provider: 'MPESA',
+    amount: 1000000, // Large amount
+    currency: 'KES',
+    expectedStatus: 'failed',
+    expectedReason: 'Insufficient funds',
+  },
+  user_cancellation: {
+    phoneNumber: '+254708374151',
+    provider: 'MPESA',
+    amount: 100,
+    currency: 'KES',
+    expectedStatus: 'cancelled',
+    expectedReason: 'User cancelled transaction',
+  },
+};
+```
+
+## Error Handling & Recovery
+
+### Comprehensive Error Management
+
+```typescript
+export class MobileMoneyError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public provider: string,
+    public recoverable: boolean = false,
+    public retryAfter?: number
+  ) {
+    super(message);
+    this.name = 'MobileMoneyError';
+  }
+}
+
+export function handleMobileMoneyError(
+  error: any,
+  provider: string
+): MobileMoneyError {
+  // Provider-specific error handling
+  switch (provider) {
+    case 'MPESA':
+      return handleMpesaError(error);
+    case 'MTN_GHANA':
+    case 'MTN_UGANDA':
+      return handleMtnError(error);
+    default:
+      return new MobileMoneyError(
+        error.message || 'Unknown mobile money error',
+        'UNKNOWN_ERROR',
+        provider
+      );
+  }
+}
+
+function handleMpesaError(error: any): MobileMoneyError {
+  if (error.response?.data?.errorCode) {
+    const errorCode = error.response.data.errorCode;
+    const errorMessage = error.response.data.errorMessage;
+
+    switch (errorCode) {
+      case '1':
+        return new MobileMoneyError(
+          'Insufficient funds in account',
+          'INSUFFICIENT_FUNDS',
+          'MPESA'
+        );
+      case '1032':
+        return new MobileMoneyError(
+          'User cancelled transaction',
+          'USER_CANCELLED',
+          'MPESA'
+        );
+      case '1037':
+        return new MobileMoneyError(
+          'Transaction timeout',
+          'TIMEOUT',
+          'MPESA',
+          true,
+          300 // Retry after 5 minutes
+        );
+      case '2001':
+        return new MobileMoneyError(
+          'Invalid initiator information',
+          'INVALID_CREDENTIALS',
+          'MPESA'
+        );
+      default:
+        return new MobileMoneyError(
+          errorMessage || 'M-Pesa transaction failed',
+          errorCode,
+          'MPESA'
+        );
+    }
+  }
+
+  return new MobileMoneyError(
+    error.message || 'M-Pesa API error',
+    'API_ERROR',
+    'MPESA',
+    true
+  );
+}
+
+function handleMtnError(error: any): MobileMoneyError {
+  if (error.response?.data?.code) {
+    const code = error.response.data.code;
+    const message = error.response.data.message;
+
+    switch (code) {
+      case 'PAYER_NOT_FOUND':
+        return new MobileMoneyError(
+          'Mobile money account not found',
+          'ACCOUNT_NOT_FOUND',
+          'MTN_MOMO'
+        );
+      case 'PAYEE_NOT_ALLOWED_TO_RECEIVE':
+        return new MobileMoneyError(
+          'Recipient not allowed to receive payments',
+          'RECIPIENT_BLOCKED',
+          'MTN_MOMO'
+        );
+      case 'NOT_ENOUGH_FUNDS':
+        return new MobileMoneyError(
+          'Insufficient funds in account',
+          'INSUFFICIENT_FUNDS',
+          'MTN_MOMO'
+        );
+      case 'INTERNAL_PROCESSING_ERROR':
+        return new MobileMoneyError(
+          'Internal processing error',
+          'INTERNAL_ERROR',
+          'MTN_MOMO',
+          true,
+          60 // Retry after 1 minute
+        );
+      default:
+        return new MobileMoneyError(
+          message || 'MTN MoMo transaction failed',
+          code,
+          'MTN_MOMO'
+        );
+    }
+  }
+
+  return new MobileMoneyError(
+    error.message || 'MTN MoMo API error',
+    'API_ERROR',
+    'MTN_MOMO',
+    true
+  );
+}
+
+// Retry logic for recoverable errors
+export async function retryMobileMoneyOperation<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: any;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      if (!(error instanceof MobileMoneyError) || !error.recoverable) {
+        throw error;
+      }
+
+      if (attempt === maxRetries) {
+        throw error;
+      }
+
+      const delay = error.retryAfter
+        ? error.retryAfter * 1000
+        : baseDelay * Math.pow(2, attempt);
+
+      console.log(`Retrying mobile money operation in ${delay}ms (attempt ${attempt + 1})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}
+```
+
+---
+
+*This comprehensive Mobile Money integration guide provides all necessary implementation details for processing mobile money payments across Africa through AWO Platform. Mobile money integration is crucial for financial inclusion and serves as the primary payment method for millions of users across the continent.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

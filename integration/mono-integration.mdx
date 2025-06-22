@@ -1,52 +1,1309 @@
----
-title: "Mono Integration"
-description: "AWO Platform mono integration integration guide"
----
+# Mono Integration Guide
 
-# Mono Integration
+This guide provides comprehensive instructions for integrating Mono's Open Banking APIs into AWO Platform for expanded coverage across Nigeria, Kenya, Ghana, and South Africa.
 
 ## Overview
 
 <Info>
-This guide covers mono integration integration with the AWO Platform.
+Mono is AWO's secondary Open Banking provider, offering extensive coverage across West and East Africa with a focus on financial data access and direct bank payments for market expansion beyond South Africa.
 </Info>
+
+### Mono Capabilities for AWO
+
+<CardGroup cols={2}>
+  <Card title="Connect - Financial Data" icon="link">
+    **Account Linking**: Secure OAuth-based connection  
+    **Transaction History**: Up to 12 months of data  
+    **Real-time Balances**: Live account balance updates  
+    **Income Analytics**: Automated income verification
+  </Card>
+  <Card title="DirectPay - Bank Payments" icon="credit-card">
+    **One-time Payments**: Direct bank transfers  
+    **Recurring Payments**: Subscription-based payments  
+    **USSD Payments**: Feature phone compatibility  
+    **Real-time Settlement**: Instant payment confirmation
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Identity Services" icon="shield-check">
+    **BVN Lookup**: Nigerian bank verification  
+    **NIN Verification**: National ID validation  
+    **Account Verification**: Bank account validation  
+    **KYC Services**: Comprehensive identity checks
+  </Card>
+  <Card title="Regional Coverage" icon="globe">
+    **Nigeria**: 25+ banks and fintechs  
+    **Kenya**: Major banks and SACCOs  
+    **Ghana**: Leading financial institutions  
+    **South Africa**: Backup coverage for Stitch
+  </Card>
+</CardGroup>
 
 ## Prerequisites
 
-Integration requirements will be listed here.
-
-## Setup Instructions
+### Business Setup
 
 <Steps>
-  <Step title="API Configuration">
-    Configure API credentials and endpoints
+  <Step title="Mono Dashboard Registration">
+    Sign up for Mono business account and complete KYC verification
   </Step>
-  <Step title="Webhook Setup">
-    Set up webhooks for real-time updates
+  <Step title="API Access Request">
+    Request production API access through sales@mono.co
   </Step>
-  <Step title="Testing">
-    Test the integration in sandbox environment
+  <Step title="Compliance Documentation">
+    Submit required business and compliance documents
+  </Step>
+  <Step title="Integration Planning">
+    Plan integration scope and regional rollout strategy
   </Step>
 </Steps>
 
-## Code Examples
+### Technical Requirements
+
+```javascript
+// Required dependencies for Mono integration
+{
+  "@mono.co/connect": "^2.0.0",
+  "axios": "^1.3.0",
+  "crypto": "^1.0.1",
+  "jsonwebtoken": "^9.0.0"
+}
+```
+
+**Environment Setup:**
+- Node.js 16+ or React Native 0.68+
+- HTTPS-enabled webhook endpoints
+- Valid SSL certificates for production
+- Secure credential storage
+
+## Authentication
+
+### API Key Authentication
+
+Mono uses API key-based authentication with secret keys for server-side operations.
+
+#### Environment Configuration
 
 ```typescript
-// Integration example
-import { MonoIntegrationClient } from '@awo-platform/integrations';
+interface MonoConfig {
+  baseUrl: string;
+  publicKey: string;
+  secretKey: string;
+  webhookSecret: string;
+}
 
-const client = new MonoIntegrationClient({
-  apiKey: process.env.API_KEY,
-  environment: 'sandbox'
+const MONO_CONFIG: Record<string, MonoConfig> = {
+  production: {
+    baseUrl: 'https://api.withmono.com',
+    publicKey: process.env.MONO_PROD_PUBLIC_KEY!,
+    secretKey: process.env.MONO_PROD_SECRET_KEY!,
+    webhookSecret: process.env.MONO_PROD_WEBHOOK_SECRET!,
+  },
+  test: {
+    baseUrl: 'https://api.withmono.com',
+    publicKey: process.env.MONO_TEST_PUBLIC_KEY!,
+    secretKey: process.env.MONO_TEST_SECRET_KEY!,
+    webhookSecret: process.env.MONO_TEST_WEBHOOK_SECRET!,
+  },
+};
+
+export const monoConfig = MONO_CONFIG[
+  process.env.NODE_ENV === 'production' ? 'production' : 'test'
+];
+```
+
+#### API Client Setup
+
+```typescript
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
+
+class MonoAPIClient {
+  private client: AxiosInstance;
+
+  constructor(private config: MonoConfig) {
+    this.client = axios.create({
+      baseURL: config.baseUrl,
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+        'mono-sec-key': config.secretKey,
+      },
+    });
+
+    this.setupInterceptors();
+  }
+
+  private setupInterceptors(): void {
+    // Request interceptor for logging
+    this.client.interceptors.request.use(
+      (config) => {
+        console.log(`Mono API Request: ${config.method?.toUpperCase()} ${config.url}`);
+        return config;
+      },
+      (error) => {
+        console.error('Mono API Request Error:', error);
+        return Promise.reject(error);
+      }
+    );
+
+    // Response interceptor for error handling
+    this.client.interceptors.response.use(
+      (response: AxiosResponse) => response,
+      (error) => {
+        const monoError = this.handleError(error);
+        return Promise.reject(monoError);
+      }
+    );
+  }
+
+  private handleError(error: any): MonoAPIError {
+    if (error.response) {
+      return {
+        code: error.response.data?.code || 'API_ERROR',
+        message: error.response.data?.message || 'API request failed',
+        status: error.response.status,
+        details: error.response.data,
+      };
+    }
+
+    if (error.request) {
+      return {
+        code: 'NETWORK_ERROR',
+        message: 'Network request failed',
+        status: 0,
+        details: error.message,
+      };
+    }
+
+    return {
+      code: 'UNKNOWN_ERROR',
+      message: error.message || 'Unknown error occurred',
+      status: 0,
+      details: error,
+    };
+  }
+
+  async get<T>(url: string, params?: any): Promise<T> {
+    const response = await this.client.get(url, { params });
+    return response.data;
+  }
+
+  async post<T>(url: string, data?: any): Promise<T> {
+    const response = await this.client.post(url, data);
+    return response.data;
+  }
+}
+
+export const monoClient = new MonoAPIClient(monoConfig);
+```
+
+## Account Linking with Mono Connect
+
+### Frontend Integration (React Native)
+
+#### Step 1: Install Mono Connect SDK
+
+```bash
+npm install @mono.co/connect-react-native
+# or
+yarn add @mono.co/connect-react-native
+```
+
+#### Step 2: Implement Connect Widget
+
+```typescript
+import React, { useState } from 'react';
+import { View, Button, Alert } from 'react-native';
+import { MonoConnect } from '@mono.co/connect-react-native';
+
+interface MonoConnectProps {
+  userId: string;
+  onSuccess: (code: string) => void;
+  onClose: () => void;
+}
+
+export const MonoConnectWidget: React.FC<MonoConnectProps> = ({
+  userId,
+  onSuccess,
+  onClose,
+}) => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  const monoConfig = {
+    publicKey: monoConfig.publicKey,
+    onSuccess: (data: any) => {
+      console.log('Mono Connect Success:', data);
+      onSuccess(data.code);
+      setIsVisible(false);
+    },
+    onEvent: (eventName: string, data: any) => {
+      console.log('Mono Connect Event:', eventName, data);
+      
+      switch (eventName) {
+        case 'OPENED':
+          console.log('Connect widget opened');
+          break;
+        case 'EXIT':
+          console.log('User exited connect flow');
+          setIsVisible(false);
+          onClose();
+          break;
+        case 'INSTITUTION_SELECTED':
+          console.log('User selected institution:', data.institution);
+          break;
+        case 'AUTH_METHOD_SWITCHED':
+          console.log('User switched auth method:', data.method);
+          break;
+        case 'SUBMIT_CREDENTIALS':
+          console.log('User submitted credentials');
+          break;
+        case 'ACCOUNT_LINKED':
+          console.log('Account linked successfully');
+          break;
+        case 'ACCOUNT_SELECTED':
+          console.log('User selected accounts:', data.accounts);
+          break;
+        case 'ERROR':
+          console.error('Connect error:', data.error);
+          Alert.alert('Connection Error', data.error.message);
+          break;
+      }
+    },
+    customer: {
+      id: userId,
+      email: `user_${userId}@awo.app`, // Optional
+    },
+    meta: {
+      reference: `awo_link_${userId}_${Date.now()}`,
+    },
+  };
+
+  return (
+    <View>
+      <Button
+        title="Link Bank Account"
+        onPress={() => setIsVisible(true)}
+      />
+      
+      {isVisible && (
+        <MonoConnect
+          publicKey={monoConfig.publicKey}
+          onSuccess={monoConfig.onSuccess}
+          onEvent={monoConfig.onEvent}
+          customer={monoConfig.customer}
+          meta={monoConfig.meta}
+        />
+      )}
+    </View>
+  );
+};
+```
+
+#### Step 3: Handle Connect Success
+
+```typescript
+export async function handleMonoConnectSuccess(
+  userId: string,
+  code: string
+): Promise<void> {
+  try {
+    // Exchange code for account ID
+    const authResponse = await monoClient.post<MonoAuthResponse>(
+      '/v2/accounts/auth',
+      { code }
+    );
+
+    const accountId = authResponse.id;
+
+    // Store account ID for future API calls
+    await storeMonoAccountId(userId, accountId);
+
+    // Fetch and store account information
+    await syncMonoAccountData(accountId);
+
+    // Trigger DIVA score recalculation
+    await triggerDivaScoreUpdate(userId);
+
+    console.log('Mono account linked successfully:', accountId);
+  } catch (error) {
+    console.error('Failed to handle Mono Connect success:', error);
+    throw error;
+  }
+}
+
+interface MonoAuthResponse {
+  id: string;
+  customer: string;
+  institution: {
+    name: string;
+    type: string;
+    country: string;
+  };
+}
+```
+
+### Backend Authentication Exchange
+
+```typescript
+export async function exchangeMonoCode(code: string): Promise<string> {
+  try {
+    const response = await monoClient.post<MonoAuthResponse>(
+      '/v2/accounts/auth',
+      { code }
+    );
+
+    return response.id; // This is the account ID
+  } catch (error) {
+    console.error('Mono code exchange failed:', error);
+    throw new Error('Failed to authenticate with Mono');
+  }
+}
+
+async function storeMonoAccountId(
+  userId: string,
+  accountId: string
+): Promise<void> {
+  await database.query(`
+    INSERT INTO user_mono_accounts (user_id, account_id, linked_at)
+    VALUES ($1, $2, NOW())
+    ON CONFLICT (user_id, account_id) 
+    DO UPDATE SET linked_at = NOW()
+  `, [userId, accountId]);
+}
+```
+
+## Financial Data Access
+
+### Fetch Account Information
+
+```typescript
+interface MonoAccount {
+  id: string;
+  name: string;
+  accountNumber: string;
+  type: string;
+  currency: string;
+  balance: number;
+  bvn?: string;
+  institution: {
+    name: string;
+    bankCode: string;
+    type: string;
+  };
+}
+
+export async function getMonoAccount(accountId: string): Promise<MonoAccount> {
+  try {
+    const response = await monoClient.get<MonoAccount>(
+      `/v2/accounts/${accountId}`
+    );
+
+    return {
+      id: response.id,
+      name: response.name,
+      accountNumber: response.accountNumber,
+      type: response.type,
+      currency: response.currency,
+      balance: response.balance,
+      bvn: response.bvn,
+      institution: response.institution,
+    };
+  } catch (error) {
+    console.error('Failed to fetch Mono account:', error);
+    throw error;
+  }
+}
+```
+
+### Fetch Transaction History
+
+```typescript
+interface MonoTransaction {
+  id: string;
+  amount: number;
+  date: string;
+  description: string;
+  type: 'debit' | 'credit';
+  category: string;
+  balance: number;
+  reference?: string;
+  location?: string;
+}
+
+interface MonoTransactionsResponse {
+  data: MonoTransaction[];
+  meta: {
+    total: number;
+    page: number;
+    previous: string | null;
+    next: string | null;
+  };
+}
+
+export async function getMonoTransactions(
+  accountId: string,
+  options?: {
+    start?: string; // YYYY-MM-DD
+    end?: string; // YYYY-MM-DD
+    page?: number;
+    limit?: number;
+  }
+): Promise<MonoTransactionsResponse> {
+  try {
+    const params = new URLSearchParams();
+    
+    if (options?.start) params.append('start', options.start);
+    if (options?.end) params.append('end', options.end);
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+
+    const response = await monoClient.get<MonoTransactionsResponse>(
+      `/v2/accounts/${accountId}/transactions?${params.toString()}`
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Failed to fetch Mono transactions:', error);
+    throw error;
+  }
+}
+```
+
+### Fetch Account Statement
+
+```typescript
+interface MonoStatementOptions {
+  period: '1' | '3' | '6' | '12'; // months
+  output: 'json' | 'pdf';
+}
+
+export async function getMonoStatement(
+  accountId: string,
+  options: MonoStatementOptions
+): Promise<any> {
+  try {
+    const response = await monoClient.get(
+      `/v2/accounts/${accountId}/statement`,
+      {
+        period: options.period,
+        output: options.output,
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Failed to fetch Mono statement:', error);
+    throw error;
+  }
+}
+```
+
+### Income Analysis
+
+```typescript
+interface MonoIncomeData {
+  type: 'salary' | 'freelance' | 'business' | 'investment' | 'other';
+  amount: number;
+  frequency: 'monthly' | 'weekly' | 'irregular';
+  confidence: number; // 0-100
+  lastPaymentDate: string;
+  employer?: string;
+  accountNumber?: string;
+}
+
+export async function getMonoIncome(accountId: string): Promise<MonoIncomeData[]> {
+  try {
+    const response = await monoClient.get<MonoIncomeData[]>(
+      `/v2/accounts/${accountId}/income`
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Failed to fetch Mono income data:', error);
+    throw error;
+  }
+}
+```
+
+## DirectPay Integration
+
+### One-time Payment Initiation
+
+```typescript
+interface MonoPaymentRequest {
+  amount: number;
+  type: 'one-time' | 'recurring';
+  description: string;
+  redirectUrl: string;
+  customerName: string;
+  customerEmail: string;
+  reference: string;
+}
+
+interface MonoPaymentResponse {
+  id: string;
+  checkout_url: string;
+  reference: string;
+  status: 'pending' | 'successful' | 'failed';
+}
+
+export async function initializeMonoPayment(
+  request: MonoPaymentRequest
+): Promise<MonoPaymentResponse> {
+  try {
+    const response = await monoClient.post<MonoPaymentResponse>(
+      '/v2/payments/initiate',
+      {
+        amount: Math.round(request.amount * 100), // Convert to kobo/cents
+        type: request.type,
+        description: request.description,
+        redirect_url: request.redirectUrl,
+        customer: {
+          name: request.customerName,
+          email: request.customerEmail,
+        },
+        meta: {
+          reference: request.reference,
+          source: 'awo_platform',
+        },
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Failed to initialize Mono payment:', error);
+    throw error;
+  }
+}
+```
+
+### Payment Status Verification
+
+```typescript
+export async function verifyMonoPayment(
+  paymentId: string
+): Promise<MonoPaymentResponse> {
+  try {
+    const response = await monoClient.get<MonoPaymentResponse>(
+      `/v2/payments/${paymentId}`
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Failed to verify Mono payment:', error);
+    throw error;
+  }
+}
+```
+
+## Identity Verification Services
+
+### BVN Lookup (Nigeria)
+
+```typescript
+interface MonoBVNRequest {
+  bvn: string;
+  scope: 'identity' | 'bank_accounts';
+}
+
+interface MonoBVNResponse {
+  status: 'successful' | 'failed';
+  message: string;
+  data?: {
+    bvn: string;
+    firstName: string;
+    lastName: string;
+    dateOfBirth: string;
+    phoneNumber: string;
+    bankAccounts?: Array<{
+      accountNumber: string;
+      bankName: string;
+    }>;
+  };
+}
+
+export async function lookupBVN(
+  bvn: string,
+  scope: 'identity' | 'bank_accounts' = 'identity'
+): Promise<MonoBVNResponse> {
+  try {
+    // Step 1: Initiate BVN lookup
+    const initiateResponse = await monoClient.post<{
+      session_id: string;
+      methods: string[];
+    }>('/v2/lookup/bvn/initiate', {
+      bvn,
+      scope,
+    });
+
+    // Store session ID for verification step
+    const sessionId = initiateResponse.session_id;
+
+    // Return session info for frontend to handle OTP verification
+    return {
+      status: 'successful',
+      message: 'BVN lookup initiated. OTP verification required.',
+      data: {
+        sessionId,
+        methods: initiateResponse.methods,
+      },
+    };
+  } catch (error) {
+    console.error('BVN lookup failed:', error);
+    return {
+      status: 'failed',
+      message: 'BVN lookup failed',
+    };
+  }
+}
+
+export async function verifyBVNOTP(
+  sessionId: string,
+  otp: string
+): Promise<MonoBVNResponse> {
+  try {
+    const response = await monoClient.post<MonoBVNResponse>(
+      '/v2/lookup/bvn/details',
+      { otp },
+      {
+        headers: {
+          'x-session-id': sessionId,
+        },
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error('BVN OTP verification failed:', error);
+    throw error;
+  }
+}
+```
+
+### Account Number Verification
+
+```typescript
+interface MonoAccountVerification {
+  accountNumber: string;
+  bankCode: string;
+}
+
+interface MonoAccountVerificationResponse {
+  status: 'successful' | 'failed';
+  data?: {
+    accountNumber: string;
+    accountName: string;
+    bankName: string;
+    bankCode: string;
+  };
+  message: string;
+}
+
+export async function verifyAccountNumber(
+  request: MonoAccountVerification
+): Promise<MonoAccountVerificationResponse> {
+  try {
+    const response = await monoClient.post<MonoAccountVerificationResponse>(
+      '/v2/lookup/account',
+      {
+        account_number: request.accountNumber,
+        bank_code: request.bankCode,
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Account verification failed:', error);
+    throw error;
+  }
+}
+```
+
+## Webhook Integration
+
+### Webhook Event Types
+
+<CardGroup cols={2}>
+  <Card title="Account Events" icon="link">
+    **mono.events.account_connected**: Account linked  
+    **mono.events.account_updated**: Account data changed  
+    **mono.events.account_reauthorization**: Re-auth required  
+    **mono.events.account_disconnected**: Account unlinked
+  </Card>
+  <Card title="Payment Events" icon="credit-card">
+    **mono.events.payment_initiated**: Payment started  
+    **mono.events.payment_successful**: Payment completed  
+    **mono.events.payment_failed**: Payment failed  
+    **mono.events.payment_pending**: Payment processing
+  </Card>
+</CardGroup>
+
+### Webhook Handler Implementation
+
+```typescript
+import { createHmac } from 'crypto';
+
+interface MonoWebhookEvent {
+  event: string;
+  data: any;
+  timestamp: string;
+}
+
+export async function handleMonoWebhook(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const signature = req.headers['x-mono-signature'] as string;
+    const body = JSON.stringify(req.body);
+
+    // Verify webhook signature
+    if (!verifyMonoWebhookSignature(body, signature)) {
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    const event: MonoWebhookEvent = req.body;
+
+    switch (event.event) {
+      case 'mono.events.account_connected':
+        await handleAccountConnected(event.data);
+        break;
+      
+      case 'mono.events.account_updated':
+        await handleAccountUpdated(event.data);
+        break;
+      
+      case 'mono.events.payment_successful':
+        await handlePaymentSuccessful(event.data);
+        break;
+      
+      case 'mono.events.payment_failed':
+        await handlePaymentFailed(event.data);
+        break;
+      
+      default:
+        console.log(`Unhandled Mono webhook event: ${event.event}`);
+    }
+
+    res.status(200).json({ status: 'success' });
+  } catch (error) {
+    console.error('Mono webhook processing error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+function verifyMonoWebhookSignature(
+  payload: string,
+  signature: string
+): boolean {
+  const webhookSecret = monoConfig.webhookSecret;
+  const expectedSignature = createHmac('sha1', webhookSecret)
+    .update(payload)
+    .digest('hex');
+  
+  return signature === expectedSignature;
+}
+
+async function handleAccountConnected(data: any): Promise<void> {
+  console.log('Mono account connected:', data);
+  
+  try {
+    // Update database with account connection
+    await database.query(`
+      UPDATE user_mono_accounts 
+      SET status = 'connected', connected_at = NOW()
+      WHERE account_id = $1
+    `, [data.id]);
+
+    // Fetch account data
+    const accountInfo = await getMonoAccount(data.id);
+    
+    // Store account information
+    await storeMonoAccountInfo(data.customer, accountInfo);
+
+    // Trigger DIVA score update
+    await triggerDivaScoreUpdate(data.customer);
+  } catch (error) {
+    console.error('Error processing account connected event:', error);
+  }
+}
+
+async function handlePaymentSuccessful(data: any): Promise<void> {
+  console.log('Mono payment successful:', data);
+  
+  try {
+    // Update payment status
+    await updatePaymentStatus(data.id, 'completed', data);
+
+    // Update user wallet balance
+    await updateUserWalletBalance(data.customer, data.amount / 100);
+
+    // Send confirmation notification
+    await sendPaymentConfirmation(data.customer, data);
+  } catch (error) {
+    console.error('Error processing payment successful event:', error);
+  }
+}
+```
+
+## Error Handling & Retry Logic
+
+### Mono Error Types
+
+```typescript
+interface MonoAPIError {
+  code: string;
+  message: string;
+  status: number;
+  details?: any;
+}
+
+class MonoErrorHandler {
+  static handle(error: MonoAPIError): MonoError {
+    switch (error.code) {
+      case 'INVALID_API_KEY':
+        return {
+          type: 'authentication',
+          code: 'INVALID_CREDENTIALS',
+          message: 'Invalid Mono API credentials',
+          retryable: false,
+        };
+      
+      case 'RATE_LIMIT_EXCEEDED':
+        return {
+          type: 'rate_limit',
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Rate limit exceeded',
+          retryable: true,
+          retryAfter: 60, // seconds
+        };
+      
+      case 'ACCOUNT_NOT_FOUND':
+        return {
+          type: 'data',
+          code: 'ACCOUNT_NOT_FOUND',
+          message: 'Account not found or disconnected',
+          retryable: false,
+        };
+      
+      case 'INSTITUTION_UNAVAILABLE':
+        return {
+          type: 'bank',
+          code: 'BANK_DOWNTIME',
+          message: 'Bank system temporarily unavailable',
+          retryable: true,
+          retryAfter: 300, // 5 minutes
+        };
+      
+      default:
+        return {
+          type: 'system',
+          code: 'UNKNOWN_ERROR',
+          message: error.message || 'Unknown error occurred',
+          retryable: true,
+        };
+    }
+  }
+}
+```
+
+### Retry Configuration
+
+```typescript
+interface MonoRetryConfig {
+  maxRetries: number;
+  baseDelay: number;
+  maxDelay: number;
+  retryableErrors: string[];
+}
+
+const monoRetryConfig: MonoRetryConfig = {
+  maxRetries: 3,
+  baseDelay: 1000,
+  maxDelay: 30000,
+  retryableErrors: [
+    'TOO_MANY_REQUESTS',
+    'BANK_DOWNTIME',
+    'NETWORK_ERROR',
+    'TIMEOUT_ERROR',
+    'TEMPORARY_UNAVAILABLE',
+  ],
+};
+
+export async function withMonoRetry<T>(
+  operation: () => Promise<T>,
+  config: MonoRetryConfig = monoRetryConfig
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const monoError = MonoErrorHandler.handle(error);
+      
+      if (attempt === config.maxRetries || !monoError.retryable) {
+        throw error;
+      }
+      
+      const delay = monoError.retryAfter 
+        ? monoError.retryAfter * 1000
+        : Math.min(
+            config.baseDelay * Math.pow(2, attempt),
+            config.maxDelay
+          );
+      
+      console.log(`Retrying Mono operation in ${delay}ms (attempt ${attempt + 1})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError;
+}
+```
+
+## Data Synchronization
+
+### Scheduled Data Sync
+
+```typescript
+import cron from 'node-cron';
+
+interface SyncJob {
+  accountId: string;
+  userId: string;
+  lastSync: Date;
+  syncType: 'transactions' | 'balance' | 'full';
+}
+
+class MonoDataSyncService {
+  private syncQueue: SyncJob[] = [];
+
+  constructor() {
+    // Schedule sync jobs
+    this.scheduleRegularSync();
+  }
+
+  private scheduleRegularSync(): void {
+    // Sync transactions every 15 minutes
+    cron.schedule('*/15 * * * *', () => {
+      this.syncRecentTransactions();
+    });
+
+    // Sync balances every 5 minutes
+    cron.schedule('*/5 * * * *', () => {
+      this.syncAccountBalances();
+    });
+
+    // Full sync daily at 2 AM
+    cron.schedule('0 2 * * *', () => {
+      this.performFullSync();
+    });
+  }
+
+  async syncRecentTransactions(): Promise<void> {
+    try {
+      const activeAccounts = await this.getActiveMonoAccounts();
+      
+      for (const account of activeAccounts) {
+        await this.syncAccountTransactions(account.accountId, account.userId);
+      }
+    } catch (error) {
+      console.error('Failed to sync recent transactions:', error);
+    }
+  }
+
+  async syncAccountTransactions(
+    accountId: string,
+    userId: string
+  ): Promise<void> {
+    try {
+      const lastSync = await this.getLastSyncTime(accountId, 'transactions');
+      const endDate = new Date().toISOString().split('T')[0];
+      const startDate = lastSync || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+        .toISOString().split('T')[0];
+
+      const transactions = await withMonoRetry(() =>
+        getMonoTransactions(accountId, {
+          start: startDate,
+          end: endDate,
+          limit: 200,
+        })
+      );
+
+      // Store new transactions
+      await this.storeTransactions(userId, transactions.data);
+      
+      // Update sync timestamp
+      await this.updateSyncTime(accountId, 'transactions');
+
+      // Trigger DIVA score update if significant new data
+      if (transactions.data.length > 10) {
+        await triggerDivaScoreUpdate(userId);
+      }
+    } catch (error) {
+      console.error(`Failed to sync transactions for account ${accountId}:`, error);
+    }
+  }
+
+  private async getActiveMonoAccounts(): Promise<Array<{
+    accountId: string;
+    userId: string;
+  }>> {
+    const result = await database.query(`
+      SELECT account_id, user_id 
+      FROM user_mono_accounts 
+      WHERE status = 'connected' 
+      AND last_error_at IS NULL 
+      OR last_error_at < NOW() - INTERVAL '1 hour'
+    `);
+
+    return result.rows;
+  }
+
+  private async storeTransactions(
+    userId: string,
+    transactions: MonoTransaction[]
+  ): Promise<void> {
+    for (const transaction of transactions) {
+      await database.query(`
+        INSERT INTO transactions (
+          id, user_id, account_id, amount, currency, description,
+          type, category, date, balance, reference, source
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'mono')
+        ON CONFLICT (id) DO UPDATE SET
+          amount = EXCLUDED.amount,
+          description = EXCLUDED.description,
+          category = EXCLUDED.category,
+          updated_at = NOW()
+      `, [
+        transaction.id,
+        userId,
+        transaction.accountId,
+        transaction.amount,
+        'NGN', // Default currency
+        transaction.description,
+        transaction.type,
+        transaction.category,
+        transaction.date,
+        transaction.balance,
+        transaction.reference,
+      ]);
+    }
+  }
+}
+
+export const monoSyncService = new MonoDataSyncService();
+```
+
+## Performance Optimization
+
+### Caching Strategy
+
+```typescript
+interface MonoCacheConfig {
+  accounts: { ttl: 300; refreshThreshold: 60 }; // 5 minutes
+  transactions: { ttl: 60; refreshThreshold: 15 }; // 1 minute
+  balances: { ttl: 30; refreshThreshold: 10 }; // 30 seconds
+  income: { ttl: 3600; refreshThreshold: 600 }; // 1 hour
+}
+
+class MonoDataCache {
+  private cache = new Map<string, { data: any; expiresAt: number }>();
+
+  async get<T>(
+    key: string,
+    fetcher: () => Promise<T>,
+    ttl: number
+  ): Promise<T> {
+    const cached = this.cache.get(key);
+    const now = Date.now();
+
+    if (cached && now < cached.expiresAt) {
+      return cached.data;
+    }
+
+    // Cache miss or expired
+    const data = await fetcher();
+    this.cache.set(key, {
+      data,
+      expiresAt: now + (ttl * 1000),
+    });
+
+    return data;
+  }
+
+  invalidate(pattern: string): void {
+    for (const key of this.cache.keys()) {
+      if (key.includes(pattern)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+}
+
+export const monoCache = new MonoDataCache();
+
+// Usage example
+export async function getCachedMonoAccount(accountId: string): Promise<MonoAccount> {
+  return monoCache.get(
+    `account:${accountId}`,
+    () => getMonoAccount(accountId),
+    300 // 5 minutes TTL
+  );
+}
+```
+
+## Testing & Development
+
+### Test Environment Setup
+
+```typescript
+const TEST_INSTITUTIONS = {
+  'test-bank': {
+    name: 'Test Bank',
+    country: 'NG',
+    type: 'bank',
+    coverage: ['accounts', 'transactions', 'income'],
+  },
+  'test-fintech': {
+    name: 'Test Fintech',
+    country: 'NG', 
+    type: 'digital_bank',
+    coverage: ['accounts', 'transactions'],
+  },
+};
+
+const TEST_ACCOUNTS = {
+  'acc_test_123': {
+    name: 'Test Current Account',
+    accountNumber: '0123456789',
+    type: 'current',
+    currency: 'NGN',
+    balance: 150000, // 1,500 NGN
+  },
+  'acc_test_456': {
+    name: 'Test Savings Account',
+    accountNumber: '9876543210',
+    type: 'savings',
+    currency: 'NGN',
+    balance: 500000, // 5,000 NGN
+  },
+};
+```
+
+### Integration Tests
+
+```typescript
+describe('Mono Integration', () => {
+  beforeEach(async () => {
+    await setupTestDatabase();
+    await clearMonoCache();
+  });
+
+  test('should successfully connect account', async () => {
+    const mockCode = 'test_auth_code_123';
+    const accountId = await exchangeMonoCode(mockCode);
+    
+    expect(accountId).toBeDefined();
+    expect(accountId).toMatch(/^acc_test_/);
+  });
+
+  test('should fetch account information', async () => {
+    const accountId = 'acc_test_123';
+    const account = await getMonoAccount(accountId);
+    
+    expect(account.name).toBe('Test Current Account');
+    expect(account.balance).toBe(150000);
+    expect(account.currency).toBe('NGN');
+  });
+
+  test('should fetch transactions', async () => {
+    const accountId = 'acc_test_123';
+    const transactions = await getMonoTransactions(accountId, {
+      limit: 10,
+    });
+    
+    expect(transactions.data).toHaveLength(10);
+    expect(transactions.data[0]).toHaveProperty('amount');
+    expect(transactions.data[0]).toHaveProperty('description');
+  });
+
+  test('should handle payment initialization', async () => {
+    const paymentRequest: MonoPaymentRequest = {
+      amount: 100.00,
+      type: 'one-time',
+      description: 'Test payment',
+      redirectUrl: 'https://test.awo.app/callback',
+      customerName: 'Test User',
+      customerEmail: 'test@awo.app',
+      reference: 'TEST_PAY_001',
+    };
+
+    const payment = await initializeMonoPayment(paymentRequest);
+    
+    expect(payment.id).toBeDefined();
+    expect(payment.checkout_url).toContain('connect.withmono.com');
+    expect(payment.status).toBe('pending');
+  });
 });
 ```
 
-## Webhooks
+## Monitoring & Analytics
 
-Webhook configuration and handling will be documented here.
+### Performance Metrics
 
-## Troubleshooting
+<CardGroup cols={2}>
+  <Card title="API Performance" icon="gauge">
+    **Response Time**: &lt;1s for 95th percentile  
+    **Success Rate**: &gt;99% for data fetching  
+    **Connect Success**: &gt;90% completion rate  
+    **Payment Success**: &gt;95% for valid requests
+  </Card>
+  <Card title="Data Quality" icon="chart-bar">
+    **Data Freshness**: &lt;15 minutes for transactions  
+    **Sync Success**: &gt;98% for scheduled syncs  
+    **Account Coverage**: Monitor per institution  
+    **Error Distribution**: Track by error type
+  </Card>
+</CardGroup>
 
-<Accordion title="Common Integration Issues">
-Common problems and solutions will be provided here.
-</Accordion>
+### Regional Performance Tracking
+
+```typescript
+interface RegionalMetrics {
+  country: string;
+  connectSuccessRate: number;
+  averageResponseTime: number;
+  topInstitutions: Array<{
+    name: string;
+    usage: number;
+    successRate: number;
+  }>;
+  commonErrors: Array<{
+    code: string;
+    frequency: number;
+  }>;
+}
+
+export async function getRegionalPerformance(): Promise<RegionalMetrics[]> {
+  const countries = ['NG', 'KE', 'GH', 'ZA'];
+  const metrics: RegionalMetrics[] = [];
+
+  for (const country of countries) {
+    const countryMetrics = await calculateCountryMetrics(country);
+    metrics.push(countryMetrics);
+  }
+
+  return metrics;
+}
+```
+
+---
+
+*This comprehensive Mono integration guide provides all implementation details needed to connect AWO Platform with Mono's Open Banking APIs across West and East Africa. For additional support, refer to the [Mono documentation](https://docs.mono.co) or contact their integration team at integrations@mono.co.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

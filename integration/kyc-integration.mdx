@@ -1,52 +1,1567 @@
----
-title: "Kyc Integration"
-description: "AWO Platform kyc integration integration guide"
----
+# KYC Integration Guide
 
-# Kyc Integration
+This guide provides comprehensive instructions for integrating Know Your Customer (KYC) and identity verification services into AWO Platform across African markets.
 
 ## Overview
 
 <Info>
-This guide covers kyc integration integration with the AWO Platform.
+KYC compliance is mandatory for financial services across Africa. AWO Platform implements a tiered KYC approach using Smile ID as the primary provider, with additional regional services for comprehensive identity verification and compliance.
 </Info>
 
-## Prerequisites
+### KYC Requirements for AWO
 
-Integration requirements will be listed here.
+<CardGroup cols={2}>
+  <Card title="Regulatory Compliance" icon="shield-check">
+    **South Africa**: FICA compliance  
+    **Nigeria**: CBN KYC requirements  
+    **Kenya**: CBK KYC guidelines  
+    **Ghana**: BoG KYC standards
+  </Card>
+  <Card title="Business Benefits" icon="trending-up">
+    **Risk Reduction**: Minimize fraud and money laundering  
+    **Trust Building**: Enhance user confidence  
+    **Regulatory Approval**: Meet licensing requirements  
+    **Market Access**: Enable cross-border services
+  </Card>
+</CardGroup>
 
-## Setup Instructions
+### Tiered KYC Approach
 
-<Steps>
-  <Step title="API Configuration">
-    Configure API credentials and endpoints
-  </Step>
-  <Step title="Webhook Setup">
-    Set up webhooks for real-time updates
-  </Step>
-  <Step title="Testing">
-    Test the integration in sandbox environment
-  </Step>
-</Steps>
+<CardGroup cols={2}>
+  <Card title="Tier 1 KYC" icon="user">
+    **Requirements**: Phone number + ID number  
+    **Services**: Basic wallet, P2P transfers  
+    **Limits**: $100/day, $500/month  
+    **Verification**: Basic identity check
+  </Card>
+  <Card title="Tier 2 KYC" icon="user-check">
+    **Requirements**: ID document + selfie + address  
+    **Services**: Full platform access, investments  
+    **Limits**: $1,000/day, $10,000/month  
+    **Verification**: Document + biometric verification
+  </Card>
+</CardGroup>
 
-## Code Examples
+## Smile ID Integration
+
+### Primary KYC Provider Setup
 
 ```typescript
-// Integration example
-import { KycIntegrationClient } from '@awo-platform/integrations';
+interface SmileIDConfig {
+  partnerId: string;
+  apiKey: string;
+  sandboxMode: boolean;
+  callbackUrl: string;
+  baseUrl: string;
+}
 
-const client = new KycIntegrationClient({
-  apiKey: process.env.API_KEY,
-  environment: 'sandbox'
+const SMILE_ID_CONFIG: Record<string, SmileIDConfig> = {
+  production: {
+    partnerId: process.env.SMILE_ID_PARTNER_ID!,
+    apiKey: process.env.SMILE_ID_API_KEY!,
+    sandboxMode: false,
+    callbackUrl: 'https://api.awo.app/webhooks/smile-id',
+    baseUrl: 'https://3eydmgh10d.execute-api.us-west-2.amazonaws.com/test',
+  },
+  sandbox: {
+    partnerId: process.env.SMILE_ID_TEST_PARTNER_ID!,
+    apiKey: process.env.SMILE_ID_TEST_API_KEY!,
+    sandboxMode: true,
+    callbackUrl: 'https://api-staging.awo.app/webhooks/smile-id',
+    baseUrl: 'https://3eydmgh10d.execute-api.us-west-2.amazonaws.com/test',
+  },
+};
+
+export const smileIdConfig = SMILE_ID_CONFIG[
+  process.env.NODE_ENV === 'production' ? 'production' : 'sandbox'
+];
+```
+
+### Smile ID Client Implementation
+
+```typescript
+import axios, { AxiosInstance } from 'axios';
+import { createHmac } from 'crypto';
+
+class SmileIDClient {
+  private client: AxiosInstance;
+  private config: SmileIDConfig;
+
+  constructor(config: SmileIDConfig) {
+    this.config = config;
+    this.client = axios.create({
+      baseURL: config.baseUrl,
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    this.setupInterceptors();
+  }
+
+  private setupInterceptors(): void {
+    this.client.interceptors.request.use(
+      (config) => {
+        // Add authentication headers
+        const timestamp = Date.now();
+        const signature = this.generateSignature(config.data || '', timestamp);
+        
+        config.headers = {
+          ...config.headers,
+          'SmileID-Partner-ID': this.config.partnerId,
+          'SmileID-Timestamp': timestamp.toString(),
+          'SmileID-Signature': signature,
+        };
+
+        return config;
+      },
+      (error) => {
+        console.error('Smile ID Request Error:', error);
+        return Promise.reject(error);
+      }
+    );
+
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        throw this.handleError(error);
+      }
+    );
+  }
+
+  private generateSignature(body: string, timestamp: number): string {
+    const payload = `${timestamp}${this.config.partnerId}${body}`;
+    return createHmac('sha256', this.config.apiKey)
+      .update(payload)
+      .digest('hex');
+  }
+
+  private handleError(error: any): SmileIDError {
+    if (error.response) {
+      return new SmileIDError(
+        error.response.data?.message || 'API request failed',
+        error.response.data?.code || 'API_ERROR',
+        error.response.status,
+        error.response.data
+      );
+    }
+
+    if (error.request) {
+      return new SmileIDError(
+        'Network request failed',
+        'NETWORK_ERROR',
+        0
+      );
+    }
+
+    return new SmileIDError(
+      error.message || 'Unknown error occurred',
+      'UNKNOWN_ERROR',
+      0
+    );
+  }
+
+  async post<T>(endpoint: string, data: any): Promise<T> {
+    const response = await this.client.post(endpoint, data);
+    return response.data;
+  }
+
+  async get<T>(endpoint: string, params?: any): Promise<T> {
+    const response = await this.client.get(endpoint, { params });
+    return response.data;
+  }
+}
+
+export class SmileIDError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public status: number,
+    public details?: any
+  ) {
+    super(message);
+    this.name = 'SmileIDError';
+  }
+}
+
+export const smileIdClient = new SmileIDClient(smileIdConfig);
+```
+
+## Identity Verification Services
+
+### Document Verification
+
+```typescript
+interface DocumentVerificationRequest {
+  userId: string;
+  idType: 'NATIONAL_ID' | 'PASSPORT' | 'DRIVERS_LICENSE' | 'VOTERS_ID';
+  idNumber: string;
+  country: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: string;
+  documentImage?: string; // Base64 encoded image
+  returnJobStatus?: boolean;
+}
+
+interface DocumentVerificationResponse {
+  jobId: string;
+  jobComplete: boolean;
+  jobSuccess: boolean;
+  code: string;
+  message: string;
+  result?: {
+    resultCode: string;
+    resultText: string;
+    smileJobId: string;
+    partnerParams: any;
+    confidenceValue: number;
+    idVerification: {
+      idChecked: boolean;
+      idExists: boolean;
+      idValidated: boolean;
+    };
+  };
+  imageLinks?: {
+    selfieImageUrl: string;
+  };
+}
+
+export async function verifyDocument(
+  request: DocumentVerificationRequest
+): Promise<DocumentVerificationResponse> {
+  try {
+    const verificationData = {
+      partner_id: smileIdConfig.partnerId,
+      job_type: 5, // Enhanced Document Verification
+      user_id: request.userId,
+      id_info: {
+        country: request.country,
+        id_type: request.idType,
+        id_number: request.idNumber,
+        first_name: request.firstName,
+        last_name: request.lastName,
+        dob: request.dateOfBirth,
+      },
+      partner_params: {
+        user_id: request.userId,
+        job_id: `awo_doc_${Date.now()}`,
+        job_type: 5,
+      },
+      callback_url: smileIdConfig.callbackUrl,
+      sandbox: smileIdConfig.sandboxMode,
+      return_job_status: request.returnJobStatus || false,
+    };
+
+    const response = await smileIdClient.post<DocumentVerificationResponse>(
+      '/submit_job',
+      verificationData
+    );
+
+    // Store verification attempt in database
+    await storeKycAttempt({
+      userId: request.userId,
+      jobId: response.jobId,
+      jobType: 'document_verification',
+      status: response.jobComplete ? 'completed' : 'pending',
+      result: response.result,
+      provider: 'smile_id',
+    });
+
+    return response;
+  } catch (error) {
+    console.error('Document verification failed:', error);
+    throw error;
+  }
+}
+```
+
+### Biometric Verification
+
+```typescript
+interface BiometricVerificationRequest {
+  userId: string;
+  idType: string;
+  idNumber: string;
+  country: string;
+  firstName: string;
+  lastName: string;
+  selfieImage: string; // Base64 encoded selfie
+  idImage?: string; // Base64 encoded ID document
+  returnJobStatus?: boolean;
+}
+
+export async function verifyBiometric(
+  request: BiometricVerificationRequest
+): Promise<DocumentVerificationResponse> {
+  try {
+    const verificationData = {
+      partner_id: smileIdConfig.partnerId,
+      job_type: 6, // Enhanced KYC
+      user_id: request.userId,
+      id_info: {
+        country: request.country,
+        id_type: request.idType,
+        id_number: request.idNumber,
+        first_name: request.firstName,
+        last_name: request.lastName,
+      },
+      images: [
+        {
+          image_type_id: 2, // Selfie
+          image: request.selfieImage,
+        },
+      ],
+      partner_params: {
+        user_id: request.userId,
+        job_id: `awo_bio_${Date.now()}`,
+        job_type: 6,
+      },
+      callback_url: smileIdConfig.callbackUrl,
+      sandbox: smileIdConfig.sandboxMode,
+      return_job_status: request.returnJobStatus || false,
+    };
+
+    // Add ID document image if provided
+    if (request.idImage) {
+      verificationData.images.push({
+        image_type_id: 3, // ID Document
+        image: request.idImage,
+      });
+    }
+
+    const response = await smileIdClient.post<DocumentVerificationResponse>(
+      '/submit_job',
+      verificationData
+    );
+
+    // Store verification attempt
+    await storeKycAttempt({
+      userId: request.userId,
+      jobId: response.jobId,
+      jobType: 'biometric_verification',
+      status: response.jobComplete ? 'completed' : 'pending',
+      result: response.result,
+      provider: 'smile_id',
+    });
+
+    return response;
+  } catch (error) {
+    console.error('Biometric verification failed:', error);
+    throw error;
+  }
+}
+```
+
+### BVN Verification (Nigeria)
+
+```typescript
+interface BVNVerificationRequest {
+  userId: string;
+  bvn: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string; // YYYY-MM-DD format
+  phoneNumber: string;
+}
+
+export async function verifyBVN(
+  request: BVNVerificationRequest
+): Promise<DocumentVerificationResponse> {
+  try {
+    const verificationData = {
+      partner_id: smileIdConfig.partnerId,
+      job_type: 7, // BVN Verification
+      user_id: request.userId,
+      id_info: {
+        country: 'NG',
+        id_type: 'BVN',
+        id_number: request.bvn,
+        first_name: request.firstName,
+        last_name: request.lastName,
+        dob: request.dateOfBirth,
+        phone_number: request.phoneNumber,
+      },
+      partner_params: {
+        user_id: request.userId,
+        job_id: `awo_bvn_${Date.now()}`,
+        job_type: 7,
+      },
+      callback_url: smileIdConfig.callbackUrl,
+      sandbox: smileIdConfig.sandboxMode,
+    };
+
+    const response = await smileIdClient.post<DocumentVerificationResponse>(
+      '/submit_job',
+      verificationData
+    );
+
+    await storeKycAttempt({
+      userId: request.userId,
+      jobId: response.jobId,
+      jobType: 'bvn_verification',
+      status: response.jobComplete ? 'completed' : 'pending',
+      result: response.result,
+      provider: 'smile_id',
+    });
+
+    return response;
+  } catch (error) {
+    console.error('BVN verification failed:', error);
+    throw error;
+  }
+}
+```
+
+## Regional KYC Services
+
+### South Africa - FICA Compliance
+
+```typescript
+interface SAIDVerificationRequest {
+  userId: string;
+  idNumber: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+}
+
+export async function verifySAID(
+  request: SAIDVerificationRequest
+): Promise<DocumentVerificationResponse> {
+  try {
+    const verificationData = {
+      partner_id: smileIdConfig.partnerId,
+      job_type: 5,
+      user_id: request.userId,
+      id_info: {
+        country: 'ZA',
+        id_type: 'NATIONAL_ID',
+        id_number: request.idNumber,
+        first_name: request.firstName,
+        last_name: request.lastName,
+        dob: request.dateOfBirth,
+      },
+      partner_params: {
+        user_id: request.userId,
+        job_id: `awo_said_${Date.now()}`,
+        job_type: 5,
+      },
+      callback_url: smileIdConfig.callbackUrl,
+      sandbox: smileIdConfig.sandboxMode,
+    };
+
+    const response = await smileIdClient.post<DocumentVerificationResponse>(
+      '/submit_job',
+      verificationData
+    );
+
+    await storeKycAttempt({
+      userId: request.userId,
+      jobId: response.jobId,
+      jobType: 'said_verification',
+      status: response.jobComplete ? 'completed' : 'pending',
+      result: response.result,
+      provider: 'smile_id',
+    });
+
+    return response;
+  } catch (error) {
+    console.error('SA ID verification failed:', error);
+    throw error;
+  }
+}
+```
+
+### Kenya - ID Verification
+
+```typescript
+export async function verifyKenyanID(
+  request: DocumentVerificationRequest
+): Promise<DocumentVerificationResponse> {
+  try {
+    const verificationData = {
+      partner_id: smileIdConfig.partnerId,
+      job_type: 5,
+      user_id: request.userId,
+      id_info: {
+        country: 'KE',
+        id_type: 'NATIONAL_ID',
+        id_number: request.idNumber,
+        first_name: request.firstName,
+        last_name: request.lastName,
+        dob: request.dateOfBirth,
+      },
+      partner_params: {
+        user_id: request.userId,
+        job_id: `awo_ke_id_${Date.now()}`,
+        job_type: 5,
+      },
+      callback_url: smileIdConfig.callbackUrl,
+      sandbox: smileIdConfig.sandboxMode,
+    };
+
+    const response = await smileIdClient.post<DocumentVerificationResponse>(
+      '/submit_job',
+      verificationData
+    );
+
+    await storeKycAttempt({
+      userId: request.userId,
+      jobId: response.jobId,
+      jobType: 'kenyan_id_verification',
+      status: response.jobComplete ? 'completed' : 'pending',
+      result: response.result,
+      provider: 'smile_id',
+    });
+
+    return response;
+  } catch (error) {
+    console.error('Kenyan ID verification failed:', error);
+    throw error;
+  }
+}
+```
+
+## Comprehensive KYC Service
+
+### KYC Management Service
+
+```typescript
+interface KYCTier {
+  level: 1 | 2;
+  requirements: string[];
+  limits: {
+    dailyLimit: number;
+    monthlyLimit: number;
+    yearlyLimit: number;
+  };
+  services: string[];
+}
+
+interface UserKYCStatus {
+  userId: string;
+  currentTier: number;
+  status: 'pending' | 'verified' | 'rejected' | 'expired';
+  verifiedAt?: Date;
+  expiresAt?: Date;
+  documents: KYCDocument[];
+  verificationHistory: KYCAttempt[];
+}
+
+interface KYCDocument {
+  id: string;
+  type: string;
+  status: 'pending' | 'verified' | 'rejected';
+  uploadedAt: Date;
+  verifiedAt?: Date;
+  rejectionReason?: string;
+}
+
+interface KYCAttempt {
+  id: string;
+  jobId: string;
+  jobType: string;
+  status: string;
+  result?: any;
+  provider: string;
+  createdAt: Date;
+  completedAt?: Date;
+}
+
+class KYCService {
+  private readonly KYC_TIERS: Record<number, KYCTier> = {
+    1: {
+      level: 1,
+      requirements: ['phone_verification', 'basic_identity'],
+      limits: {
+        dailyLimit: 100,
+        monthlyLimit: 500,
+        yearlyLimit: 2000,
+      },
+      services: ['wallet', 'p2p_transfers', 'basic_savings'],
+    },
+    2: {
+      level: 2,
+      requirements: ['document_verification', 'biometric_verification', 'address_verification'],
+      limits: {
+        dailyLimit: 1000,
+        monthlyLimit: 10000,
+        yearlyLimit: 50000,
+      },
+      services: ['investments', 'chama_management', 'cross_border_transfers', 'loans'],
+    },
+  };
+
+  async getUserKYCStatus(userId: string): Promise<UserKYCStatus> {
+    try {
+      const kycData = await database.query(`
+        SELECT 
+          u.id as user_id,
+          u.kyc_tier,
+          u.kyc_status,
+          u.kyc_verified_at,
+          u.kyc_expires_at,
+          json_agg(
+            json_build_object(
+              'id', ka.id,
+              'job_id', ka.job_id,
+              'job_type', ka.job_type,
+              'status', ka.status,
+              'result', ka.result,
+              'provider', ka.provider,
+              'created_at', ka.created_at,
+              'completed_at', ka.completed_at
+            )
+          ) as verification_history
+        FROM users u
+        LEFT JOIN kyc_attempts ka ON u.id = ka.user_id
+        WHERE u.id = $1
+        GROUP BY u.id
+      `, [userId]);
+
+      if (kycData.rows.length === 0) {
+        throw new Error('User not found');
+      }
+
+      const user = kycData.rows[0];
+
+      return {
+        userId: user.user_id,
+        currentTier: user.kyc_tier || 0,
+        status: user.kyc_status || 'pending',
+        verifiedAt: user.kyc_verified_at,
+        expiresAt: user.kyc_expires_at,
+        documents: await this.getUserDocuments(userId),
+        verificationHistory: user.verification_history.filter((h: any) => h.id),
+      };
+    } catch (error) {
+      console.error('Failed to get user KYC status:', error);
+      throw error;
+    }
+  }
+
+  async initiateKYCVerification(
+    userId: string,
+    targetTier: 1 | 2,
+    data: any
+  ): Promise<{
+    jobIds: string[];
+    status: string;
+    nextSteps: string[];
+  }> {
+    try {
+      const currentStatus = await this.getUserKYCStatus(userId);
+      const tierRequirements = this.KYC_TIERS[targetTier];
+      const jobIds: string[] = [];
+      const nextSteps: string[] = [];
+
+      // Check if user can upgrade to target tier
+      if (currentStatus.currentTier >= targetTier) {
+        throw new Error(`User already verified for tier ${targetTier} or higher`);
+      }
+
+      // Process verification based on target tier
+      if (targetTier === 1) {
+        // Tier 1: Basic identity verification
+        if (data.idNumber && data.country) {
+          const docVerification = await verifyDocument({
+            userId,
+            idType: 'NATIONAL_ID',
+            idNumber: data.idNumber,
+            country: data.country,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            dateOfBirth: data.dateOfBirth,
+          });
+          jobIds.push(docVerification.jobId);
+        }
+
+        nextSteps.push('Complete phone verification');
+        nextSteps.push('Wait for document verification results');
+      } else if (targetTier === 2) {
+        // Tier 2: Enhanced verification
+        if (data.selfieImage && data.idImage) {
+          const biometricVerification = await verifyBiometric({
+            userId,
+            idType: 'NATIONAL_ID',
+            idNumber: data.idNumber,
+            country: data.country,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            selfieImage: data.selfieImage,
+            idImage: data.idImage,
+          });
+          jobIds.push(biometricVerification.jobId);
+        }
+
+        // Nigeria-specific BVN verification
+        if (data.country === 'NG' && data.bvn) {
+          const bvnVerification = await verifyBVN({
+            userId,
+            bvn: data.bvn,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            dateOfBirth: data.dateOfBirth,
+            phoneNumber: data.phoneNumber,
+          });
+          jobIds.push(bvnVerification.jobId);
+        }
+
+        nextSteps.push('Upload proof of address');
+        nextSteps.push('Wait for biometric verification results');
+      }
+
+      return {
+        jobIds,
+        status: 'initiated',
+        nextSteps,
+      };
+    } catch (error) {
+      console.error('KYC verification initiation failed:', error);
+      throw error;
+    }
+  }
+
+  async checkVerificationStatus(jobId: string): Promise<any> {
+    try {
+      const response = await smileIdClient.get(`/job_status`, {
+        job_id: jobId,
+        partner_id: smileIdConfig.partnerId,
+      });
+
+      // Update stored KYC attempt
+      await this.updateKycAttempt(jobId, response);
+
+      return response;
+    } catch (error) {
+      console.error('Failed to check verification status:', error);
+      throw error;
+    }
+  }
+
+  async updateUserKYCTier(
+    userId: string,
+    tier: number,
+    status: string
+  ): Promise<void> {
+    try {
+      const expiresAt = new Date();
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1); // KYC expires after 1 year
+
+      await database.query(`
+        UPDATE users 
+        SET 
+          kyc_tier = $2,
+          kyc_status = $3,
+          kyc_verified_at = NOW(),
+          kyc_expires_at = $4,
+          updated_at = NOW()
+        WHERE id = $1
+      `, [userId, tier, status, expiresAt]);
+
+      // Log KYC tier change
+      await database.query(`
+        INSERT INTO kyc_tier_changes (
+          user_id, previous_tier, new_tier, status, changed_at
+        ) VALUES ($1, 0, $2, $3, NOW())
+      `, [userId, tier, status]);
+
+      // Send notification to user
+      await this.notifyKycStatusChange(userId, tier, status);
+    } catch (error) {
+      console.error('Failed to update user KYC tier:', error);
+      throw error;
+    }
+  }
+
+  async validateTransactionLimits(
+    userId: string,
+    amount: number,
+    period: 'daily' | 'monthly' | 'yearly'
+  ): Promise<{
+    allowed: boolean;
+    currentUsage: number;
+    limit: number;
+    remainingLimit: number;
+  }> {
+    try {
+      const kycStatus = await this.getUserKYCStatus(userId);
+      
+      if (kycStatus.status !== 'verified') {
+        return {
+          allowed: false,
+          currentUsage: 0,
+          limit: 0,
+          remainingLimit: 0,
+        };
+      }
+
+      const tier = this.KYC_TIERS[kycStatus.currentTier];
+      const limit = tier.limits[`${period}Limit`];
+
+      // Get current usage for the period
+      const currentUsage = await this.getCurrentUsage(userId, period);
+
+      const remainingLimit = limit - currentUsage;
+      const allowed = amount <= remainingLimit;
+
+      return {
+        allowed,
+        currentUsage,
+        limit,
+        remainingLimit,
+      };
+    } catch (error) {
+      console.error('Failed to validate transaction limits:', error);
+      throw error;
+    }
+  }
+
+  private async getUserDocuments(userId: string): Promise<KYCDocument[]> {
+    const result = await database.query(`
+      SELECT id, type, status, uploaded_at, verified_at, rejection_reason
+      FROM kyc_documents
+      WHERE user_id = $1
+      ORDER BY uploaded_at DESC
+    `, [userId]);
+
+    return result.rows.map(row => ({
+      id: row.id,
+      type: row.type,
+      status: row.status,
+      uploadedAt: row.uploaded_at,
+      verifiedAt: row.verified_at,
+      rejectionReason: row.rejection_reason,
+    }));
+  }
+
+  private async updateKycAttempt(jobId: string, result: any): Promise<void> {
+    await database.query(`
+      UPDATE kyc_attempts
+      SET 
+        status = $2,
+        result = $3,
+        completed_at = NOW(),
+        updated_at = NOW()
+      WHERE job_id = $1
+    `, [jobId, result.job_complete ? 'completed' : 'pending', JSON.stringify(result)]);
+  }
+
+  private async getCurrentUsage(
+    userId: string,
+    period: 'daily' | 'monthly' | 'yearly'
+  ): Promise<number> {
+    let dateFilter: string;
+    
+    switch (period) {
+      case 'daily':
+        dateFilter = "created_at >= CURRENT_DATE";
+        break;
+      case 'monthly':
+        dateFilter = "created_at >= DATE_TRUNC('month', CURRENT_DATE)";
+        break;
+      case 'yearly':
+        dateFilter = "created_at >= DATE_TRUNC('year', CURRENT_DATE)";
+        break;
+    }
+
+    const result = await database.query(`
+      SELECT COALESCE(SUM(amount), 0) as total_usage
+      FROM transactions
+      WHERE user_id = $1 
+      AND ${dateFilter}
+      AND status = 'completed'
+      AND type IN ('payment', 'transfer', 'investment')
+    `, [userId]);
+
+    return parseFloat(result.rows[0].total_usage) || 0;
+  }
+
+  private async notifyKycStatusChange(
+    userId: string,
+    tier: number,
+    status: string
+  ): Promise<void> {
+    // Implementation for sending KYC status change notifications
+    const tierFeatures = this.KYC_TIERS[tier];
+    
+    await notificationService.send({
+      userId,
+      type: 'kyc_status_update',
+      title: `KYC Tier ${tier} ${status === 'verified' ? 'Approved' : 'Updated'}`,
+      message: status === 'verified' 
+        ? `Congratulations! You now have access to: ${tierFeatures.services.join(', ')}`
+        : `Your KYC status has been updated to: ${status}`,
+      data: {
+        tier,
+        status,
+        services: tierFeatures.services,
+        limits: tierFeatures.limits,
+      },
+    });
+  }
+}
+
+export const kycService = new KYCService();
+```
+
+## Webhook Handling
+
+### Smile ID Webhook Processing
+
+```typescript
+import { Request, Response } from 'express';
+import { createHmac } from 'crypto';
+
+interface SmileIDWebhookEvent {
+  job_id: string;
+  job_type: number;
+  job_complete: boolean;
+  job_success: boolean;
+  result: {
+    result_code: string;
+    result_text: string;
+    smile_job_id: string;
+    partner_params: {
+      user_id: string;
+      job_id: string;
+    };
+    confidence_value: number;
+    id_verification?: {
+      id_checked: boolean;
+      id_exists: boolean;
+      id_validated: boolean;
+    };
+    biometric_verification?: {
+      liveness_verified: boolean;
+      selfie_verified: boolean;
+      id_verified: boolean;
+    };
+  };
+  image_links?: {
+    selfie_image_url: string;
+    id_card_image_url: string;
+  };
+}
+
+export async function handleSmileIDWebhook(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const signature = req.headers['smile-signature'] as string;
+    const body = JSON.stringify(req.body);
+
+    // Verify webhook signature
+    if (!verifySmileIDWebhook(body, signature)) {
+      console.error('Invalid Smile ID webhook signature');
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    const event: SmileIDWebhookEvent = req.body;
+
+    if (event.job_complete) {
+      await processKycResults(event);
+    }
+
+    res.status(200).json({ status: 'success' });
+  } catch (error) {
+    console.error('Smile ID webhook processing error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+function verifySmileIDWebhook(payload: string, signature: string): boolean {
+  const expectedSignature = createHmac('sha256', smileIdConfig.apiKey)
+    .update(payload)
+    .digest('hex');
+  
+  return signature === expectedSignature;
+}
+
+async function processKycResults(event: SmileIDWebhookEvent): Promise<void> {
+  const { job_id, job_success, result } = event;
+  const userId = result.partner_params.user_id;
+
+  try {
+    // Update KYC attempt in database
+    await database.query(`
+      UPDATE kyc_attempts
+      SET 
+        status = 'completed',
+        job_success = $2,
+        result = $3,
+        completed_at = NOW()
+      WHERE job_id = $1
+    `, [job_id, job_success, JSON.stringify(result)]);
+
+    if (job_success) {
+      await handleSuccessfulVerification(userId, event);
+    } else {
+      await handleFailedVerification(userId, event);
+    }
+  } catch (error) {
+    console.error('Failed to process KYC results:', error);
+  }
+}
+
+async function handleSuccessfulVerification(
+  userId: string,
+  event: SmileIDWebhookEvent
+): Promise<void> {
+  const { job_type, result } = event;
+  
+  try {
+    // Determine KYC tier based on job type and current status
+    const currentStatus = await kycService.getUserKYCStatus(userId);
+    let newTier = currentStatus.currentTier;
+
+    switch (job_type) {
+      case 5: // Document Verification
+        if (newTier < 1) newTier = 1;
+        break;
+      case 6: // Enhanced KYC
+      case 7: // BVN Verification
+        if (newTier < 2) newTier = 2;
+        break;
+    }
+
+    // Check if all requirements for the tier are met
+    const allRequirementsMet = await checkTierRequirements(userId, newTier);
+    
+    if (allRequirementsMet) {
+      await kycService.updateUserKYCTier(userId, newTier, 'verified');
+      
+      // Unlock tier-specific services
+      await unlockTierServices(userId, newTier);
+    } else {
+      // Update verification status but don't change tier yet
+      await notifyPartialVerification(userId, job_type);
+    }
+  } catch (error) {
+    console.error('Failed to handle successful verification:', error);
+  }
+}
+
+async function handleFailedVerification(
+  userId: string,
+  event: SmileIDWebhookEvent
+): Promise<void> {
+  const { job_type, result } = event;
+  
+  try {
+    // Notify user of failed verification
+    await notificationService.send({
+      userId,
+      type: 'kyc_verification_failed',
+      title: 'Verification Failed',
+      message: `Your ${getJobTypeName(job_type)} verification was not successful. ${result.result_text}`,
+      data: {
+        jobType: job_type,
+        reason: result.result_text,
+        canRetry: true,
+      },
+    });
+
+    // Log failed attempt for analytics
+    await logKycEvent(userId, 'verification_failed', {
+      jobType: job_type,
+      reason: result.result_text,
+      resultCode: result.result_code,
+    });
+  } catch (error) {
+    console.error('Failed to handle failed verification:', error);
+  }
+}
+
+async function checkTierRequirements(userId: string, tier: number): Promise<boolean> {
+  // Implementation to check if all requirements for a tier are met
+  const attempts = await database.query(`
+    SELECT job_type, job_success
+    FROM kyc_attempts
+    WHERE user_id = $1 AND job_success = true
+  `, [userId]);
+
+  const successfulJobTypes = attempts.rows.map(row => row.job_type);
+
+  switch (tier) {
+    case 1:
+      return successfulJobTypes.includes(5); // Document verification
+    case 2:
+      return successfulJobTypes.includes(5) && // Document verification
+             (successfulJobTypes.includes(6) || successfulJobTypes.includes(7)); // Enhanced KYC or BVN
+    default:
+      return false;
+  }
+}
+
+function getJobTypeName(jobType: number): string {
+  const jobNames: Record<number, string> = {
+    5: 'Document Verification',
+    6: 'Biometric Verification',
+    7: 'BVN Verification',
+  };
+  
+  return jobNames[jobType] || 'Unknown Verification';
+}
+```
+
+## Frontend Integration
+
+### React Native KYC Component
+
+```typescript
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Image, Alert, StyleSheet } from 'react-native';
+import { launchImageLibrary, launchCamera, ImagePickerResponse } from 'react-native-image-picker';
+import DocumentPicker from 'react-native-document-picker';
+
+interface KYCVerificationProps {
+  userId: string;
+  currentTier: number;
+  targetTier: 1 | 2;
+  onSuccess: (tier: number) => void;
+  onError: (error: any) => void;
+}
+
+export const KYCVerification: React.FC<KYCVerificationProps> = ({
+  userId,
+  currentTier,
+  targetTier,
+  onSuccess,
+  onError,
+}) => {
+  const [step, setStep] = useState(1);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    idNumber: '',
+    dateOfBirth: '',
+    country: 'KE',
+    phoneNumber: '',
+    bvn: '', // For Nigeria
+  });
+  const [documents, setDocuments] = useState({
+    selfie: null as string | null,
+    idDocument: null as string | null,
+    proofOfAddress: null as string | null,
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleImagePicker = (documentType: string) => {
+    Alert.alert(
+      'Select Image',
+      'Choose how you want to add the image',
+      [
+        { text: 'Camera', onPress: () => openCamera(documentType) },
+        { text: 'Gallery', onPress: () => openGallery(documentType) },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const openCamera = (documentType: string) => {
+    launchCamera(
+      {
+        mediaType: 'photo',
+        quality: 0.7,
+        includeBase64: true,
+      },
+      (response: ImagePickerResponse) => {
+        if (response.assets && response.assets[0]) {
+          const base64Image = response.assets[0].base64;
+          setDocuments(prev => ({
+            ...prev,
+            [documentType]: base64Image,
+          }));
+        }
+      }
+    );
+  };
+
+  const openGallery = (documentType: string) => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        quality: 0.7,
+        includeBase64: true,
+      },
+      (response: ImagePickerResponse) => {
+        if (response.assets && response.assets[0]) {
+          const base64Image = response.assets[0].base64;
+          setDocuments(prev => ({
+            ...prev,
+            [documentType]: base64Image,
+          }));
+        }
+      }
+    );
+  };
+
+  const submitKYC = async () => {
+    setIsSubmitting(true);
+
+    try {
+      const kycData = {
+        ...formData,
+        selfieImage: documents.selfie,
+        idImage: documents.idDocument,
+      };
+
+      const response = await kycAPI.initiateVerification(userId, targetTier, kycData);
+
+      // Start polling for results
+      pollVerificationStatus(response.jobIds);
+      
+      Alert.alert(
+        'Verification Submitted',
+        'Your documents have been submitted for verification. We\'ll notify you once the process is complete.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('KYC submission failed:', error);
+      onError(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const pollVerificationStatus = async (jobIds: string[]) => {
+    const checkStatus = async () => {
+      try {
+        let allCompleted = true;
+        let anySuccessful = false;
+
+        for (const jobId of jobIds) {
+          const status = await kycAPI.checkStatus(jobId);
+          
+          if (!status.job_complete) {
+            allCompleted = false;
+          } else if (status.job_success) {
+            anySuccessful = true;
+          }
+        }
+
+        if (allCompleted) {
+          if (anySuccessful) {
+            onSuccess(targetTier);
+          } else {
+            onError(new Error('Verification failed'));
+          }
+          return;
+        }
+
+        // Continue polling
+        setTimeout(checkStatus, 10000); // Check every 10 seconds
+      } catch (error) {
+        console.error('Status check failed:', error);
+        setTimeout(checkStatus, 10000); // Retry
+      }
+    };
+
+    checkStatus();
+  };
+
+  const renderStep1 = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>Personal Information</Text>
+      
+      <TextInput
+        style={styles.input}
+        placeholder="First Name"
+        value={formData.firstName}
+        onChangeText={(text) => setFormData(prev => ({ ...prev, firstName: text }))}
+      />
+      
+      <TextInput
+        style={styles.input}
+        placeholder="Last Name"
+        value={formData.lastName}
+        onChangeText={(text) => setFormData(prev => ({ ...prev, lastName: text }))}
+      />
+      
+      <TextInput
+        style={styles.input}
+        placeholder="ID Number"
+        value={formData.idNumber}
+        onChangeText={(text) => setFormData(prev => ({ ...prev, idNumber: text }))}
+      />
+      
+      <TextInput
+        style={styles.input}
+        placeholder="Date of Birth (YYYY-MM-DD)"
+        value={formData.dateOfBirth}
+        onChangeText={(text) => setFormData(prev => ({ ...prev, dateOfBirth: text }))}
+      />
+
+      {formData.country === 'NG' && (
+        <TextInput
+          style={styles.input}
+          placeholder="BVN (Nigeria only)"
+          value={formData.bvn}
+          onChangeText={(text) => setFormData(prev => ({ ...prev, bvn: text }))}
+        />
+      )}
+      
+      <TouchableOpacity
+        style={styles.nextButton}
+        onPress={() => setStep(2)}
+      >
+        <Text style={styles.buttonText}>Next</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderStep2 = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>Document Upload</Text>
+      
+      <View style={styles.documentSection}>
+        <Text style={styles.documentLabel}>Selfie Photo</Text>
+        <TouchableOpacity
+          style={styles.documentButton}
+          onPress={() => handleImagePicker('selfie')}
+        >
+          <Text style={styles.documentButtonText}>
+            {documents.selfie ? 'Selfie Uploaded ✓' : 'Take Selfie'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.documentSection}>
+        <Text style={styles.documentLabel}>ID Document</Text>
+        <TouchableOpacity
+          style={styles.documentButton}
+          onPress={() => handleImagePicker('idDocument')}
+        >
+          <Text style={styles.documentButtonText}>
+            {documents.idDocument ? 'ID Document Uploaded ✓' : 'Upload ID Document'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {targetTier === 2 && (
+        <View style={styles.documentSection}>
+          <Text style={styles.documentLabel}>Proof of Address</Text>
+          <TouchableOpacity
+            style={styles.documentButton}
+            onPress={() => handleImagePicker('proofOfAddress')}
+          >
+            <Text style={styles.documentButtonText}>
+              {documents.proofOfAddress ? 'Address Proof Uploaded ✓' : 'Upload Proof of Address'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => setStep(1)}
+        >
+          <Text style={styles.buttonText}>Back</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.submitButton, isSubmitting && styles.disabledButton]}
+          onPress={submitKYC}
+          disabled={isSubmitting || !documents.selfie || !documents.idDocument}
+        >
+          <Text style={styles.buttonText}>
+            {isSubmitting ? 'Submitting...' : 'Submit for Verification'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>KYC Verification - Tier {targetTier}</Text>
+      <Text style={styles.subtitle}>
+        {targetTier === 1 ? 'Basic verification for wallet access' : 'Enhanced verification for full platform access'}
+      </Text>
+      
+      {step === 1 ? renderStep1() : renderStep2()}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#fff',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#666',
+    marginBottom: 30,
+  },
+  stepContainer: {
+    flex: 1,
+  },
+  stepTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 15,
+  },
+  documentSection: {
+    marginBottom: 20,
+  },
+  documentLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  documentButton: {
+    borderWidth: 2,
+    borderColor: '#bc9b25',
+    borderRadius: 8,
+    padding: 15,
+    alignItems: 'center',
+    borderStyle: 'dashed',
+  },
+  documentButtonText: {
+    color: '#bc9b25',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  nextButton: {
+    backgroundColor: '#bc9b25',
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  backButton: {
+    backgroundColor: '#666',
+    padding: 16,
+    borderRadius: 8,
+    flex: 0.4,
+  },
+  submitButton: {
+    backgroundColor: '#bc9b25',
+    padding: 16,
+    borderRadius: 8,
+    flex: 0.55,
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
 });
 ```
 
-## Webhooks
+## Compliance & Monitoring
 
-Webhook configuration and handling will be documented here.
+### KYC Analytics and Reporting
 
-## Troubleshooting
+```typescript
+interface KYCMetrics {
+  totalUsers: number;
+  tier1Users: number;
+  tier2Users: number;
+  verificationSuccessRate: number;
+  avgVerificationTime: number; // in minutes
+  rejectionReasons: Array<{ reason: string; count: number }>;
+  countryBreakdown: Array<{ country: string; users: number }>;
+}
 
-<Accordion title="Common Integration Issues">
-Common problems and solutions will be provided here.
-</Accordion>
+export async function getKYCMetrics(
+  startDate: Date,
+  endDate: Date
+): Promise<KYCMetrics> {
+  try {
+    const [
+      userCounts,
+      successRate,
+      avgTime,
+      rejections,
+      countries
+    ] = await Promise.all([
+      getUserCounts(startDate, endDate),
+      getVerificationSuccessRate(startDate, endDate),
+      getAverageVerificationTime(startDate, endDate),
+      getRejectionReasons(startDate, endDate),
+      getCountryBreakdown(startDate, endDate),
+    ]);
+
+    return {
+      totalUsers: userCounts.total,
+      tier1Users: userCounts.tier1,
+      tier2Users: userCounts.tier2,
+      verificationSuccessRate: successRate,
+      avgVerificationTime: avgTime,
+      rejectionReasons: rejections,
+      countryBreakdown: countries,
+    };
+  } catch (error) {
+    console.error('Failed to get KYC metrics:', error);
+    throw error;
+  }
+}
+
+// Compliance reporting for regulators
+export async function generateComplianceReport(
+  country: string,
+  month: number,
+  year: number
+): Promise<any> {
+  try {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+
+    const report = {
+      reportPeriod: `${year}-${month.toString().padStart(2, '0')}`,
+      country,
+      generatedAt: new Date(),
+      summary: await getKYCMetrics(startDate, endDate),
+      verificationBreakdown: await getVerificationBreakdown(country, startDate, endDate),
+      riskAssessment: await getRiskAssessment(country, startDate, endDate),
+      complianceStatus: await getComplianceStatus(country),
+    };
+
+    // Store report for audit trail
+    await storeComplianceReport(report);
+
+    return report;
+  } catch (error) {
+    console.error('Failed to generate compliance report:', error);
+    throw error;
+  }
+}
+```
+
+---
+
+*This comprehensive KYC integration guide provides all necessary implementation details for identity verification and compliance across African markets through AWO Platform. Proper KYC implementation is crucial for regulatory compliance and building trust with users and regulators.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

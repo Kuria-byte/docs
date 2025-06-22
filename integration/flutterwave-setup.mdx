@@ -1,52 +1,1460 @@
----
-title: "Flutterwave Setup"
-description: "AWO Platform flutterwave setup integration guide"
----
+# Flutterwave Integration Guide
 
-# Flutterwave Setup
+This guide provides comprehensive instructions for integrating Flutterwave's payment APIs into AWO Platform for processing payments across Africa and globally.
 
 ## Overview
 
 <Info>
-This guide covers flutterwave setup integration with the AWO Platform.
+Flutterwave is AWO's primary payment gateway, providing comprehensive payment processing capabilities across 30+ African countries with support for multiple payment methods including cards, mobile money, bank transfers, and USSD.
 </Info>
+
+### Flutterwave Capabilities for AWO
+
+<CardGroup cols={2}>
+  <Card title="Payment Collection" icon="credit-card">
+    **Card Payments**: Visa, Mastercard, Verve support  
+    **Mobile Money**: M-Pesa, MTN MoMo, Airtel Money  
+    **Bank Transfers**: Direct bank account debits  
+    **USSD Payments**: Feature phone compatibility
+  </Card>
+  <Card title="Money Movement" icon="arrow-right-left">
+    **Transfers**: Bank account and mobile money payouts  
+    **Bulk Payments**: Mass payout capabilities  
+    **Cross-border**: International money transfers  
+    **Wallet Management**: Multi-currency wallet system
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Advanced Features" icon="zap">
+    **Recurring Payments**: Subscription billing  
+    **Payment Plans**: Installment payments  
+    **Split Payments**: Multi-merchant settlements  
+    **Preauth/Capture**: Payment authorization holds
+  </Card>
+  <Card title="Regional Coverage" icon="globe-africa">
+    **Pan-African**: 30+ African countries  
+    **Multi-Currency**: 150+ currencies supported  
+    **Local Methods**: Region-specific payment options  
+    **Compliance**: PCI DSS and local regulations
+  </Card>
+</CardGroup>
 
 ## Prerequisites
 
-Integration requirements will be listed here.
-
-## Setup Instructions
+### Business Requirements
 
 <Steps>
-  <Step title="API Configuration">
-    Configure API credentials and endpoints
+  <Step title="Flutterwave Account">
+    Register AWO business account at app.flutterwave.com
   </Step>
-  <Step title="Webhook Setup">
-    Set up webhooks for real-time updates
+  <Step title="KYC Verification">
+    Complete business verification and submit required documents
   </Step>
-  <Step title="Testing">
-    Test the integration in sandbox environment
+  <Step title="Payment Methods">
+    Enable required payment methods for target markets
+  </Step>
+  <Step title="Webhook Configuration">
+    Set up webhook endpoints for payment notifications
   </Step>
 </Steps>
 
-## Code Examples
+### Technical Requirements
+
+```javascript
+// Required dependencies for Flutterwave integration
+{
+  "flutterwave-node-v3": "^1.0.7",
+  "axios": "^1.3.0",
+  "crypto": "^1.0.1",
+  "helmet": "^6.0.0"
+}
+```
+
+**Environment Setup:**
+- Node.js 16+ or React Native 0.68+
+- HTTPS endpoints for webhooks
+- SSL certificates for production
+- PCI DSS compliance for card data
+
+## Authentication & Configuration
+
+### API Keys Setup
 
 ```typescript
-// Integration example
-import { FlutterwaveSetupClient } from '@awo-platform/integrations';
+interface FlutterwaveConfig {
+  publicKey: string;
+  secretKey: string;
+  encryptionKey: string;
+  webhookSecret: string;
+  baseUrl: string;
+}
 
-const client = new FlutterwaveSetupClient({
-  apiKey: process.env.API_KEY,
-  environment: 'sandbox'
+const FLUTTERWAVE_CONFIG: Record<string, FlutterwaveConfig> = {
+  production: {
+    publicKey: process.env.FLW_PROD_PUBLIC_KEY!,
+    secretKey: process.env.FLW_PROD_SECRET_KEY!,
+    encryptionKey: process.env.FLW_PROD_ENCRYPTION_KEY!,
+    webhookSecret: process.env.FLW_PROD_WEBHOOK_SECRET!,
+    baseUrl: 'https://api.flutterwave.com/v3',
+  },
+  test: {
+    publicKey: process.env.FLW_TEST_PUBLIC_KEY!,
+    secretKey: process.env.FLW_TEST_SECRET_KEY!,
+    encryptionKey: process.env.FLW_TEST_ENCRYPTION_KEY!,
+    webhookSecret: process.env.FLW_TEST_WEBHOOK_SECRET!,
+    baseUrl: 'https://api.flutterwave.com/v3',
+  },
+};
+
+export const flwConfig = FLUTTERWAVE_CONFIG[
+  process.env.NODE_ENV === 'production' ? 'production' : 'test'
+];
+```
+
+### API Client Setup
+
+```typescript
+import axios, { AxiosInstance } from 'axios';
+import { FlutterwaveConfig } from './types';
+
+class FlutterwaveClient {
+  private client: AxiosInstance;
+
+  constructor(private config: FlutterwaveConfig) {
+    this.client = axios.create({
+      baseURL: config.baseUrl,
+      timeout: 30000,
+      headers: {
+        'Authorization': `Bearer ${config.secretKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    this.setupInterceptors();
+  }
+
+  private setupInterceptors(): void {
+    // Request interceptor
+    this.client.interceptors.request.use(
+      (config) => {
+        console.log(`Flutterwave API Request: ${config.method?.toUpperCase()} ${config.url}`);
+        return config;
+      },
+      (error) => {
+        console.error('Flutterwave Request Error:', error);
+        return Promise.reject(error);
+      }
+    );
+
+    // Response interceptor
+    this.client.interceptors.response.use(
+      (response) => {
+        if (response.data.status === 'error') {
+          throw new FlutterwaveError(
+            response.data.message,
+            response.data.data?.code || 'API_ERROR',
+            response.status
+          );
+        }
+        return response;
+      },
+      (error) => {
+        throw this.handleError(error);
+      }
+    );
+  }
+
+  private handleError(error: any): FlutterwaveError {
+    if (error.response) {
+      return new FlutterwaveError(
+        error.response.data?.message || 'API request failed',
+        error.response.data?.code || 'API_ERROR',
+        error.response.status,
+        error.response.data
+      );
+    }
+
+    if (error.request) {
+      return new FlutterwaveError(
+        'Network request failed',
+        'NETWORK_ERROR',
+        0
+      );
+    }
+
+    return new FlutterwaveError(
+      error.message || 'Unknown error occurred',
+      'UNKNOWN_ERROR',
+      0
+    );
+  }
+
+  async post<T>(url: string, data?: any): Promise<T> {
+    const response = await this.client.post(url, data);
+    return response.data;
+  }
+
+  async get<T>(url: string, params?: any): Promise<T> {
+    const response = await this.client.get(url, { params });
+    return response.data;
+  }
+}
+
+export const flutterwaveClient = new FlutterwaveClient(flwConfig);
+```
+
+### Error Handling Class
+
+```typescript
+export class FlutterwaveError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public status: number,
+    public details?: any
+  ) {
+    super(message);
+    this.name = 'FlutterwaveError';
+  }
+}
+```
+
+## Payment Collection
+
+### Card Payments
+
+#### Inline Payment (React Native)
+
+```typescript
+import { FlutterwaveInit, FlutterwaveInitOptions } from 'flutterwave-react-native';
+
+interface AWOPaymentRequest {
+  amount: number;
+  currency: string;
+  userId: string;
+  email: string;
+  phone: string;
+  fullName: string;
+  reference: string;
+  description: string;
+}
+
+export const FlutterwavePayment: React.FC<{
+  request: AWOPaymentRequest;
+  onSuccess: (transaction: any) => void;
+  onError: (error: any) => void;
+  onClose: () => void;
+}> = ({ request, onSuccess, onError, onClose }) => {
+  const [showPayment, setShowPayment] = useState(false);
+
+  const paymentOptions: FlutterwaveInitOptions = {
+    public_key: flwConfig.publicKey,
+    tx_ref: request.reference,
+    amount: request.amount,
+    currency: request.currency,
+    customer: {
+      email: request.email,
+      phone_number: request.phone,
+      name: request.fullName,
+    },
+    payment_options: 'card, banktransfer, ussd, mobilemoneyghana, mobilemoneyuganda, mobilemoneykenya, mobilemoneyng',
+    meta: {
+      user_id: request.userId,
+      source: 'awo_mobile_app',
+    },
+    customizations: {
+      title: 'AWO Platform',
+      description: request.description,
+      logo: 'https://awo.app/logo.png',
+    },
+    redirect_url: 'https://api.awo.app/payments/flutterwave/callback',
+  };
+
+  const handlePaymentSuccess = (transaction: any) => {
+    console.log('Payment successful:', transaction);
+    setShowPayment(false);
+    onSuccess(transaction);
+  };
+
+  const handlePaymentError = (error: any) => {
+    console.error('Payment error:', error);
+    setShowPayment(false);
+    onError(error);
+  };
+
+  const handlePaymentCancel = () => {
+    console.log('Payment cancelled');
+    setShowPayment(false);
+    onClose();
+  };
+
+  return (
+    <View>
+      <TouchableOpacity
+        style={styles.payButton}
+        onPress={() => setShowPayment(true)}
+      >
+        <Text style={styles.payButtonText}>
+          Pay {request.currency} {request.amount}
+        </Text>
+      </TouchableOpacity>
+
+      {showPayment && (
+        <FlutterwaveInit
+          {...paymentOptions}
+          onRedirect={handlePaymentSuccess}
+          onAbort={handlePaymentCancel}
+        />
+      )}
+    </View>
+  );
+};
+```
+
+#### Standard Checkout (Web)
+
+```typescript
+// For web integration using Flutterwave's standard checkout
+export const initializeFlutterwaveCheckout = (
+  request: AWOPaymentRequest
+): void => {
+  // Load Flutterwave inline script
+  const script = document.createElement('script');
+  script.src = 'https://checkout.flutterwave.com/v3.js';
+  script.async = true;
+  document.head.appendChild(script);
+
+  script.onload = () => {
+    // @ts-ignore - FlutterwaveCheckout is loaded globally
+    FlutterwaveCheckout({
+      public_key: flwConfig.publicKey,
+      tx_ref: request.reference,
+      amount: request.amount,
+      currency: request.currency,
+      customer: {
+        email: request.email,
+        phone_number: request.phone,
+        name: request.fullName,
+      },
+      payment_options: 'card, banktransfer, ussd, mobilemoney',
+      meta: {
+        user_id: request.userId,
+        source: 'awo_web_app',
+      },
+      customizations: {
+        title: 'AWO Platform',
+        description: request.description,
+        logo: 'https://awo.app/logo.png',
+      },
+      callback: (response: any) => {
+        console.log('Payment response:', response);
+        if (response.status === 'successful') {
+          // Verify payment on backend
+          verifyPayment(response.transaction_id);
+        }
+      },
+      onclose: () => {
+        console.log('Payment modal closed');
+      },
+    });
+  };
+};
+```
+
+### Mobile Money Payments
+
+#### Direct Mobile Money API
+
+```typescript
+interface MobileMoneyPaymentRequest {
+  amount: number;
+  currency: string;
+  email: string;
+  phone: string;
+  fullName: string;
+  network: 'MTN' | 'AIRTEL' | 'TIGO' | 'VODAFONE';
+  country: string;
+  reference: string;
+}
+
+export async function chargeMobileMoney(
+  request: MobileMoneyPaymentRequest
+): Promise<FlutterwaveChargeResponse> {
+  try {
+    const response = await flutterwaveClient.post<FlutterwaveChargeResponse>(
+      '/charges?type=mobile_money_ghana', // Adjust endpoint based on country
+      {
+        tx_ref: request.reference,
+        amount: request.amount,
+        currency: request.currency,
+        email: request.email,
+        phone_number: request.phone,
+        fullname: request.fullName,
+        network: request.network,
+        meta: {
+          user_id: request.userId,
+          source: 'awo_platform',
+        },
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Mobile money charge failed:', error);
+    throw error;
+  }
+}
+
+// Example usage for different African countries
+export const MOBILE_MONEY_NETWORKS = {
+  GH: {
+    MTN: 'MTN',
+    VODAFONE: 'VOD',
+    AIRTEL: 'ATL',
+  },
+  KE: {
+    MPESA: 'MPESA',
+  },
+  UG: {
+    MTN: 'MTN',
+    AIRTEL: 'AIRTEL',
+  },
+  RW: {
+    MTN: 'MTN',
+    AIRTEL: 'AIRTEL',
+  },
+};
+```
+
+### USSD Payments
+
+```typescript
+interface USSDPaymentRequest {
+  amount: number;
+  currency: string;
+  email: string;
+  phone: string;
+  fullName: string;
+  bankCode: string;
+  reference: string;
+}
+
+export async function chargeUSSD(
+  request: USSDPaymentRequest
+): Promise<FlutterwaveChargeResponse> {
+  try {
+    const response = await flutterwaveClient.post<FlutterwaveChargeResponse>(
+      '/charges?type=ussd',
+      {
+        tx_ref: request.reference,
+        amount: request.amount,
+        currency: request.currency,
+        email: request.email,
+        phone_number: request.phone,
+        fullname: request.fullName,
+        account_bank: request.bankCode,
+        meta: {
+          user_id: request.userId,
+          source: 'awo_platform',
+        },
+      }
+    );
+
+    // Response will contain USSD code for user
+    return response;
+  } catch (error) {
+    console.error('USSD charge failed:', error);
+    throw error;
+  }
+}
+
+// Nigerian bank codes for USSD
+export const NIGERIAN_BANK_CODES = {
+  ACCESS: '044',
+  GTBANK: '058',
+  ZENITH: '057',
+  FIRST_BANK: '011',
+  UBA: '033',
+  DIAMOND: '063',
+  WEMA: '035',
+  STERLING: '232',
+  POLARIS: '076',
+};
+```
+
+### Bank Account Charges
+
+```typescript
+interface BankAccountChargeRequest {
+  amount: number;
+  currency: string;
+  email: string;
+  phone: string;
+  fullName: string;
+  accountNumber: string;
+  bankCode: string;
+  reference: string;
+}
+
+export async function chargeBankAccount(
+  request: BankAccountChargeRequest
+): Promise<FlutterwaveChargeResponse> {
+  try {
+    const response = await flutterwaveClient.post<FlutterwaveChargeResponse>(
+      '/charges?type=debit_ng_account',
+      {
+        tx_ref: request.reference,
+        amount: request.amount,
+        currency: request.currency,
+        email: request.email,
+        phone_number: request.phone,
+        fullname: request.fullName,
+        account_bank: request.bankCode,
+        account_number: request.accountNumber,
+        meta: {
+          user_id: request.userId,
+          source: 'awo_platform',
+        },
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Bank account charge failed:', error);
+    throw error;
+  }
+}
+```
+
+## Payment Verification
+
+### Transaction Verification
+
+```typescript
+interface FlutterwaveVerificationResponse {
+  status: string;
+  message: string;
+  data: {
+    id: number;
+    tx_ref: string;
+    flw_ref: string;
+    device_fingerprint: string;
+    amount: number;
+    currency: string;
+    charged_amount: number;
+    app_fee: number;
+    merchant_fee: number;
+    processor_response: string;
+    auth_model: string;
+    ip: string;
+    narration: string;
+    status: 'successful' | 'failed' | 'cancelled';
+    payment_type: string;
+    created_at: string;
+    account_id: number;
+    customer: {
+      id: number;
+      name: string;
+      phone_number: string;
+      email: string;
+      created_at: string;
+    };
+    card?: {
+      first_6digits: string;
+      last_4digits: string;
+      issuer: string;
+      country: string;
+      type: string;
+      expiry: string;
+    };
+    meta?: any;
+  };
+}
+
+export async function verifyTransaction(
+  transactionId: string
+): Promise<FlutterwaveVerificationResponse> {
+  try {
+    const response = await flutterwaveClient.get<FlutterwaveVerificationResponse>(
+      `/transactions/${transactionId}/verify`
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Transaction verification failed:', error);
+    throw error;
+  }
+}
+
+// Comprehensive verification function
+export async function verifyAndProcessPayment(
+  transactionId: string,
+  expectedAmount: number,
+  expectedCurrency: string,
+  userId: string
+): Promise<{
+  isValid: boolean;
+  transaction?: any;
+  errors: string[];
+}> {
+  try {
+    const verification = await verifyTransaction(transactionId);
+    const errors: string[] = [];
+
+    // Verify transaction status
+    if (verification.data.status !== 'successful') {
+      errors.push(`Transaction status is ${verification.data.status}`);
+    }
+
+    // Verify amount
+    if (verification.data.amount !== expectedAmount) {
+      errors.push(`Amount mismatch: expected ${expectedAmount}, got ${verification.data.amount}`);
+    }
+
+    // Verify currency
+    if (verification.data.currency !== expectedCurrency) {
+      errors.push(`Currency mismatch: expected ${expectedCurrency}, got ${verification.data.currency}`);
+    }
+
+    // Verify user association through metadata
+    if (verification.data.meta?.user_id !== userId) {
+      errors.push('User ID mismatch in transaction metadata');
+    }
+
+    if (errors.length === 0) {
+      // Store successful transaction
+      await storeSuccessfulTransaction(verification.data);
+      
+      // Update user wallet balance
+      await updateUserWalletBalance(userId, verification.data.amount);
+      
+      // Send confirmation notification
+      await sendPaymentConfirmation(userId, verification.data);
+    }
+
+    return {
+      isValid: errors.length === 0,
+      transaction: verification.data,
+      errors,
+    };
+  } catch (error) {
+    console.error('Payment verification and processing failed:', error);
+    return {
+      isValid: false,
+      errors: ['Verification failed due to system error'],
+    };
+  }
+}
+```
+
+## Money Transfer & Payouts
+
+### Single Transfers
+
+```typescript
+interface TransferRequest {
+  amount: number;
+  currency: string;
+  bankCode: string;
+  accountNumber: string;
+  accountName: string;
+  narration: string;
+  reference: string;
+  beneficiaryName?: string;
+}
+
+export async function initiateBankTransfer(
+  request: TransferRequest
+): Promise<FlutterwaveTransferResponse> {
+  try {
+    const response = await flutterwaveClient.post<FlutterwaveTransferResponse>(
+      '/transfers',
+      {
+        account_bank: request.bankCode,
+        account_number: request.accountNumber,
+        amount: request.amount,
+        currency: request.currency,
+        narration: request.narration,
+        reference: request.reference,
+        callback_url: 'https://api.awo.app/webhooks/flutterwave/transfer',
+        debit_currency: request.currency,
+        beneficiary_name: request.beneficiaryName || request.accountName,
+        meta: {
+          source: 'awo_platform',
+          type: 'wallet_withdrawal',
+        },
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Bank transfer failed:', error);
+    throw error;
+  }
+}
+```
+
+### Bulk Transfers
+
+```typescript
+interface BulkTransferItem {
+  bankCode: string;
+  accountNumber: string;
+  amount: number;
+  currency: string;
+  narration: string;
+  reference: string;
+  beneficiaryName: string;
+}
+
+export async function initiateBulkTransfer(
+  transfers: BulkTransferItem[]
+): Promise<FlutterwaveBulkTransferResponse> {
+  try {
+    const bulkData = transfers.map(transfer => ({
+      bank_code: transfer.bankCode,
+      account_number: transfer.accountNumber,
+      amount: transfer.amount,
+      currency: transfer.currency,
+      narration: transfer.narration,
+      reference: transfer.reference,
+      beneficiary_name: transfer.beneficiaryName,
+    }));
+
+    const response = await flutterwaveClient.post<FlutterwaveBulkTransferResponse>(
+      '/bulk-transfers',
+      {
+        title: `AWO Bulk Transfer ${new Date().toISOString()}`,
+        bulk_data: bulkData,
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Bulk transfer failed:', error);
+    throw error;
+  }
+}
+```
+
+### Mobile Money Transfers
+
+```typescript
+interface MobileMoneyTransferRequest {
+  amount: number;
+  currency: string;
+  phoneNumber: string;
+  network: string;
+  country: string;
+  narration: string;
+  reference: string;
+}
+
+export async function initiateMobileMoneyTransfer(
+  request: MobileMoneyTransferRequest
+): Promise<FlutterwaveTransferResponse> {
+  try {
+    const response = await flutterwaveClient.post<FlutterwaveTransferResponse>(
+      '/transfers',
+      {
+        account_bank: request.network, // e.g., 'MTN', 'VDF'
+        account_number: request.phoneNumber,
+        amount: request.amount,
+        currency: request.currency,
+        narration: request.narration,
+        reference: request.reference,
+        callback_url: 'https://api.awo.app/webhooks/flutterwave/transfer',
+        beneficiary_name: 'Mobile Money Account',
+        meta: {
+          source: 'awo_platform',
+          type: 'mobile_money_transfer',
+          country: request.country,
+        },
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Mobile money transfer failed:', error);
+    throw error;
+  }
+}
+```
+
+## Webhook Integration
+
+### Webhook Event Types
+
+<CardGroup cols={2}>
+  <Card title="Payment Events" icon="credit-card">
+    **charge.completed**: Payment successful  
+    **charge.failed**: Payment failed  
+    **charge.cancelled**: Payment cancelled  
+    **transfer.completed**: Transfer successful
+  </Card>
+  <Card title="Other Events" icon="bell">
+    **charge.dispute**: Payment disputed  
+    **charge.dispute.create**: New dispute  
+    **charge.dispute.update**: Dispute updated  
+    **payout.completed**: Payout successful
+  </Card>
+</CardGroup>
+
+### Webhook Handler Implementation
+
+```typescript
+import { createHmac } from 'crypto';
+import { Request, Response } from 'express';
+
+interface FlutterwaveWebhookEvent {
+  event: string;
+  data: {
+    id: number;
+    tx_ref: string;
+    flw_ref: string;
+    device_fingerprint: string;
+    amount: number;
+    currency: string;
+    charged_amount: number;
+    app_fee: number;
+    merchant_fee: number;
+    processor_response: string;
+    auth_model: string;
+    ip: string;
+    narration: string;
+    status: string;
+    payment_type: string;
+    created_at: string;
+    account_id: number;
+    customer: {
+      id: number;
+      name: string;
+      phone_number: string;
+      email: string;
+      created_at: string;
+    };
+    meta?: any;
+  };
+  event_type?: string;
+}
+
+export async function handleFlutterwaveWebhook(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const signature = req.headers['verif-hash'] as string;
+    const body = JSON.stringify(req.body);
+
+    // Verify webhook signature
+    if (!verifyFlutterwaveWebhook(body, signature)) {
+      console.error('Invalid Flutterwave webhook signature');
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    const event: FlutterwaveWebhookEvent = req.body;
+
+    switch (event.event) {
+      case 'charge.completed':
+        await handleChargeCompleted(event.data);
+        break;
+      
+      case 'charge.failed':
+        await handleChargeFailed(event.data);
+        break;
+      
+      case 'transfer.completed':
+        await handleTransferCompleted(event.data);
+        break;
+      
+      default:
+        console.log(`Unhandled Flutterwave webhook event: ${event.event}`);
+    }
+
+    res.status(200).json({ status: 'success' });
+  } catch (error) {
+    console.error('Flutterwave webhook processing error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+function verifyFlutterwaveWebhook(
+  payload: string,
+  signature: string
+): boolean {
+  const webhookSecret = flwConfig.webhookSecret;
+  const expectedSignature = createHmac('sha256', webhookSecret)
+    .update(payload)
+    .digest('hex');
+  
+  return signature === expectedSignature;
+}
+
+async function handleChargeCompleted(data: any): Promise<void> {
+  console.log('Flutterwave charge completed:', data);
+  
+  try {
+    // Verify the transaction is legitimate
+    const verification = await verifyTransaction(data.id.toString());
+    
+    if (verification.data.status === 'successful') {
+      // Update payment status in database
+      await updatePaymentStatus(data.tx_ref, 'completed', data);
+      
+      // Extract user ID from metadata
+      const userId = data.meta?.user_id;
+      if (userId) {
+        // Update user wallet balance
+        await updateUserWalletBalance(userId, data.amount);
+        
+        // Send confirmation notification
+        await sendPaymentConfirmation(userId, data);
+        
+        // Trigger any post-payment processes
+        await processPostPaymentActions(userId, data);
+      }
+    }
+  } catch (error) {
+    console.error('Error processing charge completed event:', error);
+  }
+}
+
+async function handleChargeFailed(data: any): Promise<void> {
+  console.log('Flutterwave charge failed:', data);
+  
+  try {
+    // Update payment status
+    await updatePaymentStatus(data.tx_ref, 'failed', data);
+    
+    // Notify user of failed payment
+    const userId = data.meta?.user_id;
+    if (userId) {
+      await sendPaymentFailureNotification(userId, data);
+    }
+  } catch (error) {
+    console.error('Error processing charge failed event:', error);
+  }
+}
+
+async function handleTransferCompleted(data: any): Promise<void> {
+  console.log('Flutterwave transfer completed:', data);
+  
+  try {
+    // Update transfer status
+    await updateTransferStatus(data.reference, 'completed', data);
+    
+    // Notify user of successful transfer
+    const userId = data.meta?.user_id;
+    if (userId) {
+      await sendTransferConfirmation(userId, data);
+    }
+  } catch (error) {
+    console.error('Error processing transfer completed event:', error);
+  }
+}
+```
+
+## Recurring Payments & Subscriptions
+
+### Payment Plans
+
+```typescript
+interface PaymentPlanRequest {
+  amount: number;
+  name: string;
+  interval: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  duration?: number; // Number of times to charge
+  currency: string;
+}
+
+export async function createPaymentPlan(
+  request: PaymentPlanRequest
+): Promise<FlutterwavePaymentPlan> {
+  try {
+    const response = await flutterwaveClient.post<FlutterwavePaymentPlan>(
+      '/payment-plans',
+      {
+        amount: request.amount,
+        name: request.name,
+        interval: request.interval,
+        duration: request.duration,
+        currency: request.currency,
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Payment plan creation failed:', error);
+    throw error;
+  }
+}
+```
+
+### Subscription Management
+
+```typescript
+interface SubscriptionRequest {
+  customer: {
+    email: string;
+    name: string;
+    phone: string;
+  };
+  planId: string;
+  cardToken?: string; // For card subscriptions
+}
+
+export async function createSubscription(
+  request: SubscriptionRequest
+): Promise<FlutterwaveSubscription> {
+  try {
+    const response = await flutterwaveClient.post<FlutterwaveSubscription>(
+      '/subscriptions',
+      {
+        payment_plan: request.planId,
+        customer: request.customer,
+        card_token: request.cardToken,
+      }
+    );
+
+    return response;
+  } catch (error) {
+    console.error('Subscription creation failed:', error);
+    throw error;
+  }
+}
+
+export async function cancelSubscription(
+  subscriptionId: string
+): Promise<void> {
+  try {
+    await flutterwaveClient.put(`/subscriptions/${subscriptionId}/cancel`);
+  } catch (error) {
+    console.error('Subscription cancellation failed:', error);
+    throw error;
+  }
+}
+```
+
+## Testing & Mock Data
+
+### Test Environment Setup
+
+```typescript
+// Test card numbers for different scenarios
+export const TEST_CARDS = {
+  SUCCESSFUL_VISA: {
+    number: '4187427415564246',
+    cvv: '828',
+    expiry_month: '09',
+    expiry_year: '32',
+    pin: '3310',
+  },
+  SUCCESSFUL_MASTERCARD: {
+    number: '5531886652142950',
+    cvv: '564',
+    expiry_month: '09',
+    expiry_year: '32',
+    pin: '3310',
+  },
+  INSUFFICIENT_FUNDS: {
+    number: '4000000000000002',
+    cvv: '812',
+    expiry_month: '01',
+    expiry_year: '31',
+  },
+  INVALID_PIN: {
+    number: '4187427415564246',
+    cvv: '828',
+    expiry_month: '09',
+    expiry_year: '32',
+    pin: '1111', // Wrong PIN
+  },
+};
+
+// Test bank accounts
+export const TEST_BANK_ACCOUNTS = {
+  SUCCESSFUL_ACCOUNT: '0690000004',
+  INSUFFICIENT_FUNDS: '0690000005',
+  INVALID_ACCOUNT: '0690000006',
+};
+
+// Test mobile money numbers
+export const TEST_MOBILE_MONEY = {
+  GHANA_MTN: '054789456123',
+  GHANA_VODAFONE: '020789456123',
+  KENYA_MPESA: '254723789456',
+  UGANDA_MTN: '256789456123',
+};
+```
+
+### Integration Testing
+
+```typescript
+describe('Flutterwave Integration', () => {
+  beforeEach(async () => {
+    await setupTestDatabase();
+    await clearPaymentRecords();
+  });
+
+  test('should process card payment successfully', async () => {
+    const paymentRequest: AWOPaymentRequest = {
+      amount: 100.00,
+      currency: 'NGN',
+      userId: 'test_user_123',
+      email: 'test@awo.app',
+      phone: '+2348123456789',
+      fullName: 'Test User',
+      reference: `AWO_TEST_${Date.now()}`,
+      description: 'Test payment',
+    };
+
+    // This would typically be done on the frontend
+    const mockTransactionId = 'flw_test_12345';
+
+    // Verify the mock transaction
+    const verification = await verifyAndProcessPayment(
+      mockTransactionId,
+      paymentRequest.amount,
+      paymentRequest.currency,
+      paymentRequest.userId
+    );
+
+    expect(verification.isValid).toBe(true);
+    expect(verification.errors).toHaveLength(0);
+  });
+
+  test('should handle mobile money payment', async () => {
+    const mobileMoneyRequest: MobileMoneyPaymentRequest = {
+      amount: 50.00,
+      currency: 'GHS',
+      email: 'test@awo.app',
+      phone: '054789456123',
+      fullName: 'Test User',
+      network: 'MTN',
+      country: 'GH',
+      reference: `AWO_MOMO_${Date.now()}`,
+    };
+
+    const result = await chargeMobileMoney(mobileMoneyRequest);
+    
+    expect(result.status).toBe('success');
+    expect(result.data).toHaveProperty('id');
+  });
+
+  test('should process bank transfer successfully', async () => {
+    const transferRequest: TransferRequest = {
+      amount: 200.00,
+      currency: 'NGN',
+      bankCode: '044',
+      accountNumber: '0690000004',
+      accountName: 'Test Recipient',
+      narration: 'AWO wallet withdrawal',
+      reference: `AWO_TRANSFER_${Date.now()}`,
+    };
+
+    const result = await initiateBankTransfer(transferRequest);
+    
+    expect(result.status).toBe('success');
+    expect(result.data).toHaveProperty('reference');
+  });
 });
 ```
 
-## Webhooks
+## Error Handling & Retry Logic
 
-Webhook configuration and handling will be documented here.
+### Error Classification
 
-## Troubleshooting
+```typescript
+interface FlutterwaveErrorClassification {
+  type: 'authentication' | 'validation' | 'rate_limit' | 'payment' | 'system';
+  retryable: boolean;
+  retryAfter?: number;
+}
 
-<Accordion title="Common Integration Issues">
-Common problems and solutions will be provided here.
-</Accordion>
+export function classifyFlutterwaveError(error: FlutterwaveError): FlutterwaveErrorClassification {
+  const errorCode = error.code.toLowerCase();
+
+  // Authentication errors
+  if (errorCode.includes('invalid_key') || errorCode.includes('unauthorized')) {
+    return { type: 'authentication', retryable: false };
+  }
+
+  // Rate limiting
+  if (errorCode.includes('rate_limit') || error.status === 429) {
+    return { type: 'rate_limit', retryable: true, retryAfter: 60 };
+  }
+
+  // Validation errors
+  if (error.status >= 400 && error.status < 500) {
+    return { type: 'validation', retryable: false };
+  }
+
+  // Payment-specific errors
+  if (errorCode.includes('insufficient_funds') || errorCode.includes('card_declined')) {
+    return { type: 'payment', retryable: false };
+  }
+
+  // System errors
+  if (error.status >= 500) {
+    return { type: 'system', retryable: true, retryAfter: 30 };
+  }
+
+  return { type: 'system', retryable: true };
+}
+```
+
+### Retry Implementation
+
+```typescript
+interface RetryConfig {
+  maxRetries: number;
+  baseDelay: number;
+  maxDelay: number;
+}
+
+const defaultRetryConfig: RetryConfig = {
+  maxRetries: 3,
+  baseDelay: 1000,
+  maxDelay: 30000,
+};
+
+export async function withFlutterwaveRetry<T>(
+  operation: () => Promise<T>,
+  config: RetryConfig = defaultRetryConfig
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      
+      if (!(error instanceof FlutterwaveError)) {
+        throw error;
+      }
+
+      const classification = classifyFlutterwaveError(error);
+      
+      if (attempt === config.maxRetries || !classification.retryable) {
+        throw error;
+      }
+      
+      const delay = classification.retryAfter 
+        ? classification.retryAfter * 1000
+        : Math.min(
+            config.baseDelay * Math.pow(2, attempt),
+            config.maxDelay
+          );
+      
+      console.log(`Retrying Flutterwave operation in ${delay}ms (attempt ${attempt + 1})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError;
+}
+```
+
+## Performance Optimization
+
+### Payment Caching
+
+```typescript
+interface PaymentCache {
+  reference: string;
+  amount: number;
+  currency: string;
+  status: string;
+  expiresAt: number;
+}
+
+class FlutterwaveCache {
+  private cache = new Map<string, PaymentCache>();
+
+  setPayment(reference: string, payment: PaymentCache): void {
+    this.cache.set(reference, {
+      ...payment,
+      expiresAt: Date.now() + (5 * 60 * 1000), // 5 minutes
+    });
+  }
+
+  getPayment(reference: string): PaymentCache | null {
+    const cached = this.cache.get(reference);
+    
+    if (!cached || Date.now() > cached.expiresAt) {
+      this.cache.delete(reference);
+      return null;
+    }
+    
+    return cached;
+  }
+
+  invalidatePayment(reference: string): void {
+    this.cache.delete(reference);
+  }
+
+  cleanup(): void {
+    const now = Date.now();
+    for (const [key, value] of this.cache.entries()) {
+      if (now > value.expiresAt) {
+        this.cache.delete(key);
+      }
+    }
+  }
+}
+
+export const flutterwaveCache = new FlutterwaveCache();
+
+// Cleanup expired entries every 5 minutes
+setInterval(() => {
+  flutterwaveCache.cleanup();
+}, 5 * 60 * 1000);
+```
+
+## Security Best Practices
+
+### API Key Management
+
+```typescript
+// Secure API key rotation
+export class FlutterwaveKeyManager {
+  private currentKeys: FlutterwaveConfig;
+  private backupKeys?: FlutterwaveConfig;
+
+  constructor(keys: FlutterwaveConfig) {
+    this.currentKeys = keys;
+  }
+
+  rotateKeys(newKeys: FlutterwaveConfig): void {
+    this.backupKeys = this.currentKeys;
+    this.currentKeys = newKeys;
+    
+    // Test new keys
+    this.testKeys(newKeys).catch(() => {
+      // Rollback on failure
+      this.currentKeys = this.backupKeys!;
+      this.backupKeys = undefined;
+    });
+  }
+
+  private async testKeys(keys: FlutterwaveConfig): Promise<void> {
+    const testClient = new FlutterwaveClient(keys);
+    
+    try {
+      // Make a simple API call to verify keys
+      await testClient.get('/banks/NG');
+    } catch (error) {
+      throw new Error('Key validation failed');
+    }
+  }
+
+  getCurrentKeys(): FlutterwaveConfig {
+    return this.currentKeys;
+  }
+}
+```
+
+### PCI DSS Compliance
+
+```typescript
+// Ensure PCI DSS compliance for card data handling
+export const PCI_DSS_GUIDELINES = {
+  // Never store full card numbers
+  cardDataHandling: {
+    store: ['first_6digits', 'last_4digits', 'expiry_month', 'expiry_year'],
+    never_store: ['full_card_number', 'cvv', 'pin'],
+    encrypt: ['card_token'],
+  },
+  
+  // Use HTTPS for all communications
+  communication: {
+    protocol: 'HTTPS',
+    tls_version: 'TLS 1.2+',
+    certificate_validation: true,
+  },
+  
+  // Logging restrictions
+  logging: {
+    never_log: ['card_number', 'cvv', 'pin', 'card_data'],
+    mask_sensitive: ['phone_number', 'email'],
+    retain_duration: '1_year',
+  },
+};
+```
+
+## Monitoring & Analytics
+
+### Payment Metrics
+
+<CardGroup cols={2}>
+  <Card title="Performance Metrics" icon="gauge">
+    **Payment Success Rate**: &gt;95% for card payments  
+    **API Response Time**: &lt;2s for payment initiation  
+    **Mobile Money Success**: &gt;90% completion rate  
+    **Transfer Success Rate**: &gt;98% for bank transfers
+  </Card>
+  <Card title="Business Metrics" icon="chart-bar">
+    **Transaction Volume**: Daily/monthly volume tracking  
+    **Revenue per Payment**: Average transaction value  
+    **Payment Method Mix**: Usage distribution  
+    **Regional Performance**: Success rates by country
+  </Card>
+</CardGroup>
+
+### Alerting Setup
+
+```typescript
+interface PaymentAlert {
+  metric: string;
+  threshold: number;
+  severity: 'warning' | 'critical';
+  action: string;
+}
+
+const FLUTTERWAVE_ALERTS: PaymentAlert[] = [
+  {
+    metric: 'payment_failure_rate',
+    threshold: 0.1, // 10%
+    severity: 'critical',
+    action: 'Investigate payment processing issues',
+  },
+  {
+    metric: 'api_response_time_p95',
+    threshold: 5000, // 5 seconds
+    severity: 'warning',
+    action: 'Monitor API performance degradation',
+  },
+  {
+    metric: 'webhook_delivery_failures',
+    threshold: 0.05, // 5%
+    severity: 'critical',
+    action: 'Check webhook endpoint health',
+  },
+];
+
+export async function checkFlutterwaveMetrics(): Promise<void> {
+  for (const alert of FLUTTERWAVE_ALERTS) {
+    const metricValue = await getMetricValue(alert.metric);
+    
+    if (metricValue > alert.threshold) {
+      await sendAlert({
+        service: 'Flutterwave',
+        metric: alert.metric,
+        value: metricValue,
+        threshold: alert.threshold,
+        severity: alert.severity,
+        action: alert.action,
+      });
+    }
+  }
+}
+```
+
+---
+
+*This comprehensive Flutterwave integration guide provides all necessary implementation details for processing payments across Africa through AWO Platform. For additional support, refer to the [Flutterwave documentation](https://developer.flutterwave.com) or contact their integration team.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*
