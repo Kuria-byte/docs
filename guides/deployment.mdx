@@ -1,28 +1,1151 @@
----
-title: "Deployment"
-description: "Deployment implementation guide"
----
+# Deployment Guide
 
-# Deployment
+This comprehensive guide covers deploying AWO Platform across multiple environments, from development to production, ensuring reliable financial services delivery across the SADC region.
 
-## Overview
-
-This guide documentation is coming soon.
+## Deployment Overview
 
 <Info>
-This page is under development. Please check back later for complete implementation guide.
+AWO Platform uses a modern, cloud-native deployment strategy optimized for African markets, emphasizing reliability, security, and cost-effectiveness while maintaining compliance with SADC financial regulations.
 </Info>
 
-## Getting Started
+### Deployment Architecture
 
-Step-by-step instructions will be added here.
+<CardGroup cols={3}>
+  <Card title="Backend Services" icon="server">
+    Railway/Render hosting with auto-scaling and load balancing
+  </Card>
+  <Card title="Database" icon="database">
+    Neon PostgreSQL with global edge locations and automatic backups
+  </Card>
+  <Card title="Mobile Apps" icon="smartphone">
+    Expo Application Services (EAS) with over-the-air updates
+  </Card>
+</CardGroup>
 
-## Examples
+### Environment Strategy
 
-Code examples and best practices will be provided.
+| Environment | Purpose | Characteristics | Deployment Trigger |
+|-------------|---------|-----------------|-------------------|
+| **Development** | Local development | Local services, mock APIs | Manual deployment |
+| **Staging** | Pre-production testing | Production-like, test data | Automatic on PR merge |
+| **Production** | Live user environment | Full scale, real data | Manual approval required |
+| **Demo** | Client demonstrations | Controlled test data | Manual deployment |
 
-## Next Steps
+## Pre-Deployment Checklist
 
-<Card title="Related Documentation" href="/api-reference/introduction">
-  Explore other sections of our documentation
-</Card>
+### Security and Compliance Verification
+
+<Steps>
+  <Step title="Security Audit">
+    **Required Checks:**
+    - All environment variables properly configured
+    - SSL certificates valid and updated
+    - API rate limiting configured
+    - Database encryption enabled
+    - Access controls properly implemented
+  </Step>
+  <Step title="Compliance Validation">
+    **Regulatory Requirements:**
+    - POPIA compliance verification
+    - KYC/AML procedures tested
+    - Data retention policies implemented
+    - Cross-border data handling compliant
+    - Audit logging enabled
+  </Step>
+  <Step title="Financial Accuracy">
+    **Critical Validations:**
+    - All financial calculations tested
+    - Currency conversion accuracy verified
+    - Fee calculations validated
+    - Transaction integrity confirmed
+    - Backup and recovery tested
+  </Step>
+</Steps>
+
+### Performance Requirements
+
+**Minimum Performance Standards:**
+
+| Metric | Development | Staging | Production |
+|--------|------------|---------|------------|
+| API Response Time | &lt;500ms | &lt;300ms | &lt;200ms |
+| Database Query Time | &lt;200ms | &lt;100ms | &lt;50ms |
+| App Startup Time | &lt;5 seconds | &lt;4 seconds | &lt;3 seconds |
+| System Uptime | 95% | 99% | 99.9% |
+
+## Backend Deployment
+
+### Railway Deployment (Primary)
+
+**Railway Configuration:**
+```bash
+# Install Railway CLI
+npm install -g @railway/cli
+
+# Login and link project
+railway login
+railway link
+
+# Environment setup
+railway variables set NODE_ENV=production
+railway variables set DATABASE_URL=${{Neon.DATABASE_URL}}
+railway variables set JWT_SECRET=${{Railway.JWT_SECRET}}
+railway variables set ENCRYPTION_KEY=${{Railway.ENCRYPTION_KEY}}
+```
+
+**Railway Environment Variables:**
+```bash
+# Database Configuration
+DATABASE_URL="postgresql://user:password@host:5432/awo_production"
+REDIS_URL="redis://redis-host:6379"
+
+# Security Configuration  
+JWT_SECRET="your-jwt-secret-key"
+JWT_REFRESH_SECRET="your-refresh-secret-key"
+ENCRYPTION_KEY="your-aes-256-encryption-key"
+
+# External Service APIs
+STITCH_CLIENT_ID="your-stitch-client-id"
+STITCH_CLIENT_SECRET="your-stitch-client-secret"
+FLUTTERWAVE_PUBLIC_KEY="your-flutterwave-public-key"
+FLUTTERWAVE_SECRET_KEY="your-flutterwave-secret-key"
+SMILE_ID_PARTNER_ID="your-smile-id-partner"
+SMILE_ID_API_KEY="your-smile-id-api-key"
+
+# Communication Services
+TWILIO_ACCOUNT_SID="your-twilio-account-sid"
+TWILIO_AUTH_TOKEN="your-twilio-auth-token"
+SENDGRID_API_KEY="your-sendgrid-api-key"
+
+# Monitoring and Analytics
+SENTRY_DSN="your-sentry-dsn"
+```
+
+**Deployment Script:**
+```bash
+#!/bin/bash
+# deploy-backend.sh
+
+echo "🚀 Starting AWO Backend Deployment..."
+
+# Build validation
+echo "📦 Building application..."
+npm run build
+if [ $? -ne 0 ]; then
+    echo "❌ Build failed!"
+    exit 1
+fi
+
+# Run tests
+echo "🧪 Running tests..."
+npm run test:ci
+if [ $? -ne 0 ]; then
+    echo "❌ Tests failed!"
+    exit 1
+fi
+
+# Database migrations
+echo "🗄️ Running database migrations..."
+npm run migration:run
+if [ $? -ne 0 ]; then
+    echo "❌ Migration failed!"
+    exit 1
+fi
+
+# Deploy to Railway
+echo "🚂 Deploying to Railway..."
+railway up
+if [ $? -eq 0 ]; then
+    echo "✅ Deployment successful!"
+else
+    echo "❌ Deployment failed!"
+    exit 1
+fi
+```
+
+### Render Deployment (Alternative)
+
+**Render Configuration:**
+```yaml
+# render.yaml
+services:
+  - type: web
+    name: awo-backend
+    env: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: awo-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: awo-redis
+          property: connectionString
+
+databases:
+  - name: awo-postgres
+    databaseName: awo_production
+    user: awo_user
+    plan: starter
+
+services:
+  - type: redis
+    name: awo-redis
+    plan: starter
+```
+
+### Health Check Configuration
+
+**Health Check Endpoints:**
+```typescript
+// health-check.ts
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: process.env.APP_VERSION,
+    environment: process.env.NODE_ENV
+  });
+});
+
+app.get('/health/detailed', async (req, res) => {
+  const checks = {
+    database: await checkDatabase(),
+    redis: await checkRedis(),
+    externalAPIs: await checkExternalServices(),
+    memory: process.memoryUsage(),
+    uptime: process.uptime()
+  };
+  
+  const isHealthy = Object.values(checks).every(check => 
+    typeof check === 'object' ? check.status === 'healthy' : true
+  );
+  
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'healthy' : 'unhealthy',
+    checks,
+    timestamp: new Date().toISOString()
+  });
+});
+```
+
+## Database Deployment
+
+### Neon PostgreSQL Setup
+
+**Database Configuration:**
+```bash
+# Create production database
+npx neon create-database awo-production --region eu-central-1
+
+# Configure connection pooling
+npx neon connection-pooling enable --max-connections=100
+
+# Set up read replicas for SADC regions
+npx neon create-replica --region af-south-1 --name awo-africa
+```
+
+**Migration Strategy:**
+```bash
+# Database migration pipeline
+#!/bin/bash
+
+echo "🗄️ Starting database deployment..."
+
+# Backup current database
+echo "💾 Creating backup..."
+pg_dump $DATABASE_URL > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Run migrations
+echo "🔄 Running migrations..."
+npm run migration:run
+
+# Verify migration success
+echo "✅ Verifying migrations..."
+npm run migration:verify
+
+# Update materialized views
+echo "📊 Refreshing materialized views..."
+psql $DATABASE_URL -c "REFRESH MATERIALIZED VIEW CONCURRENTLY diva_score_aggregates;"
+
+echo "✅ Database deployment complete!"
+```
+
+**Database Schema Validation:**
+```sql
+-- Production schema validation queries
+SELECT 
+    table_name,
+    table_type,
+    is_insertable_into
+FROM information_schema.tables 
+WHERE table_schema = 'public'
+ORDER BY table_name;
+
+-- Check critical indexes exist
+SELECT 
+    indexname,
+    tablename,
+    indexdef
+FROM pg_indexes 
+WHERE tablename IN ('users', 'transactions', 'chamas', 'investments')
+ORDER BY tablename, indexname;
+
+-- Validate data integrity constraints
+SELECT 
+    conname,
+    contype,
+    confupdtype,
+    confdeltype
+FROM pg_constraint 
+WHERE contype IN ('f', 'c', 'u')
+ORDER BY conname;
+```
+
+### Data Seeding and Migration
+
+**Production Data Seeding:**
+```typescript
+// seed-production.ts
+import { seedCurrencies } from './seeds/currencies';
+import { seedInvestmentProducts } from './seeds/investment-products';
+import { seedSystemConfigs } from './seeds/system-configs';
+
+export async function seedProductionData() {
+  console.log('🌱 Seeding production data...');
+  
+  // Essential reference data only
+  await seedCurrencies();
+  await seedInvestmentProducts();
+  await seedSystemConfigs();
+  
+  console.log('✅ Production seeding complete');
+}
+
+// Investment products seeding
+export async function seedInvestmentProducts() {
+  const products = [
+    {
+      name: 'South African Government Bonds',
+      category: 'bonds',
+      riskLevel: 'low',
+      minInvestment: 1000,
+      portfolioTiers: ['bronze', 'silver', 'gold', 'platinum'],
+      currency: 'ZAR'
+    },
+    {
+      name: 'Women Entrepreneurs Fund',
+      category: 'sme_debt',
+      riskLevel: 'high',
+      minInvestment: 5000,
+      portfolioTiers: ['gold', 'platinum'],
+      currency: 'ZAR'
+    }
+  ];
+  
+  for (const product of products) {
+    await InvestmentProduct.upsert(product, {
+      conflictFields: ['name', 'currency']
+    });
+  }
+}
+```
+
+## Mobile App Deployment
+
+### Expo Application Services (EAS)
+
+**EAS Configuration:**
+```json
+// eas.json
+{
+  "cli": {
+    "version": ">= 5.4.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview"
+    },
+    "production": {
+      "channel": "production",
+      "ios": {
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "your-apple-id@email.com",
+        "ascAppId": "your-app-store-connect-id",
+        "appleTeamId": "your-apple-team-id"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "production"
+      }
+    }
+  }
+}
+```
+
+**Build and Deploy Script:**
+```bash
+#!/bin/bash
+# deploy-mobile.sh
+
+echo "📱 Starting mobile app deployment..."
+
+# Version bump
+echo "🔢 Bumping version..."
+npm version patch
+
+# Build for production
+echo "🏗️ Building production apps..."
+eas build --platform all --profile production
+
+# Submit to app stores (if approved)
+if [ "$SUBMIT_TO_STORES" = "true" ]; then
+    echo "📋 Submitting to app stores..."
+    eas submit --platform all --profile production
+fi
+
+# Publish OTA update
+echo "🔄 Publishing OTA update..."
+eas update --branch production --message "Production release $(git describe --tags)"
+
+echo "✅ Mobile deployment complete!"
+```
+
+### Over-The-Air (OTA) Updates
+
+**Update Strategy:**
+```typescript
+// App.tsx - OTA update handling
+import * as Updates from 'expo-updates';
+
+export default function App() {
+  useEffect(() => {
+    async function onFetchUpdateAsync() {
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          await Updates.reloadAsync();
+        }
+      } catch (error) {
+        // Log error but don't block app
+        console.error('Error fetching update:', error);
+      }
+    }
+    
+    onFetchUpdateAsync();
+  }, []);
+
+  return <AppContainer />;
+}
+```
+
+**Update Channels Strategy:**
+
+<CardGroup cols={3}>
+  <Card title="Development" icon="code">
+    **Channel**: dev  
+    **Audience**: Development team  
+    **Frequency**: Multiple daily updates
+  </Card>
+  <Card title="Preview" icon="eye">
+    **Channel**: preview  
+    **Audience**: Internal testing, stakeholders  
+    **Frequency**: Weekly releases
+  </Card>
+  <Card title="Production" icon="globe">
+    **Channel**: production  
+    **Audience**: End users  
+    **Frequency**: Bi-weekly stable releases
+  </Card>
+</CardGroup>
+
+## CI/CD Pipeline Configuration
+
+### GitHub Actions Workflow
+
+**Main Deployment Pipeline:**
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy AWO Platform
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: awo_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run linting
+        run: npm run lint
+      
+      - name: Run unit tests
+        run: npm run test:unit
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/awo_test
+      
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/awo_test
+
+  deploy-staging:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build application
+        run: npm run build
+      
+      - name: Deploy to staging
+        run: npm run deploy:staging
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_STAGING_TOKEN }}
+
+  deploy-production:
+    needs: [test, deploy-staging]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build application
+        run: npm run build
+      
+      - name: Run production tests
+        run: npm run test:production
+      
+      - name: Deploy to production
+        run: npm run deploy:production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_PRODUCTION_TOKEN }}
+      
+      - name: Run smoke tests
+        run: npm run test:smoke
+        env:
+          API_BASE_URL: https://api.awo-platform.com
+
+  mobile-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Publish OTA update
+        run: eas update --branch production --non-interactive
+```
+
+### Deployment Secrets Management
+
+**Required Secrets:**
+```bash
+# GitHub Secrets Configuration
+RAILWAY_PRODUCTION_TOKEN="your-railway-production-token"
+RAILWAY_STAGING_TOKEN="your-railway-staging-token"
+EXPO_TOKEN="your-expo-access-token"
+
+# Database and Infrastructure
+NEON_API_KEY="your-neon-api-key"
+CLOUDFLARE_API_TOKEN="your-cloudflare-token"
+
+# External Service APIs
+STITCH_PRODUCTION_SECRET="your-stitch-production-secret"
+FLUTTERWAVE_PRODUCTION_SECRET="your-flutterwave-secret"
+SMILE_ID_PRODUCTION_KEY="your-smile-id-production-key"
+
+# Monitoring and Analytics
+SENTRY_AUTH_TOKEN="your-sentry-auth-token"
+DATADOG_API_KEY="your-datadog-api-key"
+```
+
+## Environment-Specific Configurations
+
+### Development Environment
+
+**Local Development Setup:**
+```bash
+# docker-compose.yml for local development
+version: '3.8'
+services:
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: awo_development
+      POSTGRES_USER: awo_user
+      POSTGRES_PASSWORD: development_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://awo_user:development_password@postgres:5432/awo_development
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+
+volumes:
+  postgres_data:
+  redis_data:
+  node_modules:
+```
+
+### Staging Environment
+
+**Staging Configuration:**
+```typescript
+// config/staging.ts
+export const stagingConfig = {
+  database: {
+    url: process.env.STAGING_DATABASE_URL,
+    ssl: true,
+    poolSize: 10
+  },
+  apis: {
+    stitch: {
+      baseUrl: 'https://api.stitch.money/sandbox',
+      clientId: process.env.STITCH_SANDBOX_CLIENT_ID
+    },
+    flutterwave: {
+      baseUrl: 'https://api.flutterwave.com/v3',
+      publicKey: process.env.FLUTTERWAVE_TEST_PUBLIC_KEY
+    }
+  },
+  features: {
+    enabledFeatures: ['chama', 'investments', 'coaching'],
+    maintenanceMode: false,
+    debugMode: true
+  }
+};
+```
+
+### Production Environment
+
+**Production Configuration:**
+```typescript
+// config/production.ts
+export const productionConfig = {
+  database: {
+    url: process.env.DATABASE_URL,
+    ssl: true,
+    poolSize: 50,
+    connectionTimeout: 30000
+  },
+  apis: {
+    stitch: {
+      baseUrl: 'https://api.stitch.money',
+      clientId: process.env.STITCH_PRODUCTION_CLIENT_ID
+    },
+    flutterwave: {
+      baseUrl: 'https://api.flutterwave.com/v3',
+      publicKey: process.env.FLUTTERWAVE_PRODUCTION_PUBLIC_KEY
+    }
+  },
+  features: {
+    enabledFeatures: ['all'],
+    maintenanceMode: false,
+    debugMode: false
+  },
+  monitoring: {
+    sentry: {
+      dsn: process.env.SENTRY_DSN,
+      environment: 'production'
+    },
+    datadog: {
+      apiKey: process.env.DATADOG_API_KEY
+    }
+  }
+};
+```
+
+## Load Balancing and Scaling
+
+### Auto-Scaling Configuration
+
+**Railway Auto-Scaling:**
+```bash
+# Railway auto-scaling setup
+railway variables set RAILWAY_STATIC_URL=api.awo-platform.com
+railway variables set RAILWAY_HEALTHCHECK_PATH=/health
+railway variables set RAILWAY_HEALTHCHECK_TIMEOUT=30
+
+# Configure scaling metrics
+railway variables set MIN_REPLICAS=2
+railway variables set MAX_REPLICAS=10
+railway variables set CPU_THRESHOLD=70
+railway variables set MEMORY_THRESHOLD=80
+```
+
+**Load Balancer Health Checks:**
+```typescript
+// health-check.ts
+export const healthCheckRouter = express.Router();
+
+healthCheckRouter.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString()
+  });
+});
+
+healthCheckRouter.get('/readiness', async (req, res) => {
+  try {
+    // Check database connectivity
+    await db.raw('SELECT 1');
+    
+    // Check Redis connectivity  
+    await redis.ping();
+    
+    res.status(200).json({
+      status: 'ready',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'not ready',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+```
+
+## Security Hardening
+
+### SSL/TLS Configuration
+
+**SSL Certificate Management:**
+```bash
+# Cloudflare SSL configuration
+curl -X PATCH "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/settings/ssl" \
+  -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  --data '{"value":"strict"}'
+
+# Enable HSTS
+curl -X PATCH "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/settings/security_header" \
+  -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  --data '{
+    "value": {
+      "strict_transport_security": {
+        "enabled": true,
+        "max_age": 31536000,
+        "include_subdomains": true
+      }
+    }
+  }'
+```
+
+### Security Headers Configuration
+
+**Express.js Security Middleware:**
+```typescript
+// security.ts
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+
+export function configureSecurityMiddleware(app: Express) {
+  // Basic security headers
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "https://api.stitch.money", "https://api.flutterwave.com"]
+      }
+    },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true
+    }
+  }));
+
+  // Rate limiting
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 1000, // limit each IP to 1000 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.'
+  });
+  
+  app.use('/api', limiter);
+  
+  // Stricter rate limiting for auth endpoints
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // limit each IP to 10 auth requests per windowMs
+    skipSuccessfulRequests: true
+  });
+  
+  app.use('/api/auth', authLimiter);
+}
+```
+
+## Monitoring and Alerting Setup
+
+### Application Monitoring
+
+**Sentry Configuration:**
+```typescript
+// monitoring.ts
+import * as Sentry from '@sentry/node';
+import * as Tracing from '@sentry/tracing';
+
+export function initializeMonitoring(app: Express) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV,
+    integrations: [
+      new Sentry.Integrations.Http({ tracing: true }),
+      new Tracing.Integrations.Express({ app }),
+      new Tracing.Integrations.Postgres()
+    ],
+    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+    beforeSend(event, hint) {
+      // Filter out sensitive financial data
+      if (event.extra && event.extra.sensitiveData) {
+        delete event.extra.sensitiveData;
+      }
+      return event;
+    }
+  });
+
+  app.use(Sentry.Handlers.requestHandler());
+  app.use(Sentry.Handlers.tracingHandler());
+}
+```
+
+### Performance Monitoring
+
+**Custom Metrics Collection:**
+```typescript
+// metrics.ts
+import { collectDefaultMetrics, register, Counter, Histogram } from 'prom-client';
+
+// Collect default metrics
+collectDefaultMetrics();
+
+// Custom metrics
+export const httpRequestDuration = new Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status_code']
+});
+
+export const divaScoreCalculations = new Counter({
+  name: 'diva_score_calculations_total',
+  help: 'Total number of DIVA score calculations'
+});
+
+export const chamaTransactions = new Counter({
+  name: 'chama_transactions_total',
+  help: 'Total number of Chama transactions',
+  labelNames: ['type', 'status']
+});
+
+// Middleware to collect HTTP metrics
+export function metricsMiddleware(req: Request, res: Response, next: NextFunction) {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = (Date.now() - start) / 1000;
+    httpRequestDuration
+      .labels(req.method, req.route?.path || req.path, res.statusCode.toString())
+      .observe(duration);
+  });
+  
+  next();
+}
+```
+
+## Backup and Disaster Recovery
+
+### Automated Backup Strategy
+
+**Database Backup Configuration:**
+```bash
+#!/bin/bash
+# backup-database.sh
+
+echo "💾 Starting database backup..."
+
+# Generate backup filename with timestamp
+BACKUP_FILE="awo_backup_$(date +%Y%m%d_%H%M%S).sql"
+
+# Create database backup
+pg_dump $DATABASE_URL > "/backups/${BACKUP_FILE}"
+
+# Compress backup
+gzip "/backups/${BACKUP_FILE}"
+
+# Upload to cloud storage
+aws s3 cp "/backups/${BACKUP_FILE}.gz" "s3://awo-backups/database/"
+
+# Clean up local files older than 7 days
+find /backups -name "*.sql.gz" -mtime +7 -delete
+
+echo "✅ Database backup complete: ${BACKUP_FILE}.gz"
+```
+
+**Disaster Recovery Plan:**
+```bash
+#!/bin/bash
+# disaster-recovery.sh
+
+echo "🚨 Starting disaster recovery procedure..."
+
+# 1. Assess damage and determine recovery point
+echo "📊 Determining recovery point..."
+RECOVERY_POINT=${1:-"latest"}
+
+# 2. Restore database from backup
+echo "🗄️ Restoring database..."
+aws s3 cp "s3://awo-backups/database/${RECOVERY_POINT}" "/tmp/recovery.sql.gz"
+gunzip "/tmp/recovery.sql.gz"
+psql $DATABASE_URL < "/tmp/recovery.sql"
+
+# 3. Restart application services
+echo "🔄 Restarting services..."
+railway restart awo-backend
+
+# 4. Verify system functionality
+echo "✅ Verifying system health..."
+curl -f https://api.awo-platform.com/health || exit 1
+
+# 5. Notify stakeholders
+echo "📧 Notifying stakeholders..."
+curl -X POST $SLACK_WEBHOOK_URL \
+  -H 'Content-type: application/json' \
+  --data '{"text":"🚨 AWO Platform disaster recovery completed successfully"}'
+
+echo "✅ Disaster recovery complete"
+```
+
+## Post-Deployment Verification
+
+### Smoke Tests
+
+**Critical Path Verification:**
+```bash
+#!/bin/bash
+# smoke-tests.sh
+
+API_BASE_URL=${1:-"https://api.awo-platform.com"}
+
+echo "🔥 Running smoke tests..."
+
+# Test 1: Health check
+echo "1. Testing health endpoint..."
+curl -f "$API_BASE_URL/health" || exit 1
+
+# Test 2: User registration
+echo "2. Testing user registration..."
+REGISTER_RESPONSE=$(curl -s -X POST "$API_BASE_URL/api/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"Test123!","phoneNumber":"+27821234567"}')
+
+if [[ $REGISTER_RESPONSE == *"success"* ]]; then
+  echo "✅ Registration test passed"
+else
+  echo "❌ Registration test failed"
+  exit 1
+fi
+
+# Test 3: Database connectivity
+echo "3. Testing database connectivity..."
+curl -f "$API_BASE_URL/health/detailed" | grep -q "database.*healthy" || exit 1
+
+# Test 4: External API connectivity
+echo "4. Testing external API connectivity..."
+curl -f "$API_BASE_URL/api/system/external-status" || exit 1
+
+echo "✅ All smoke tests passed!"
+```
+
+### Performance Validation
+
+**Load Testing Post-Deployment:**
+```bash
+#!/bin/bash
+# post-deployment-load-test.sh
+
+echo "⚡ Running post-deployment load test..."
+
+# Install k6 if not present
+if ! command -v k6 &> /dev/null; then
+    echo "Installing k6..."
+    sudo apt-get update
+    sudo apt-get install k6
+fi
+
+# Run load test
+k6 run --vus 50 --duration 5m load-test.js
+
+# Check if load test passed
+if [ $? -eq 0 ]; then
+    echo "✅ Load test passed"
+else
+    echo "❌ Load test failed - consider rolling back"
+    exit 1
+fi
+```
+
+## Rollback Procedures
+
+### Automated Rollback Strategy
+
+**Rollback Script:**
+```bash
+#!/bin/bash
+# rollback.sh
+
+ROLLBACK_VERSION=${1:-"previous"}
+
+echo "🔄 Starting rollback to ${ROLLBACK_VERSION}..."
+
+# 1. Rollback application code
+echo "📦 Rolling back application..."
+railway rollback $ROLLBACK_VERSION
+
+# 2. Rollback database if needed
+if [ "$2" = "--with-database" ]; then
+    echo "🗄️ Rolling back database..."
+    npm run migration:rollback
+fi
+
+# 3. Clear caches
+echo "🧹 Clearing caches..."
+redis-cli flushall
+
+# 4. Verify rollback success
+echo "✅ Verifying rollback..."
+./smoke-tests.sh
+
+# 5. Notify team
+echo "📧 Notifying team..."
+curl -X POST $SLACK_WEBHOOK_URL \
+  -H 'Content-type: application/json' \
+  --data "{\"text\":\"🔄 AWO Platform rolled back to ${ROLLBACK_VERSION}\"}"
+
+echo "✅ Rollback complete"
+```
+
+---
+
+*This deployment guide ensures reliable, secure, and compliant deployment of AWO Platform across all environments, supporting the financial needs of African women across the SADC region.*
+
+*Last updated: June 2025*  
+*Next review: Aug 2025*

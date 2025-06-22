@@ -1,28 +1,1518 @@
----
-title: "Best Practices"
-description: "Best Practices implementation guide"
----
+# Best Practices Guide
 
-# Best Practices
+This comprehensive guide outlines development, security, and operational best practices for AWO Platform, ensuring reliable, secure, and maintainable financial services across the SADC region.
 
-## Overview
-
-This guide documentation is coming soon.
+## Best Practices Philosophy
 
 <Info>
-This page is under development. Please check back later for complete implementation guide.
+AWO Platform best practices emphasize financial accuracy, security compliance, user experience optimization, and sustainable development practices tailored for African market conditions.
 </Info>
 
-## Getting Started
+### Core Principles
 
-Step-by-step instructions will be added here.
+**Financial Services Best Practices:**
+- **Financial accuracy above all**: Zero tolerance for monetary calculation errors
+- **Security by design**: Built-in security at every architectural layer
+- **African market optimization**: Performance and functionality for SADC conditions
+- **Regulatory compliance**: Proactive adherence to financial regulations
+- **Sustainable development**: Long-term maintainability and scalability
 
-## Examples
+## Development Best Practices
 
-Code examples and best practices will be provided.
+### Code Quality Standards
 
-## Next Steps
+#### TypeScript Best Practices
 
-<Card title="Related Documentation" href="/api-reference/introduction">
-  Explore other sections of our documentation
-</Card>
+**Type Safety and Financial Accuracy:**
+```typescript
+// ✅ GOOD: Strict typing for financial calculations
+interface MonetaryAmount {
+  readonly amount: number;
+  readonly currency: CurrencyCode;
+  readonly precision: 2; // Always 2 decimal places for money
+}
+
+interface DivaScoreComponents {
+  readonly discipline: number; // 0-100
+  readonly income: number;     // 0-100  
+  readonly velocity: number;   // 0-100
+  readonly assets: number;     // 0-100
+}
+
+class FinancialCalculator {
+  static calculateDivaScore(components: DivaScoreComponents): number {
+    // Use banker's rounding for financial calculations
+    const score = (
+      components.discipline * 0.3 +
+      components.income * 0.25 +
+      components.velocity * 0.25 +
+      components.assets * 0.2
+    );
+    
+    return Math.round(score * 100) / 100; // Precise to 2 decimal places
+  }
+}
+
+// ❌ BAD: Loose typing allows errors
+function calculateBalance(transactions: any[]): number {
+  return transactions.reduce((sum, t) => sum + t.amount, 0); // No validation
+}
+```
+
+**Error Handling Patterns:**
+```typescript
+// ✅ GOOD: Comprehensive error handling with context
+export class FinancialError extends Error {
+  constructor(
+    message: string,
+    public readonly errorCode: string,
+    public readonly context: Record<string, any> = {},
+    public readonly userSafe: boolean = false
+  ) {
+    super(message);
+    this.name = 'FinancialError';
+  }
+}
+
+async function processPayment(paymentRequest: PaymentRequest): Promise<PaymentResult> {
+  try {
+    // Validate input
+    validatePaymentRequest(paymentRequest);
+    
+    // Process with retries
+    return await retryWithBackoff(
+      () => executePayment(paymentRequest),
+      { maxRetries: 3, baseDelay: 1000 }
+    );
+  } catch (error) {
+    // Log with context for debugging
+    logger.error('Payment processing failed', {
+      paymentId: paymentRequest.id,
+      userId: paymentRequest.userId,
+      amount: '***REDACTED***', // Never log actual amounts
+      error: error.message
+    });
+    
+    // Throw user-safe error
+    if (error instanceof ValidationError) {
+      throw new FinancialError(
+        'Invalid payment information provided',
+        'INVALID_PAYMENT_REQUEST',
+        { field: error.field },
+        true // User-safe message
+      );
+    }
+    
+    throw new FinancialError(
+      'Payment processing temporarily unavailable',
+      'PAYMENT_PROCESSING_ERROR',
+      { originalError: error.message },
+      true
+    );
+  }
+}
+```
+
+#### React Native Best Practices
+
+**Performance Optimization:**
+```typescript
+// ✅ GOOD: Optimized component patterns
+import React, { memo, useCallback, useMemo } from 'react';
+import { FlatList, ListRenderItem } from 'react-native';
+
+interface TransactionListProps {
+  transactions: Transaction[];
+  onTransactionPress: (transaction: Transaction) => void;
+}
+
+const TransactionList = memo<TransactionListProps>(({ transactions, onTransactionPress }) => {
+  // Memoize expensive calculations
+  const sortedTransactions = useMemo(() => {
+    return transactions.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }, [transactions]);
+  
+  // Memoize callbacks to prevent unnecessary re-renders
+  const renderTransaction: ListRenderItem<Transaction> = useCallback(({ item }) => (
+    <TransactionItem 
+      transaction={item} 
+      onPress={() => onTransactionPress(item)}
+    />
+  ), [onTransactionPress]);
+  
+  const keyExtractor = useCallback((item: Transaction) => item.id, []);
+  
+  return (
+    <FlatList
+      data={sortedTransactions}
+      renderItem={renderTransaction}
+      keyExtractor={keyExtractor}
+      removeClippedSubviews={true}
+      maxToRenderPerBatch={10}
+      windowSize={10}
+      initialNumToRender={10}
+      getItemLayout={getTransactionItemLayout} // For better performance
+    />
+  );
+});
+
+// ❌ BAD: Performance anti-patterns
+const BadTransactionList = ({ transactions, onTransactionPress }) => {
+  return (
+    <FlatList
+      data={transactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))} // Sorts on every render
+      renderItem={({ item }) => (
+        <TransactionItem 
+          transaction={item} 
+          onPress={() => onTransactionPress(item)} // New function on every render
+        />
+      )}
+      // No keyExtractor, no performance optimizations
+    />
+  );
+};
+```
+
+**Offline-First Patterns:**
+```typescript
+// ✅ GOOD: Robust offline handling
+class OfflineFirstService {
+  async syncData<T>(
+    key: string,
+    fetchFn: () => Promise<T>,
+    options: SyncOptions = {}
+  ): Promise<T> {
+    const { maxAge = 5 * 60 * 1000, fallbackToCache = true } = options;
+    
+    try {
+      // Check if cached data is still fresh
+      const cached = await this.getCachedData<T>(key);
+      if (cached && (Date.now() - cached.timestamp) < maxAge) {
+        return cached.data;
+      }
+      
+      // Fetch fresh data
+      const freshData = await fetchFn();
+      await this.setCachedData(key, freshData);
+      
+      return freshData;
+    } catch (error) {
+      // Fallback to cached data if available
+      if (fallbackToCache) {
+        const cached = await this.getCachedData<T>(key);
+        if (cached) {
+          logger.warn('Using cached data due to network error', { key, error: error.message });
+          return cached.data;
+        }
+      }
+      
+      throw error;
+    }
+  }
+  
+  private async getCachedData<T>(key: string): Promise<CachedData<T> | null> {
+    try {
+      const cached = await AsyncStorage.getItem(key);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  }
+  
+  private async setCachedData<T>(key: string, data: T): Promise<void> {
+    const cacheEntry: CachedData<T> = {
+      data,
+      timestamp: Date.now()
+    };
+    
+    await AsyncStorage.setItem(key, JSON.stringify(cacheEntry));
+  }
+}
+```
+
+### API Design Best Practices
+
+#### RESTful API Standards
+
+**Consistent API Patterns:**
+```typescript
+// ✅ GOOD: Consistent, predictable API design
+class UserController {
+  // GET /api/v1/users/{id}
+  async getUser(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const user = await userService.findById(id);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: 'USER_NOT_FOUND',
+            message: 'User not found'
+          }
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: user,
+        meta: {
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+  
+  // POST /api/v1/users
+  async createUser(req: Request, res: Response) {
+    try {
+      const userData = await this.validateUserData(req.body);
+      const user = await userService.create(userData);
+      
+      res.status(201).json({
+        success: true,
+        data: user,
+        meta: {
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+  
+  private handleError(res: Response, error: Error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: error.message,
+          details: error.details
+        }
+      });
+    }
+    
+    // Log internal errors but don't expose details
+    logger.error('Internal server error', { error: error.message, stack: error.stack });
+    
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'An internal error occurred'
+      }
+    });
+  }
+}
+```
+
+**Request/Response Validation:**
+```typescript
+// ✅ GOOD: Comprehensive validation with Zod
+import { z } from 'zod';
+
+// Reusable schemas
+const MoneyAmountSchema = z.object({
+  amount: z.number().min(0.01).max(1000000),
+  currency: z.enum(['ZAR', 'BWP', 'NAD', 'ZMW'])
+});
+
+const PaymentRequestSchema = z.object({
+  recipientId: z.string().uuid(),
+  amount: MoneyAmountSchema,
+  description: z.string().min(1).max(200),
+  scheduled: z.boolean().optional(),
+  scheduledFor: z.string().datetime().optional()
+}).refine(data => {
+  // Custom validation: if scheduled, scheduledFor is required
+  if (data.scheduled && !data.scheduledFor) {
+    throw new Error('scheduledFor is required when scheduled is true');
+  }
+  return true;
+});
+
+export const validatePaymentRequest = (data: unknown) => {
+  try {
+    return PaymentRequestSchema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new ValidationError('Invalid payment request', error.errors);
+    }
+    throw error;
+  }
+};
+```
+
+#### Rate Limiting and Security
+
+**Smart Rate Limiting:**
+```typescript
+// ✅ GOOD: Context-aware rate limiting
+import rateLimit from 'express-rate-limit';
+import RedisStore from 'rate-limit-redis';
+
+const createRateLimiter = (options: RateLimitOptions) => {
+  return rateLimit({
+    store: new RedisStore({
+      client: redisClient,
+      prefix: 'awo:rate-limit:'
+    }),
+    keyGenerator: (req) => {
+      // Use authenticated user ID when available, otherwise IP
+      return req.user?.id || req.ip;
+    },
+    skip: (req) => {
+      // Skip rate limiting for health checks
+      return req.path === '/health';
+    },
+    onLimitReached: (req, res) => {
+      logger.warn('Rate limit exceeded', {
+        userId: req.user?.id,
+        ip: req.ip,
+        endpoint: req.path
+      });
+    },
+    ...options
+  });
+};
+
+// Different limits for different endpoints
+app.use('/api/auth', createRateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 auth attempts per window
+  message: {
+    error: {
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'Too many authentication attempts'
+    }
+  }
+}));
+
+app.use('/api/payments', createRateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // 5 payment requests per minute
+  message: {
+    error: {
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'Too many payment requests'
+    }
+  }
+}));
+```
+
+### Database Best Practices
+
+#### Query Optimization
+
+**Efficient Database Queries:**
+```sql
+-- ✅ GOOD: Optimized queries with proper indexing
+-- Index for common DIVA score queries
+CREATE INDEX CONCURRENTLY idx_diva_scores_user_calculated 
+ON diva_scores(user_id, calculated_at DESC);
+
+-- Compound index for transaction queries
+CREATE INDEX CONCURRENTLY idx_transactions_user_status_date 
+ON transactions(user_id, status, created_at DESC);
+
+-- Efficient pagination query
+SELECT t.id, t.amount, t.type, t.created_at
+FROM transactions t
+WHERE t.user_id = $1 
+AND t.status = 'completed'
+AND t.created_at < $2  -- cursor-based pagination
+ORDER BY t.created_at DESC
+LIMIT 25;
+
+-- ❌ BAD: Inefficient queries
+-- No indexes, full table scan
+SELECT * FROM transactions 
+WHERE EXTRACT(MONTH FROM created_at) = 12
+AND amount > 1000;
+
+-- Offset pagination (slow for large datasets)
+SELECT * FROM transactions 
+WHERE user_id = $1
+ORDER BY created_at DESC
+OFFSET 1000 LIMIT 25;
+```
+
+**Database Transaction Patterns:**
+```typescript
+// ✅ GOOD: Proper transaction management
+class TransactionService {
+  async transferMoney(
+    fromUserId: string,
+    toUserId: string,
+    amount: MonetaryAmount
+  ): Promise<Transfer> {
+    return await db.transaction(async (trx) => {
+      // 1. Lock user accounts for update
+      const [fromUser, toUser] = await Promise.all([
+        trx('users').where({ id: fromUserId }).forUpdate().first(),
+        trx('users').where({ id: toUserId }).forUpdate().first()
+      ]);
+      
+      if (!fromUser || !toUser) {
+        throw new Error('User not found');
+      }
+      
+      if (fromUser.wallet_balance < amount.amount) {
+        throw new Error('Insufficient funds');
+      }
+      
+      // 2. Create transfer record
+      const [transfer] = await trx('transfers').insert({
+        id: generateId(),
+        from_user_id: fromUserId,
+        to_user_id: toUserId,
+        amount: amount.amount,
+        currency: amount.currency,
+        status: 'processing'
+      }).returning('*');
+      
+      // 3. Update balances atomically
+      await Promise.all([
+        trx('users')
+          .where({ id: fromUserId })
+          .update({ wallet_balance: fromUser.wallet_balance - amount.amount }),
+        trx('users')
+          .where({ id: toUserId })
+          .update({ wallet_balance: toUser.wallet_balance + amount.amount })
+      ]);
+      
+      // 4. Mark transfer as completed
+      await trx('transfers')
+        .where({ id: transfer.id })
+        .update({ status: 'completed', completed_at: new Date() });
+      
+      return transfer;
+    });
+  }
+}
+```
+
+#### Data Validation and Integrity
+
+**Database Constraints and Validation:**
+```sql
+-- ✅ GOOD: Comprehensive database constraints
+CREATE TABLE transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    amount DECIMAL(15,2) NOT NULL CHECK (amount > 0),
+    currency CHAR(3) NOT NULL CHECK (currency IN ('ZAR', 'BWP', 'NAD', 'ZMW')),
+    type VARCHAR(20) NOT NULL CHECK (type IN ('deposit', 'withdrawal', 'transfer', 'payment')),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'cancelled')),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    
+    -- Financial integrity constraints
+    CONSTRAINT valid_status_transitions CHECK (
+        (status = 'pending') OR
+        (status = 'processing' AND created_at < NOW()) OR
+        (status IN ('completed', 'failed', 'cancelled') AND created_at < NOW())
+    )
+);
+
+-- Trigger to maintain updated_at
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_transactions_updated_at 
+    BEFORE UPDATE ON transactions 
+    FOR EACH ROW 
+    EXECUTE PROCEDURE update_updated_at_column();
+```
+
+## Security Best Practices
+
+### Authentication and Authorization
+
+**Secure Authentication Implementation:**
+```typescript
+// ✅ GOOD: Comprehensive authentication security
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
+
+class AuthService {
+  private readonly SALT_ROUNDS = 12;
+  private readonly MAX_LOGIN_ATTEMPTS = 5;
+  private readonly LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
+  
+  async register(userData: UserRegistration): Promise<AuthResult> {
+    // 1. Validate and sanitize input
+    const validatedData = await this.validateRegistrationData(userData);
+    
+    // 2. Check if user already exists
+    const existingUser = await User.findByEmail(validatedData.email);
+    if (existingUser) {
+      throw new AuthError('User already exists', 'USER_EXISTS');
+    }
+    
+    // 3. Hash password with high-cost factor
+    const passwordHash = await bcrypt.hash(validatedData.password, this.SALT_ROUNDS);
+    
+    // 4. Create user with verified email requirement
+    const user = await User.create({
+      ...validatedData,
+      passwordHash,
+      emailVerified: false,
+      status: 'pending_verification'
+    });
+    
+    // 5. Send verification email
+    await this.sendVerificationEmail(user);
+    
+    return { user, requiresVerification: true };
+  }
+  
+  async login(email: string, password: string, ipAddress: string): Promise<AuthResult> {
+    // 1. Check for account lockout
+    await this.checkAccountLockout(email, ipAddress);
+    
+    // 2. Find user
+    const user = await User.findByEmail(email);
+    if (!user) {
+      await this.recordFailedAttempt(email, ipAddress);
+      throw new AuthError('Invalid credentials', 'INVALID_CREDENTIALS');
+    }
+    
+    // 3. Verify password
+    const passwordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!passwordValid) {
+      await this.recordFailedAttempt(email, ipAddress);
+      throw new AuthError('Invalid credentials', 'INVALID_CREDENTIALS');
+    }
+    
+    // 4. Check account status
+    if (user.status !== 'active') {
+      throw new AuthError('Account not active', 'ACCOUNT_INACTIVE');
+    }
+    
+    // 5. Clear failed attempts
+    await this.clearFailedAttempts(email, ipAddress);
+    
+    // 6. Generate tokens
+    const tokens = await this.generateTokens(user);
+    
+    // 7. Log successful login
+    await this.logSuccessfulLogin(user, ipAddress);
+    
+    return { user, tokens };
+  }
+  
+  private async generateTokens(user: User): Promise<TokenPair> {
+    const accessToken = jwt.sign(
+      { 
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        sessionId: generateId()
+      },
+      process.env.JWT_SECRET!,
+      { 
+        expiresIn: '15m',
+        issuer: 'awo-platform',
+        audience: 'awo-api'
+      }
+    );
+    
+    const refreshToken = jwt.sign(
+      { userId: user.id, sessionId: generateId() },
+      process.env.JWT_REFRESH_SECRET!,
+      { 
+        expiresIn: '30d',
+        issuer: 'awo-platform',
+        audience: 'awo-api'
+      }
+    );
+    
+    // Store refresh token hash in database
+    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+    await RefreshToken.create({
+      userId: user.id,
+      tokenHash: refreshTokenHash,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    });
+    
+    return { accessToken, refreshToken };
+  }
+}
+```
+
+### Data Protection and Privacy
+
+**PII Data Handling:**
+```typescript
+// ✅ GOOD: Secure PII data handling
+import crypto from 'crypto';
+
+class DataProtectionService {
+  private readonly ENCRYPTION_ALGORITHM = 'aes-256-gcm';
+  private readonly KEY_DERIVATION_ITERATIONS = 100000;
+  
+  async encryptPII(data: string, purpose: string): Promise<EncryptedData> {
+    // Generate unique salt for each encryption
+    const salt = crypto.randomBytes(32);
+    
+    // Derive key from master key and salt
+    const key = crypto.pbkdf2Sync(
+      process.env.ENCRYPTION_MASTER_KEY!,
+      salt,
+      this.KEY_DERIVATION_ITERATIONS,
+      32,
+      'sha512'
+    );
+    
+    // Generate initialization vector
+    const iv = crypto.randomBytes(16);
+    
+    // Encrypt data
+    const cipher = crypto.createCipher(this.ENCRYPTION_ALGORITHM, key);
+    cipher.setAAD(Buffer.from(purpose)); // Additional authenticated data
+    
+    let encrypted = cipher.update(data, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    
+    const authTag = cipher.getAuthTag();
+    
+    return {
+      encrypted,
+      salt: salt.toString('hex'),
+      iv: iv.toString('hex'),
+      authTag: authTag.toString('hex'),
+      purpose,
+      algorithm: this.ENCRYPTION_ALGORITHM
+    };
+  }
+  
+  async decryptPII(encryptedData: EncryptedData, purpose: string): Promise<string> {
+    // Verify purpose matches
+    if (encryptedData.purpose !== purpose) {
+      throw new Error('Purpose mismatch - unauthorized decryption attempt');
+    }
+    
+    // Derive same key
+    const salt = Buffer.from(encryptedData.salt, 'hex');
+    const key = crypto.pbkdf2Sync(
+      process.env.ENCRYPTION_MASTER_KEY!,
+      salt,
+      this.KEY_DERIVATION_ITERATIONS,
+      32,
+      'sha512'
+    );
+    
+    // Decrypt data
+    const decipher = crypto.createDecipher(encryptedData.algorithm, key);
+    decipher.setAAD(Buffer.from(purpose));
+    decipher.setAuthTag(Buffer.from(encryptedData.authTag, 'hex'));
+    
+    let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  }
+  
+  // Anonymize data for analytics
+  anonymizeForAnalytics(user: User): AnalyticsUser {
+    return {
+      id: this.hashUserId(user.id),
+      ageGroup: this.categorizeAge(user.birthDate),
+      countryCode: user.countryCode,
+      registrationMonth: user.createdAt.toISOString().substring(0, 7), // YYYY-MM
+      portfolioTier: user.portfolioTier,
+      // Remove all PII
+      email: undefined,
+      phoneNumber: undefined,
+      firstName: undefined,
+      lastName: undefined,
+      address: undefined
+    };
+  }
+  
+  private hashUserId(userId: string): string {
+    return crypto
+      .createHash('sha256')
+      .update(userId + process.env.ANALYTICS_SALT!)
+      .digest('hex')
+      .substring(0, 16); // Truncate for analytics
+  }
+}
+```
+
+### API Security Hardening
+
+**Security Middleware Stack:**
+```typescript
+// ✅ GOOD: Comprehensive security middleware
+import helmet from 'helmet';
+import cors from 'cors';
+import { rateLimit } from 'express-rate-limit';
+
+export function setupSecurityMiddleware(app: Express) {
+  // Basic security headers
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // Minimize unsafe-inline usage
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: [
+          "'self'",
+          "https://api.stitch.money",
+          "https://api.flutterwave.com",
+          "https://api.smileidentity.com"
+        ],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"]
+      }
+    },
+    crossOriginEmbedderPolicy: false // Disable for mobile compatibility
+  }));
+  
+  // CORS configuration
+  app.use(cors({
+    origin: (origin, callback) => {
+      const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+      
+      // Allow requests with no origin (mobile apps)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    optionsSuccessStatus: 200,
+    maxAge: 86400 // 24 hours
+  }));
+  
+  // Request sanitization
+  app.use(express.json({ 
+    limit: '10mb',
+    verify: (req, res, buf) => {
+      // Store raw body for webhook verification
+      (req as any).rawBody = buf;
+    }
+  }));
+  
+  // Custom security middleware
+  app.use(securityHeaders);
+  app.use(requestSanitization);
+  app.use(apiKeyValidation);
+}
+
+function securityHeaders(req: Request, res: Response, next: NextFunction) {
+  // Remove server fingerprinting
+  res.removeHeader('X-Powered-By');
+  
+  // Add custom security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // African market specific headers
+  res.setHeader('X-AWO-Region', 'SADC');
+  res.setHeader('X-AWO-Market', 'african-fintech');
+  
+  next();
+}
+```
+
+## Performance Best Practices
+
+### Database Performance
+
+**Optimization Strategies:**
+```sql
+-- ✅ GOOD: Performance-optimized database design
+
+-- Partitioning for large transaction tables
+CREATE TABLE transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    amount DECIMAL(15,2) NOT NULL,
+    currency CHAR(3) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    -- ... other fields
+) PARTITION BY RANGE (created_at);
+
+-- Monthly partitions for better query performance
+CREATE TABLE transactions_2025_01 PARTITION OF transactions
+    FOR VALUES FROM ('2025-01-01') TO ('2025-02-01');
+CREATE TABLE transactions_2025_02 PARTITION OF transactions
+    FOR VALUES FROM ('2025-02-01') TO ('2025-03-01');
+
+-- Efficient materialized views for DIVA calculations
+CREATE MATERIALIZED VIEW diva_score_aggregates AS
+SELECT 
+    user_id,
+    COUNT(*) as transaction_count,
+    AVG(amount) as avg_transaction_amount,
+    STDDEV(amount) as transaction_variance,
+    COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as recent_activity,
+    MAX(created_at) as last_transaction_date
+FROM transactions
+WHERE status = 'completed'
+GROUP BY user_id;
+
+-- Index on materialized view
+CREATE UNIQUE INDEX idx_diva_aggregates_user ON diva_score_aggregates(user_id);
+
+-- Refresh strategy
+CREATE OR REPLACE FUNCTION refresh_diva_aggregates()
+RETURNS void AS $$
+BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY diva_score_aggregates;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Schedule refresh every hour
+SELECT cron.schedule('refresh-diva-aggregates', '0 * * * *', 'SELECT refresh_diva_aggregates();');
+```
+
+### Caching Strategies
+
+**Multi-Layer Caching:**
+```typescript
+// ✅ GOOD: Intelligent caching strategy
+class CacheService {
+  private redis: Redis;
+  private memoryCache: Map<string, CacheEntry> = new Map();
+  
+  constructor(redisClient: Redis) {
+    this.redis = redisClient;
+    this.setupCacheEviction();
+  }
+  
+  async get<T>(key: string, options: CacheOptions = {}): Promise<T | null> {
+    const { useMemoryCache = true, useRedisCache = true } = options;
+    
+    // L1: Memory cache (fastest)
+    if (useMemoryCache) {
+      const memoryEntry = this.memoryCache.get(key);
+      if (memoryEntry && !this.isExpired(memoryEntry)) {
+        return memoryEntry.data;
+      }
+    }
+    
+    // L2: Redis cache
+    if (useRedisCache) {
+      try {
+        const redisValue = await this.redis.get(key);
+        if (redisValue) {
+          const data = JSON.parse(redisValue);
+          
+          // Populate memory cache
+          if (useMemoryCache) {
+            this.memoryCache.set(key, {
+              data,
+              timestamp: Date.now(),
+              ttl: options.ttl || 5 * 60 * 1000 // 5 minutes default
+            });
+          }
+          
+          return data;
+        }
+      } catch (error) {
+        logger.warn('Redis cache error', { key, error: error.message });
+      }
+    }
+    
+    return null;
+  }
+  
+  async set<T>(
+    key: string, 
+    value: T, 
+    options: CacheSetOptions = {}
+  ): Promise<void> {
+    const { 
+      memoryTtl = 5 * 60 * 1000,  // 5 minutes
+      redisTtl = 60 * 60 * 1000,  // 1 hour
+      useMemoryCache = true,
+      useRedisCache = true 
+    } = options;
+    
+    // Set in memory cache
+    if (useMemoryCache) {
+      this.memoryCache.set(key, {
+        data: value,
+        timestamp: Date.now(),
+        ttl: memoryTtl
+      });
+    }
+    
+    // Set in Redis cache
+    if (useRedisCache) {
+      try {
+        await this.redis.setex(
+          key, 
+          Math.floor(redisTtl / 1000), 
+          JSON.stringify(value)
+        );
+      } catch (error) {
+        logger.warn('Redis cache set error', { key, error: error.message });
+      }
+    }
+  }
+  
+  // Smart caching for DIVA scores
+  async cacheDivaScore(userId: string, score: DivaScore): Promise<void> {
+    const key = `diva_score:${userId}`;
+    
+    await this.set(key, score, {
+      memoryTtl: 10 * 60 * 1000,   // 10 minutes in memory
+      redisTtl: 60 * 60 * 1000,    // 1 hour in Redis
+      tags: ['diva', 'user-data']
+    });
+  }
+  
+  // Cache invalidation patterns
+  async invalidateUserData(userId: string): Promise<void> {
+    const patterns = [
+      `user:${userId}`,
+      `diva_score:${userId}`,
+      `wallet_balance:${userId}`,
+      `chama_memberships:${userId}`
+    ];
+    
+    // Clear from memory
+    patterns.forEach(pattern => {
+      this.memoryCache.delete(pattern);
+    });
+    
+    // Clear from Redis
+    try {
+      await this.redis.del(...patterns);
+    } catch (error) {
+      logger.warn('Cache invalidation error', { userId, error: error.message });
+    }
+  }
+  
+  private setupCacheEviction(): void {
+    // Evict expired entries every minute
+    setInterval(() => {
+      const now = Date.now();
+      for (const [key, entry] of this.memoryCache.entries()) {
+        if (this.isExpired(entry)) {
+          this.memoryCache.delete(key);
+        }
+      }
+    }, 60 * 1000);
+  }
+  
+  private isExpired(entry: CacheEntry): boolean {
+    return Date.now() - entry.timestamp > entry.ttl;
+  }
+}
+```
+
+### Mobile Performance Optimization
+
+**African Market Optimization:**
+```typescript
+// ✅ GOOD: African market performance optimizations
+class AfricanMarketOptimizer {
+  // Optimize for slow networks (2G/3G common in rural areas)
+  static configureNetworkOptimizations() {
+    // Aggressive request compression
+    const compressionOptions = {
+      level: 9, // Maximum compression
+      threshold: 100, // Compress responses > 100 bytes
+      filter: (req: Request, res: Response) => {
+        // Don't compress images
+        return !req.headers['content-type']?.includes('image');
+      }
+    };
+    
+    // Request batching for multiple operations
+    const batchRequests = new Map<string, BatchRequest>();
+    
+    return {
+      compression: compressionOptions,
+      batchRequests
+    };
+  }
+  
+  // Optimize for limited data plans
+  static createDataEfficientAPI() {
+    return {
+      // Minimal response payloads
+      userSummary: (user: User) => ({
+        id: user.id,
+        name: user.firstName,
+        balance: user.walletBalance,
+        tier: user.portfolioTier,
+        // Exclude heavy fields
+        avatar: undefined,
+        preferences: undefined
+      }),
+      
+      // Pagination with cursor-based navigation
+      paginatedTransactions: (transactions: Transaction[], cursor?: string) => ({
+        data: transactions.map(t => ({
+          id: t.id,
+          amount: t.amount,
+          type: t.type,
+          date: t.createdAt.toISOString().split('T')[0], // Date only
+          // Exclude description, metadata for list view
+        })),
+        hasMore: transactions.length === 25,
+        nextCursor: transactions[transactions.length - 1]?.id
+      })
+    };
+  }
+  
+  // Smart offline sync for African connectivity patterns
+  static configureOfflineSync() {
+    return {
+      // Sync during off-peak hours (cheaper data)
+      syncSchedule: {
+        preferredHours: [1, 2, 3, 4, 5], // 1-5 AM local time
+        avoidPeakHours: [7, 8, 17, 18, 19] // Morning/evening commute
+      },
+      
+      // Prioritized sync order
+      syncPriority: [
+        'wallet_balance',
+        'pending_transactions', 
+        'chama_updates',
+        'diva_score',
+        'investment_performance',
+        'education_progress'
+      ],
+      
+      // Selective sync based on network quality
+      adaptiveSync: (networkInfo: NetworkInfo) => {
+        if (networkInfo.effectiveType === '2g') {
+          return ['wallet_balance', 'pending_transactions']; // Essential only
+        } else if (networkInfo.effectiveType === '3g') {
+          return ['wallet_balance', 'pending_transactions', 'chama_updates'];
+        } else {
+          return null; // Full sync
+        }
+      }
+    };
+  }
+}
+```
+
+## Testing Best Practices
+
+### Comprehensive Test Coverage
+
+**Financial Logic Testing:**
+```typescript
+// ✅ GOOD: Comprehensive financial testing
+describe('DIVA Score Calculation', () => {
+  describe('Discipline Component', () => {
+    it('should calculate perfect discipline score for consistent payments', () => {
+      const transactions = createMockTransactions({
+        pattern: 'consistent_monthly_savings',
+        amount: 500,
+        months: 12,
+        consistency: 100 // Perfect consistency
+      });
+      
+      const calculator = new DivaScoreCalculator();
+      const disciplineScore = calculator.calculateDiscipline(transactions);
+      
+      expect(disciplineScore).toBe(100);
+    });
+    
+    it('should penalize irregular payment patterns appropriately', () => {
+      const transactions = createMockTransactions({
+        pattern: 'irregular_payments',
+        amounts: [100, 0, 300, 0, 500], // Inconsistent
+        months: 5
+      });
+      
+      const calculator = new DivaScoreCalculator();
+      const disciplineScore = calculator.calculateDiscipline(transactions);
+      
+      expect(disciplineScore).toBeLessThan(60);
+    });
+    
+    it('should handle edge cases correctly', () => {
+      // Test with no transactions
+      expect(() => {
+        new DivaScoreCalculator().calculateDiscipline([]);
+      }).toThrow('Insufficient transaction history');
+      
+      // Test with single transaction
+      const singleTransaction = createMockTransactions({
+        pattern: 'single_transaction',
+        amount: 1000,
+        months: 1
+      });
+      
+      const score = new DivaScoreCalculator().calculateDiscipline(singleTransaction);
+      expect(score).toBeGreaterThan(0);
+      expect(score).toBeLessThan(50); // Should be penalized for lack of history
+    });
+  });
+  
+  describe('Currency Precision', () => {
+    it('should maintain precision in all calculations', () => {
+      const testCases = [
+        { amount: 0.01, expected: 0.01 },
+        { amount: 99.99, expected: 99.99 },
+        { amount: 1234.567, expected: 1234.57 }, // Rounds to 2 decimals
+        { amount: 1000.005, expected: 1000.01 }  // Banker's rounding
+      ];
+      
+      testCases.forEach(({ amount, expected }) => {
+        const result = FinancialCalculator.roundToCurrency(amount);
+        expect(result).toBe(expected);
+      });
+    });
+  });
+});
+```
+
+### Integration Testing Patterns
+
+**External Service Testing:**
+```typescript
+// ✅ GOOD: Robust integration testing
+describe('Payment Gateway Integration', () => {
+  beforeEach(() => {
+    // Set up mock servers for external APIs
+    nock('https://api.flutterwave.com')
+      .defaultReplyHeaders({
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+      });
+      
+    nock('https://api.stitch.money')
+      .defaultReplyHeaders({
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+      });
+  });
+  
+  describe('Payment Processing', () => {
+    it('should handle successful payment flow', async () => {
+      // Mock successful payment response
+      const mockPaymentResponse = {
+        status: 'success',
+        data: {
+          id: 'mock-payment-123',
+          status: 'completed',
+          amount: 100,
+          currency: 'ZAR'
+        }
+      };
+      
+      nock('https://api.flutterwave.com')
+        .post('/v3/payments')
+        .reply(200, mockPaymentResponse);
+      
+      const paymentService = new PaymentService();
+      const result = await paymentService.processPayment({
+        amount: 100,
+        currency: 'ZAR',
+        method: 'mobile_money',
+        phoneNumber: '+27821234567'
+      });
+      
+      expect(result.status).toBe('success');
+      expect(result.externalId).toBe('mock-payment-123');
+    });
+    
+    it('should handle payment failures gracefully', async () => {
+      nock('https://api.flutterwave.com')
+        .post('/v3/payments')
+        .reply(400, {
+          status: 'error',
+          message: 'Insufficient funds'
+        });
+      
+      const paymentService = new PaymentService();
+      
+      await expect(paymentService.processPayment({
+        amount: 1000000, // Large amount
+        currency: 'ZAR',
+        method: 'mobile_money',
+        phoneNumber: '+27821234567'
+      })).rejects.toThrow('Insufficient funds');
+    });
+    
+    it('should retry on network failures', async () => {
+      // First attempt fails
+      nock('https://api.flutterwave.com')
+        .post('/v3/payments')
+        .replyWithError('Network timeout');
+      
+      // Second attempt succeeds
+      nock('https://api.flutterwave.com')
+        .post('/v3/payments')
+        .reply(200, { status: 'success', data: { id: 'retry-success' } });
+      
+      const paymentService = new PaymentService();
+      const result = await paymentService.processPayment({
+        amount: 100,
+        currency: 'ZAR',
+        method: 'mobile_money',
+        phoneNumber: '+27821234567'
+      });
+      
+      expect(result.status).toBe('success');
+    });
+  });
+});
+```
+
+## Deployment and Operations Best Practices
+
+### CI/CD Pipeline Optimization
+
+**Automated Quality Gates:**
+```yaml
+# ✅ GOOD: Comprehensive CI/CD pipeline
+name: AWO Platform CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '18'
+  
+jobs:
+  quality-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Type checking
+        run: npm run type-check
+      
+      - name: Linting
+        run: npm run lint
+      
+      - name: Security audit
+        run: npm audit --audit-level=high
+      
+      - name: License check
+        run: npm run license-check
+  
+  test-suite:
+    needs: quality-checks
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: awo_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run unit tests
+        run: npm run test:unit
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/awo_test
+          REDIS_URL: redis://localhost:6379
+      
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/awo_test
+          REDIS_URL: redis://localhost:6379
+      
+      - name: Test coverage check
+        run: npm run test:coverage
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+  
+  security-scan:
+    needs: quality-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Run security scan
+        uses: securecodewarrior/github-action-add-sarif@v1
+        with:
+          sarif-file: 'security-scan-results.sarif'
+      
+      - name: Dependency vulnerability scan
+        run: |
+          npm install -g @cyclonedx/cdxgen
+          cdxgen -t js -o bom.json
+          # Upload to security scanning service
+  
+  build-and-deploy:
+    needs: [test-suite, security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build application
+        run: |
+          npm ci
+          npm run build
+      
+      - name: Deploy to staging
+        if: github.ref == 'refs/heads/develop'
+        run: npm run deploy:staging
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_STAGING_TOKEN }}
+      
+      - name: Deploy to production
+        if: github.ref == 'refs/heads/main'
+        run: npm run deploy:production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_PRODUCTION_TOKEN }}
+      
+      - name: Run smoke tests
+        run: npm run test:smoke
+        env:
+          API_BASE_URL: ${{ github.ref == 'refs/heads/main' && 'https://api.awo-platform.com' || 'https://staging-api.awo-platform.com' }}
+```
+
+### Monitoring and Alerting
+
+**Proactive Monitoring Setup:**
+```typescript
+// ✅ GOOD: Comprehensive monitoring implementation
+class MonitoringService {
+  private metrics: MetricsCollector;
+  private alerts: AlertManager;
+  
+  constructor() {
+    this.metrics = new MetricsCollector();
+    this.alerts = new AlertManager();
+    this.setupCustomMetrics();
+  }
+  
+  private setupCustomMetrics() {
+    // Financial accuracy monitoring
+    this.metrics.createCounter('financial_calculations_total', {
+      help: 'Total number of financial calculations',
+      labelNames: ['type', 'success']
+    });
+    
+    this.metrics.createHistogram('diva_calculation_duration', {
+      help: 'Time taken for DIVA score calculations',
+      buckets: [0.1, 0.5, 1, 2, 5, 10]
+    });
+    
+    // User engagement metrics
+    this.metrics.createGauge('active_users_current', {
+      help: 'Currently active users'
+    });
+    
+    // System health metrics
+    this.metrics.createGauge('database_connections_active', {
+      help: 'Active database connections'
+    });
+  }
+  
+  // Monitor critical financial operations
+  async monitorFinancialOperation<T>(
+    operationType: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    const timer = this.metrics.startTimer('financial_operation_duration', {
+      operation_type: operationType
+    });
+    
+    try {
+      const result = await operation();
+      
+      this.metrics.incrementCounter('financial_calculations_total', {
+        type: operationType,
+        success: 'true'
+      });
+      
+      return result;
+    } catch (error) {
+      this.metrics.incrementCounter('financial_calculations_total', {
+        type: operationType,
+        success: 'false'
+      });
+      
+      // Alert on financial calculation errors
+      if (operationType.includes('balance') || operationType.includes('payment')) {
+        await this.alerts.sendCriticalAlert(
+          'Financial Calculation Error',
+          `Error in ${operationType}: ${error.message}`,
+          { operationType, error: error.message }
+        );
+      }
+      
+      throw error;
+    } finally {
+      timer.end();
+    }
+  }
+}
+```
+
+---
+
+*These best practices ensure AWO Platform maintains the highest standards of development, security, and operational excellence while serving the financial needs of African women across the SADC region.*
+
+*Last updated: June 2025*  
+*Next review: Aug 2025*

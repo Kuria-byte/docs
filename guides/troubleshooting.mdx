@@ -1,28 +1,1107 @@
----
-title: "Troubleshooting"
-description: "Troubleshooting implementation guide"
----
+# Troubleshooting Guide
 
-# Troubleshooting
+This comprehensive troubleshooting guide provides systematic approaches to diagnosing and resolving common issues in AWO Platform, ensuring reliable financial services across the SADC region.
 
-## Overview
-
-This guide documentation is coming soon.
+## Troubleshooting Philosophy
 
 <Info>
-This page is under development. Please check back later for complete implementation guide.
+AWO Platform troubleshooting emphasizes rapid issue identification, minimal user impact, and systematic root cause analysis, with special attention to financial accuracy and compliance requirements.
 </Info>
 
-## Getting Started
+### Troubleshooting Principles
 
-Step-by-step instructions will be added here.
+**Financial Services Troubleshooting Standards:**
+- **Financial integrity first**: Ensure no monetary errors during troubleshooting
+- **Minimal user disruption**: Resolve issues with minimal service interruption
+- **Systematic diagnosis**: Follow structured troubleshooting procedures
+- **Comprehensive logging**: Maintain detailed logs for audit and analysis
+- **Rapid escalation**: Clear escalation paths for critical financial issues
 
-## Examples
+## Issue Classification System
 
-Code examples and best practices will be provided.
+### Severity Levels
 
-## Next Steps
+<CardGroup cols={2}>
+  <Card title="Critical (P0)" icon="alert-triangle" style="border-color: #ff0000;">
+    **Impact**: Financial loss, data corruption, complete service outage  
+    **Response Time**: Immediate (&lt;15 minutes)  
+    **Examples**: Money lost, incorrect calculations, payment failures
+  </Card>
+  <Card title="High (P1)" icon="exclamation-triangle" style="border-color: #ff8c00;">
+    **Impact**: Major feature unavailable, significant user impact  
+    **Response Time**: &lt;1 hour  
+    **Examples**: Login failures, Chama inaccessible, KYC processing down
+  </Card>
+</CardGroup>
 
-<Card title="Related Documentation" href="/api-reference/introduction">
-  Explore other sections of our documentation
-</Card>
+<CardGroup cols={2}>
+  <Card title="Medium (P2)" icon="info" style="border-color: #ffd700;">
+    **Impact**: Minor feature issues, performance degradation  
+    **Response Time**: &lt;4 hours  
+    **Examples**: Slow responses, minor UI bugs, delayed notifications
+  </Card>
+  <Card title="Low (P3)" icon="minus-circle" style="border-color: #90ee90;">
+    **Impact**: Cosmetic issues, enhancement requests  
+    **Response Time**: &lt;24 hours  
+    **Examples**: UI inconsistencies, non-critical feature improvements
+  </Card>
+</CardGroup>
+
+### Issue Categories
+
+| Category | Description | Common Causes | Primary Tools |
+|----------|-------------|---------------|---------------|
+| **Financial** | Money calculations, transactions | Logic errors, rounding issues | Database queries, audit logs |
+| **Authentication** | Login, registration, session | JWT issues, API problems | Token inspection, user logs |
+| **Integration** | External APIs, payments | Network issues, API changes | API logs, webhook debugging |
+| **Performance** | Slow responses, timeouts | Database queries, network | Performance profiling, metrics |
+| **Mobile** | App crashes, offline issues | Platform bugs, sync problems | Device logs, crash reports |
+
+## Common Issues and Solutions
+
+### Financial Transaction Issues
+
+#### Issue: Incorrect Balance Display
+
+<Steps>
+  <Step title="Immediate Assessment">
+    **Check Data Integrity:**
+    ```sql
+    -- Verify user balance calculation
+    SELECT 
+        u.id,
+        u.wallet_balance,
+        COALESCE(SUM(
+            CASE 
+                WHEN t.type IN ('deposit', 'received') THEN t.amount
+                WHEN t.type IN ('withdrawal', 'sent') THEN -t.amount
+                ELSE 0
+            END
+        ), 0) as calculated_balance
+    FROM users u
+    LEFT JOIN transactions t ON u.id = t.user_id AND t.status = 'completed'
+    WHERE u.id = ?
+    GROUP BY u.id, u.wallet_balance;
+    ```
+  </Step>
+  <Step title="Identify Discrepancy">
+    **Check for Missing Transactions:**
+    ```sql
+    -- Find unprocessed transactions
+    SELECT * FROM transactions 
+    WHERE user_id = ? 
+    AND status IN ('pending', 'processing')
+    AND created_at < NOW() - INTERVAL '1 hour'
+    ORDER BY created_at DESC;
+    ```
+  </Step>
+  <Step title="Resolve and Reconcile">
+    **Recalculate Balance:**
+    ```typescript
+    async function recalculateUserBalance(userId: string) {
+      const transactions = await db('transactions')
+        .where({ user_id: userId, status: 'completed' })
+        .orderBy('created_at', 'asc');
+      
+      let balance = 0;
+      for (const transaction of transactions) {
+        if (['deposit', 'received'].includes(transaction.type)) {
+          balance += transaction.amount;
+        } else if (['withdrawal', 'sent'].includes(transaction.type)) {
+          balance -= transaction.amount;
+        }
+      }
+      
+      await db('users')
+        .where({ id: userId })
+        .update({ wallet_balance: balance });
+      
+      return balance;
+    }
+    ```
+  </Step>
+</Steps>
+
+#### Issue: Payment Processing Failures
+
+**Diagnosis Checklist:**
+
+<CardGroup cols={2}>
+  <Card title="API Connectivity" icon="wifi">
+    **Check External Services:**
+    - Flutterwave API status
+    - Stitch API connectivity  
+    - Mobile money provider status
+    - Network connectivity from server
+  </Card>
+  <Card title="Transaction State" icon="list">
+    **Verify Transaction Flow:**
+    - Initial payment request logged
+    - External API call made
+    - Webhook received (if applicable)
+    - Final status updated
+  </Card>
+</CardGroup>
+
+**Common Solutions:**
+
+```typescript
+// Payment failure recovery script
+async function recoverFailedPayment(transactionId: string) {
+  const transaction = await db('transactions').where({ id: transactionId }).first();
+  
+  if (!transaction) {
+    throw new Error('Transaction not found');
+  }
+  
+  // Check external payment status
+  const externalStatus = await checkExternalPaymentStatus(
+    transaction.external_transaction_id
+  );
+  
+  if (externalStatus.status === 'successful' && transaction.status === 'pending') {
+    // Payment succeeded but our system wasn't updated
+    await completeTransaction(transactionId, externalStatus);
+  } else if (externalStatus.status === 'failed') {
+    // Payment failed, refund user if money was debited
+    await refundFailedTransaction(transactionId);
+  }
+}
+```
+
+### DIVA Score Calculation Issues
+
+#### Issue: Score Not Updating
+
+**Diagnostic Steps:**
+
+<Steps>
+  <Step title="Check Data Availability">
+    **Verify Transaction Data:**
+    ```sql
+    -- Check if user has recent transactions
+    SELECT 
+        COUNT(*) as transaction_count,
+        MAX(created_at) as latest_transaction,
+        MIN(created_at) as earliest_transaction
+    FROM transactions 
+    WHERE user_id = ? 
+    AND created_at > NOW() - INTERVAL '90 days';
+    ```
+  </Step>
+  <Step title="Verify Calculation Logic">
+    **Debug Score Components:**
+    ```typescript
+    async function debugDivaCalculation(userId: string) {
+      const user = await User.findById(userId);
+      const transactions = await getTransactionHistory(userId, 90); // 90 days
+      
+      console.log('Debug DIVA Calculation for user:', userId);
+      console.log('Transaction count:', transactions.length);
+      
+      try {
+        const discipline = calculateDiscipline(transactions);
+        console.log('Discipline score:', discipline);
+        
+        const income = calculateIncome(transactions);
+        console.log('Income score:', income);
+        
+        const velocity = calculateVelocity(transactions);
+        console.log('Velocity score:', velocity);
+        
+        const assets = calculateAssets(user, transactions);
+        console.log('Assets score:', assets);
+        
+        const overallScore = (discipline * 0.3) + (income * 0.25) + 
+                           (velocity * 0.25) + (assets * 0.2);
+        console.log('Overall score:', overallScore);
+        
+        return overallScore;
+      } catch (error) {
+        console.error('DIVA calculation error:', error);
+        throw error;
+      }
+    }
+    ```
+  </Step>
+  <Step title="Force Recalculation">
+    **Manual Score Update:**
+    ```typescript
+    async function forceScoreRecalculation(userId: string) {
+      // Clear existing score
+      await db('diva_scores').where({ user_id: userId }).del();
+      
+      // Recalculate score
+      const newScore = await calculateDivaScore(userId);
+      
+      // Update user tier based on new score
+      const tier = assignPortfolioTier(newScore.overall_score);
+      await db('users').where({ id: userId }).update({ portfolio_tier: tier });
+      
+      return newScore;
+    }
+    ```
+  </Step>
+</Steps>
+
+### Authentication and Session Issues
+
+#### Issue: JWT Token Problems
+
+**Common JWT Issues:**
+
+<CardGroup cols={2}>
+  <Card title="Token Expired" icon="clock">
+    **Symptoms**: 401 Unauthorized errors  
+    **Solution**: Implement automatic token refresh
+    ```typescript
+    async function refreshAccessToken(refreshToken: string) {
+      try {
+        const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+        const newAccessToken = jwt.sign(
+          { userId: payload.userId },
+          process.env.JWT_SECRET,
+          { expiresIn: '15m' }
+        );
+        return newAccessToken;
+      } catch (error) {
+        throw new Error('Invalid refresh token');
+      }
+    }
+    ```
+  </Card>
+  <Card title="Invalid Signature" icon="shield">
+    **Symptoms**: Token verification failures  
+    **Solution**: Check JWT secret configuration
+    ```bash
+    # Verify JWT secret is consistent across instances
+    echo $JWT_SECRET | wc -c  # Should be 32+ characters
+    
+    # Check if secret changed recently
+    docker logs app-container | grep "JWT_SECRET"
+    ```
+  </Card>
+</CardGroup>
+
+#### Issue: Login Failures
+
+**Systematic Diagnosis:**
+
+```typescript
+async function diagnosLoginFailure(email: string, password: string) {
+  // 1. Check if user exists
+  const user = await User.findByEmail(email);
+  if (!user) {
+    return { error: 'User not found', step: 'user_lookup' };
+  }
+  
+  // 2. Check if account is active
+  if (user.status !== 'active') {
+    return { error: 'Account inactive', step: 'account_status', status: user.status };
+  }
+  
+  // 3. Verify password
+  const passwordValid = await bcrypt.compare(password, user.password_hash);
+  if (!passwordValid) {
+    return { error: 'Invalid password', step: 'password_verification' };
+  }
+  
+  // 4. Check for account locks
+  const lockInfo = await checkAccountLock(user.id);
+  if (lockInfo.isLocked) {
+    return { error: 'Account locked', step: 'account_lock', ...lockInfo };
+  }
+  
+  // 5. Check MFA if enabled
+  if (user.mfa_enabled) {
+    return { success: true, step: 'mfa_required', userId: user.id };
+  }
+  
+  return { success: true, step: 'login_complete', userId: user.id };
+}
+```
+
+### Database Performance Issues
+
+#### Issue: Slow Query Performance
+
+**Query Analysis Tools:**
+
+```sql
+-- Identify slow queries
+SELECT 
+    query,
+    mean_exec_time,
+    calls,
+    total_exec_time,
+    rows,
+    100.0 * shared_blks_hit / nullif(shared_blks_hit + shared_blks_read, 0) AS hit_percent
+FROM pg_stat_statements 
+WHERE mean_exec_time > 1000  -- Queries taking longer than 1 second
+ORDER BY mean_exec_time DESC 
+LIMIT 10;
+
+-- Check index usage
+SELECT 
+    schemaname,
+    tablename,
+    attname,
+    n_distinct,
+    correlation
+FROM pg_stats 
+WHERE schemaname = 'public' 
+AND tablename IN ('users', 'transactions', 'chamas', 'investments')
+ORDER BY tablename, attname;
+
+-- Analyze table sizes
+SELECT 
+    schemaname,
+    tablename,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size,
+    pg_total_relation_size(schemaname||'.'||tablename) as size_bytes
+FROM pg_tables 
+WHERE schemaname = 'public'
+ORDER BY size_bytes DESC;
+```
+
+**Performance Optimization Steps:**
+
+<Steps>
+  <Step title="Identify Bottlenecks">
+    **Analyze Query Performance:**
+    ```bash
+    # Enable query logging for analysis
+    ALTER SYSTEM SET log_min_duration_statement = 1000;
+    SELECT pg_reload_conf();
+    
+    # Monitor active queries
+    SELECT 
+        pid,
+        now() - pg_stat_activity.query_start AS duration,
+        query 
+    FROM pg_stat_activity 
+    WHERE (now() - pg_stat_activity.query_start) > interval '5 minutes';
+    ```
+  </Step>
+  <Step title="Optimize Queries">
+    **Add Missing Indexes:**
+    ```sql
+    -- Common indexes for AWO Platform
+    CREATE INDEX CONCURRENTLY idx_transactions_user_created 
+    ON transactions(user_id, created_at);
+    
+    CREATE INDEX CONCURRENTLY idx_diva_scores_user_calculated 
+    ON diva_scores(user_id, calculated_at);
+    
+    CREATE INDEX CONCURRENTLY idx_chama_contributions_chama_date 
+    ON chama_contributions(chama_id, created_at);
+    ```
+  </Step>
+  <Step title="Update Statistics">
+    **Refresh Database Statistics:**
+    ```sql
+    -- Update table statistics
+    ANALYZE users;
+    ANALYZE transactions;
+    ANALYZE chamas;
+    ANALYZE investments;
+    
+    -- Refresh materialized views if used
+    REFRESH MATERIALIZED VIEW CONCURRENTLY diva_score_aggregates;
+    ```
+  </Step>
+</Steps>
+
+### Mobile App Issues
+
+#### Issue: App Crashes
+
+**Crash Analysis Workflow:**
+
+<Steps>
+  <Step title="Gather Crash Data">
+    **Collect Information:**
+    - Sentry crash reports
+    - Device information (OS, version, model)
+    - User actions leading to crash
+    - App version and build number
+  </Step>
+  <Step title="Reproduce Issue">
+    **Local Reproduction:**
+    ```bash
+    # Check crash logs in development
+    npx react-native log-ios
+    npx react-native log-android
+    
+    # Debug with Flipper
+    npx react-native start --experimental-debugger
+    ```
+  </Step>
+  <Step title="Analyze Root Cause">
+    **Common Crash Patterns:**
+    ```typescript
+    // Memory leak detection
+    import { useEffect, useRef } from 'react';
+    
+    function useMemoryTracker(componentName: string) {
+      const mountTime = useRef(Date.now());
+      
+      useEffect(() => {
+        return () => {
+          const lifetime = Date.now() - mountTime.current;
+          if (lifetime > 60000) { // Component lived more than 1 minute
+            console.warn(`Long-lived component: ${componentName} (${lifetime}ms)`);
+          }
+        };
+      }, [componentName]);
+    }
+    ```
+  </Step>
+</Steps>
+
+#### Issue: Offline Sync Problems
+
+**Sync Troubleshooting:**
+
+```typescript
+// Offline sync debugging utility
+class OfflineSyncDebugger {
+  static async diagnoseSyncIssues(userId: string) {
+    const issues = [];
+    
+    // Check pending sync operations
+    const pendingOps = await AsyncStorage.getItem(`pendingSync_${userId}`);
+    if (pendingOps) {
+      const operations = JSON.parse(pendingOps);
+      issues.push({
+        type: 'pending_operations',
+        count: operations.length,
+        oldestOperation: Math.min(...operations.map(op => op.timestamp))
+      });
+    }
+    
+    // Check last successful sync
+    const lastSync = await AsyncStorage.getItem(`lastSync_${userId}`);
+    if (lastSync) {
+      const timeSinceSync = Date.now() - parseInt(lastSync);
+      if (timeSinceSync > 24 * 60 * 60 * 1000) { // 24 hours
+        issues.push({
+          type: 'stale_sync',
+          timeSinceSync: timeSinceSync
+        });
+      }
+    }
+    
+    // Check data consistency
+    const localData = await AsyncStorage.getItem(`userData_${userId}`);
+    if (localData) {
+      const parsed = JSON.parse(localData);
+      // Validate data structure
+      if (!parsed.divaScore || !parsed.walletBalance) {
+        issues.push({
+          type: 'corrupted_local_data',
+          missingFields: []
+        });
+      }
+    }
+    
+    return issues;
+  }
+  
+  static async forceSyncRecovery(userId: string) {
+    // Clear corrupted local data
+    await AsyncStorage.removeItem(`userData_${userId}`);
+    await AsyncStorage.removeItem(`pendingSync_${userId}`);
+    
+    // Force fresh data fetch
+    await this.fetchFreshUserData(userId);
+  }
+}
+```
+
+### External Integration Issues
+
+#### Issue: Open Banking API Failures
+
+**Stitch API Troubleshooting:**
+
+<Steps>
+  <Step title="Check API Status">
+    **Verify Service Health:**
+    ```typescript
+    async function checkStitchAPIHealth() {
+      try {
+        const response = await fetch('https://api.stitch.money/health');
+        const health = await response.json();
+        
+        console.log('Stitch API Health:', health);
+        return health.status === 'ok';
+      } catch (error) {
+        console.error('Stitch API unreachable:', error);
+        return false;
+      }
+    }
+    ```
+  </Step>
+  <Step title="Validate Authentication">
+    **Check OAuth Token:**
+    ```typescript
+    async function validateStitchToken(accessToken: string) {
+      try {
+        const response = await fetch('https://api.stitch.money/accounts', {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.status === 401) {
+          throw new Error('Invalid or expired token');
+        }
+        
+        return response.ok;
+      } catch (error) {
+        console.error('Token validation failed:', error);
+        return false;
+      }
+    }
+    ```
+  </Step>
+  <Step title="Handle Rate Limiting">
+    **Implement Retry Logic:**
+    ```typescript
+    async function retryStitchRequest(requestFn: () => Promise<any>, maxRetries = 3) {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const result = await requestFn();
+          return result;
+        } catch (error) {
+          if (error.status === 429) { // Rate limited
+            const retryAfter = error.headers['retry-after'] || (attempt * 2);
+            console.log(`Rate limited, retrying after ${retryAfter}s`);
+            await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+          } else if (attempt === maxRetries) {
+            throw error;
+          }
+        }
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+#### Issue: Payment Gateway Problems
+
+**Flutterwave Integration Debugging:**
+
+```typescript
+// Payment gateway debugging utility
+class PaymentGatewayDebugger {
+  static async diagnosePaymentFailure(transactionId: string) {
+    const transaction = await db('transactions').where({ id: transactionId }).first();
+    
+    if (!transaction) {
+      return { error: 'Transaction not found' };
+    }
+    
+    // Check external transaction status
+    const externalStatus = await this.checkFlutterwaveStatus(
+      transaction.external_transaction_id
+    );
+    
+    // Check webhook delivery
+    const webhookLogs = await db('webhook_logs')
+      .where({ external_transaction_id: transaction.external_transaction_id })
+      .orderBy('created_at', 'desc');
+    
+    // Analyze failure pattern
+    const failureAnalysis = this.analyzeFailurePattern(transaction, externalStatus, webhookLogs);
+    
+    return {
+      transaction,
+      externalStatus,
+      webhookLogs,
+      failureAnalysis,
+      recommendations: this.getRecommendations(failureAnalysis)
+    };
+  }
+  
+  private static analyzeFailurePattern(transaction: any, externalStatus: any, webhookLogs: any[]) {
+    const patterns = [];
+    
+    // Pattern 1: Payment succeeded but webhook failed
+    if (externalStatus.status === 'successful' && transaction.status === 'pending') {
+      patterns.push('webhook_delivery_failure');
+    }
+    
+    // Pattern 2: Payment failed at gateway
+    if (externalStatus.status === 'failed') {
+      patterns.push('gateway_rejection');
+    }
+    
+    // Pattern 3: Network timeout
+    if (webhookLogs.length === 0 && transaction.status === 'pending') {
+      patterns.push('network_timeout');
+    }
+    
+    return patterns;
+  }
+}
+```
+
+## Systematic Debugging Approaches
+
+### Log Analysis Techniques
+
+**Structured Log Analysis:**
+
+```typescript
+// Log analysis utility
+class LogAnalyzer {
+  static async analyzeUserJourney(userId: string, timeRange: TimeRange) {
+    const logs = await this.getUserLogs(userId, timeRange);
+    
+    // Group logs by session
+    const sessions = this.groupLogsBySessions(logs);
+    
+    // Identify issues in each session
+    const issues = [];
+    for (const session of sessions) {
+      const sessionIssues = this.analyzeSession(session);
+      issues.push(...sessionIssues);
+    }
+    
+    return {
+      totalSessions: sessions.length,
+      issues,
+      recommendations: this.generateRecommendations(issues)
+    };
+  }
+  
+  private static analyzeSession(sessionLogs: LogEntry[]) {
+    const issues = [];
+    
+    // Check for error patterns
+    const errors = sessionLogs.filter(log => log.level === 'error');
+    if (errors.length > 0) {
+      issues.push({
+        type: 'errors_in_session',
+        count: errors.length,
+        errors: errors.map(e => ({ message: e.message, timestamp: e.timestamp }))
+      });
+    }
+    
+    // Check for performance issues
+    const slowOperations = sessionLogs.filter(log => 
+      log.duration && log.duration > 5000
+    );
+    if (slowOperations.length > 0) {
+      issues.push({
+        type: 'slow_operations',
+        operations: slowOperations.map(op => ({
+          operation: op.operation,
+          duration: op.duration
+        }))
+      });
+    }
+    
+    // Check for incomplete flows
+    const incompleteFlows = this.detectIncompleteFlows(sessionLogs);
+    if (incompleteFlows.length > 0) {
+      issues.push({
+        type: 'incomplete_flows',
+        flows: incompleteFlows
+      });
+    }
+    
+    return issues;
+  }
+}
+```
+
+### Performance Debugging
+
+**Performance Profiling Tools:**
+
+```typescript
+// Performance debugging utility
+class PerformanceDebugger {
+  static async profileDivaCalculation(userId: string) {
+    const profile = {
+      startTime: Date.now(),
+      steps: []
+    };
+    
+    try {
+      // Step 1: Fetch user data
+      const fetchStart = Date.now();
+      const user = await User.findById(userId);
+      profile.steps.push({
+        step: 'fetch_user',
+        duration: Date.now() - fetchStart,
+        success: !!user
+      });
+      
+      // Step 2: Fetch transactions
+      const transactionsStart = Date.now();
+      const transactions = await getTransactionHistory(userId, 90);
+      profile.steps.push({
+        step: 'fetch_transactions',
+        duration: Date.now() - transactionsStart,
+        count: transactions.length
+      });
+      
+      // Step 3: Calculate components
+      const calcStart = Date.now();
+      const discipline = calculateDiscipline(transactions);
+      const disciplineTime = Date.now() - calcStart;
+      
+      const income = calculateIncome(transactions);
+      const incomeTime = Date.now() - calcStart - disciplineTime;
+      
+      const velocity = calculateVelocity(transactions);
+      const velocityTime = Date.now() - calcStart - disciplineTime - incomeTime;
+      
+      const assets = calculateAssets(user, transactions);
+      const assetsTime = Date.now() - calcStart - disciplineTime - incomeTime - velocityTime;
+      
+      profile.steps.push(
+        { step: 'calculate_discipline', duration: disciplineTime, score: discipline },
+        { step: 'calculate_income', duration: incomeTime, score: income },
+        { step: 'calculate_velocity', duration: velocityTime, score: velocity },
+        { step: 'calculate_assets', duration: assetsTime, score: assets }
+      );
+      
+      // Step 4: Save results
+      const saveStart = Date.now();
+      const overallScore = (discipline * 0.3) + (income * 0.25) + (velocity * 0.25) + (assets * 0.2);
+      await saveDivaScore(userId, { discipline, income, velocity, assets, overallScore });
+      profile.steps.push({
+        step: 'save_score',
+        duration: Date.now() - saveStart,
+        score: overallScore
+      });
+      
+      profile.totalDuration = Date.now() - profile.startTime;
+      profile.success = true;
+      
+      return profile;
+    } catch (error) {
+      profile.error = error.message;
+      profile.success = false;
+      profile.totalDuration = Date.now() - profile.startTime;
+      
+      return profile;
+    }
+  }
+}
+```
+
+## Emergency Response Procedures
+
+### Critical Issue Response
+
+**P0 Incident Response:**
+
+<Steps>
+  <Step title="Immediate Response (0-15 minutes)">
+    **Critical Actions:**
+    1. **Stop Financial Operations**: Disable money movements if calculation errors suspected
+    2. **Assess Impact**: Determine number of affected users and transactions
+    3. **Alert Team**: Notify on-call engineers and management immediately
+    4. **Create War Room**: Set up communication channel for incident response
+  </Step>
+  <Step title="Diagnosis (15-30 minutes)">
+    **Investigation Steps:**
+    1. **Check System Health**: Review monitoring dashboards and alerts
+    2. **Analyze Recent Changes**: Review recent deployments and configuration changes
+    3. **Examine Error Logs**: Focus on errors around incident start time
+    4. **Test Critical Paths**: Verify core functionality manually
+  </Step>
+  <Step title="Containment (30-60 minutes)">
+    **Damage Control:**
+    1. **Isolate Issue**: Identify and isolate affected components
+    2. **Implement Workaround**: Deploy temporary fixes if possible
+    3. **Communicate Status**: Update users and stakeholders on progress
+    4. **Document Timeline**: Maintain detailed incident timeline
+  </Step>
+  <Step title="Resolution (1-4 hours)">
+    **Fix Implementation:**
+    1. **Deploy Fix**: Implement and deploy permanent solution
+    2. **Verify Resolution**: Test all affected functionality thoroughly
+    3. **Monitor Recovery**: Watch for recurrence or new issues
+    4. **Restore Services**: Gradually restore full service capacity
+  </Step>
+</Steps>
+
+### Data Recovery Procedures
+
+**Financial Data Recovery:**
+
+```bash
+#!/bin/bash
+# financial-data-recovery.sh
+
+echo "🚨 Starting financial data recovery procedure..."
+
+# 1. Stop all financial operations
+echo "⏹️ Stopping financial operations..."
+kubectl scale deployment awo-backend --replicas=0
+
+# 2. Create current state backup
+echo "💾 Creating emergency backup..."
+pg_dump $DATABASE_URL > "emergency_backup_$(date +%Y%m%d_%H%M%S).sql"
+
+# 3. Identify corrupted data
+echo "🔍 Identifying data issues..."
+psql $DATABASE_URL -f scripts/data-integrity-check.sql > integrity_report.txt
+
+# 4. Restore from clean backup if needed
+if [ "$1" = "--restore-backup" ]; then
+    echo "🔄 Restoring from backup..."
+    BACKUP_FILE=${2:-"latest"}
+    psql $DATABASE_URL < "backups/${BACKUP_FILE}"
+fi
+
+# 5. Recalculate financial aggregates
+echo "🧮 Recalculating balances..."
+psql $DATABASE_URL -f scripts/recalculate-balances.sql
+
+# 6. Verify data integrity
+echo "✅ Verifying repairs..."
+psql $DATABASE_URL -f scripts/data-integrity-check.sql > post_recovery_report.txt
+
+# 7. Restart services
+echo "🚀 Restarting services..."
+kubectl scale deployment awo-backend --replicas=3
+
+echo "✅ Recovery procedure complete"
+```
+
+### Communication Templates
+
+**Incident Communication:**
+
+```markdown
+# Incident Status Update Template
+
+**Incident ID**: AWO-INC-[YYYY-MM-DD]-[NUMBER]
+**Severity**: [P0/P1/P2/P3]
+**Status**: [Investigating/Identified/Monitoring/Resolved]
+**Started**: [TIME]
+**Last Updated**: [TIME]
+
+## Summary
+[Brief description of the issue and user impact]
+
+## Current Status
+[What is currently happening to resolve the issue]
+
+## User Impact
+[How users are affected and what they should expect]
+
+## Next Update
+[When the next update will be provided]
+
+## Actions for Users
+[What users should or should not do during the incident]
+```
+
+## Prevention and Monitoring
+
+### Proactive Issue Detection
+
+**Health Check Automation:**
+
+```typescript
+// Automated health monitoring
+class HealthMonitor {
+  private checks: HealthCheck[] = [
+    new DatabaseConnectionCheck(),
+    new APIEndpointCheck(),
+    new ExternalServiceCheck(),
+    new FinancialIntegrityCheck(),
+    new PerformanceCheck()
+  ];
+  
+  async runHealthChecks(): Promise<HealthStatus> {
+    const results = await Promise.all(
+      this.checks.map(check => this.runCheck(check))
+    );
+    
+    const failed = results.filter(r => !r.healthy);
+    const critical = failed.filter(r => r.severity === 'critical');
+    
+    if (critical.length > 0) {
+      await this.alertCriticalIssues(critical);
+    }
+    
+    return {
+      overall: failed.length === 0 ? 'healthy' : 'degraded',
+      checks: results,
+      timestamp: new Date()
+    };
+  }
+  
+  private async runCheck(check: HealthCheck): Promise<HealthResult> {
+    try {
+      const startTime = Date.now();
+      const result = await check.execute();
+      const duration = Date.now() - startTime;
+      
+      return {
+        name: check.name,
+        healthy: result.healthy,
+        duration,
+        message: result.message,
+        severity: check.severity
+      };
+    } catch (error) {
+      return {
+        name: check.name,
+        healthy: false,
+        error: error.message,
+        severity: check.severity
+      };
+    }
+  }
+}
+```
+
+### Automated Recovery Scripts
+
+**Self-Healing Mechanisms:**
+
+```typescript
+// Auto-recovery system
+class AutoRecovery {
+  private recoveryStrategies = new Map<string, RecoveryStrategy>();
+  
+  constructor() {
+    this.registerStrategies();
+  }
+  
+  private registerStrategies() {
+    this.recoveryStrategies.set('database_connection_timeout', 
+      new DatabaseRecoveryStrategy());
+    this.recoveryStrategies.set('external_api_failure', 
+      new ExternalAPIRecoveryStrategy());
+    this.recoveryStrategies.set('memory_leak', 
+      new MemoryRecoveryStrategy());
+    this.recoveryStrategies.set('stuck_transaction', 
+      new TransactionRecoveryStrategy());
+  }
+  
+  async attemptRecovery(issue: DetectedIssue): Promise<RecoveryResult> {
+    const strategy = this.recoveryStrategies.get(issue.type);
+    
+    if (!strategy) {
+      return { success: false, reason: 'No recovery strategy available' };
+    }
+    
+    try {
+      const result = await strategy.recover(issue);
+      
+      if (result.success) {
+        await this.logRecoverySuccess(issue, result);
+      }
+      
+      return result;
+    } catch (error) {
+      await this.logRecoveryFailure(issue, error);
+      return { success: false, reason: error.message };
+    }
+  }
+}
+```
+
+## Troubleshooting Tools and Scripts
+
+### Diagnostic Scripts
+
+**System Diagnostic Tool:**
+
+```bash
+#!/bin/bash
+# awo-diagnostics.sh
+
+echo "🔧 AWO Platform Diagnostic Tool"
+echo "================================"
+
+# Basic system info
+echo "📊 System Information:"
+echo "Node Version: $(node --version)"
+echo "NPM Version: $(npm --version)"
+echo "OS: $(uname -a)"
+echo "Memory: $(free -h | grep Mem | awk '{print $2}')"
+echo "Disk: $(df -h / | tail -1 | awk '{print $4}')"
+echo ""
+
+# Database connectivity
+echo "🗄️ Database Connectivity:"
+if psql $DATABASE_URL -c '\l' > /dev/null 2>&1; then
+    echo "✅ Database connection successful"
+    echo "Database size: $(psql $DATABASE_URL -t -c \"SELECT pg_size_pretty(pg_database_size(current_database()));\")"
+else
+    echo "❌ Database connection failed"
+fi
+echo ""
+
+# API health
+echo "🌐 API Health:"
+if curl -f "$API_BASE_URL/health" > /dev/null 2>&1; then
+    echo "✅ API health endpoint accessible"
+    curl -s "$API_BASE_URL/health" | jq .
+else
+    echo "❌ API health endpoint failed"
+fi
+echo ""
+
+# External services
+echo "🔗 External Services:"
+services=("https://api.stitch.money/health" "https://api.flutterwave.com/v3/status")
+for service in "${services[@]}"; do
+    if curl -f "$service" > /dev/null 2>&1; then
+        echo "✅ $(echo $service | cut -d'/' -f3) - OK"
+    else
+        echo "❌ $(echo $service | cut -d'/' -f3) - Failed"
+    fi
+done
+echo ""
+
+# Recent errors
+echo "🚨 Recent Errors (Last 1 hour):"
+if [ -f "/var/log/awo/error.log" ]; then
+    tail -100 /var/log/awo/error.log | grep "$(date -d '1 hour ago' '+%Y-%m-%d %H')" || echo "No recent errors found"
+else
+    echo "Error log not found"
+fi
+```
+
+### Quick Fix Scripts
+
+**Common Fix Scripts:**
+
+```bash
+# Clear Redis cache
+redis-cli flushall
+
+# Restart stuck workers
+pm2 restart all
+
+# Clear expired sessions
+psql $DATABASE_URL -c "DELETE FROM user_sessions WHERE expires_at < NOW();"
+
+# Recalculate user balances
+node scripts/recalculate-balances.js
+
+# Reset stuck transactions
+psql $DATABASE_URL -c "UPDATE transactions SET status = 'failed' WHERE status = 'processing' AND updated_at < NOW() - INTERVAL '1 hour';"
+```
+
+---
+
+*This troubleshooting guide provides systematic approaches to identifying and resolving issues in AWO Platform, ensuring minimal disruption to financial services for African women across the SADC region.*
+
+*Last updated: June 2025*  
+*Next review: Aug 2025*

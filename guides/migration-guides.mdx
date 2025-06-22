@@ -1,52 +1,1522 @@
----
-title: "Migration Guides"
-description: "AWO Platform migration guides implementation guide"
----
-
 # Migration Guides
 
-## Overview
+This comprehensive guide covers all types of migrations for AWO Platform, from database schema updates to API version changes, ensuring smooth transitions while maintaining financial data integrity across the SADC region.
+
+## Migration Philosophy
 
 <Info>
-This comprehensive guide covers migration guides for the AWO Platform.
+AWO Platform migrations prioritize financial data integrity, zero-downtime deployments, and seamless user experience during transitions, with special consideration for African market connectivity challenges.
 </Info>
 
-## Step-by-Step Implementation
+### Migration Principles
 
-<Steps>
-  <Step title="Planning">
-    Plan your implementation approach
-  </Step>
-  <Step title="Setup">
-    Set up required components
-  </Step>
-  <Step title="Implementation">
-    Implement the feature
-  </Step>
-  <Step title="Testing">
-    Test your implementation
-  </Step>
-  <Step title="Deployment">
-    Deploy to production
-  </Step>
-</Steps>
+**Financial Services Migration Standards:**
+- **Data integrity first**: Financial data must never be corrupted or lost
+- **Zero-downtime deployments**: Continuous service availability during migrations
+- **Backward compatibility**: Maintain API compatibility during transition periods
+- **Rollback readiness**: Every migration must be reversible
+- **Audit trail maintenance**: Complete migration history for compliance
 
-## Code Examples
+## Database Migrations
 
-Implementation examples will be provided here.
+### Schema Migration Strategy
 
-## Best Practices
+#### Migration Framework Setup
 
-Implementation best practices will be documented here.
+**Database Migration Infrastructure:**
+```typescript
+// migrations/migration-runner.ts
+import { Pool } from 'pg';
+import { readdir, readFile } from 'fs/promises';
+import path from 'path';
 
-## Common Pitfalls
+export class MigrationRunner {
+  private db: Pool;
+  
+  constructor(databaseUrl: string) {
+    this.db = new Pool({ connectionString: databaseUrl });
+  }
+  
+  async initialize(): Promise<void> {
+    // Create migrations table if it doesn't exist
+    await this.db.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        id SERIAL PRIMARY KEY,
+        version VARCHAR(14) NOT NULL UNIQUE, -- YYYYMMDDHHMMSS format
+        name VARCHAR(255) NOT NULL,
+        executed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        execution_time_ms INTEGER,
+        checksum VARCHAR(64) NOT NULL
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_schema_migrations_version 
+      ON schema_migrations(version);
+    `);
+  }
+  
+  async runMigrations(direction: 'up' | 'down' = 'up'): Promise<void> {
+    const migrationsDir = path.join(__dirname, 'sql');
+    const files = await readdir(migrationsDir);
+    
+    const migrationFiles = files
+      .filter(file => file.endsWith(`_${direction}.sql`))
+      .sort((a, b) => {
+        const versionA = a.split('_')[0];
+        const versionB = b.split('_')[0];
+        return direction === 'up' ? 
+          versionA.localeCompare(versionB) : 
+          versionB.localeCompare(versionA);
+      });
+    
+    for (const file of migrationFiles) {
+      await this.runMigration(file, direction);
+    }
+  }
+  
+  private async runMigration(filename: string, direction: 'up' | 'down'): Promise<void> {
+    const version = filename.split('_')[0];
+    const name = filename.replace(`${version}_`, '').replace(`_${direction}.sql`, '');
+    
+    // Check if migration already executed (for up migrations)
+    if (direction === 'up') {
+      const existing = await this.db.query(
+        'SELECT version FROM schema_migrations WHERE version = $1',
+        [version]
+      );
+      
+      if (existing.rows.length > 0) {
+        console.log(`Migration ${version} already executed, skipping`);
+        return;
+      }
+    }
+    
+    const migrationPath = path.join(__dirname, 'sql', filename);
+    const sql = await readFile(migrationPath, 'utf8');
+    const checksum = this.calculateChecksum(sql);
+    
+    console.log(`Running migration ${version}: ${name} (${direction})`);
+    
+    const startTime = Date.now();
+    const client = await this.db.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Execute migration SQL
+      await client.query(sql);
+      
+      // Update migration record
+      if (direction === 'up') {
+        await client.query(`
+          INSERT INTO schema_migrations (version, name, execution_time_ms, checksum)
+          VALUES ($1, $2, $3, $4)
+        `, [version, name, Date.now() - startTime, checksum]);
+      } else {
+        await client.query(
+          'DELETE FROM schema_migrations WHERE version = $1',
+          [version]
+        );
+      }
+      
+      await client.query('COMMIT');
+      console.log(`Migration ${version} completed successfully`);
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error(`Migration ${version} failed:`, error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  
+  private calculateChecksum(content: string): string {
+    return require('crypto')
+      .createHash('sha256')
+      .update(content)
+      .digest('hex');
+  }
+}
+```
 
-<Warning>
-Common mistakes and how to avoid them will be listed here.
-</Warning>
+#### Financial Data Migration Patterns
 
-## Next Steps
+**Safe Financial Migrations:**
+```sql
+-- migrations/sql/20250120120000_add_transaction_categories_up.sql
+-- Migration: Add transaction categorization system
+-- Financial Impact: None (additive only)
+-- Rollback: Available
 
-<Card title="Related Guides" href="/guides/integration-walkthrough">
-  Explore other implementation guides
-</Card>
+BEGIN;
+
+-- Add new columns with safe defaults
+ALTER TABLE transactions 
+ADD COLUMN category VARCHAR(50),
+ADD COLUMN subcategory VARCHAR(50),
+ADD COLUMN auto_categorized BOOLEAN DEFAULT FALSE,
+ADD COLUMN categorized_at TIMESTAMP WITH TIME ZONE;
+
+-- Create categories reference table
+CREATE TABLE transaction_categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(50) NOT NULL UNIQUE,
+    parent_category VARCHAR(50),
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    CONSTRAINT fk_parent_category 
+    FOREIGN KEY (parent_category) 
+    REFERENCES transaction_categories(name)
+);
+
+-- Insert standard categories for African financial patterns
+INSERT INTO transaction_categories (name, description) VALUES
+('income', 'All types of income'),
+('expenses', 'All types of expenses'),
+('savings', 'Savings and investments'),
+('transfers', 'Money transfers and remittances'),
+('chama', 'Chama-related transactions'),
+('mobile_money', 'Mobile money operations');
+
+-- Insert subcategories
+INSERT INTO transaction_categories (name, parent_category, description) VALUES
+('salary', 'income', 'Employment salary'),
+('business', 'income', 'Business income'),
+('remittances', 'income', 'Money received from abroad'),
+('groceries', 'expenses', 'Food and groceries'),
+('transport', 'expenses', 'Transportation costs'),
+('utilities', 'expenses', 'Electricity, water, internet'),
+('education', 'expenses', 'School and education fees'),
+('healthcare', 'expenses', 'Medical expenses'),
+('emergency', 'savings', 'Emergency fund contributions'),
+('investment', 'savings', 'Investment purchases'),
+('chama_contribution', 'chama', 'Regular Chama contributions'),
+('chama_payout', 'chama', 'Chama payout received'),
+('mpesa', 'mobile_money', 'M-Pesa transactions'),
+('mtn_momo', 'mobile_money', 'MTN Mobile Money');
+
+-- Add indexes for performance
+CREATE INDEX idx_transactions_category ON transactions(category);
+CREATE INDEX idx_transactions_categorized_at ON transactions(categorized_at);
+
+-- Create function to auto-categorize existing transactions
+CREATE OR REPLACE FUNCTION auto_categorize_transaction(
+    p_transaction_id UUID,
+    p_description TEXT,
+    p_amount DECIMAL,
+    p_type VARCHAR
+) RETURNS VARCHAR AS $$
+DECLARE
+    category VARCHAR(50);
+BEGIN
+    -- Simple rule-based categorization
+    -- This would be enhanced with ML in production
+    
+    IF p_type IN ('salary', 'income') THEN
+        category := 'income';
+    ELSIF p_description ILIKE '%chama%' THEN
+        category := 'chama';
+    ELSIF p_description ILIKE '%mpesa%' OR p_description ILIKE '%mobile money%' THEN
+        category := 'mobile_money';
+    ELSIF p_type = 'transfer' THEN
+        category := 'transfers';
+    ELSIF p_amount > 0 AND p_type = 'deposit' THEN
+        category := 'income';
+    ELSE
+        category := 'expenses';
+    END IF;
+    
+    RETURN category;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Safely categorize existing transactions (in batches to avoid locks)
+-- This will be run as a background job post-migration
+-- UPDATE transactions 
+-- SET category = auto_categorize_transaction(id, description, amount, type),
+--     auto_categorized = TRUE,
+--     categorized_at = NOW()
+-- WHERE category IS NULL;
+
+COMMIT;
+```
+
+**Rollback Migration:**
+```sql
+-- migrations/sql/20250120120000_add_transaction_categories_down.sql
+-- Rollback: Remove transaction categorization system
+-- Safety: Verified no dependent features before rollback
+
+BEGIN;
+
+-- Remove function
+DROP FUNCTION IF EXISTS auto_categorize_transaction(UUID, TEXT, DECIMAL, VARCHAR);
+
+-- Remove indexes
+DROP INDEX IF EXISTS idx_transactions_category;
+DROP INDEX IF EXISTS idx_transactions_categorized_at;
+
+-- Remove foreign key constraint and columns
+ALTER TABLE transactions 
+DROP CONSTRAINT IF EXISTS fk_transaction_category;
+
+ALTER TABLE transactions 
+DROP COLUMN IF EXISTS category,
+DROP COLUMN IF EXISTS subcategory,
+DROP COLUMN IF EXISTS auto_categorized,
+DROP COLUMN IF EXISTS categorized_at;
+
+-- Remove categories table
+DROP TABLE IF EXISTS transaction_categories;
+
+COMMIT;
+```
+
+### Large-Scale Data Migrations
+
+#### Zero-Downtime Migration Strategy
+
+**Background Data Processing:**
+```typescript
+// migrations/background-migration.ts
+export class BackgroundMigration {
+  private db: Pool;
+  private batchSize = 1000;
+  private delayBetweenBatches = 100; // ms
+  
+  constructor(databaseUrl: string) {
+    this.db = new Pool({ connectionString: databaseUrl });
+  }
+  
+  async migrateUserBalanceCalculations(): Promise<void> {
+    console.log('Starting background migration: User balance recalculation');
+    
+    // Get total count for progress tracking
+    const totalResult = await this.db.query(
+      'SELECT COUNT(*) FROM users WHERE wallet_balance_verified = FALSE OR wallet_balance_verified IS NULL'
+    );
+    const totalUsers = parseInt(totalResult.rows[0].count);
+    
+    console.log(`Total users to migrate: ${totalUsers}`);
+    
+    let processed = 0;
+    let lastUserId = '';
+    
+    while (processed < totalUsers) {
+      const batchStartTime = Date.now();
+      
+      // Process batch with cursor-based pagination
+      const users = await this.db.query(`
+        SELECT id, wallet_balance, created_at 
+        FROM users 
+        WHERE (wallet_balance_verified = FALSE OR wallet_balance_verified IS NULL)
+        AND id > $1
+        ORDER BY id
+        LIMIT $2
+      `, [lastUserId, this.batchSize]);
+      
+      if (users.rows.length === 0) break;
+      
+      // Process each user in the batch
+      for (const user of users.rows) {
+        await this.recalculateUserBalance(user.id);
+        lastUserId = user.id;
+      }
+      
+      processed += users.rows.length;
+      const batchTime = Date.now() - batchStartTime;
+      
+      console.log(
+        `Processed ${processed}/${totalUsers} users (${Math.round(processed/totalUsers*100)}%) - Batch time: ${batchTime}ms`
+      );
+      
+      // Delay to avoid overwhelming the database
+      await this.sleep(this.delayBetweenBatches);
+    }
+    
+    console.log('Background migration completed successfully');
+  }
+  
+  private async recalculateUserBalance(userId: string): Promise<void> {
+    const client = await this.db.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Calculate correct balance from transactions
+      const result = await client.query(`
+        SELECT COALESCE(SUM(
+          CASE 
+            WHEN type IN ('deposit', 'received', 'chama_payout') THEN amount
+            WHEN type IN ('withdrawal', 'sent', 'chama_contribution', 'investment') THEN -amount
+            ELSE 0
+          END
+        ), 0) as calculated_balance
+        FROM transactions 
+        WHERE user_id = $1 AND status = 'completed'
+      `, [userId]);
+      
+      const calculatedBalance = parseFloat(result.rows[0].calculated_balance);
+      
+      // Update user balance
+      await client.query(`
+        UPDATE users 
+        SET wallet_balance = $1,
+            wallet_balance_verified = TRUE,
+            balance_last_calculated = NOW()
+        WHERE id = $2
+      `, [calculatedBalance, userId]);
+      
+      await client.query('COMMIT');
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error(`Failed to recalculate balance for user ${userId}:`, error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// Migration script runner
+async function runBackgroundMigration() {
+  const migration = new BackgroundMigration(process.env.DATABASE_URL!);
+  
+  try {
+    await migration.migrateUserBalanceCalculations();
+    process.exit(0);
+  } catch (error) {
+    console.error('Background migration failed:', error);
+    process.exit(1);
+  }
+}
+
+// Run if called directly
+if (require.main === module) {
+  runBackgroundMigration();
+}
+```
+
+### DIVA Score Migration
+
+**Migrating DIVA Calculation Engine:**
+```typescript
+// migrations/diva-score-migration.ts
+export class DivaScoreMigration {
+  private db: Pool;
+  
+  constructor(databaseUrl: string) {
+    this.db = new Pool({ connectionString: databaseUrl });
+  }
+  
+  async migrateToNewDivaAlgorithm(): Promise<void> {
+    console.log('Starting DIVA score algorithm migration...');
+    
+    // Step 1: Create new score table structure
+    await this.createNewScoreTable();
+    
+    // Step 2: Migrate existing scores with new algorithm
+    await this.migrateDivaScores();
+    
+    // Step 3: Update portfolio assignments
+    await this.updatePortfolioAssignments();
+    
+    console.log('DIVA score migration completed');
+  }
+  
+  private async createNewScoreTable(): Promise<void> {
+    await this.db.query(`
+      -- Create new DIVA scores table with enhanced structure
+      CREATE TABLE diva_scores_v2 (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        
+        -- Core components with enhanced tracking
+        discipline_score DECIMAL(5,2) NOT NULL CHECK (discipline_score >= 0 AND discipline_score <= 100),
+        income_score DECIMAL(5,2) NOT NULL CHECK (income_score >= 0 AND income_score <= 100),
+        velocity_score DECIMAL(5,2) NOT NULL CHECK (velocity_score >= 0 AND velocity_score <= 100),
+        assets_score DECIMAL(5,2) NOT NULL CHECK (assets_score >= 0 AND assets_score <= 100),
+        
+        -- New: Behavioral factors
+        consistency_score DECIMAL(5,2) NOT NULL DEFAULT 0,
+        growth_score DECIMAL(5,2) NOT NULL DEFAULT 0,
+        risk_awareness_score DECIMAL(5,2) NOT NULL DEFAULT 0,
+        
+        -- Enhanced overall calculation
+        overall_score DECIMAL(5,2) NOT NULL CHECK (overall_score >= 0 AND overall_score <= 100),
+        previous_score DECIMAL(5,2), -- Track score changes
+        score_trend VARCHAR(20) CHECK (score_trend IN ('improving', 'stable', 'declining')),
+        
+        -- Algorithm metadata
+        algorithm_version VARCHAR(10) NOT NULL DEFAULT 'v2.0',
+        calculation_method VARCHAR(50) NOT NULL DEFAULT 'enhanced_behavioral',
+        confidence_level DECIMAL(3,2) DEFAULT 0.85, -- Algorithm confidence
+        
+        -- Temporal data
+        calculated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        data_period_start TIMESTAMP WITH TIME ZONE NOT NULL,
+        data_period_end TIMESTAMP WITH TIME ZONE NOT NULL,
+        next_calculation_due TIMESTAMP WITH TIME ZONE,
+        
+        -- Performance tracking
+        calculation_time_ms INTEGER,
+        data_points_used INTEGER,
+        
+        UNIQUE(user_id, calculated_at),
+        CHECK (data_period_start < data_period_end),
+        CHECK (calculated_at >= data_period_end)
+      );
+      
+      -- Indexes for performance
+      CREATE INDEX idx_diva_scores_v2_user_calculated ON diva_scores_v2(user_id, calculated_at DESC);
+      CREATE INDEX idx_diva_scores_v2_overall_score ON diva_scores_v2(overall_score DESC);
+      CREATE INDEX idx_diva_scores_v2_algorithm_version ON diva_scores_v2(algorithm_version);
+      CREATE INDEX idx_diva_scores_v2_next_calculation ON diva_scores_v2(next_calculation_due) WHERE next_calculation_due IS NOT NULL;
+    `);
+  }
+  
+  private async migrateDivaScores(): Promise<void> {
+    console.log('Migrating existing DIVA scores...');
+    
+    // Get all users with existing scores
+    const usersResult = await this.db.query(`
+      SELECT DISTINCT u.id, u.created_at, ds.calculated_at, ds.overall_score as old_score
+      FROM users u
+      LEFT JOIN diva_scores ds ON u.id = ds.user_id
+      WHERE u.status = 'active'
+      ORDER BY u.created_at
+    `);
+    
+    const batchSize = 100;
+    const users = usersResult.rows;
+    
+    for (let i = 0; i < users.length; i += batchSize) {
+      const batch = users.slice(i, i + batchSize);
+      await this.processBatch(batch);
+      
+      console.log(`Migrated ${Math.min(i + batchSize, users.length)}/${users.length} users`);
+      
+      // Rate limiting to avoid overwhelming the system
+      await this.sleep(500);
+    }
+  }
+  
+  private async processBatch(users: any[]): Promise<void> {
+    const promises = users.map(user => this.migrateUserScore(user));
+    await Promise.all(promises);
+  }
+  
+  private async migrateUserScore(user: any): Promise<void> {
+    try {
+      // Calculate new DIVA score using enhanced algorithm
+      const newScore = await this.calculateEnhancedDivaScore(user.id);
+      
+      if (newScore) {
+        await this.db.query(`
+          INSERT INTO diva_scores_v2 (
+            user_id, discipline_score, income_score, velocity_score, assets_score,
+            consistency_score, growth_score, risk_awareness_score,
+            overall_score, previous_score, score_trend,
+            algorithm_version, calculation_method, confidence_level,
+            data_period_start, data_period_end, calculated_at,
+            next_calculation_due, calculation_time_ms, data_points_used
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+          )
+        `, [
+          user.id,
+          newScore.discipline, newScore.income, newScore.velocity, newScore.assets,
+          newScore.consistency, newScore.growth, newScore.riskAwareness,
+          newScore.overall, user.old_score, newScore.trend,
+          'v2.0', 'enhanced_behavioral', newScore.confidence,
+          newScore.periodStart, newScore.periodEnd, new Date(),
+          newScore.nextCalculationDue, newScore.calculationTime, newScore.dataPoints
+        ]);
+      }
+    } catch (error) {
+      console.error(`Failed to migrate score for user ${user.id}:`, error);
+      // Continue with other users
+    }
+  }
+  
+  private async calculateEnhancedDivaScore(userId: string): Promise<EnhancedDivaScore | null> {
+    const startTime = Date.now();
+    
+    // Get user's transaction history
+    const transactionsResult = await this.db.query(`
+      SELECT * FROM transactions 
+      WHERE user_id = $1 
+      AND status = 'completed'
+      AND created_at > NOW() - INTERVAL '6 months'
+      ORDER BY created_at DESC
+    `, [userId]);
+    
+    if (transactionsResult.rows.length < 5) {
+      return null; // Insufficient data
+    }
+    
+    const transactions = transactionsResult.rows;
+    const endDate = new Date();
+    const startDate = new Date(endDate.getTime() - 6 * 30 * 24 * 60 * 60 * 1000); // 6 months
+    
+    // Enhanced calculations with behavioral factors
+    const discipline = this.calculateEnhancedDiscipline(transactions);
+    const income = this.calculateEnhancedIncome(transactions);
+    const velocity = this.calculateEnhancedVelocity(transactions);
+    const assets = this.calculateEnhancedAssets(transactions);
+    
+    // New behavioral factors
+    const consistency = this.calculateConsistency(transactions);
+    const growth = this.calculateGrowthPattern(transactions);
+    const riskAwareness = this.calculateRiskAwareness(transactions);
+    
+    // Enhanced overall score calculation
+    const overall = this.calculateOverallScore({
+      discipline, income, velocity, assets,
+      consistency, growth, riskAwareness
+    });
+    
+    const calculationTime = Date.now() - startTime;
+    
+    return {
+      discipline, income, velocity, assets,
+      consistency, growth, riskAwareness,
+      overall,
+      trend: this.determineTrend(transactions),
+      confidence: this.calculateConfidence(transactions.length, calculationTime),
+      periodStart: startDate,
+      periodEnd: endDate,
+      nextCalculationDue: new Date(endDate.getTime() + 90 * 24 * 60 * 60 * 1000), // 90 days
+      calculationTime,
+      dataPoints: transactions.length
+    };
+  }
+  
+  private calculateOverallScore(components: DivaCoreComponents): number {
+    // Enhanced weighting with behavioral factors
+    return (
+      components.discipline * 0.25 +      // Reduced from 0.3
+      components.income * 0.2 +           // Reduced from 0.25
+      components.velocity * 0.2 +         // Reduced from 0.25
+      components.assets * 0.15 +          // Reduced from 0.2
+      components.consistency * 0.1 +       // New factor
+      components.growth * 0.05 +          // New factor
+      components.riskAwareness * 0.05     // New factor
+    );
+  }
+  
+  private async updatePortfolioAssignments(): Promise<void> {
+    console.log('Updating portfolio tier assignments...');
+    
+    await this.db.query(`
+      UPDATE users 
+      SET portfolio_tier = CASE 
+        WHEN dsv2.overall_score >= 85 THEN 'platinum'
+        WHEN dsv2.overall_score >= 65 THEN 'gold'
+        WHEN dsv2.overall_score >= 40 THEN 'silver'
+        ELSE 'bronze'
+      END,
+      portfolio_tier_updated_at = NOW()
+      FROM (
+        SELECT DISTINCT ON (user_id) 
+          user_id, overall_score
+        FROM diva_scores_v2
+        ORDER BY user_id, calculated_at DESC
+      ) dsv2
+      WHERE users.id = dsv2.user_id
+    `);
+  }
+  
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+```
+
+## API Version Migrations
+
+### API Versioning Strategy
+
+**Backward-Compatible API Evolution:**
+```typescript
+// api/versioning/api-version-manager.ts
+export class APIVersionManager {
+  private supportedVersions = ['v1', 'v2'];
+  private defaultVersion = 'v2';
+  private deprecatedVersions = new Map([
+    ['v1', new Date('2025-06-01')] // v1 deprecated June 1, 2025
+  ]);
+  
+  getAPIVersion(req: Request): string {
+    // Check URL path first
+    const pathVersion = this.extractVersionFromPath(req.path);
+    if (pathVersion) return pathVersion;
+    
+    // Check Accept header
+    const acceptHeader = req.headers.accept;
+    if (acceptHeader?.includes('application/vnd.awo.v2+json')) return 'v2';
+    if (acceptHeader?.includes('application/vnd.awo.v1+json')) return 'v1';
+    
+    // Check custom header
+    const versionHeader = req.headers['x-api-version'] as string;
+    if (versionHeader && this.supportedVersions.includes(versionHeader)) {
+      return versionHeader;
+    }
+    
+    return this.defaultVersion;
+  }
+  
+  createVersionedResponse(data: any, version: string, req: Request): any {
+    switch (version) {
+      case 'v1':
+        return this.transformToV1Format(data, req);
+      case 'v2':
+        return this.transformToV2Format(data, req);
+      default:
+        throw new Error(`Unsupported API version: ${version}`);
+    }
+  }
+  
+  private transformToV1Format(data: any, req: Request): any {
+    // Add deprecation warning
+    const response = {
+      ...data,
+      _meta: {
+        ...data._meta,
+        apiVersion: 'v1',
+        deprecated: true,
+        deprecationDate: '2025-06-01',
+        migrationGuide: 'https://docs.awo-platform.com/migration/v1-to-v2'
+      }
+    };
+    
+    // Transform v2 DIVA score format to v1 format
+    if (data.divaScore) {
+      response.divaScore = {
+        discipline: data.divaScore.discipline_score,
+        income: data.divaScore.income_score,
+        velocity: data.divaScore.velocity_score,
+        assets: data.divaScore.assets_score,
+        overall: data.divaScore.overall_score,
+        calculatedAt: data.divaScore.calculated_at,
+        // Omit new v2 fields
+      };
+    }
+    
+    return response;
+  }
+  
+  private transformToV2Format(data: any, req: Request): any {
+    return {
+      ...data,
+      _meta: {
+        ...data._meta,
+        apiVersion: 'v2',
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+}
+
+// Middleware for version handling
+export function apiVersionMiddleware(req: Request, res: Response, next: NextFunction) {
+  const versionManager = new APIVersionManager();
+  const version = versionManager.getAPIVersion(req);
+  
+  // Store version in request for use by controllers
+  (req as any).apiVersion = version;
+  
+  // Add version to response headers
+  res.setHeader('X-API-Version', version);
+  
+  // Check if version is deprecated
+  const deprecationDate = versionManager.isVersionDeprecated(version);
+  if (deprecationDate) {
+    res.setHeader('X-API-Deprecated', 'true');
+    res.setHeader('X-API-Deprecation-Date', deprecationDate.toISOString());
+    res.setHeader('X-API-Migration-Guide', 'https://docs.awo-platform.com/migration/v1-to-v2');
+  }
+  
+  next();
+}
+```
+
+### API Migration Examples
+
+**DIVA Score API Migration (v1 to v2):**
+```typescript
+// controllers/diva-score-controller.ts
+export class DivaScoreController {
+  async getUserDivaScore(req: Request, res: Response) {
+    const userId = req.params.userId;
+    const version = (req as any).apiVersion;
+    
+    try {
+      const scoreData = await this.divaService.getUserScore(userId);
+      
+      if (!scoreData) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: 'SCORE_NOT_FOUND',
+            message: 'DIVA score not calculated for this user'
+          }
+        });
+      }
+      
+      const response = this.formatScoreResponse(scoreData, version);
+      res.json(response);
+      
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+  
+  private formatScoreResponse(scoreData: any, version: string): any {
+    if (version === 'v1') {
+      // v1 format: Legacy flat structure
+      return {
+        success: true,
+        data: {
+          userId: scoreData.user_id,
+          discipline: scoreData.discipline_score,
+          income: scoreData.income_score,
+          velocity: scoreData.velocity_score,
+          assets: scoreData.assets_score,
+          overall: scoreData.overall_score,
+          portfolioTier: this.mapTierForV1(scoreData.portfolio_tier),
+          calculatedAt: scoreData.calculated_at,
+          nextUpdate: scoreData.next_calculation_due
+        },
+        meta: {
+          version: 'v1',
+          deprecated: true,
+          deprecationDate: '2025-06-01'
+        }
+      };
+    } else {
+      // v2 format: Enhanced structure with new behavioral factors
+      return {
+        success: true,
+        data: {
+          userId: scoreData.user_id,
+          scoreComponents: {
+            core: {
+              discipline: scoreData.discipline_score,
+              income: scoreData.income_score,
+              velocity: scoreData.velocity_score,
+              assets: scoreData.assets_score
+            },
+            behavioral: {
+              consistency: scoreData.consistency_score,
+              growth: scoreData.growth_score,
+              riskAwareness: scoreData.risk_awareness_score
+            }
+          },
+          overallScore: scoreData.overall_score,
+          scoreMetadata: {
+            algorithmVersion: scoreData.algorithm_version,
+            confidenceLevel: scoreData.confidence_level,
+            trend: scoreData.score_trend,
+            previousScore: scoreData.previous_score
+          },
+          portfolioAssignment: {
+            tier: scoreData.portfolio_tier,
+            tierName: this.getTierDisplayName(scoreData.portfolio_tier),
+            assignedAt: scoreData.portfolio_tier_updated_at,
+            benefits: this.getTierBenefits(scoreData.portfolio_tier)
+          },
+          timeline: {
+            calculatedAt: scoreData.calculated_at,
+            dataPeriod: {
+              start: scoreData.data_period_start,
+              end: scoreData.data_period_end
+            },
+            nextCalculationDue: scoreData.next_calculation_due
+          },
+          calculationMetrics: {
+            executionTimeMs: scoreData.calculation_time_ms,
+            dataPointsUsed: scoreData.data_points_used
+          }
+        },
+        meta: {
+          version: 'v2',
+          timestamp: new Date().toISOString()
+        }
+      };
+    }
+  }
+  
+  private mapTierForV1(tier: string): string {
+    // v1 used different tier names
+    const tierMap = {
+      'bronze': 'basic',
+      'silver': 'standard', 
+      'gold': 'premium',
+      'platinum': 'elite'
+    };
+    
+    return tierMap[tier] || tier;
+  }
+}
+```
+
+## Mobile App Migrations
+
+### React Native Migration Strategies
+
+**App Version Migration:**
+```typescript
+// mobile/src/utils/app-migration.ts
+export class AppMigrationManager {
+  private currentVersion: string;
+  private migrations: Migration[];
+  
+  constructor() {
+    this.currentVersion = Constants.expoConfig?.version || '1.0.0';
+    this.migrations = [
+      new AsyncStorageMigration_1_0_to_1_1(),
+      new DatabaseSchemaMigration_1_1_to_1_2(),
+      new OfflineDataMigration_1_2_to_2_0()
+    ];
+  }
+  
+  async runMigrations(): Promise<void> {
+    const lastMigratedVersion = await AsyncStorage.getItem('lastMigratedVersion');
+    
+    for (const migration of this.migrations) {
+      if (this.shouldRunMigration(migration, lastMigratedVersion)) {
+        console.log(`Running migration: ${migration.name}`);
+        
+        try {
+          await migration.execute();
+          await AsyncStorage.setItem('lastMigratedVersion', migration.targetVersion);
+          console.log(`Migration ${migration.name} completed successfully`);
+        } catch (error) {
+          console.error(`Migration ${migration.name} failed:`, error);
+          
+          // Attempt rollback
+          if (migration.rollback) {
+            try {
+              await migration.rollback();
+              console.log(`Migration ${migration.name} rolled back successfully`);
+            } catch (rollbackError) {
+              console.error(`Migration rollback failed:`, rollbackError);
+            }
+          }
+          
+          throw error;
+        }
+      }
+    }
+  }
+  
+  private shouldRunMigration(migration: Migration, lastMigratedVersion: string | null): boolean {
+    if (!lastMigratedVersion) return true;
+    
+    return this.compareVersions(migration.targetVersion, lastMigratedVersion) > 0;
+  }
+  
+  private compareVersions(version1: string, version2: string): number {
+    const v1Parts = version1.split('.').map(Number);
+    const v2Parts = version2.split('.').map(Number);
+    
+    for (let i = 0; i < Math.max(v1Parts.length, v2Parts.length); i++) {
+      const v1Part = v1Parts[i] || 0;
+      const v2Part = v2Parts[i] || 0;
+      
+      if (v1Part > v2Part) return 1;
+      if (v1Part < v2Part) return -1;
+    }
+    
+    return 0;
+  }
+}
+
+// Example migration: AsyncStorage structure changes
+class AsyncStorageMigration_1_0_to_1_1 implements Migration {
+  name = 'AsyncStorage Migration 1.0 to 1.1';
+  targetVersion = '1.1.0';
+  
+  async execute(): Promise<void> {
+    // Migrate from flat user data to structured format
+    const userData = await AsyncStorage.getItem('userData');
+    
+    if (userData) {
+      const parsed = JSON.parse(userData);
+      
+      // Old format: flat structure
+      // New format: nested structure with metadata
+      const migratedData = {
+        profile: {
+          id: parsed.id,
+          firstName: parsed.firstName,
+          lastName: parsed.lastName,
+          email: parsed.email,
+          phoneNumber: parsed.phoneNumber
+        },
+        wallet: {
+          balance: parsed.walletBalance,
+          currency: parsed.currency || 'ZAR',
+          lastUpdated: new Date().toISOString()
+        },
+        settings: {
+          biometricEnabled: parsed.biometricEnabled || false,
+          notificationsEnabled: parsed.notificationsEnabled !== false,
+          language: parsed.language || 'en'
+        },
+        metadata: {
+          version: '1.1.0',
+          migratedAt: new Date().toISOString(),
+          lastSync: parsed.lastSync
+        }
+      };
+      
+      await AsyncStorage.setItem('userData_v1_1', JSON.stringify(migratedData));
+      await AsyncStorage.removeItem('userData'); // Remove old format
+    }
+  }
+  
+  async rollback(): Promise<void> {
+    const newData = await AsyncStorage.getItem('userData_v1_1');
+    
+    if (newData) {
+      const parsed = JSON.parse(newData);
+      
+      // Convert back to flat structure
+      const oldFormat = {
+        id: parsed.profile.id,
+        firstName: parsed.profile.firstName,
+        lastName: parsed.profile.lastName,
+        email: parsed.profile.email,
+        phoneNumber: parsed.profile.phoneNumber,
+        walletBalance: parsed.wallet.balance,
+        currency: parsed.wallet.currency,
+        biometricEnabled: parsed.settings.biometricEnabled,
+        notificationsEnabled: parsed.settings.notificationsEnabled,
+        language: parsed.settings.language,
+        lastSync: parsed.metadata.lastSync
+      };
+      
+      await AsyncStorage.setItem('userData', JSON.stringify(oldFormat));
+      await AsyncStorage.removeItem('userData_v1_1');
+    }
+  }
+}
+```
+
+### Offline Data Migration
+
+**Offline Database Schema Updates:**
+```typescript
+// mobile/src/database/offline-migration.ts
+export class OfflineDataMigration {
+  private db: SQLite.Database;
+  
+  constructor(database: SQLite.Database) {
+    this.db = database;
+  }
+  
+  async migrateToSchema_v2(): Promise<void> {
+    console.log('Migrating offline database to schema v2...');
+    
+    await this.db.transaction(async (tx) => {
+      // Add new columns to existing tables
+      await tx.executeSql(`
+        ALTER TABLE cached_transactions 
+        ADD COLUMN category TEXT;
+      `);
+      
+      await tx.executeSql(`
+        ALTER TABLE cached_transactions 
+        ADD COLUMN metadata TEXT; -- JSON string
+      `);
+      
+      // Create new table for enhanced DIVA scores
+      await tx.executeSql(`
+        CREATE TABLE IF NOT EXISTS cached_diva_scores_v2 (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id TEXT NOT NULL,
+          discipline_score REAL NOT NULL,
+          income_score REAL NOT NULL,
+          velocity_score REAL NOT NULL,
+          assets_score REAL NOT NULL,
+          consistency_score REAL NOT NULL DEFAULT 0,
+          growth_score REAL NOT NULL DEFAULT 0,
+          risk_awareness_score REAL NOT NULL DEFAULT 0,
+          overall_score REAL NOT NULL,
+          algorithm_version TEXT NOT NULL DEFAULT 'v2.0',
+          calculated_at TEXT NOT NULL,
+          cached_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          sync_status INTEGER DEFAULT 0, -- 0: synced, 1: pending
+          UNIQUE(user_id, calculated_at)
+        );
+      `);
+      
+      // Migrate existing DIVA scores to new format
+      const existingScores = await tx.executeSql(`
+        SELECT * FROM cached_diva_scores
+      `);
+      
+      for (let i = 0; i < existingScores.rows.length; i++) {
+        const score = existingScores.rows.item(i);
+        
+        await tx.executeSql(`
+          INSERT OR REPLACE INTO cached_diva_scores_v2 (
+            user_id, discipline_score, income_score, velocity_score, assets_score,
+            consistency_score, growth_score, risk_awareness_score, overall_score,
+            algorithm_version, calculated_at, sync_status
+          ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?, 'v1.0', ?, 1)
+        `, [
+          score.user_id,
+          score.discipline,
+          score.income,
+          score.velocity,
+          score.assets,
+          score.overall,
+          score.calculated_at
+        ]);
+      }
+      
+      // Create index for performance
+      await tx.executeSql(`
+        CREATE INDEX IF NOT EXISTS idx_diva_scores_v2_user 
+        ON cached_diva_scores_v2(user_id);
+      `);
+      
+      // Update schema version
+      await tx.executeSql(`
+        CREATE TABLE IF NOT EXISTS schema_version (
+          version INTEGER PRIMARY KEY,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      
+      await tx.executeSql(`
+        INSERT OR REPLACE INTO schema_version (version) VALUES (2);
+      `);
+    });
+    
+    console.log('Offline database migration completed');
+  }
+}
+```
+
+## Environment Migrations
+
+### Development to Production Migration
+
+**Production Deployment Checklist:**
+```bash
+#!/bin/bash
+# scripts/production-migration.sh
+
+echo "🚀 AWO Platform Production Migration"
+echo "======================================"
+
+# Environment validation
+echo "1. Validating environment..."
+
+# Check required environment variables
+required_vars=(
+  "DATABASE_URL"
+  "JWT_SECRET"
+  "JWT_REFRESH_SECRET"
+  "ENCRYPTION_KEY"
+  "STITCH_CLIENT_ID"
+  "STITCH_CLIENT_SECRET"
+  "FLUTTERWAVE_PUBLIC_KEY"
+  "FLUTTERWAVE_SECRET_KEY"
+  "SENTRY_DSN"
+)
+
+for var in "${required_vars[@]}"; do
+  if [ -z "${!var}" ]; then
+    echo "❌ Missing required environment variable: $var"
+    exit 1
+  fi
+done
+
+echo "✅ Environment variables validated"
+
+# Database migration
+echo "2. Running database migrations..."
+npm run migration:run
+if [ $? -ne 0 ]; then
+  echo "❌ Database migration failed"
+  exit 1
+fi
+
+# Data seeding (production-safe)
+echo "3. Seeding production reference data..."
+npm run seed:production
+if [ $? -ne 0 ]; then
+  echo "❌ Production seeding failed"
+  exit 1
+fi
+
+# Security verification
+echo "4. Verifying security configuration..."
+npm run security:verify
+if [ $? -ne 0 ]; then
+  echo "❌ Security verification failed"
+  exit 1
+fi
+
+# Performance optimization
+echo "5. Optimizing database..."
+psql $DATABASE_URL -c "VACUUM ANALYZE;"
+psql $DATABASE_URL -c "REINDEX DATABASE;"
+
+# Health check
+echo "6. Running health checks..."
+npm run health:check
+if [ $? -ne 0 ]; then
+  echo "❌ Health check failed"
+  exit 1
+fi
+
+echo "✅ Production migration completed successfully!"
+echo "🌟 AWO Platform is ready to serve African women across SADC region"
+```
+
+### Multi-Region Migration
+
+**SADC Region Deployment:**
+```typescript
+// scripts/regional-migration.ts
+export class RegionalMigrationManager {
+  private regions = ['ZA', 'BW', 'NA', 'ZM']; // South Africa, Botswana, Namibia, Zambia
+  
+  async deployToAllRegions(): Promise<void> {
+    console.log('Starting multi-region deployment...');
+    
+    for (const region of this.regions) {
+      console.log(`\n🌍 Deploying to region: ${region}`);
+      await this.deployToRegion(region);
+    }
+    
+    console.log('\n✅ Multi-region deployment completed');
+  }
+  
+  private async deployToRegion(regionCode: string): Promise<void> {
+    const regionConfig = this.getRegionConfig(regionCode);
+    
+    // 1. Deploy database read replica
+    await this.deployDatabaseReplica(regionCode, regionConfig);
+    
+    // 2. Deploy application instances
+    await this.deployApplicationInstances(regionCode, regionConfig);
+    
+    // 3. Configure CDN edge locations
+    await this.configureCDN(regionCode, regionConfig);
+    
+    // 4. Set up monitoring
+    await this.setupRegionalMonitoring(regionCode, regionConfig);
+    
+    // 5. Configure compliance settings
+    await this.configureRegionalCompliance(regionCode, regionConfig);
+    
+    console.log(`✅ Region ${regionCode} deployment completed`);
+  }
+  
+  private getRegionConfig(regionCode: string): RegionConfig {
+    const configs = {
+      'ZA': {
+        name: 'South Africa',
+        currency: 'ZAR',
+        timezone: 'Africa/Johannesburg',
+        dataResidency: true,
+        regulations: ['POPIA', 'SARB'],
+        primaryPaymentMethods: ['mpesa', 'capitec', 'fnb', 'absa']
+      },
+      'BW': {
+        name: 'Botswana',
+        currency: 'BWP',
+        timezone: 'Africa/Gaborone',
+        dataResidency: false,
+        regulations: ['BOB'],
+        primaryPaymentMethods: ['orange_money', 'first_national_bank_bw']
+      },
+      'NA': {
+        name: 'Namibia',
+        currency: 'NAD',
+        timezone: 'Africa/Windhoek',
+        dataResidency: false,
+        regulations: ['BON'],
+        primaryPaymentMethods: ['mobile_payment_namibia', 'first_national_bank_na']
+      },
+      'ZM': {
+        name: 'Zambia',
+        currency: 'ZMW',
+        timezone: 'Africa/Lusaka',
+        dataResidency: false,
+        regulations: ['BOZ'],
+        primaryPaymentMethods: ['airtel_money', 'mtn_mobile_money']
+      }
+    };
+    
+    return configs[regionCode];
+  }
+  
+  private async configureRegionalCompliance(regionCode: string, config: RegionConfig): Promise<void> {
+    // Configure data handling based on regional requirements
+    await this.db.query(`
+      INSERT INTO regional_compliance_settings (
+        region_code, 
+        data_residency_required,
+        applicable_regulations,
+        retention_period_days,
+        kyc_requirements,
+        aml_monitoring_level
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (region_code) DO UPDATE SET
+        data_residency_required = EXCLUDED.data_residency_required,
+        applicable_regulations = EXCLUDED.applicable_regulations,
+        updated_at = NOW()
+    `, [
+      regionCode,
+      config.dataResidency,
+      JSON.stringify(config.regulations),
+      config.dataResidency ? 2555 : 1825, // 7 years if residency required, 5 years otherwise
+      this.getKYCRequirements(regionCode),
+      this.getAMLLevel(regionCode)
+    ]);
+  }
+}
+```
+
+## Migration Monitoring and Rollback
+
+### Migration Health Monitoring
+
+**Migration Progress Tracking:**
+```typescript
+// utils/migration-monitor.ts
+export class MigrationMonitor {
+  private metrics: MetricsCollector;
+  
+  constructor() {
+    this.metrics = new MetricsCollector();
+  }
+  
+  async monitorMigration(migrationName: string, migrationFn: () => Promise<void>): Promise<void> {
+    const startTime = Date.now();
+    const migrationId = generateId();
+    
+    console.log(`📊 Starting migration monitoring: ${migrationName}`);
+    
+    // Log migration start
+    await this.logMigrationEvent(migrationId, 'started', migrationName);
+    
+    try {
+      // Monitor system resources during migration
+      const resourceMonitor = setInterval(async () => {
+        await this.recordResourceUsage(migrationId);
+      }, 30000); // Every 30 seconds
+      
+      // Execute migration
+      await migrationFn();
+      
+      clearInterval(resourceMonitor);
+      
+      const duration = Date.now() - startTime;
+      await this.logMigrationEvent(migrationId, 'completed', migrationName, { duration });
+      
+      console.log(`✅ Migration completed successfully in ${duration}ms`);
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      await this.logMigrationEvent(migrationId, 'failed', migrationName, { 
+        duration, 
+        error: error.message 
+      });
+      
+      console.error(`❌ Migration failed after ${duration}ms:`, error);
+      throw error;
+    }
+  }
+  
+  private async recordResourceUsage(migrationId: string): Promise<void> {
+    const usage = await this.getSystemResourceUsage();
+    
+    await this.db.query(`
+      INSERT INTO migration_resource_usage (
+        migration_id, cpu_usage, memory_usage, disk_usage, 
+        database_connections, active_queries, recorded_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+    `, [
+      migrationId,
+      usage.cpu,
+      usage.memory,
+      usage.disk,
+      usage.dbConnections,
+      usage.activeQueries
+    ]);
+  }
+  
+  async generateMigrationReport(migrationId: string): Promise<MigrationReport> {
+    const events = await this.db.query(`
+      SELECT * FROM migration_events 
+      WHERE migration_id = $1 
+      ORDER BY created_at
+    `, [migrationId]);
+    
+    const resourceUsage = await this.db.query(`
+      SELECT * FROM migration_resource_usage 
+      WHERE migration_id = $1 
+      ORDER BY recorded_at
+    `, [migrationId]);
+    
+    return {
+      migrationId,
+      events: events.rows,
+      resourceUsage: resourceUsage.rows,
+      summary: this.generateSummary(events.rows, resourceUsage.rows)
+    };
+  }
+}
+```
+
+### Automated Rollback System
+
+**Smart Rollback Implementation:**
+```typescript
+// utils/rollback-manager.ts
+export class RollbackManager {
+  private db: Pool;
+  private backupManager: BackupManager;
+  
+  constructor(databaseUrl: string) {
+    this.db = new Pool({ connectionString: databaseUrl });
+    this.backupManager = new BackupManager(databaseUrl);
+  }
+  
+  async createMigrationCheckpoint(migrationName: string): Promise<string> {
+    const checkpointId = generateId();
+    
+    console.log(`📸 Creating migration checkpoint: ${migrationName}`);
+    
+    // Create database backup
+    const backupPath = await this.backupManager.createBackup(
+      `checkpoint_${migrationName}_${Date.now()}`
+    );
+    
+    // Store checkpoint metadata
+    await this.db.query(`
+      INSERT INTO migration_checkpoints (
+        id, migration_name, backup_path, created_at, 
+        database_size, table_count, row_count
+      ) VALUES ($1, $2, $3, NOW(), $4, $5, $6)
+    `, [
+      checkpointId,
+      migrationName,
+      backupPath,
+      await this.getDatabaseSize(),
+      await this.getTableCount(),
+      await this.getRowCount()
+    ]);
+    
+    return checkpointId;
+  }
+  
+  async executeRollback(checkpointId: string, reason: string): Promise<void> {
+    console.log(`🔄 Executing rollback to checkpoint: ${checkpointId}`);
+    console.log(`Reason: ${reason}`);
+    
+    const checkpoint = await this.getCheckpoint(checkpointId);
+    if (!checkpoint) {
+      throw new Error(`Checkpoint ${checkpointId} not found`);
+    }
+    
+    // 1. Stop all application services
+    await this.stopApplicationServices();
+    
+    try {
+      // 2. Restore from backup
+      await this.backupManager.restoreFromBackup(checkpoint.backup_path);
+      
+      // 3. Verify data integrity
+      await this.verifyDataIntegrity();
+      
+      // 4. Update rollback log
+      await this.logRollback(checkpointId, 'successful', reason);
+      
+      console.log('✅ Rollback completed successfully');
+      
+    } catch (error) {
+      await this.logRollback(checkpointId, 'failed', reason, error.message);
+      throw error;
+    } finally {
+      // 5. Restart application services
+      await this.startApplicationServices();
+    }
+  }
+  
+  async verifyMigrationIntegrity(): Promise<IntegrityCheckResult> {
+    console.log('🔍 Verifying migration integrity...');
+    
+    const checks = await Promise.all([
+      this.checkDataConsistency(),
+      this.checkReferentialIntegrity(),
+      this.checkFinancialCalculations(),
+      this.checkIndexIntegrity()
+    ]);
+    
+    const passed = checks.every(check => check.passed);
+    
+    return {
+      passed,
+      checks,
+      summary: this.generateIntegrityReport(checks)
+    };
+  }
+  
+  private async checkFinancialCalculations(): Promise<IntegrityCheck> {
+    // Verify critical financial calculations after migration
+    const inconsistencies = await this.db.query(`
+      SELECT u.id, u.wallet_balance, 
+             COALESCE(SUM(
+               CASE 
+                 WHEN t.type IN ('deposit', 'received') THEN t.amount
+                 WHEN t.type IN ('withdrawal', 'sent') THEN -t.amount
+                 ELSE 0
+               END
+             ), 0) as calculated_balance
+      FROM users u
+      LEFT JOIN transactions t ON u.id = t.user_id AND t.status = 'completed'
+      GROUP BY u.id, u.wallet_balance
+      HAVING ABS(u.wallet_balance - COALESCE(SUM(
+        CASE 
+          WHEN t.type IN ('deposit', 'received') THEN t.amount
+          WHEN t.type IN ('withdrawal', 'sent') THEN -t.amount
+          ELSE 0
+        END
+      ), 0)) > 0.01
+      LIMIT 10
+    `);
+    
+    return {
+      name: 'Financial Calculations',
+      passed: inconsistencies.rows.length === 0,
+      issues: inconsistencies.rows.length,
+      details: inconsistencies.rows.length > 0 ? 
+        `Found ${inconsistencies.rows.length} users with balance inconsistencies` : 
+        'All user balances are consistent'
+    };
+  }
+}
+```
+
+---
+
+*This comprehensive migration guide ensures smooth evolution of AWO Platform while maintaining financial data integrity and service continuity for African women across the SADC region.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

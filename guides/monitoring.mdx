@@ -1,28 +1,1311 @@
----
-title: "Monitoring"
-description: "Monitoring implementation guide"
----
+# Monitoring Guide
 
-# Monitoring
+This comprehensive guide covers monitoring, observability, and alerting for AWO Platform, ensuring reliable financial services across the SADC region with proactive issue detection and resolution.
 
-## Overview
-
-This guide documentation is coming soon.
+## Monitoring Philosophy
 
 <Info>
-This page is under development. Please check back later for complete implementation guide.
+AWO Platform implements comprehensive observability across all system layers, emphasizing financial accuracy monitoring, compliance tracking, and user experience optimization for African market conditions.
 </Info>
 
-## Getting Started
+### Monitoring Principles
 
-Step-by-step instructions will be added here.
+**Financial Services Monitoring Standards:**
+- **Zero financial errors tolerance**: All monetary operations continuously monitored
+- **Regulatory compliance tracking**: Real-time compliance metrics and alerts
+- **User experience focus**: African market-specific performance monitoring
+- **Proactive alerting**: Issue detection before user impact
+- **Business metric correlation**: Technical metrics tied to business outcomes
 
-## Examples
+## Monitoring Stack Overview
 
-Code examples and best practices will be provided.
+<CardGroup cols={3}>
+  <Card title="Application Monitoring" icon="activity">
+    Sentry for error tracking and performance monitoring
+  </Card>
+  <Card title="Infrastructure Metrics" icon="server">
+    Native cloud provider metrics with custom dashboards
+  </Card>
+  <Card title="Business Analytics" icon="chart-bar">
+    Custom PostgreSQL analytics with real-time reporting
+  </Card>
+</CardGroup>
 
-## Next Steps
+### Monitoring Layers
 
-<Card title="Related Documentation" href="/api-reference/introduction">
-  Explore other sections of our documentation
-</Card>
+| Layer | Tools | Focus | Retention |
+|-------|-------|-------|-----------|
+| **Application** | Sentry, Custom logs | Errors, performance, user journeys | 90 days |
+| **Infrastructure** | Railway/Render metrics | CPU, memory, network, storage | 30 days |
+| **Database** | Neon monitoring, Custom queries | Performance, connections, growth | 180 days |
+| **Business** | PostgreSQL, Redis | Financial metrics, user behavior | 2 years |
+
+## Application Monitoring
+
+### Error Tracking with Sentry
+
+**Sentry Configuration:**
+```typescript
+// monitoring/sentry.ts
+import * as Sentry from '@sentry/node';
+import * as Tracing from '@sentry/tracing';
+
+export function initializeSentry(app: Express) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV,
+    release: process.env.APP_VERSION,
+    integrations: [
+      new Sentry.Integrations.Http({ tracing: true }),
+      new Tracing.Integrations.Express({ app }),
+      new Tracing.Integrations.Postgres(),
+      new Tracing.Integrations.Redis()
+    ],
+    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+    beforeSend(event, hint) {
+      // Filter sensitive financial data
+      if (event.contexts?.trace?.data) {
+        delete event.contexts.trace.data.accountNumber;
+        delete event.contexts.trace.data.cardNumber;
+        delete event.contexts.trace.data.pin;
+      }
+      return event;
+    }
+  });
+
+  // Custom context for African market tracking
+  Sentry.configureScope((scope) => {
+    scope.setTag('region', 'SADC');
+    scope.setTag('market', 'african_fintech');
+  });
+}
+```
+
+**Financial Error Classification:**
+```typescript
+// monitoring/error-classification.ts
+export enum FinancialErrorSeverity {
+  CRITICAL = 'critical',    // Money lost or incorrect calculations
+  HIGH = 'high',           // Payment failures or security issues  
+  MEDIUM = 'medium',       // User experience degradation
+  LOW = 'low'             // Non-critical functionality issues
+}
+
+export function classifyFinancialError(error: Error, context: any): FinancialErrorSeverity {
+  // Critical: Any monetary calculation error
+  if (error.message.includes('calculation') || error.message.includes('balance')) {
+    return FinancialErrorSeverity.CRITICAL;
+  }
+  
+  // High: Payment processing failures
+  if (context.module === 'payments' || context.module === 'chama') {
+    return FinancialErrorSeverity.HIGH;
+  }
+  
+  // Medium: User authentication or account access
+  if (context.module === 'auth' || context.module === 'kyc') {
+    return FinancialErrorSeverity.MEDIUM;
+  }
+  
+  return FinancialErrorSeverity.LOW;
+}
+
+// Custom error reporting
+export function reportFinancialError(error: Error, context: any) {
+  const severity = classifyFinancialError(error, context);
+  
+  Sentry.withScope((scope) => {
+    scope.setLevel(severity);
+    scope.setTag('error_type', 'financial');
+    scope.setTag('module', context.module);
+    scope.setContext('financial_context', {
+      userId: context.userId,
+      transactionId: context.transactionId,
+      amount: context.amount ? '***REDACTED***' : undefined,
+      currency: context.currency
+    });
+    
+    Sentry.captureException(error);
+  });
+}
+```
+
+### Performance Monitoring
+
+**Custom Performance Metrics:**
+```typescript
+// monitoring/performance.ts
+import { performance } from 'perf_hooks';
+
+export class PerformanceMonitor {
+  private static metrics = new Map<string, number[]>();
+  
+  static startTimer(operationName: string): string {
+    const timerId = `${operationName}_${Date.now()}_${Math.random()}`;
+    performance.mark(`start_${timerId}`);
+    return timerId;
+  }
+  
+  static endTimer(timerId: string, operationName: string) {
+    performance.mark(`end_${timerId}`);
+    performance.measure(timerId, `start_${timerId}`, `end_${timerId}`);
+    
+    const measure = performance.getEntriesByName(timerId)[0];
+    const duration = measure.duration;
+    
+    // Store metrics
+    if (!this.metrics.has(operationName)) {
+      this.metrics.set(operationName, []);
+    }
+    this.metrics.get(operationName)!.push(duration);
+    
+    // Alert on slow operations
+    if (duration > this.getThreshold(operationName)) {
+      this.alertSlowOperation(operationName, duration);
+    }
+    
+    // Clean up
+    performance.clearMarks(`start_${timerId}`);
+    performance.clearMarks(`end_${timerId}`);
+    performance.clearMeasures(timerId);
+  }
+  
+  private static getThreshold(operationName: string): number {
+    const thresholds = {
+      'diva_calculation': 5000,      // 5 seconds
+      'payment_processing': 10000,   // 10 seconds
+      'kyc_verification': 30000,     // 30 seconds
+      'chama_payout': 15000,         // 15 seconds
+      'database_query': 1000,        // 1 second
+      'api_request': 5000            // 5 seconds
+    };
+    
+    return thresholds[operationName] || 5000;
+  }
+  
+  private static alertSlowOperation(operationName: string, duration: number) {
+    Sentry.addBreadcrumb({
+      message: `Slow operation detected: ${operationName}`,
+      level: 'warning',
+      data: {
+        operation: operationName,
+        duration_ms: duration,
+        threshold_ms: this.getThreshold(operationName)
+      }
+    });
+  }
+}
+
+// Usage in financial operations
+export function monitorDivaCalculation<T>(
+  calculationFn: () => T,
+  userId: string
+): T {
+  const timerId = PerformanceMonitor.startTimer('diva_calculation');
+  
+  try {
+    const result = calculationFn();
+    
+    // Log successful calculation
+    console.log(`DIVA calculation completed for user ${userId}`);
+    
+    return result;
+  } catch (error) {
+    reportFinancialError(error, {
+      module: 'diva',
+      userId,
+      operation: 'calculation'
+    });
+    throw error;
+  } finally {
+    PerformanceMonitor.endTimer(timerId, 'diva_calculation');
+  }
+}
+```
+
+### User Journey Tracking
+
+**Critical User Flow Monitoring:**
+```typescript
+// monitoring/user-journeys.ts
+export class UserJourneyTracker {
+  static trackUserStep(
+    userId: string,
+    journey: string,
+    step: string,
+    metadata?: any
+  ) {
+    // Log to analytics
+    console.log(`User Journey: ${userId} - ${journey} - ${step}`, metadata);
+    
+    // Send to analytics service
+    Sentry.addBreadcrumb({
+      message: `User journey step: ${journey} - ${step}`,
+      category: 'user_journey',
+      data: {
+        userId: userId.substring(0, 8) + '***', // Partial masking
+        journey,
+        step,
+        timestamp: new Date().toISOString(),
+        ...metadata
+      }
+    });
+  }
+  
+  static trackUserJourneyCompletion(
+    userId: string,
+    journey: string,
+    durationMs: number,
+    success: boolean
+  ) {
+    const event = success ? 'journey_completed' : 'journey_abandoned';
+    
+    Sentry.withScope((scope) => {
+      scope.setTag('event_type', 'user_journey');
+      scope.setTag('journey_name', journey);
+      scope.setTag('journey_outcome', success ? 'success' : 'failure');
+      
+      scope.setContext('journey_metrics', {
+        duration_ms: durationMs,
+        success,
+        journey
+      });
+      
+      Sentry.captureMessage(`User journey ${event}: ${journey}`, 'info');
+    });
+  }
+}
+
+// Critical journeys to monitor
+export const CRITICAL_JOURNEYS = {
+  USER_ONBOARDING: 'user_onboarding',
+  BANK_LINKING: 'bank_linking',
+  FIRST_CHAMA_JOIN: 'first_chama_join',
+  FIRST_INVESTMENT: 'first_investment',
+  PAYMENT_PROCESSING: 'payment_processing',
+  KYC_COMPLETION: 'kyc_completion'
+};
+```
+
+## Infrastructure Monitoring
+
+### System Metrics Collection
+
+**Custom Metrics Dashboard:**
+```typescript
+// monitoring/infrastructure.ts
+import { collectDefaultMetrics, register, Counter, Histogram, Gauge } from 'prom-client';
+
+// Initialize default metrics collection
+collectDefaultMetrics({ prefix: 'awo_' });
+
+// Custom application metrics
+export const httpRequestDuration = new Histogram({
+  name: 'awo_http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status_code', 'region'],
+  buckets: [0.1, 0.3, 0.5, 0.7, 1, 3, 5, 7, 10]
+});
+
+export const activeUsers = new Gauge({
+  name: 'awo_active_users_total',
+  help: 'Number of currently active users',
+  labelNames: ['country', 'platform']
+});
+
+export const divaScoreCalculations = new Counter({
+  name: 'awo_diva_calculations_total',
+  help: 'Total number of DIVA score calculations',
+  labelNames: ['user_tier', 'calculation_type']
+});
+
+export const chamaTransactions = new Counter({
+  name: 'awo_chama_transactions_total',
+  help: 'Total number of Chama transactions',
+  labelNames: ['type', 'status', 'country']
+});
+
+export const paymentOperations = new Counter({
+  name: 'awo_payment_operations_total',
+  help: 'Total number of payment operations',
+  labelNames: ['provider', 'type', 'status', 'country']
+});
+
+export const financialErrors = new Counter({
+  name: 'awo_financial_errors_total',
+  help: 'Total number of financial errors',
+  labelNames: ['severity', 'module', 'error_type']
+});
+
+// Middleware to collect HTTP metrics
+export function metricsMiddleware(req: Request, res: Response, next: NextFunction) {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = (Date.now() - start) / 1000;
+    const region = req.headers['cf-ipcountry'] || 'unknown';
+    
+    httpRequestDuration
+      .labels(req.method, req.route?.path || req.path, res.statusCode.toString(), region)
+      .observe(duration);
+  });
+  
+  next();
+}
+
+// Metrics endpoint
+export function setupMetricsEndpoint(app: Express) {
+  app.get('/metrics', async (req, res) => {
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  });
+}
+```
+
+### Database Performance Monitoring
+
+**Database Metrics Collection:**
+```sql
+-- Database monitoring queries
+-- Active connections monitoring
+SELECT 
+    count(*) as active_connections,
+    state,
+    application_name
+FROM pg_stat_activity 
+WHERE state IS NOT NULL 
+GROUP BY state, application_name;
+
+-- Slow query monitoring  
+SELECT 
+    query,
+    mean_exec_time,
+    calls,
+    total_exec_time,
+    rows,
+    100.0 * shared_blks_hit / nullif(shared_blks_hit + shared_blks_read, 0) AS hit_percent
+FROM pg_stat_statements 
+WHERE mean_exec_time > 1000  -- Queries taking longer than 1 second
+ORDER BY mean_exec_time DESC 
+LIMIT 10;
+
+-- Table size monitoring
+SELECT 
+    schemaname,
+    tablename,
+    attname,
+    n_distinct,
+    correlation,
+    most_common_vals
+FROM pg_stats 
+WHERE schemaname = 'public' 
+ORDER BY tablename, attname;
+
+-- Index usage monitoring
+SELECT 
+    schemaname,
+    tablename,
+    indexname,
+    idx_scan,
+    idx_tup_read,
+    idx_tup_fetch
+FROM pg_stat_user_indexes 
+WHERE idx_scan < 100  -- Potentially unused indexes
+ORDER BY schemaname, tablename;
+```
+
+**Automated Database Health Checks:**
+```typescript
+// monitoring/database-health.ts
+export class DatabaseHealthMonitor {
+  private db: Database;
+  
+  constructor(database: Database) {
+    this.db = database;
+  }
+  
+  async checkHealth(): Promise<DatabaseHealth> {
+    try {
+      const [connections, slowQueries, tableStats] = await Promise.all([
+        this.getConnectionStats(),
+        this.getSlowQueries(),
+        this.getTableStats()
+      ]);
+      
+      return {
+        status: 'healthy',
+        connections,
+        slowQueries,
+        tableStats,
+        timestamp: new Date()
+      };
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        error: error.message,
+        timestamp: new Date()
+      };
+    }
+  }
+  
+  private async getConnectionStats() {
+    const result = await this.db.raw(`
+      SELECT 
+        count(*) as total,
+        count(*) FILTER (WHERE state = 'active') as active,
+        count(*) FILTER (WHERE state = 'idle') as idle
+      FROM pg_stat_activity 
+      WHERE datname = current_database()
+    `);
+    
+    return result.rows[0];
+  }
+  
+  private async getSlowQueries() {
+    const result = await this.db.raw(`
+      SELECT 
+        query,
+        mean_exec_time,
+        calls
+      FROM pg_stat_statements 
+      WHERE mean_exec_time > 5000
+      ORDER BY mean_exec_time DESC 
+      LIMIT 5
+    `);
+    
+    return result.rows;
+  }
+  
+  private async getTableStats() {
+    const result = await this.db.raw(`
+      SELECT 
+        schemaname,
+        tablename,
+        n_tup_ins + n_tup_upd + n_tup_del as total_changes,
+        n_live_tup as live_tuples,
+        n_dead_tup as dead_tuples
+      FROM pg_stat_user_tables 
+      WHERE schemaname = 'public'
+      ORDER BY total_changes DESC
+      LIMIT 10
+    `);
+    
+    return result.rows;
+  }
+}
+```
+
+## Business Metrics Monitoring
+
+### Financial Metrics Dashboard
+
+**Key Financial Indicators:**
+```typescript
+// monitoring/financial-metrics.ts
+export class FinancialMetricsCollector {
+  private db: Database;
+  
+  constructor(database: Database) {
+    this.db = database;
+  }
+  
+  async collectDailyMetrics(date: Date = new Date()): Promise<DailyFinancialMetrics> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    const [
+      userStats,
+      transactionStats,
+      chamaStats,
+      divaStats,
+      investmentStats
+    ] = await Promise.all([
+      this.getUserStats(startOfDay, endOfDay),
+      this.getTransactionStats(startOfDay, endOfDay),
+      this.getChamaStats(startOfDay, endOfDay),
+      this.getDivaStats(startOfDay, endOfDay),
+      this.getInvestmentStats(startOfDay, endOfDay)
+    ]);
+    
+    return {
+      date,
+      userStats,
+      transactionStats,
+      chamaStats,
+      divaStats,
+      investmentStats
+    };
+  }
+  
+  private async getUserStats(startDate: Date, endDate: Date) {
+    const result = await this.db.raw(`
+      SELECT 
+        COUNT(*) FILTER (WHERE created_at BETWEEN ? AND ?) as new_registrations,
+        COUNT(*) FILTER (WHERE last_login_at BETWEEN ? AND ?) as daily_active_users,
+        COUNT(*) FILTER (WHERE kyc_status = 'verified' AND kyc_verified_at BETWEEN ? AND ?) as kyc_completions,
+        COUNT(DISTINCT country) as active_countries
+      FROM users
+    `, [startDate, endDate, startDate, endDate, startDate, endDate]);
+    
+    return result.rows[0];
+  }
+  
+  private async getTransactionStats(startDate: Date, endDate: Date) {
+    const result = await this.db.raw(`
+      SELECT 
+        COUNT(*) as total_transactions,
+        SUM(amount) as total_volume,
+        AVG(amount) as average_transaction_size,
+        COUNT(*) FILTER (WHERE status = 'failed') as failed_transactions,
+        COUNT(DISTINCT user_id) as unique_users_transacting
+      FROM transactions 
+      WHERE created_at BETWEEN ? AND ?
+    `, [startDate, endDate]);
+    
+    return result.rows[0];
+  }
+  
+  private async getChamaStats(startDate: Date, endDate: Date) {
+    const result = await this.db.raw(`
+      SELECT 
+        COUNT(*) FILTER (WHERE created_at BETWEEN ? AND ?) as new_chamas,
+        COUNT(DISTINCT cm.chama_id) as active_chamas,
+        SUM(cc.amount) as total_contributions,
+        AVG(cc.amount) as average_contribution
+      FROM chama_contributions cc
+      JOIN chama_members cm ON cc.chama_id = cm.chama_id
+      WHERE cc.created_at BETWEEN ? AND ?
+    `, [startDate, endDate, startDate, endDate]);
+    
+    return result.rows[0];
+  }
+  
+  private async getDivaStats(startDate: Date, endDate: Date) {
+    const result = await this.db.raw(`
+      SELECT 
+        COUNT(*) as total_calculations,
+        AVG(overall_score) as average_score,
+        COUNT(*) FILTER (WHERE overall_score >= 850) as platinum_tier,
+        COUNT(*) FILTER (WHERE overall_score >= 650 AND overall_score < 850) as gold_tier,
+        COUNT(*) FILTER (WHERE overall_score >= 400 AND overall_score < 650) as silver_tier,
+        COUNT(*) FILTER (WHERE overall_score < 400) as bronze_tier
+      FROM diva_scores 
+      WHERE calculated_at BETWEEN ? AND ?
+    `, [startDate, endDate]);
+    
+    return result.rows[0];
+  }
+  
+  private async getInvestmentStats(startDate: Date, endDate: Date) {
+    const result = await this.db.raw(`
+      SELECT 
+        COUNT(*) as total_investments,
+        SUM(amount) as total_invested,
+        COUNT(DISTINCT user_id) as unique_investors,
+        COUNT(*) FILTER (WHERE investment_type = 'sme_debt') as sme_investments,
+        AVG(amount) as average_investment_size
+      FROM investments 
+      WHERE created_at BETWEEN ? AND ?
+    `, [startDate, endDate]);
+    
+    return result.rows[0];
+  }
+}
+```
+
+### User Engagement Analytics
+
+**Engagement Metrics Collection:**
+```typescript
+// monitoring/engagement-metrics.ts
+export class EngagementMetricsCollector {
+  async calculateUserEngagement(userId: string, timeframe: 'daily' | 'weekly' | 'monthly'): Promise<UserEngagementScore> {
+    const now = new Date();
+    const startDate = this.getStartDate(now, timeframe);
+    
+    const [
+      loginFrequency,
+      transactionActivity,
+      chamaParticipation,
+      educationProgress,
+      investmentActivity
+    ] = await Promise.all([
+      this.getLoginFrequency(userId, startDate, now),
+      this.getTransactionActivity(userId, startDate, now),
+      this.getChamaParticipation(userId, startDate, now),
+      this.getEducationProgress(userId, startDate, now),
+      this.getInvestmentActivity(userId, startDate, now)
+    ]);
+    
+    // Calculate weighted engagement score
+    const engagementScore = (
+      loginFrequency.score * 0.2 +
+      transactionActivity.score * 0.3 +
+      chamaParticipation.score * 0.2 +
+      educationProgress.score * 0.15 +
+      investmentActivity.score * 0.15
+    );
+    
+    return {
+      userId,
+      timeframe,
+      overallScore: Math.round(engagementScore),
+      components: {
+        loginFrequency,
+        transactionActivity,
+        chamaParticipation,
+        educationProgress,
+        investmentActivity
+      },
+      calculatedAt: now
+    };
+  }
+  
+  private getStartDate(endDate: Date, timeframe: string): Date {
+    const start = new Date(endDate);
+    switch (timeframe) {
+      case 'daily':
+        start.setDate(start.getDate() - 1);
+        break;
+      case 'weekly':
+        start.setDate(start.getDate() - 7);
+        break;
+      case 'monthly':
+        start.setMonth(start.getMonth() - 1);
+        break;
+    }
+    return start;
+  }
+}
+```
+
+## Real-Time Alerting System
+
+### Alert Configuration
+
+**Critical Alert Definitions:**
+```typescript
+// monitoring/alerts.ts
+export interface AlertRule {
+  name: string;
+  condition: string;
+  threshold: number;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  channels: ('slack' | 'email' | 'sms')[];
+  cooldown: number; // minutes
+}
+
+export const ALERT_RULES: AlertRule[] = [
+  {
+    name: 'Financial Calculation Error',
+    condition: 'financial_errors_total > 0',
+    threshold: 0,
+    severity: 'critical',
+    channels: ['slack', 'email', 'sms'],
+    cooldown: 0 // Immediate alert
+  },
+  {
+    name: 'Payment Processing Failure Rate',
+    condition: 'payment_failure_rate > 0.05',
+    threshold: 5, // 5%
+    severity: 'high',
+    channels: ['slack', 'email'],
+    cooldown: 15
+  },
+  {
+    name: 'Database Connection Issues',
+    condition: 'database_connection_errors > 10',
+    threshold: 10,
+    severity: 'high',
+    channels: ['slack', 'email'],
+    cooldown: 10
+  },
+  {
+    name: 'High Response Time',
+    condition: 'api_response_time_p95 > 5000',
+    threshold: 5000, // 5 seconds
+    severity: 'medium',
+    channels: ['slack'],
+    cooldown: 30
+  },
+  {
+    name: 'Low User Engagement',
+    condition: 'daily_active_users < 1000',
+    threshold: 1000,
+    severity: 'medium',
+    channels: ['slack'],
+    cooldown: 60
+  }
+];
+```
+
+**Alert Manager Implementation:**
+```typescript
+// monitoring/alert-manager.ts
+export class AlertManager {
+  private activeAlerts = new Map<string, Date>();
+  private alertHistory: AlertEvent[] = [];
+  
+  async evaluateAlerts(metrics: SystemMetrics) {
+    for (const rule of ALERT_RULES) {
+      const shouldAlert = await this.evaluateRule(rule, metrics);
+      
+      if (shouldAlert && this.canSendAlert(rule.name, rule.cooldown)) {
+        await this.sendAlert(rule, metrics);
+        this.activeAlerts.set(rule.name, new Date());
+      }
+    }
+  }
+  
+  private async evaluateRule(rule: AlertRule, metrics: SystemMetrics): boolean {
+    // Simple threshold evaluation - could be enhanced with complex expressions
+    switch (rule.condition) {
+      case 'financial_errors_total > 0':
+        return metrics.financialErrors > rule.threshold;
+      case 'payment_failure_rate > 0.05':
+        return (metrics.failedPayments / metrics.totalPayments) > (rule.threshold / 100);
+      case 'database_connection_errors > 10':
+        return metrics.databaseErrors > rule.threshold;
+      case 'api_response_time_p95 > 5000':
+        return metrics.apiResponseTimeP95 > rule.threshold;
+      case 'daily_active_users < 1000':
+        return metrics.dailyActiveUsers < rule.threshold;
+      default:
+        return false;
+    }
+  }
+  
+  private canSendAlert(alertName: string, cooldownMinutes: number): boolean {
+    const lastAlert = this.activeAlerts.get(alertName);
+    if (!lastAlert) return true;
+    
+    const cooldownMs = cooldownMinutes * 60 * 1000;
+    return (Date.now() - lastAlert.getTime()) > cooldownMs;
+  }
+  
+  private async sendAlert(rule: AlertRule, metrics: SystemMetrics) {
+    const alertEvent: AlertEvent = {
+      id: generateId(),
+      name: rule.name,
+      severity: rule.severity,
+      message: this.formatAlertMessage(rule, metrics),
+      timestamp: new Date(),
+      metrics: metrics
+    };
+    
+    // Send to configured channels
+    for (const channel of rule.channels) {
+      try {
+        await this.sendToChannel(channel, alertEvent);
+      } catch (error) {
+        console.error(`Failed to send alert to ${channel}:`, error);
+      }
+    }
+    
+    // Store in history
+    this.alertHistory.push(alertEvent);
+  }
+  
+  private async sendToChannel(channel: string, alert: AlertEvent) {
+    switch (channel) {
+      case 'slack':
+        await this.sendSlackAlert(alert);
+        break;
+      case 'email':
+        await this.sendEmailAlert(alert);
+        break;
+      case 'sms':
+        await this.sendSMSAlert(alert);
+        break;
+    }
+  }
+  
+  private async sendSlackAlert(alert: AlertEvent) {
+    const webhook = process.env.SLACK_ALERT_WEBHOOK;
+    if (!webhook) return;
+    
+    const color = {
+      critical: '#FF0000',
+      high: '#FF8C00',
+      medium: '#FFD700',
+      low: '#90EE90'
+    }[alert.severity];
+    
+    const payload = {
+      text: `🚨 AWO Platform Alert: ${alert.name}`,
+      attachments: [{
+        color,
+        fields: [
+          {
+            title: 'Severity',
+            value: alert.severity.toUpperCase(),
+            short: true
+          },
+          {
+            title: 'Time',
+            value: alert.timestamp.toISOString(),
+            short: true
+          },
+          {
+            title: 'Message',
+            value: alert.message,
+            short: false
+          }
+        ]
+      }]
+    };
+    
+    await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }
+}
+```
+
+### SADC-Specific Monitoring
+
+**Regional Performance Tracking:**
+```typescript
+// monitoring/regional-metrics.ts
+export class RegionalMetricsCollector {
+  async collectRegionalMetrics(): Promise<RegionalMetrics> {
+    const countries = ['ZA', 'BW', 'NA', 'ZM']; // SADC focus countries
+    const metrics: RegionalMetrics = {};
+    
+    for (const country of countries) {
+      metrics[country] = await this.getCountryMetrics(country);
+    }
+    
+    return metrics;
+  }
+  
+  private async getCountryMetrics(countryCode: string): Promise<CountryMetrics> {
+    const [
+      userStats,
+      performanceStats,
+      financialStats
+    ] = await Promise.all([
+      this.getUserStatsByCountry(countryCode),
+      this.getPerformanceStatsByCountry(countryCode),
+      this.getFinancialStatsByCountry(countryCode)
+    ]);
+    
+    return {
+      countryCode,
+      userStats,
+      performanceStats,
+      financialStats,
+      timestamp: new Date()
+    };
+  }
+  
+  private async getPerformanceStatsByCountry(countryCode: string) {
+    // Analyze performance by country based on CF-IPCountry header
+    const result = await this.db.raw(`
+      SELECT 
+        AVG(response_time_ms) as avg_response_time,
+        PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY response_time_ms) as p95_response_time,
+        COUNT(*) FILTER (WHERE response_time_ms > 5000) as slow_requests,
+        COUNT(*) as total_requests
+      FROM request_logs 
+      WHERE country_code = ? 
+      AND created_at > NOW() - INTERVAL '24 hours'
+    `, [countryCode]);
+    
+    return result.rows[0];
+  }
+}
+```
+
+## Mobile App Monitoring
+
+### Crash Reporting and Performance
+
+**React Native Monitoring Setup:**
+```typescript
+// mobile/monitoring.ts
+import * as Sentry from '@sentry/react-native';
+import { Performance } from '@react-native-firebase/perf';
+
+// Initialize Sentry for React Native
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: __DEV__ ? 'development' : 'production',
+  beforeSend(event, hint) {
+    // Filter sensitive financial data from mobile crashes
+    if (event.extra?.userInput?.accountNumber) {
+      delete event.extra.userInput.accountNumber;
+    }
+    return event;
+  }
+});
+
+// Performance monitoring for critical user flows
+export class MobilePerformanceMonitor {
+  static startTrace(traceName: string): Performance {
+    const trace = Performance().newTrace(traceName);
+    trace.start();
+    return trace;
+  }
+  
+  static async trackScreenLoad(screenName: string, loadFunction: () => Promise<void>) {
+    const trace = this.startTrace(`screen_load_${screenName}`);
+    
+    try {
+      await loadFunction();
+      trace.putAttribute('success', 'true');
+    } catch (error) {
+      trace.putAttribute('success', 'false');
+      trace.putAttribute('error', error.message);
+      throw error;
+    } finally {
+      await trace.stop();
+    }
+  }
+  
+  static trackUserInteraction(interactionName: string, metadata?: Record<string, string>) {
+    Sentry.addBreadcrumb({
+      message: `User interaction: ${interactionName}`,
+      category: 'ui',
+      level: 'info',
+      data: metadata
+    });
+  }
+}
+
+// Usage in screens
+export function useScreenMonitoring(screenName: string) {
+  useEffect(() => {
+    const trace = MobilePerformanceMonitor.startTrace(`screen_view_${screenName}`);
+    
+    return () => {
+      trace.stop();
+    };
+  }, [screenName]);
+}
+```
+
+### Offline Capability Monitoring
+
+**Offline State Tracking:**
+```typescript
+// mobile/offline-monitoring.ts
+import NetInfo from '@react-native-netinfo/netinfo';
+
+export class OfflineMonitor {
+  private static connectionHistory: ConnectionEvent[] = [];
+  
+  static initialize() {
+    NetInfo.addEventListener((state) => {
+      this.trackConnectionChange(state);
+    });
+  }
+  
+  private static trackConnectionChange(state: NetInfoState) {
+    const event: ConnectionEvent = {
+      timestamp: new Date(),
+      isConnected: state.isConnected ?? false,
+      connectionType: state.type,
+      isInternetReachable: state.isInternetReachable ?? false
+    };
+    
+    this.connectionHistory.push(event);
+    
+    // Track offline usage patterns
+    if (!state.isConnected) {
+      Sentry.addBreadcrumb({
+        message: 'App went offline',
+        category: 'connectivity',
+        level: 'info',
+        data: {
+          connectionType: state.type,
+          lastConnection: this.getLastConnectionTime()
+        }
+      });
+    }
+    
+    // Alert on extended offline periods
+    if (this.getOfflineDuration() > 30 * 60 * 1000) { // 30 minutes
+      this.reportExtendedOffline();
+    }
+  }
+  
+  private static getOfflineDuration(): number {
+    const lastOnline = this.connectionHistory
+      .reverse()
+      .find(event => event.isConnected);
+      
+    return lastOnline ? Date.now() - lastOnline.timestamp.getTime() : 0;
+  }
+  
+  static getConnectionStats(): ConnectionStats {
+    const recentEvents = this.connectionHistory.filter(
+      event => event.timestamp.getTime() > Date.now() - 24 * 60 * 60 * 1000
+    );
+    
+    const totalTime = 24 * 60 * 60 * 1000; // 24 hours in ms
+    const onlineTime = this.calculateOnlineTime(recentEvents);
+    
+    return {
+      uptime: (onlineTime / totalTime) * 100,
+      connectionDrops: this.countConnectionDrops(recentEvents),
+      averageOfflineDuration: this.calculateAverageOfflineDuration(recentEvents)
+    };
+  }
+}
+```
+
+## Compliance and Audit Monitoring
+
+### Regulatory Compliance Tracking
+
+**Compliance Metrics Dashboard:**
+```typescript
+// monitoring/compliance-metrics.ts
+export class ComplianceMonitor {
+  async generateComplianceReport(startDate: Date, endDate: Date): Promise<ComplianceReport> {
+    const [
+      kycMetrics,
+      amlMetrics,
+      dataProtectionMetrics,
+      transactionMetrics
+    ] = await Promise.all([
+      this.getKYCMetrics(startDate, endDate),
+      this.getAMLMetrics(startDate, endDate),
+      this.getDataProtectionMetrics(startDate, endDate),
+      this.getTransactionMetrics(startDate, endDate)
+    ]);
+    
+    return {
+      reportPeriod: { startDate, endDate },
+      kycMetrics,
+      amlMetrics,
+      dataProtectionMetrics,
+      transactionMetrics,
+      generatedAt: new Date()
+    };
+  }
+  
+  private async getKYCMetrics(startDate: Date, endDate: Date) {
+    const result = await this.db.raw(`
+      SELECT 
+        COUNT(*) as total_verifications,
+        COUNT(*) FILTER (WHERE status = 'verified') as successful_verifications,
+        COUNT(*) FILTER (WHERE status = 'failed') as failed_verifications,
+        COUNT(*) FILTER (WHERE status = 'pending') as pending_verifications,
+        AVG(EXTRACT(EPOCH FROM (verified_at - created_at))/3600) as avg_verification_time_hours
+      FROM kyc_verifications 
+      WHERE created_at BETWEEN ? AND ?
+    `, [startDate, endDate]);
+    
+    return result.rows[0];
+  }
+  
+  private async getAMLMetrics(startDate: Date, endDate: Date) {
+    const result = await this.db.raw(`
+      SELECT 
+        COUNT(*) as transactions_monitored,
+        COUNT(*) FILTER (WHERE risk_score > 80) as high_risk_transactions,
+        COUNT(*) FILTER (WHERE is_reported = true) as suspicious_activity_reports,
+        AVG(risk_score) as average_risk_score
+      FROM aml_transaction_monitoring 
+      WHERE created_at BETWEEN ? AND ?
+    `, [startDate, endDate]);
+    
+    return result.rows[0];
+  }
+  
+  private async getDataProtectionMetrics(startDate: Date, endDate: Date) {
+    const result = await this.db.raw(`
+      SELECT 
+        COUNT(*) FILTER (WHERE request_type = 'access') as data_access_requests,
+        COUNT(*) FILTER (WHERE request_type = 'deletion') as data_deletion_requests,
+        COUNT(*) FILTER (WHERE request_type = 'portability') as data_portability_requests,
+        AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/86400) as avg_resolution_time_days
+      FROM data_protection_requests 
+      WHERE created_at BETWEEN ? AND ?
+    `, [startDate, endDate]);
+    
+    return result.rows[0];
+  }
+}
+```
+
+### Audit Trail Monitoring
+
+**Audit Event Tracking:**
+```typescript
+// monitoring/audit-trail.ts
+export class AuditMonitor {
+  static logFinancialEvent(event: FinancialAuditEvent) {
+    // Store in audit table
+    db.table('audit_trail').insert({
+      event_type: event.type,
+      user_id: event.userId,
+      transaction_id: event.transactionId,
+      amount: event.amount,
+      currency: event.currency,
+      event_data: JSON.stringify(event.data),
+      ip_address: event.ipAddress,
+      user_agent: event.userAgent,
+      timestamp: new Date()
+    });
+    
+    // Also send to Sentry for critical events
+    if (event.severity === 'critical') {
+      Sentry.withScope((scope) => {
+        scope.setTag('event_type', 'financial_audit');
+        scope.setTag('severity', event.severity);
+        scope.setContext('audit_event', {
+          type: event.type,
+          userId: event.userId?.substring(0, 8) + '***',
+          amount: '***REDACTED***',
+          currency: event.currency
+        });
+        
+        Sentry.captureMessage(`Critical financial event: ${event.type}`, 'warning');
+      });
+    }
+  }
+  
+  static async detectAnomalies(): Promise<AuditAnomaly[]> {
+    // Detect unusual patterns in audit trail
+    const anomalies: AuditAnomaly[] = [];
+    
+    // Check for unusual transaction patterns
+    const unusualPatterns = await db.raw(`
+      SELECT 
+        user_id,
+        COUNT(*) as transaction_count,
+        SUM(amount) as total_amount
+      FROM audit_trail 
+      WHERE event_type = 'transaction'
+      AND timestamp > NOW() - INTERVAL '1 hour'
+      GROUP BY user_id
+      HAVING COUNT(*) > 50 OR SUM(amount) > 100000
+    `);
+    
+    for (const pattern of unusualPatterns.rows) {
+      anomalies.push({
+        type: 'unusual_transaction_pattern',
+        userId: pattern.user_id,
+        details: `User made ${pattern.transaction_count} transactions totaling ${pattern.total_amount}`,
+        severity: 'high',
+        detectedAt: new Date()
+      });
+    }
+    
+    return anomalies;
+  }
+}
+```
+
+## Monitoring Dashboard Setup
+
+### Real-Time Dashboard Configuration
+
+**Dashboard Components:**
+```typescript
+// dashboard/metrics-dashboard.ts
+export class MetricsDashboard {
+  async getDashboardData(): Promise<DashboardData> {
+    const [
+      systemHealth,
+      businessMetrics,
+      userMetrics,
+      regionalMetrics,
+      complianceMetrics
+    ] = await Promise.all([
+      this.getSystemHealth(),
+      this.getBusinessMetrics(),
+      this.getUserMetrics(),
+      this.getRegionalMetrics(),
+      this.getComplianceMetrics()
+    ]);
+    
+    return {
+      systemHealth,
+      businessMetrics,
+      userMetrics,
+      regionalMetrics,
+      complianceMetrics,
+      lastUpdated: new Date()
+    };
+  }
+  
+  private async getSystemHealth(): Promise<SystemHealthData> {
+    return {
+      apiResponseTime: await this.getAverageResponseTime(),
+      databasePerformance: await this.getDatabasePerformance(),
+      errorRate: await this.getErrorRate(),
+      uptime: await this.getSystemUptime(),
+      activeUsers: await this.getActiveUserCount()
+    };
+  }
+  
+  private async getBusinessMetrics(): Promise<BusinessMetricsData> {
+    const today = new Date();
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    
+    return {
+      dailyActiveUsers: await this.getDailyActiveUsers(today),
+      totalTransactions: await this.getTotalTransactions(today),
+      transactionVolume: await this.getTransactionVolume(today),
+      newRegistrations: await this.getNewRegistrations(today),
+      chamaFormations: await this.getChamaFormations(today),
+      investmentActivity: await this.getInvestmentActivity(today)
+    };
+  }
+}
+```
+
+### Custom Dashboard Widgets
+
+**Widget Configuration:**
+```json
+{
+  "dashboards": [
+    {
+      "name": "AWO Platform Overview",
+      "widgets": [
+        {
+          "type": "metric",
+          "title": "Active Users",
+          "query": "SELECT COUNT(DISTINCT user_id) FROM user_sessions WHERE created_at > NOW() - INTERVAL '24 hours'",
+          "target": 5000,
+          "format": "number"
+        },
+        {
+          "type": "chart",
+          "title": "Transaction Volume",
+          "query": "SELECT DATE(created_at) as date, SUM(amount) as volume FROM transactions WHERE created_at > NOW() - INTERVAL '30 days' GROUP BY DATE(created_at)",
+          "chartType": "line"
+        },
+        {
+          "type": "alert",
+          "title": "System Health",
+          "conditions": [
+            {
+              "metric": "error_rate",
+              "threshold": 0.01,
+              "severity": "critical"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+*This monitoring guide ensures comprehensive visibility into AWO Platform's operations, enabling proactive management and continuous optimization of financial services for African women across the SADC region.*
+
+*Last updated: June 2025*  
+*Next review: Aug 2025*

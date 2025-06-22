@@ -1,28 +1,698 @@
----
-title: "Testing Strategies"
-description: "Testing Strategies implementation guide"
----
-
 # Testing Strategies
 
-## Overview
+This comprehensive guide outlines AWO Platform's testing methodology, from unit tests to end-to-end testing, ensuring reliable financial services across the SADC region.
 
-This guide documentation is coming soon.
+## Testing Philosophy
 
 <Info>
-This page is under development. Please check back later for complete implementation guide.
+AWO Platform follows a comprehensive testing pyramid approach, emphasizing automated testing at all levels to ensure financial accuracy, security compliance, and excellent user experience across African markets.
 </Info>
 
-## Getting Started
+### Testing Principles
 
-Step-by-step instructions will be added here.
+**Financial Services Testing Standards:**
+- **Zero-tolerance for financial errors**: All monetary calculations must be tested to the cent
+- **Regulatory compliance validation**: Every compliance requirement must have automated tests
+- **Cross-platform consistency**: Identical behavior across iOS, Android, and web platforms
+- **Offline-first testing**: All core features must work without internet connectivity
+- **Performance under load**: System must perform well with African internet conditions
 
-## Examples
+## Testing Pyramid Overview
 
-Code examples and best practices will be provided.
+<CardGroup cols={3}>
+  <Card title="Unit Tests (70%)" icon="code">
+    Fast, isolated tests for individual functions and components
+  </Card>
+  <Card title="Integration Tests (20%)" icon="link">
+    Tests for service interactions and API integrations
+  </Card>
+  <Card title="E2E Tests (10%)" icon="monitor">
+    Complete user journey testing across platforms
+  </Card>
+</CardGroup>
 
-## Next Steps
+### Test Coverage Requirements
 
-<Card title="Related Documentation" href="/api-reference/introduction">
-  Explore other sections of our documentation
-</Card>
+| Component | Minimum Coverage | Target Coverage |
+|-----------|-----------------|-----------------|
+| Financial Logic | 95% | 100% |
+| API Endpoints | 90% | 95% |
+| UI Components | 80% | 90% |
+| Integration Services | 85% | 95% |
+| Critical User Flows | 100% | 100% |
+
+## Unit Testing Strategy
+
+### Backend Unit Testing
+
+**Framework**: Jest with TypeScript support
+
+**Test Structure:**
+```typescript
+// Example: DIVA Score calculation testing
+describe('DivaScoreCalculator', () => {
+  describe('calculateDisciplineScore', () => {
+    it('should calculate 100% discipline score for perfect payment history', () => {
+      const transactions = mockPerfectPaymentHistory();
+      const calculator = new DivaScoreCalculator();
+      
+      const score = calculator.calculateDisciplineScore(transactions);
+      
+      expect(score).toBe(100);
+    });
+
+    it('should penalize late payments appropriately', () => {
+      const transactions = mockLatePaymentHistory();
+      const calculator = new DivaScoreCalculator();
+      
+      const score = calculator.calculateDisciplineScore(transactions);
+      
+      expect(score).toBeLessThan(70);
+    });
+  });
+});
+```
+
+**Financial Calculation Testing:**
+
+<CardGroup cols={2}>
+  <Card title="Precision Testing" icon="calculator">
+    Test all financial calculations to 2 decimal places with proper rounding
+  </Card>
+  <Card title="Edge Case Validation" icon="alert-triangle">
+    Test boundary conditions, negative values, and extreme amounts
+  </Card>
+</CardGroup>
+
+**Critical Test Categories:**
+
+<Steps>
+  <Step title="DIVA Score Calculations">
+    - Individual component calculations (Discipline, Income, Velocity, Assets)
+    - Score aggregation and weighting
+    - Historical trend analysis
+    - Portfolio tier assignment logic
+  </Step>
+  <Step title="Financial Operations">
+    - Currency conversions with exchange rates
+    - Interest calculations and compounding
+    - Fee calculations and application
+    - Balance updates and transaction processing
+  </Step>
+  <Step title="Validation Logic">
+    - Input sanitization and validation
+    - Business rule enforcement
+    - Regulatory compliance checks
+    - Data integrity validations
+  </Step>
+</Steps>
+
+### Frontend Unit Testing
+
+**Framework**: Jest + React Native Testing Library
+
+**Component Testing Strategy:**
+```typescript
+// Example: Wallet balance component testing
+describe('WalletBalance', () => {
+  it('should display balance in correct currency format', () => {
+    const mockBalance = { amount: 1234.56, currency: 'ZAR' };
+    
+    const { getByText } = render(
+      <WalletBalance balance={mockBalance} />
+    );
+    
+    expect(getByText('R 1,234.56')).toBeTruthy();
+  });
+
+  it('should handle zero balance gracefully', () => {
+    const mockBalance = { amount: 0, currency: 'ZAR' };
+    
+    const { getByText } = render(
+      <WalletBalance balance={mockBalance} />
+    );
+    
+    expect(getByText('R 0.00')).toBeTruthy();
+  });
+});
+```
+
+**State Management Testing:**
+- Zustand store mutations
+- React Query cache behavior
+- AsyncStorage persistence
+- Real-time data synchronization
+
+## Integration Testing
+
+### API Integration Testing
+
+**Framework**: Supertest with Express.js
+
+**Test Categories:**
+
+<CardGroup cols={2}>
+  <Card title="Authentication Flow" icon="lock">
+    Complete OAuth flows, token validation, and session management
+  </Card>
+  <Card title="Payment Processing" icon="credit-card">
+    End-to-end payment flows with mock payment providers
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Banking Integration" icon="building">
+    Open Banking API calls, account linking, and data synchronization
+  </Card>
+  <Card title="Chama Operations" icon="users">
+    Group creation, member management, and contribution processing
+  </Card>
+</CardGroup>
+
+**Sample Integration Test:**
+```typescript
+describe('Chama Management API', () => {
+  describe('POST /api/chamas', () => {
+    it('should create chama with valid data', async () => {
+      const chamaData = {
+        name: 'Test Savings Group',
+        description: 'Monthly savings for women entrepreneurs',
+        contributionAmount: 500,
+        contributionFrequency: 'monthly',
+        memberLimit: 10
+      };
+
+      const response = await request(app)
+        .post('/api/chamas')
+        .set('Authorization', `Bearer ${validToken}`)
+        .send(chamaData)
+        .expect(201);
+
+      expect(response.body.chama.name).toBe(chamaData.name);
+      expect(response.body.chama.treasurerId).toBe(testUserId);
+    });
+
+    it('should reject chama creation with insufficient funds', async () => {
+      const chamaData = {
+        name: 'High Contribution Group',
+        contributionAmount: 10000,
+        contributionFrequency: 'monthly'
+      };
+
+      await request(app)
+        .post('/api/chamas')
+        .set('Authorization', `Bearer ${validToken}`)
+        .send(chamaData)
+        .expect(400);
+    });
+  });
+});
+```
+
+### Database Integration Testing
+
+**Test Database Strategy:**
+- Isolated test database per test suite
+- Transaction rollback after each test
+- Seed data for consistent test scenarios
+- Migration testing for schema changes
+
+**Critical Database Tests:**
+- ACID transaction compliance
+- Concurrent user operations
+- Data integrity constraints
+- Performance under load
+
+### Third-Party Integration Testing
+
+**Mock Strategy for External Services:**
+
+| Service | Test Approach | Mock Level |
+|---------|---------------|------------|
+| Stitch API | Request/Response mocking | HTTP mocks |
+| Flutterwave | Webhook simulation | Event-driven mocks |
+| Smile ID | Document verification | ML model mocks |
+| Twilio SMS | Message delivery | API response mocks |
+
+**Integration Test Environment:**
+```typescript
+// Example: Payment provider integration test
+describe('Payment Provider Integration', () => {
+  beforeEach(() => {
+    nock('https://api.flutterwave.com')
+      .post('/v3/payments')
+      .reply(200, mockPaymentResponse);
+  });
+
+  it('should process mobile money payment successfully', async () => {
+    const paymentRequest = {
+      amount: 100,
+      currency: 'ZAR',
+      phoneNumber: '+27821234567',
+      provider: 'vodacom'
+    };
+
+    const result = await paymentService.processMobilePayment(paymentRequest);
+    
+    expect(result.status).toBe('success');
+    expect(result.transactionId).toBeDefined();
+  });
+});
+```
+
+## End-to-End Testing
+
+### E2E Testing Framework
+
+**Tools**: Detox for React Native, Playwright for web
+
+**Test Environments:**
+- **Development**: Local environment with mock services
+- **Staging**: Production-like environment with real integrations
+- **Production**: Smoke tests only, non-destructive operations
+
+### Critical User Journey Testing
+
+**Complete User Flows:**
+
+<Steps>
+  <Step title="User Onboarding">
+    - Registration with phone number
+    - Tier 1 KYC completion
+    - Bank account linking
+    - First DIVA score calculation
+  </Step>
+  <Step title="Chama Participation">
+    - Join existing Chama
+    - Make first contribution
+    - Participate in group voting
+    - Receive payout distribution
+  </Step>
+  <Step title="Investment Journey">
+    - Portfolio tier assignment
+    - Investment product selection
+    - Purchase execution
+    - Performance monitoring
+  </Step>
+  <Step title="Payment Operations">
+    - Wallet funding via mobile money
+    - P2P transfers to other users
+    - Chama contributions
+    - Investment purchases
+  </Step>
+</Steps>
+
+### Cross-Platform E2E Testing
+
+**Platform Matrix:**
+
+| Feature | iOS | Android | Web |
+|---------|-----|---------|-----|
+| User Registration | ✅ | ✅ | ✅ |
+| Bank Account Linking | ✅ | ✅ | ✅ |
+| Chama Management | ✅ | ✅ | ❌ |
+| Investment Portfolio | ✅ | ✅ | ✅ |
+| Mobile Money | ✅ | ✅ | ❌ |
+
+**Sample E2E Test:**
+```typescript
+describe('Complete Investment Flow', () => {
+  it('should allow user to invest in SME debt', async () => {
+    // Step 1: Login
+    await loginScreen.loginWithCredentials(testUser.email, testUser.password);
+    
+    // Step 2: Navigate to investments
+    await homeScreen.tapInvestmentsTab();
+    
+    // Step 3: Select SME investment
+    await investmentScreen.selectSMECategory();
+    await investmentScreen.selectInvestmentProduct('Women Entrepreneurs Fund');
+    
+    // Step 4: Enter investment amount
+    await investmentScreen.enterAmount(1000);
+    
+    // Step 5: Confirm investment
+    await investmentScreen.tapInvestButton();
+    await investmentScreen.confirmInvestment();
+    
+    // Step 6: Verify success
+    await expect(investmentScreen.successMessage).toBeVisible();
+    await expect(portfolioScreen.newInvestment).toBeVisible();
+  });
+});
+```
+
+## Financial Services Testing
+
+### Regulatory Compliance Testing
+
+**KYC/AML Testing:**
+
+<CardGroup cols={2}>
+  <Card title="Identity Verification" icon="id-card">
+    Test document upload, verification status, and approval workflows
+  </Card>
+  <Card title="Transaction Monitoring" icon="search">
+    Validate suspicious activity detection and reporting mechanisms
+  </Card>
+</CardGroup>
+
+**Compliance Test Scenarios:**
+- Maximum daily transaction limits
+- Cross-border payment restrictions
+- Age verification for youth accounts
+- Parental consent workflows
+- Data retention and deletion
+
+### Financial Accuracy Testing
+
+**Precision Requirements:**
+- All monetary calculations accurate to 2 decimal places
+- Consistent rounding across all operations
+- Currency conversion accuracy within 0.01%
+- Fee calculations match regulatory requirements
+
+**Test Data Scenarios:**
+
+| Scenario | Test Cases | Expected Behavior |
+|----------|------------|------------------|
+| Small amounts | R0.01 - R10.00 | Exact precision maintained |
+| Medium amounts | R10.01 - R10,000 | Standard rounding rules |
+| Large amounts | &gt;R10,000 | Banker's rounding applied |
+| Cross-currency | Multi-currency ops | Exchange rate + fee accuracy |
+
+### Performance Testing
+
+**Load Testing Requirements:**
+
+<CardGroup cols={2}>
+  <Card title="Peak Load Simulation" icon="activity">
+    **Target**: 10,000 concurrent users  
+    **Scenarios**: Month-end Chama payouts, salary deposits  
+    **Metrics**: Response time &lt;500ms, 99.9% uptime
+  </Card>
+  <Card title="Stress Testing" icon="zap">
+    **Target**: 2x expected peak load  
+    **Duration**: 30 minutes sustained load  
+    **Recovery**: System stability after load removal
+  </Card>
+</CardGroup>
+
+**African Market Conditions:**
+- Variable internet connectivity simulation
+- Low-bandwidth testing (&lt;1Mbps)
+- High latency conditions (500ms+)
+- Intermittent connectivity patterns
+
+### Security Testing
+
+**Automated Security Tests:**
+
+<Steps>
+  <Step title="Authentication Security">
+    - JWT token validation and expiry
+    - Refresh token rotation
+    - Session management security
+    - Multi-factor authentication flows
+  </Step>
+  <Step title="API Security">
+    - Input validation and sanitization
+    - SQL injection prevention
+    - XSS protection
+    - Rate limiting effectiveness
+  </Step>
+  <Step title="Data Protection">
+    - Encryption at rest validation
+    - TLS implementation verification
+    - PII data handling compliance
+    - Secure data deletion
+  </Step>
+</Steps>
+
+**Penetration Testing Schedule:**
+- **Monthly**: Automated vulnerability scans
+- **Quarterly**: Manual penetration testing
+- **Annual**: Comprehensive security audit
+- **Ad-hoc**: After major feature releases
+
+## Mobile-Specific Testing
+
+### Offline Functionality Testing
+
+**Offline Scenarios:**
+
+<CardGroup cols={2}>
+  <Card title="Core Features" icon="smartphone">
+    Wallet balance viewing, transaction history, DIVA score display
+  </Card>
+  <Card title="Data Synchronization" icon="refresh-cw">
+    Automatic sync when connectivity restored, conflict resolution
+  </Card>
+</CardGroup>
+
+**Network Condition Testing:**
+- Complete offline operation
+- Slow network (2G speed simulation)
+- Intermittent connectivity
+- WiFi to mobile data switching
+
+### Device-Specific Testing
+
+**Device Matrix:**
+
+| Category | Models | Testing Focus |
+|----------|--------|---------------|
+| High-end | iPhone 14, Samsung S23 | Feature completeness |
+| Mid-range | Samsung A52, Xiaomi Redmi | Performance optimization |
+| Budget | Samsung A12, Tecno Spark | Core functionality |
+| Tablets | iPad, Samsung Tab | Responsive design |
+
+**Performance Benchmarks:**
+- App startup time: &lt;3 seconds
+- Screen transition: &lt;200ms
+- Battery impact: &lt;5% per hour active use
+- Memory usage: &lt;150MB average
+
+### Real Device Testing
+
+**Testing Lab Setup:**
+- Physical devices representing 80% of user base
+- Various OS versions (iOS 13+, Android 8+)
+- Different screen sizes and resolutions
+- Network provider diversity (Vodacom, MTN, Cell C)
+
+## Automated Testing Infrastructure
+
+### Continuous Integration Testing
+
+**CI/CD Pipeline:**
+
+<Steps>
+  <Step title="Code Commit">
+    **Triggers**: Unit tests, linting, security scans  
+    **Duration**: &lt;5 minutes  
+    **Gates**: Must pass to proceed
+  </Step>
+  <Step title="Pull Request">
+    **Triggers**: Integration tests, component tests  
+    **Duration**: &lt;15 minutes  
+    **Gates**: Code review + test approval
+  </Step>
+  <Step title="Staging Deployment">
+    **Triggers**: E2E tests, performance tests  
+    **Duration**: &lt;30 minutes  
+    **Gates**: All critical paths verified
+  </Step>
+  <Step title="Production Release">
+    **Triggers**: Smoke tests, monitoring alerts  
+    **Duration**: &lt;10 minutes  
+    **Gates**: Health checks pass
+  </Step>
+</Steps>
+
+### Test Environment Management
+
+**Environment Strategy:**
+```bash
+# Development Environment
+npm run test:unit          # Unit tests only
+npm run test:integration   # With local database
+npm run test:e2e:dev      # Mock external services
+
+# Staging Environment  
+npm run test:staging      # Full integration testing
+npm run test:performance  # Load testing
+npm run test:security     # Security validation
+
+# Production Environment
+npm run test:smoke        # Critical path verification
+npm run test:monitoring   # Health check validation
+```
+
+### Test Data Management
+
+**Data Strategy:**
+
+<CardGroup cols={2}>
+  <Card title="Synthetic Data" icon="database">
+    Generated test data for various user scenarios and edge cases
+  </Card>
+  <Card title="Anonymized Production Data" icon="shield">
+    Real patterns with PII removed for accurate testing scenarios
+  </Card>
+</CardGroup>
+
+**Test Data Categories:**
+- **Clean Data**: Perfect scenarios for positive testing
+- **Edge Cases**: Boundary conditions and unusual scenarios  
+- **Invalid Data**: Malformed inputs for negative testing
+- **Performance Data**: Large datasets for load testing
+
+## Testing Best Practices
+
+### Code Quality Standards
+
+**Test Code Requirements:**
+- Clear, descriptive test names
+- Comprehensive assertions
+- Proper test isolation
+- Minimal test dependencies
+- Regular test maintenance
+
+**Test Documentation:**
+```typescript
+/**
+ * Test: DIVA Score Calculation - Discipline Component
+ * 
+ * Purpose: Validates that discipline score accurately reflects
+ * user payment behavior according to business rules
+ * 
+ * Scenarios:
+ * - Perfect payment history → 100% score
+ * - Occasional late payments → 70-85% score  
+ * - Frequent late payments → 40-60% score
+ * - Multiple overdrafts → &lt;40% score
+ * 
+ * Business Impact: Incorrect scoring affects portfolio assignment
+ * and investment access, potentially excluding qualified users
+ */
+describe('DIVA Score - Discipline Component', () => {
+  // Test implementations...
+});
+```
+
+### Regional Testing Considerations
+
+**SADC Market Adaptations:**
+
+<CardGroup cols={2}>
+  <Card title="Localization Testing" icon="globe">
+    **Languages**: English, Afrikaans, Portuguese  
+    **Currencies**: ZAR, BWP, NAD, ZMW  
+    **Formats**: Date, number, and currency formatting
+  </Card>
+  <Card title="Regulatory Testing" icon="shield-check">
+    **Compliance**: Country-specific financial regulations  
+    **Banking**: Local banking standard compliance  
+    **Privacy**: POPIA and GDPR requirement validation
+  </Card>
+</CardGroup>
+
+### Test Monitoring and Reporting
+
+**Metrics Tracking:**
+
+| Metric | Target | Alert Threshold |
+|--------|--------|-----------------|
+| Test Coverage | &gt;90% | &lt;85% |
+| Test Execution Time | &lt;30 minutes | &gt;45 minutes |
+| Test Success Rate | &gt;95% | &lt;90% |
+| Flaky Test Rate | &lt;2% | &gt;5% |
+
+**Reporting Dashboard:**
+- Real-time test execution status
+- Coverage trends over time
+- Failed test analysis
+- Performance impact tracking
+
+## Troubleshooting Common Testing Issues
+
+### Flaky Test Resolution
+
+**Common Causes and Solutions:**
+
+<CardGroup cols={2}>
+  <Card title="Timing Issues" icon="clock">
+    **Problem**: Tests fail due to async operations  
+    **Solution**: Proper wait strategies, explicit timeouts
+  </Card>
+  <Card title="State Dependencies" icon="link">
+    **Problem**: Tests affect each other's state  
+    **Solution**: Better test isolation, cleanup procedures
+  </Card>
+</CardGroup>
+
+### Performance Test Debugging
+
+**Analysis Approach:**
+```bash
+# Identify bottlenecks
+npm run test:performance:profile
+
+# Database query analysis  
+npm run test:db:analyze
+
+# Network latency testing
+npm run test:network:simulate
+
+# Memory leak detection
+npm run test:memory:profile
+```
+
+### Mobile Test Challenges
+
+**Common Solutions:**
+
+<Steps>
+  <Step title="Device-Specific Issues">
+    Maintain device-specific test configurations and known issue tracking
+  </Step>
+  <Step title="Network Simulation">
+    Use network condition simulators for consistent testing environments
+  </Step>
+  <Step title="Battery and Performance">
+    Regular performance regression testing with automated benchmarks
+  </Step>
+</Steps>
+
+## Future Testing Enhancements
+
+### Planned Improvements
+
+<CardGroup cols={2}>
+  <Card title="AI-Powered Testing" icon="brain">
+    **Timeline**: Q3 2025  
+    **Scope**: Intelligent test generation and maintenance  
+    **Benefits**: Reduced test maintenance overhead
+  </Card>
+  <Card title="Visual Regression Testing" icon="eye">
+    **Timeline**: Q2 2025  
+    **Scope**: Automated UI consistency validation  
+    **Benefits**: Catch visual bugs across platforms
+  </Card>
+</CardGroup>
+
+### Emerging Technologies
+
+**Future Considerations:**
+- Blockchain transaction testing for immutable audit trails
+- Machine learning model testing for enhanced DIVA scoring
+- IoT device integration testing for agent network tools
+- Advanced biometric testing for enhanced security
+
+---
+
+*This testing strategy ensures AWO Platform delivers reliable, secure, and high-performance financial services to African women across the SADC region, with comprehensive validation at every level of the system.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*
