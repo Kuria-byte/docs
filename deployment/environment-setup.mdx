@@ -1,43 +1,788 @@
----
-title: "Environment Setup"
-description: "AWO Platform environment setup deployment guide"
----
-
-# Environment Setup
+# Environment Setup - Deployment
 
 ## Overview
 
+Setting up proper development, staging, and production environments is crucial for AWO Platform's success. This guide provides comprehensive instructions for configuring each environment to ensure consistency, security, and optimal performance across the SADC region.
+
 <Info>
-This guide covers environment setup for the AWO Platform.
+AWO Platform uses a three-tier environment strategy: Development (local), Staging (Railway/Render), and Production (Railway/Render) with Neon PostgreSQL as the database layer.
 </Info>
 
-## Deployment Steps
+## Prerequisites
 
-<Steps>
-  <Step title="Environment Preparation">
-    Prepare deployment environment
-  </Step>
-  <Step title="Configuration">
-    Configure deployment settings
-  </Step>
-  <Step title="Deployment">
-    Execute deployment process
-  </Step>
-  <Step title="Verification">
-    Verify successful deployment
-  </Step>
-</Steps>
+### Required Tools
 
-## Configuration
+**Core Development Tools**:
+```bash
+# Node.js (v18+)
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
 
-Deployment configuration will be documented here.
+# Git
+sudo apt-get install git
 
-## Monitoring
+# Railway CLI
+npm install -g @railway/cli
 
-Post-deployment monitoring setup will be covered here.
+# EAS CLI (Expo)
+npm install -g eas-cli
 
-## Rollback Procedures
+# Neon CLI (optional but recommended)
+npm install -g neonctl
+```
 
-<Accordion title="Emergency Rollback">
-Rollback procedures will be documented here.
-</Accordion>
+**Development Dependencies**:
+```bash
+# Docker (for local PostgreSQL if needed)
+sudo apt-get install docker.io docker-compose
+
+# VS Code extensions (recommended)
+code --install-extension ms-vscode.vscode-typescript-next
+code --install-extension bradlc.vscode-tailwindcss
+code --install-extension esbenp.prettier-vscode
+```
+
+### Account Setup
+
+**Required Accounts**:
+<CardGroup cols={2}>
+  <Card title="Railway Account" icon="train">
+    **Purpose**: Backend hosting and deployment  
+    **URL**: https://railway.app  
+    **Plan**: Hobby plan ($5/month credits)  
+    **Setup**: Link GitHub account for auto-deployment
+  </Card>
+  <Card title="Expo Account" icon="smartphone">
+    **Purpose**: Mobile app builds and distribution  
+    **URL**: https://expo.dev  
+    **Plan**: Free tier (sufficient for development)  
+    **Setup**: EAS Build for cloud builds
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Neon Account" icon="database">
+    **Purpose**: Serverless PostgreSQL database  
+    **URL**: https://neon.tech  
+    **Plan**: Free tier (sufficient for development)  
+    **Setup**: Create projects for dev/staging/production
+  </Card>
+  <Card title="Cloudflare Account" icon="cloud">
+    **Purpose**: CDN and domain management  
+    **URL**: https://cloudflare.com  
+    **Plan**: Free tier (sufficient for initial deployment)  
+    **Setup**: Configure DNS and CDN settings
+  </Card>
+</CardGroup>
+
+**Optional Accounts**:
+- **Sentry**: Error tracking and performance monitoring
+- **GitHub**: Code repository (if not already set up)
+- **Render**: Alternative to Railway for backend hosting
+
+## Development Environment Setup
+
+### Local Development Configuration
+
+**1. Repository Setup**:
+```bash
+# Clone the AWO platform repositories
+git clone https://github.com/awo-platform/awo-backend
+git clone https://github.com/awo-platform/awo-mobile
+git clone https://github.com/awo-platform/awo-docs
+
+# Navigate to backend and install dependencies
+cd awo-backend
+npm install
+
+# Navigate to mobile and install dependencies
+cd ../awo-mobile
+npm install
+```
+
+**2. Environment Variables Setup**:
+
+Create `.env.local` in the backend directory:
+```bash
+# Database Configuration
+DATABASE_URL=postgresql://username:password@localhost:5432/awo_dev
+REDIS_URL=redis://localhost:6379
+
+# API Keys (Development)
+STITCH_CLIENT_ID=dev_stitch_client_id
+STITCH_CLIENT_SECRET=dev_stitch_client_secret
+FLUTTERWAVE_SECRET_KEY=dev_flutterwave_secret
+SMILE_ID_API_KEY=dev_smile_id_key
+
+# JWT Configuration
+JWT_SECRET=your-super-secret-jwt-key-min-32-chars
+JWT_REFRESH_SECRET=your-refresh-secret-jwt-key-min-32-chars
+
+# Environment
+NODE_ENV=development
+PORT=3000
+CORS_ORIGIN=http://localhost:19006
+
+# Logging
+LOG_LEVEL=debug
+SENTRY_DSN=your-development-sentry-dsn
+```
+
+**3. Database Setup (Local Option)**:
+
+Using Docker Compose for local PostgreSQL:
+```yaml
+# docker-compose.dev.yml
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: awo_dev
+      POSTGRES_USER: awo_user
+      POSTGRES_PASSWORD: awo_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+Start local services:
+```bash
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+**4. Neon Development Branch (Recommended)**:
+
+Instead of local PostgreSQL, use Neon branches:
+```bash
+# Create a development branch
+neonctl branches create --name dev/your-name --parent main
+
+# Get connection string
+neonctl connection-string dev/your-name
+
+# Update .env.local with Neon connection string
+DATABASE_URL=postgresql://username:password@ep-xxx.us-east-2.aws.neon.tech/dbname?sslmode=require
+```
+
+### Mobile Development Setup
+
+**1. Expo Configuration**:
+
+Create `app.config.js` in mobile directory:
+```javascript
+export default {
+  expo: {
+    name: "AWO Platform",
+    slug: "awo-platform",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "light",
+    splash: {
+      image: "./assets/splash.png",
+      resizeMode: "contain",
+      backgroundColor: "#bc9b25"
+    },
+    assetBundlePatterns: ["**/*"],
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.awo.platform.dev"
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#FFFFFF"
+      },
+      package: "com.awo.platform.dev"
+    },
+    web: {
+      favicon: "./assets/favicon.png"
+    },
+    extra: {
+      apiUrl: process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000",
+      environment: "development"
+    }
+  }
+};
+```
+
+**2. EAS Configuration**:
+
+Create `eas.json`:
+```json
+{
+  "cli": {
+    "version": ">= 5.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:3000"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api-staging.awo-platform.com"
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.awo-platform.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
+```
+
+### Development Workflow
+
+**Daily Development Setup**:
+```bash
+# Backend development
+cd awo-backend
+npm run dev  # Starts Express server with hot reload
+
+# Mobile development (separate terminal)
+cd awo-mobile
+npx expo start  # Starts Expo development server
+
+# Database migrations (if needed)
+npm run migrate:dev
+npm run seed:dev
+```
+
+**Development Tools**:
+<CardGroup cols={2}>
+  <Card title="Hot Reload" icon="refresh">
+    **Backend**: Nodemon for automatic server restart  
+    **Mobile**: Expo's Fast Refresh for instant updates  
+    **Database**: Neon branch for isolated development
+  </Card>
+  <Card title="Debugging" icon="bug">
+    **Backend**: VS Code debugger, Winston logging  
+    **Mobile**: Flipper, React Native Debugger  
+    **Database**: pgAdmin, Neon console SQL editor
+  </Card>
+</CardGroup>
+
+## Staging Environment Setup
+
+### Railway Staging Configuration
+
+**1. Railway Project Setup**:
+```bash
+# Login to Railway
+railway login
+
+# Create new project for staging
+railway new awo-platform-staging
+
+# Link to GitHub repository
+railway connect github-repo awo-platform/awo-backend
+
+# Configure staging service
+railway service create awo-backend-staging
+```
+
+**2. Environment Variables (Railway)**:
+
+Set up staging environment variables via Railway CLI:
+```bash
+# Database
+railway variables set DATABASE_URL postgresql://staging-user:pass@staging-host:5432/awo_staging
+
+# API Keys (Staging/Sandbox)
+railway variables set STITCH_CLIENT_ID staging_stitch_client_id
+railway variables set STITCH_CLIENT_SECRET staging_stitch_client_secret
+railway variables set FLUTTERWAVE_SECRET_KEY staging_flutterwave_secret
+
+# Application Configuration
+railway variables set NODE_ENV staging
+railway variables set PORT 3000
+railway variables set CORS_ORIGIN https://awo-staging.railway.app
+
+# Monitoring
+railway variables set SENTRY_DSN https://staging-sentry-dsn@sentry.io/project
+railway variables set LOG_LEVEL info
+```
+
+**3. Neon Staging Database**:
+
+Create dedicated staging database:
+```bash
+# Create staging project in Neon
+neonctl projects create --name "AWO Platform Staging"
+
+# Create staging database
+neonctl databases create --name awo_staging
+
+# Get staging connection string
+neonctl connection-string main --project-id your-staging-project-id
+
+# Set in Railway
+railway variables set DATABASE_URL "postgresql://staging-connection-string"
+```
+
+### Staging Deployment Configuration
+
+**1. Railway.toml Configuration**:
+
+Create `railway.toml` in backend root:
+```toml
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm ci && npm run build"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+
+[env]
+NODE_ENV = "staging"
+```
+
+**2. Automated Staging Deployment**:
+
+GitHub Actions workflow for staging:
+```yaml
+name: Deploy to Staging
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run tests
+        run: npm test
+        
+      - name: Deploy to Railway
+        run: |
+          npm install -g @railway/cli
+          railway login --token ${{ secrets.RAILWAY_TOKEN }}
+          railway deploy --service awo-backend-staging
+        
+      - name: Run health check
+        run: |
+          sleep 30
+          curl -f https://awo-backend-staging.railway.app/health
+```
+
+### Staging Mobile App Configuration
+
+**1. EAS Staging Build**:
+```bash
+# Build for staging
+eas build --platform all --profile preview
+
+# Update staging app
+eas update --branch staging --message "Staging update"
+```
+
+**2. Staging App Distribution**:
+- **Internal Distribution**: TestFlight (iOS), Internal App Sharing (Android)
+- **QR Code Access**: Direct install via Expo
+- **Stakeholder Access**: Email invitations with install links
+
+## Production Environment Setup
+
+### Railway Production Configuration
+
+**1. Production Project Setup**:
+```bash
+# Create production project
+railway new awo-platform-production
+
+# Configure production service
+railway service create awo-backend-production
+
+# Set up custom domain
+railway domain add api.awo-platform.com
+```
+
+**2. Production Environment Variables**:
+
+**Security-First Configuration**:
+```bash
+# Database (Production Neon)
+railway variables set DATABASE_URL postgresql://prod-connection-string
+
+# Production API Keys
+railway variables set STITCH_CLIENT_ID prod_stitch_client_id
+railway variables set STITCH_CLIENT_SECRET prod_stitch_client_secret
+railway variables set FLUTTERWAVE_SECRET_KEY prod_flutterwave_secret
+
+# Security Configuration
+railway variables set JWT_SECRET $(openssl rand -base64 32)
+railway variables set JWT_REFRESH_SECRET $(openssl rand -base64 32)
+railway variables set ENCRYPTION_KEY $(openssl rand -base64 32)
+
+# Production Settings
+railway variables set NODE_ENV production
+railway variables set PORT 3000
+railway variables set CORS_ORIGIN https://app.awo-platform.com
+
+# Monitoring and Logging
+railway variables set SENTRY_DSN https://production-sentry-dsn@sentry.io/project
+railway variables set LOG_LEVEL warn
+```
+
+### Production Database Setup
+
+**1. Neon Production Configuration**:
+```bash
+# Create production project
+neonctl projects create --name "AWO Platform Production"
+
+# Configure high availability
+neonctl databases create --name awo_production
+
+# Set up read replicas for SADC regions
+neonctl compute create --name awo-read-replica-cape-town --region cape-town
+neonctl compute create --name awo-read-replica-lagos --region lagos
+
+# Configure automated backups
+neonctl backup configure --schedule "0 2 * * *" --retention-period 30
+```
+
+**2. Database Security Configuration**:
+```sql
+-- Create application user with limited permissions
+CREATE USER awo_app_user WITH PASSWORD 'secure-random-password';
+
+-- Grant necessary permissions
+GRANT CONNECT ON DATABASE awo_production TO awo_app_user;
+GRANT USAGE ON SCHEMA public TO awo_app_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO awo_app_user;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO awo_app_user;
+
+-- Create read-only user for reporting
+CREATE USER awo_readonly WITH PASSWORD 'readonly-password';
+GRANT CONNECT ON DATABASE awo_production TO awo_readonly;
+GRANT USAGE ON SCHEMA public TO awo_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO awo_readonly;
+```
+
+### Production Security Configuration
+
+**1. Infrastructure Security**:
+
+**Cloudflare Security Setup**:
+```bash
+# Configure WAF rules
+cloudflare firewall-rule create \
+  --name "Block malicious requests" \
+  --expression "(cf.threat_score gt 14)" \
+  --action "block"
+
+# Configure DDoS protection
+cloudflare firewall-rule create \
+  --name "Rate limit API" \
+  --expression "(http.request.uri.path matches \"^/api/\")" \
+  --action "rate_limit" \
+  --rate-limit 100
+```
+
+**2. Application Security**:
+
+Production security middleware:
+```javascript
+// Production security configuration
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+
+// Security headers
+app.use(helmet({
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: "Too many requests from this IP"
+});
+app.use('/api/', limiter);
+```
+
+### Production Mobile App Setup
+
+**1. Production Build Configuration**:
+
+Update `eas.json` for production:
+```json
+{
+  "build": {
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.awo-platform.com",
+        "EXPO_PUBLIC_ENVIRONMENT": "production"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "resourceClass": "m1-medium"
+      }
+    }
+  }
+}
+```
+
+**2. App Store Configuration**:
+
+**iOS App Store**:
+```bash
+# Build for App Store
+eas build --platform ios --profile production
+
+# Submit to App Store
+eas submit --platform ios --latest
+```
+
+**Google Play Store**:
+```bash
+# Build for Play Store
+eas build --platform android --profile production
+
+# Submit to Play Store
+eas submit --platform android --latest
+```
+
+## Environment Validation
+
+### Health Checks
+
+**Backend Health Check Endpoint**:
+```javascript
+app.get('/health', async (req, res) => {
+  const health = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    version: process.env.npm_package_version,
+    checks: {
+      database: 'unknown',
+      redis: 'unknown',
+      external_apis: 'unknown'
+    }
+  };
+
+  try {
+    // Database check
+    await pool.query('SELECT 1');
+    health.checks.database = 'healthy';
+
+    // Redis check
+    await redis.ping();
+    health.checks.redis = 'healthy';
+
+    // External API check
+    const apiCheck = await checkExternalAPIs();
+    health.checks.external_apis = apiCheck ? 'healthy' : 'degraded';
+
+    const allHealthy = Object.values(health.checks)
+      .every(check => check === 'healthy');
+    
+    health.status = allHealthy ? 'healthy' : 'degraded';
+    
+    res.status(allHealthy ? 200 : 503).json(health);
+  } catch (error) {
+    health.status = 'unhealthy';
+    health.error = error.message;
+    res.status(503).json(health);
+  }
+});
+```
+
+### Environment Testing
+
+**Automated Environment Tests**:
+```bash
+# Test staging environment
+npm run test:staging
+
+# Test production environment (read-only tests)
+npm run test:production
+
+# Performance tests
+npm run test:performance
+
+# Security tests
+npm run test:security
+```
+
+**Manual Verification Checklist**:
+
+<CardGroup cols={2}>
+  <Card title="Backend Verification" icon="server">
+    ✅ Health endpoint returns 200  
+    ✅ Database connections working  
+    ✅ API authentication functional  
+    ✅ External integrations connected  
+    ✅ Logging and monitoring active
+  </Card>
+  <Card title="Mobile App Verification" icon="smartphone">
+    ✅ App builds and installs correctly  
+    ✅ API connectivity working  
+    ✅ Authentication flow functional  
+    ✅ Core features accessible  
+    ✅ Crash reporting active
+  </Card>
+</CardGroup>
+
+## Environment Management
+
+### Configuration Management
+
+**Environment Variable Management**:
+```javascript
+// config/environment.js
+const environments = {
+  development: {
+    apiUrl: 'http://localhost:3000',
+    database: process.env.DATABASE_URL,
+    logLevel: 'debug',
+    enableDebug: true
+  },
+  staging: {
+    apiUrl: 'https://api-staging.awo-platform.com',
+    database: process.env.DATABASE_URL,
+    logLevel: 'info',
+    enableDebug: false
+  },
+  production: {
+    apiUrl: 'https://api.awo-platform.com',
+    database: process.env.DATABASE_URL,
+    logLevel: 'warn',
+    enableDebug: false
+  }
+};
+
+module.exports = environments[process.env.NODE_ENV] || environments.development;
+```
+
+### Secrets Management
+
+**Railway Secrets**:
+```bash
+# Set sensitive variables via Railway CLI
+railway variables set --name JWT_SECRET --value $(openssl rand -base64 32)
+railway variables set --name DATABASE_PASSWORD --value secure-password
+
+# List all variables
+railway variables list
+
+# Remove variable
+railway variables remove VARIABLE_NAME
+```
+
+**Local Secrets (.env.local)**:
+```bash
+# Never commit .env files to version control
+echo ".env*" >> .gitignore
+
+# Use template files for documentation
+cp .env.example .env.local
+# Edit .env.local with actual values
+```
+
+## Troubleshooting
+
+### Common Environment Issues
+
+**Database Connection Issues**:
+```bash
+# Test database connection
+psql $DATABASE_URL -c "SELECT 1;"
+
+# Check connection string format
+echo $DATABASE_URL
+
+# Verify SSL requirements for Neon
+# Ensure ?sslmode=require is in connection string
+```
+
+**Railway Deployment Issues**:
+```bash
+# Check deployment logs
+railway logs --tail
+
+# Verify build configuration
+cat railway.toml
+
+# Check environment variables
+railway variables list
+```
+
+**Mobile Build Issues**:
+```bash
+# Clear Expo cache
+expo start --clear
+
+# Rebuild with verbose output
+eas build --platform all --profile development --clear-cache
+
+# Check EAS build logs
+eas build:list
+```
+
+### Recovery Procedures
+
+**Environment Recovery Steps**:
+1. **Identify Issue**: Check health endpoints and logs
+2. **Isolate Problem**: Determine if issue is code, config, or infrastructure
+3. **Apply Fix**: Use appropriate recovery method
+4. **Verify Resolution**: Run health checks and functional tests
+5. **Document Incident**: Update runbooks and prevention measures
+
+---
+
+*This environment setup guide provides comprehensive instructions for configuring AWO Platform across all deployment environments, ensuring consistency, security, and optimal performance for African users.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

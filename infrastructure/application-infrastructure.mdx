@@ -1,35 +1,1179 @@
----
-title: "Application Infrastructure"
-description: "AWO Platform application infrastructure infrastructure documentation"
----
-
 # Application Infrastructure
 
-## Overview
+AWO Platform's application infrastructure is built on a cloud-native, containerized architecture using Express.js for backend services and React Native for mobile applications, optimized for the unique requirements of African fintech operations.
+
+## Architecture Overview
 
 <Info>
-This section covers application infrastructure for the AWO Platform infrastructure.
+AWO's application infrastructure follows a **modular monolith** approach, designed for easy extraction to microservices while maintaining operational simplicity for rapid African market deployment.
 </Info>
 
-## Infrastructure Components
+### Application Architecture Principles
 
-Infrastructure details will be documented here.
+**1. African-First Design**
+- Offline-first mobile architecture for variable connectivity
+- Intelligent caching and sync strategies for bandwidth optimization
+- Multi-language support (English, Afrikaans, French, Portuguese)
+- Currency-aware processing and regional compliance automation
 
-## Scaling Strategy
+**2. Financial-Grade Reliability**
+- Stateless application design for horizontal scaling
+- Circuit breaker patterns for external service resilience
+- Distributed transaction handling with saga patterns
+- Real-time monitoring and alerting for critical financial operations
 
-Scaling approach and implementation will be covered here.
+**3. Developer Experience Optimization**
+- TypeScript throughout for type safety and maintainability
+- Hot reloading and instant feedback for rapid development
+- Automated testing and quality assurance at every layer
+- Comprehensive API documentation with interactive examples
 
-## Performance Optimization
+## Backend Infrastructure (Express.js)
 
-<CardGroup cols={2}>
-  <Card title="Database Optimization" icon="database">
-    PostgreSQL performance tuning
-  </Card>
-  <Card title="API Optimization" icon="zap">
-    Express.js performance optimization
-  </Card>
-</CardGroup>
+### Service Architecture
 
-## Monitoring & Alerts
+```
+┌─────────────────────────────────────────────────────────┐
+│                EXPRESS.JS BACKEND                       │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              API Gateway Layer                      │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │  Auth   │ │  Rate   │ │Request  │ │  CORS &     ││ │
+│  │  │Middleware│ │Limiting │ │Validation│ │  Security   ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────────────────────────────────────────────┐│ │
+│  │  │           Request/Response Pipeline             ││ │
+│  │  │    Logging → Validation → Processing → Format  ││ │
+│  │  └─────────────────────────────────────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │               Service Layer                         │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │  User   │ │  DIVA   │ │Financial│ │    Chama    ││ │
+│  │  │Service  │ │ Service │ │ Service │ │   Service   ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │Payment  │ │Compliance│ │Coaching │ │Notification ││ │
+│  │  │Service  │ │ Service │ │ Service │ │  Service    ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────────────────────────────────────────────┐│ │
+│  │  │              Shared Services                    ││ │
+│  │  │   Analytics • Audit • Event Bus • Cache        ││ │
+│  │  └─────────────────────────────────────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │             Integration Layer                       │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │Banking  │ │Payment  │ │   KYC   │ │Communication││ │
+│  │  │Gateway  │ │Gateway  │ │ Gateway │ │  Gateway    ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────────────────────────────────────────────┐│ │
+│  │  │           Circuit Breakers & Retry             ││ │
+│  │  │        Timeout Management & Fallbacks          ││ │
+│  │  └─────────────────────────────────────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
 
-Monitoring setup and alerting will be documented here.
+### Express.js Configuration and Setup
+
+**Production-Ready Server Configuration**
+```typescript
+// server.ts - Production Express.js setup
+import express from 'express';
+import helmet from 'helmet';
+import cors from 'cors';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
+import { createProxyMiddleware } from 'http-proxy-middleware';
+
+class AWOExpressServer {
+  private app: express.Application;
+  private port: number;
+  
+  constructor() {
+    this.app = express();
+    this.port = parseInt(process.env.PORT || '3000');
+    this.initializeMiddleware();
+    this.initializeRoutes();
+    this.initializeErrorHandling();
+  }
+  
+  private initializeMiddleware(): void {
+    // Security middleware
+    this.app.use(helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'"],
+          imgSrc: ["'self'", "data:", "https:"],
+          connectSrc: ["'self'", "wss:", "https:"]
+        }
+      },
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+      }
+    }));
+    
+    // CORS configuration for mobile apps and web clients
+    this.app.use(cors({
+      origin: (origin, callback) => {
+        const allowedOrigins = [
+          'https://app.awo-platform.com',
+          'https://admin.awo-platform.com',
+          'capacitor://localhost', // Capacitor apps
+          'ionic://localhost',     // Ionic apps
+          ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : [])
+        ];
+        
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
+      credentials: true,
+      optionsSuccessStatus: 200
+    }));
+    
+    // Compression for African bandwidth optimization
+    this.app.use(compression({
+      level: 6, // Balance between compression ratio and CPU usage
+      threshold: 1024, // Only compress responses > 1KB
+      filter: (req, res) => {
+        // Don't compress if already compressed or if streaming
+        if (req.headers['x-no-compression']) return false;
+        return compression.filter(req, res);
+      }
+    }));
+    
+    // Rate limiting with African market considerations
+    const africanRateLimit = rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: (req) => {
+        // Higher limits for authenticated users
+        if (req.user?.id) return 1000;
+        // Lower limits for unauthenticated requests
+        return 100;
+      },
+      message: {
+        error: 'Too many requests',
+        retryAfter: '15 minutes'
+      },
+      standardHeaders: true,
+      legacyHeaders: false,
+      // Custom key generator for regional considerations
+      keyGenerator: (req) => {
+        return req.ip + ':' + (req.headers['x-forwarded-for'] || '');
+      }
+    });
+    
+    this.app.use('/api/', africanRateLimit);
+    
+    // Body parsing with size limits
+    this.app.use(express.json({ 
+      limit: '10mb', // Allow larger payloads for document uploads
+      verify: (req, res, buf) => {
+        // Store raw body for webhook signature verification
+        req.rawBody = buf;
+      }
+    }));
+    
+    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+    
+    // Request logging and tracing
+    this.app.use((req, res, next) => {
+      req.requestId = generateRequestId();
+      req.startTime = Date.now();
+      
+      // Set regional context
+      req.region = this.detectUserRegion(req);
+      
+      console.log({
+        requestId: req.requestId,
+        method: req.method,
+        url: req.url,
+        userAgent: req.get('User-Agent'),
+        region: req.region,
+        timestamp: new Date().toISOString()
+      });
+      
+      next();
+    });
+  }
+  
+  private detectUserRegion(req: express.Request): string {
+    // Detect user region for compliance and performance optimization
+    const countryHeader = req.headers['cf-ipcountry'] as string; // Cloudflare
+    const acceptLanguage = req.headers['accept-language'];
+    
+    if (countryHeader) {
+      const africanCountries = {
+        'ZA': 'SA', 'NG': 'NG', 'KE': 'KE', 'GH': 'GH',
+        'BW': 'SA', 'NA': 'SA', 'ZM': 'SA' // SADC routing
+      };
+      return africanCountries[countryHeader] || 'SA';
+    }
+    
+    // Fallback to language detection
+    if (acceptLanguage?.includes('af')) return 'SA'; // Afrikaans
+    if (acceptLanguage?.includes('fr')) return 'NG'; // French (West Africa)
+    
+    return 'SA'; // Default to South Africa
+  }
+}
+```
+
+**Service Architecture Implementation**
+```typescript
+// services/base/BaseService.ts
+import { Pool } from 'pg';
+import { Redis } from 'ioredis';
+import { EventEmitter } from 'events';
+
+export abstract class BaseService extends EventEmitter {
+  protected db: Pool;
+  protected cache: Redis;
+  protected logger: any;
+  
+  constructor(db: Pool, cache: Redis, logger: any) {
+    super();
+    this.db = db;
+    this.cache = cache;
+    this.logger = logger;
+  }
+  
+  // Centralized transaction handling
+  protected async withTransaction<T>(
+    callback: (client: any) => Promise<T>
+  ): Promise<T> {
+    const client = await this.db.connect();
+    
+    try {
+      await client.query('BEGIN');
+      const result = await callback(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      this.logger.error('Transaction failed', {
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  
+  // Caching with African network considerations
+  protected async getCached<T>(
+    key: string, 
+    fallback: () => Promise<T>,
+    ttl: number = 300 // 5 minutes default
+  ): Promise<T> {
+    try {
+      const cached = await this.cache.get(key);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (error) {
+      // Cache miss or error - continue to fallback
+      this.logger.warn('Cache error', { key, error: error.message });
+    }
+    
+    const result = await fallback();
+    
+    // Set cache with error handling
+    try {
+      await this.cache.setex(key, ttl, JSON.stringify(result));
+    } catch (error) {
+      this.logger.warn('Cache set error', { key, error: error.message });
+    }
+    
+    return result;
+  }
+}
+
+// services/DIVAService.ts - Example service implementation
+export class DIVAService extends BaseService {
+  async calculateDIVAScore(userId: string): Promise<DIVAScore> {
+    const cacheKey = `diva:score:${userId}`;
+    
+    return this.getCached(cacheKey, async () => {
+      return this.withTransaction(async (client) => {
+        // Get user's financial data
+        const financialData = await this.getFinancialData(client, userId);
+        
+        // Calculate DIVA components
+        const discipline = await this.calculateDisciplineScore(financialData);
+        const income = await this.calculateIncomeScore(financialData);
+        const velocity = await this.calculateVelocityScore(financialData);
+        const assets = await this.calculateAssetsScore(financialData);
+        
+        // Calculate overall score
+        const overallScore = Math.round(
+          (discipline * 0.3) + (income * 0.25) + 
+          (velocity * 0.25) + (assets * 0.2)
+        );
+        
+        // Determine portfolio tier
+        const portfolioTier = this.determinePortfolioTier(overallScore);
+        
+        const score: DIVAScore = {
+          userId,
+          discipline,
+          income,
+          velocity,
+          assets,
+          overallScore,
+          portfolioTier,
+          calculatedAt: new Date(),
+          validUntil: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
+        };
+        
+        // Store in database
+        await this.storeDIVAScore(client, score);
+        
+        // Emit event for real-time updates
+        this.emit('score:calculated', score);
+        
+        return score;
+      });
+    }, 3600); // Cache for 1 hour
+  }
+  
+  private determinePortfolioTier(score: number): PortfolioTier {
+    if (score < 400) return 'bronze';
+    if (score < 650) return 'silver';
+    if (score < 850) return 'gold';
+    return 'platinum';
+  }
+}
+```
+
+### API Infrastructure and Management
+
+**RESTful API Design with African Considerations**
+```typescript
+// routes/api.ts - Main API routing
+import { Router } from 'express';
+import { AuthMiddleware } from '../middleware/auth';
+import { ValidationMiddleware } from '../middleware/validation';
+import { RegionalMiddleware } from '../middleware/regional';
+
+class APIRouter {
+  private router: Router;
+  private auth: AuthMiddleware;
+  private validation: ValidationMiddleware;
+  private regional: RegionalMiddleware;
+  
+  constructor() {
+    this.router = Router();
+    this.auth = new AuthMiddleware();
+    this.validation = new ValidationMiddleware();
+    this.regional = new RegionalMiddleware();
+    
+    this.setupRoutes();
+  }
+  
+  private setupRoutes(): void {
+    // Health check endpoints
+    this.router.get('/health', this.healthCheck);
+    this.router.get('/health/database', this.auth.optional, this.databaseHealth);
+    this.router.get('/health/services', this.auth.required, this.servicesHealth);
+    
+    // Authentication routes
+    this.router.use('/auth', this.setupAuthRoutes());
+    
+    // User management routes
+    this.router.use('/users', 
+      this.auth.required,
+      this.regional.setContext,
+      this.setupUserRoutes()
+    );
+    
+    // Financial services routes
+    this.router.use('/financial',
+      this.auth.required,
+      this.validation.kyc(2), // Require Tier 2 KYC
+      this.regional.complianceCheck,
+      this.setupFinancialRoutes()
+    );
+    
+    // DIVA scoring routes
+    this.router.use('/diva',
+      this.auth.required,
+      this.regional.setContext,
+      this.setupDIVARoutes()
+    );
+    
+    // Chama management routes
+    this.router.use('/chamas',
+      this.auth.required,
+      this.validation.kyc(1), // Require Tier 1 KYC
+      this.setupChamaRoutes()
+    );
+    
+    // Payment processing routes
+    this.router.use('/payments',
+      this.auth.required,
+      this.validation.kyc(2),
+      this.regional.complianceCheck,
+      this.setupPaymentRoutes()
+    );
+    
+    // Webhook endpoints (no auth required)
+    this.router.use('/webhooks', this.setupWebhookRoutes());
+  }
+  
+  private healthCheck = async (req: Request, res: Response) => {
+    const health = {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      region: req.region,
+      version: process.env.APP_VERSION,
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV
+    };
+    
+    res.json(health);
+  };
+}
+
+// middleware/regional.ts - Regional compliance and optimization
+export class RegionalMiddleware {
+  setContext = (req: Request, res: Response, next: NextFunction) => {
+    // Set regional context for database routing and compliance
+    req.dbContext = {
+      region: req.region,
+      timezone: this.getRegionalTimezone(req.region),
+      currency: this.getRegionalCurrency(req.region),
+      locale: this.getRegionalLocale(req.region)
+    };
+    
+    // Set appropriate database connection
+    req.dbConfig = this.getRegionalDBConfig(req.region);
+    
+    next();
+  };
+  
+  complianceCheck = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Check if operation is allowed in user's region
+      const operation = `${req.method}:${req.route.path}`;
+      const allowed = await this.checkRegionalCompliance(
+        req.user.id,
+        req.region,
+        operation
+      );
+      
+      if (!allowed.permitted) {
+        return res.status(403).json({
+          error: 'Operation not permitted in this region',
+          reason: allowed.reason,
+          alternatives: allowed.alternatives
+        });
+      }
+      
+      // Set compliance context
+      req.compliance = allowed.requirements;
+      
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+  
+  private getRegionalTimezone(region: string): string {
+    const timezones = {
+      'SA': 'Africa/Johannesburg',
+      'NG': 'Africa/Lagos',
+      'KE': 'Africa/Nairobi',
+      'GH': 'Africa/Accra'
+    };
+    return timezones[region] || 'UTC';
+  }
+}
+```
+
+## Mobile Infrastructure (React Native)
+
+### React Native Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              REACT NATIVE APPLICATION                   │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │                Navigation Layer                     │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │  Tab    │ │ Stack   │ │ Modal   │ │   Deep      ││ │
+│  │  │Navigator│ │Navigator│ │Navigator│ │  Linking    ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │                Screen Layer                         │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │  Auth   │ │Dashboard│ │  DIVA   │ │    Chama    ││ │
+│  │  │ Screens │ │ Screens │ │ Screens │ │   Screens   ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │Payment  │ │Investment│ │ Profile │ │   Settings  ││ │
+│  │  │ Screens │ │ Screens │ │ Screens │ │   Screens   ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              Component Layer                        │ │
+│  │                                                     │ │
+│  │  ┌─────────────────────────────────────────────────┐│ │
+│  │  │            Shared Components                    ││ │
+│  │  │   Button • Input • Card • Modal • Loading      ││ │
+│  │  └─────────────────────────────────────────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────────────────────────────────────────────┐│ │
+│  │  │           Feature Components                    ││ │
+│  │  │  DIVACard • ChamaCard • TransactionList        ││ │
+│  │  └─────────────────────────────────────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │               State Layer                           │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │ Zustand │ │ React   │ │ Async   │ │   Context   ││ │
+│  │  │ Global  │ │ Query   │ │ Storage │ │   Providers ││ │
+│  │  │  State  │ │ Server  │ │ Local   │ │             ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │               Service Layer                         │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │   API   │ │ Storage │ │  Sync   │ │   Push      ││ │
+│  │  │ Client  │ │ Service │ │ Service │ │Notifications││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │ Crypto  │ │Biometric│ │ Camera  │ │   Device    ││ │
+│  │  │ Service │ │ Service │ │ Service │ │   Info      ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Offline-First Architecture
+
+**Local Data Management**
+```typescript
+// services/OfflineStorageService.ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MMKV } from 'react-native-mmkv';
+
+export class OfflineStorageService {
+  private mmkv: MMKV;
+  private syncQueue: SyncOperation[] = [];
+  
+  constructor() {
+    this.mmkv = new MMKV({
+      id: 'awo-offline-storage',
+      encryptionKey: 'awo-encryption-key' // Use secure key derivation
+    });
+    
+    this.initializeOfflineStructure();
+  }
+  
+  // Store critical data offline with encryption
+  async storeUserData(userId: string, data: UserData): Promise<void> {
+    const encryptedData = await this.encryptSensitiveData(data);
+    
+    // Store in MMKV for performance-critical data
+    this.mmkv.set(`user:${userId}`, JSON.stringify(encryptedData));
+    
+    // Also store in AsyncStorage as backup
+    await AsyncStorage.setItem(
+      `user:${userId}:backup`, 
+      JSON.stringify(encryptedData)
+    );
+  }
+  
+  // Offline transaction queue for poor connectivity
+  async queueTransaction(transaction: OfflineTransaction): Promise<string> {
+    const transactionId = generateTransactionId();
+    const queueItem: SyncOperation = {
+      id: transactionId,
+      type: 'transaction',
+      data: transaction,
+      timestamp: Date.now(),
+      retryCount: 0,
+      priority: transaction.type === 'payment' ? 'high' : 'normal'
+    };
+    
+    this.syncQueue.push(queueItem);
+    
+    // Store queue persistently
+    await this.persistSyncQueue();
+    
+    // Attempt immediate sync if online
+    if (await this.isOnline()) {
+      this.processSyncQueue();
+    }
+    
+    return transactionId;
+  }
+  
+  // Intelligent sync with African network considerations
+  async processSyncQueue(): Promise<void> {
+    if (!await this.isOnline()) return;
+    
+    // Sort by priority and timestamp
+    this.syncQueue.sort((a, b) => {
+      if (a.priority !== b.priority) {
+        return a.priority === 'high' ? -1 : 1;
+      }
+      return a.timestamp - b.timestamp;
+    });
+    
+    const networkQuality = await this.assessNetworkQuality();
+    const batchSize = networkQuality === 'good' ? 10 : 3;
+    
+    const batch = this.syncQueue.splice(0, batchSize);
+    
+    for (const operation of batch) {
+      try {
+        await this.syncOperation(operation);
+      } catch (error) {
+        // Retry logic for African network conditions
+        if (operation.retryCount < 3) {
+          operation.retryCount++;
+          operation.nextRetry = Date.now() + (Math.pow(2, operation.retryCount) * 1000);
+          this.syncQueue.unshift(operation); // Add back to front
+        } else {
+          // Store failed operation for manual review
+          await this.storeFailed(operation, error);
+        }
+      }
+    }
+    
+    await this.persistSyncQueue();
+  }
+  
+  private async assessNetworkQuality(): Promise<'good' | 'poor' | 'offline'> {
+    try {
+      const start = Date.now();
+      const response = await fetch('https://api.awo-platform.com/health', {
+        timeout: 5000
+      });
+      const latency = Date.now() - start;
+      
+      if (!response.ok) return 'poor';
+      if (latency > 2000) return 'poor';
+      return 'good';
+    } catch {
+      return 'offline';
+    }
+  }
+}
+
+// State management with offline support
+// stores/offlineStore.ts
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+interface OfflineState {
+  isOnline: boolean;
+  pendingTransactions: OfflineTransaction[];
+  lastSync: Date | null;
+  syncInProgress: boolean;
+  
+  // Actions
+  setOnlineStatus: (status: boolean) => void;
+  addPendingTransaction: (transaction: OfflineTransaction) => void;
+  removePendingTransaction: (id: string) => void;
+  setSyncStatus: (syncing: boolean) => void;
+  updateLastSync: () => void;
+}
+
+export const useOfflineStore = create<OfflineState>()(
+  persist(
+    (set, get) => ({
+      isOnline: true,
+      pendingTransactions: [],
+      lastSync: null,
+      syncInProgress: false,
+      
+      setOnlineStatus: (status) => {
+        set({ isOnline: status });
+        
+        // Trigger sync when coming back online
+        if (status && get().pendingTransactions.length > 0) {
+          get().setSyncStatus(true);
+          // Trigger sync process
+        }
+      },
+      
+      addPendingTransaction: (transaction) => {
+        set(state => ({
+          pendingTransactions: [...state.pendingTransactions, transaction]
+        }));
+      },
+      
+      removePendingTransaction: (id) => {
+        set(state => ({
+          pendingTransactions: state.pendingTransactions.filter(t => t.id !== id)
+        }));
+      },
+      
+      setSyncStatus: (syncing) => {
+        set({ syncInProgress: syncing });
+      },
+      
+      updateLastSync: () => {
+        set({ lastSync: new Date() });
+      }
+    }),
+    {
+      name: 'awo-offline-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        pendingTransactions: state.pendingTransactions,
+        lastSync: state.lastSync
+      })
+    }
+  )
+);
+```
+
+### Performance Optimization for African Markets
+
+**React Native Performance Configuration**
+```typescript
+// config/performance.ts
+import { InteractionManager, Dimensions } from 'react-native';
+
+export class PerformanceOptimizer {
+  private static instance: PerformanceOptimizer;
+  private deviceSpecs: DeviceSpecs;
+  
+  constructor() {
+    this.deviceSpecs = this.analyzeDevice();
+    this.configureOptimizations();
+  }
+  
+  private analyzeDevice(): DeviceSpecs {
+    const { width, height } = Dimensions.get('window');
+    const screenSize = width * height;
+    
+    // Categorize device for African market
+    let category: 'low' | 'mid' | 'high';
+    if (screenSize < 800 * 600) {
+      category = 'low';  // Entry-level devices
+    } else if (screenSize < 1080 * 1920) {
+      category = 'mid';  // Mid-range devices
+    } else {
+      category = 'high'; // High-end devices
+    }
+    
+    return {
+      category,
+      screenSize,
+      width,
+      height,
+      pixelRatio: Dimensions.get('window').scale
+    };
+  }
+  
+  private configureOptimizations(): void {
+    // Configure based on device capabilities
+    if (this.deviceSpecs.category === 'low') {
+      // Reduce animations and effects for low-end devices
+      this.configureLowEndOptimizations();
+    } else if (this.deviceSpecs.category === 'mid') {
+      this.configureMidRangeOptimizations();
+    } else {
+      this.configureHighEndOptimizations();
+    }
+  }
+  
+  private configureLowEndOptimizations(): void {
+    // Reduce memory usage and CPU intensive operations
+    global.AWO_CONFIG = {
+      ...global.AWO_CONFIG,
+      animations: {
+        enabled: false,
+        duration: 0
+      },
+      images: {
+        quality: 'low',
+        cacheSize: 50, // MB
+        preloadCount: 2
+      },
+      lists: {
+        initialNumToRender: 5,
+        maxToRenderPerBatch: 3,
+        windowSize: 10
+      }
+    };
+  }
+  
+  // Lazy loading with intersection observer
+  async loadComponentWhenVisible<T>(
+    importFn: () => Promise<T>,
+    fallback: T
+  ): Promise<T> {
+    return new Promise((resolve) => {
+      InteractionManager.runAfterInteractions(() => {
+        importFn().then(resolve).catch(() => resolve(fallback));
+      });
+    });
+  }
+  
+  // Image optimization for bandwidth conservation
+  optimizeImageUri(uri: string, dimensions?: { width: number; height: number }): string {
+    if (!dimensions) return uri;
+    
+    const quality = this.deviceSpecs.category === 'low' ? 60 : 80;
+    const scale = this.deviceSpecs.pixelRatio;
+    
+    const width = Math.round(dimensions.width * scale);
+    const height = Math.round(dimensions.height * scale);
+    
+    // Use Cloudflare image optimization if available
+    if (uri.includes('imagedelivery.net')) {
+      return `${uri}/w=${width},h=${height},q=${quality},f=auto`;
+    }
+    
+    return uri;
+  }
+}
+
+// components/OptimizedImage.tsx
+import React, { useState, useCallback } from 'react';
+import { Image, View, ActivityIndicator } from 'react-native';
+import FastImage from 'react-native-fast-image';
+
+interface OptimizedImageProps {
+  source: { uri: string };
+  style?: any;
+  resizeMode?: 'cover' | 'contain' | 'stretch' | 'center';
+}
+
+export const OptimizedImage: React.FC<OptimizedImageProps> = ({
+  source,
+  style,
+  resizeMode = 'cover'
+}) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  
+  const onLoad = useCallback(() => {
+    setLoading(false);
+  }, []);
+  
+  const onError = useCallback(() => {
+    setError(true);
+    setLoading(false);
+  }, []);
+  
+  if (error) {
+    return (
+      <View style={[style, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+        {/* Fallback placeholder */}
+      </View>
+    );
+  }
+  
+  return (
+    <View style={style}>
+      <FastImage
+        source={{
+          uri: PerformanceOptimizer.getInstance().optimizeImageUri(
+            source.uri,
+            style
+          ),
+          priority: FastImage.priority.normal,
+          cache: FastImage.cacheControl.web
+        }}
+        style={style}
+        resizeMode={FastImage.resizeMode[resizeMode]}
+        onLoad={onLoad}
+        onError={onError}
+      />
+      {loading && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: '#f9f9f9'
+        }}>
+          <ActivityIndicator size="small" color="#bc9b25" />
+        </View>
+      )}
+    </View>
+  );
+};
+```
+
+## Containerization and Deployment
+
+### Docker Configuration
+
+**Multi-Stage Backend Dockerfile**
+```dockerfile
+# Dockerfile.backend
+# Stage 1: Build stage
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy source code
+COPY src/ ./src/
+
+# Build TypeScript
+RUN npm run build
+
+# Stage 2: Production stage
+FROM node:18-alpine AS production
+
+# Create app user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S awoapi -u 1001
+
+WORKDIR /app
+
+# Copy package files and install production dependencies
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy built application from builder stage
+COPY --from=builder /app/dist ./dist
+COPY --chown=awoapi:nodejs . .
+
+# Set security configurations
+RUN apk add --no-cache dumb-init && \
+    chmod +x /app/dist/server.js
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node dist/healthcheck.js
+
+# Switch to non-root user
+USER awoapi
+
+# Expose port
+EXPOSE 3000
+
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "dist/server.js"]
+```
+
+**Docker Compose for Development**
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  awo-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: development
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - AWS_REGION=af-south-1
+    volumes:
+      - ./src:/app/src:ro
+      - /app/node_modules
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - awo-network
+    restart: unless-stopped
+    
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - awo-network
+    restart: unless-stopped
+    
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=awo_dev
+      - POSTGRES_USER=awo_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - awo-network
+    restart: unless-stopped
+    
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - awo-backend
+    networks:
+      - awo-network
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  postgres-data:
+
+networks:
+  awo-network:
+    driver: bridge
+```
+
+### Load Balancing and Scaling
+
+**Nginx Configuration for African Markets**
+```nginx
+# nginx/nginx.conf
+upstream awo_backend {
+    least_conn;
+    server awo-backend-1:3000 max_fails=3 fail_timeout=30s;
+    server awo-backend-2:3000 max_fails=3 fail_timeout=30s;
+    server awo-backend-3:3000 max_fails=3 fail_timeout=30s;
+    
+    # Health checks
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name api.awo-platform.com;
+    
+    # Security headers
+    add_header X-Frame-Options DENY;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload";
+    
+    # Rate limiting for African market conditions
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/s;
+    
+    # Gzip compression for bandwidth optimization
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        text/javascript
+        application/json
+        application/javascript
+        application/xml+rss
+        application/atom+xml
+        image/svg+xml;
+    
+    # API routes
+    location /api/ {
+        limit_req zone=api burst=20 nodelay;
+        
+        proxy_pass http://awo_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Timeouts optimized for African networks
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        
+        # Buffering
+        proxy_buffering on;
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+    }
+    
+    # Authentication endpoints with stricter rate limiting
+    location /api/auth/ {
+        limit_req zone=auth burst=10 nodelay;
+        
+        proxy_pass http://awo_backend;
+        # ... same proxy settings as above
+    }
+    
+    # Health check endpoint
+    location /health {
+        proxy_pass http://awo_backend;
+        access_log off;
+    }
+    
+    # Static file caching
+    location ~* \.(jpg|jpeg|png|gif|ico|css|js)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+}
+```
+
+---
+
+*This application infrastructure documentation provides comprehensive guidance for deploying, scaling, and maintaining AWO Platform's Express.js backend and React Native mobile applications optimized for African market conditions.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

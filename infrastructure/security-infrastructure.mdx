@@ -1,35 +1,1495 @@
----
-title: "Security Infrastructure"
-description: "AWO Platform security infrastructure infrastructure documentation"
----
-
 # Security Infrastructure
 
-## Overview
+AWO Platform implements a comprehensive security infrastructure designed for financial services, incorporating zero-trust principles, multi-layered defense, and compliance with African regulatory requirements including POPIA, GDPR, and regional financial regulations.
+
+## Security Architecture Overview
 
 <Info>
-This section covers security infrastructure for the AWO Platform infrastructure.
+AWO's security infrastructure adopts a **defense-in-depth strategy** with multiple security layers, assuming breach scenarios and implementing containment mechanisms specifically designed for African fintech operations and threat landscapes.
 </Info>
 
-## Infrastructure Components
+### Core Security Principles
 
-Infrastructure details will be documented here.
+**1. Zero-Trust Architecture**
+- Never trust, always verify approach to all network traffic
+- Microsegmentation with application-level controls
+- Continuous authentication and authorization validation
+- Assume breach mentality with comprehensive logging and monitoring
 
-## Scaling Strategy
+**2. African Threat Landscape Awareness**
+- Protection against SMS-based fraud and SIM swapping attacks
+- Mobile money fraud prevention and detection
+- Social engineering attack mitigation strategies
+- Protection against infrastructure-level attacks on African connectivity
 
-Scaling approach and implementation will be covered here.
+**3. Financial Services Compliance**
+- Real-time transaction monitoring and anomaly detection
+- Immutable audit trails for all financial operations
+- Automated compliance reporting for multiple jurisdictions
+- Privacy-by-design with data minimization and retention controls
 
-## Performance Optimization
+**4. Incident Response Excellence**
+- 24/7 security operations center (SOC) capabilities
+- Automated threat detection and response playbooks
+- Regional incident response coordination across SADC countries
+- Business continuity planning with African infrastructure considerations
 
-<CardGroup cols={2}>
-  <Card title="Database Optimization" icon="database">
-    PostgreSQL performance tuning
-  </Card>
-  <Card title="API Optimization" icon="zap">
-    Express.js performance optimization
-  </Card>
-</CardGroup>
+## Network Security Architecture
 
-## Monitoring & Alerts
+```
+┌─────────────────────────────────────────────────────────┐
+│               NETWORK SECURITY LAYERS                   │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │                Edge Security                        │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │Cloudflare│ │  DDoS   │ │   WAF   │ │    Bot      ││ │
+│  │  │   CDN    │ │Protect. │ │ Rules   │ │ Management  ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────────────────────────────────────────────┐│ │
+│  │  │          Rate Limiting & Geo-blocking           ││ │
+│  │  │     Threat Intelligence & IP Reputation        ││ │
+│  │  └─────────────────────────────────────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                          │                              │
+│                         │ Clean Traffic                 │
+│                          ▼                              │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              Network Perimeter                      │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │ Network │ │Security │ │   VPN   │ │   Bastion   ││ │
+│  │  │   ACLs  │ │ Groups  │ │ Gateway │ │    Host     ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────────────────────────────────────────────┐│ │
+│  │  │         Network Flow Monitoring                 ││ │
+│  │  │         Intrusion Detection (IDS)              ││ │
+│  │  └─────────────────────────────────────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                          │                              │
+│                         │ Authenticated Traffic         │
+│                          ▼                              │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              Application Security                   │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │   API   │ │  mTLS   │ │Service  │ │    RBAC     ││ │
+│  │  │Gateway  │ │Termination│ │ Mesh   │ │Authorization││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │Request  │ │Response │ │  App    │ │   Business  ││ │
+│  │  │Validate │ │ Filter  │ │Security │ │    Logic    ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                          │                              │
+│                         │ Authorized Requests           │
+│                          ▼                              │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │               Data Security                         │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │Database │ │ Field   │ │  Key    │ │   Backup    ││ │
+│  │  │Encrypt. │ │ Encrypt.│ │ Mgmt.   │ │ Encryption  ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────────────────────────────────────────────┐│ │
+│  │  │          Data Loss Prevention (DLP)             ││ │
+│  │  │         Audit Logging & Monitoring              ││ │
+│  │  └─────────────────────────────────────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
 
-Monitoring setup and alerting will be documented here.
+### Cloudflare Security Configuration
+
+**Edge Security with African Optimization**
+```javascript
+// cloudflare-security-config.js
+const cloudflareSecurityRules = {
+  // DDoS Protection optimized for African traffic patterns
+  ddosProtection: {
+    enabled: true,
+    sensitivity: 'high',
+    adaptiveRateLimit: {
+      // Higher thresholds for legitimate African traffic spikes
+      burstRatio: 5,
+      sustainedThreshold: 1000,
+      regionSpecific: {
+        'Africa': {
+          // Account for slower connections and retry patterns
+          burstRatio: 8,
+          sustainedThreshold: 1500
+        }
+      }
+    }
+  },
+
+  // WAF Rules for Fintech Protection
+  webApplicationFirewall: {
+    rules: [
+      {
+        id: 'awo-financial-endpoints',
+        description: 'Protect financial transaction endpoints',
+        expression: '(http.request.uri.path matches "^/api/(payments|transactions|diva)")',
+        action: 'managed_challenge',
+        rateLimit: {
+          requests: 60,
+          period: 300, // 5 minutes
+          action: 'block'
+        }
+      },
+      {
+        id: 'awo-auth-protection',
+        description: 'Authentication endpoint protection',
+        expression: '(http.request.uri.path matches "^/api/auth/(login|register)")',
+        action: 'js_challenge',
+        rateLimit: {
+          requests: 10,
+          period: 300,
+          action: 'block'
+        }
+      },
+      {
+        id: 'awo-african-allowlist',
+        description: 'Allow legitimate African traffic',
+        expression: '(ip.geoip.continent eq "AF") and (cf.threat_score le 10)',
+        action: 'allow'
+      },
+      {
+        id: 'awo-suspicious-patterns',
+        description: 'Block suspicious financial attack patterns',
+        expression: '(http.request.body contains "admin" and http.request.body contains "password") or (http.request.uri.query contains "union" and http.request.uri.query contains "select")',
+        action: 'block'
+      }
+    ]
+  },
+
+  // Bot Management for African Mobile Patterns
+  botManagement: {
+    enabled: true,
+    fightMode: true,
+    rules: [
+      {
+        name: 'legitimate-mobile-apps',
+        expression: '(http.user_agent matches "AWOApp|Expo") and (cf.bot_management.score ge 80)',
+        action: 'allow'
+      },
+      {
+        name: 'suspicious-automation',
+        expression: '(cf.bot_management.score le 30) and (http.request.uri.path matches "^/api/(payments|auth)")',
+        action: 'managed_challenge'
+      },
+      {
+        name: 'mobile-money-bots',
+        expression: '(http.user_agent contains "curl|wget|python|bot") and (http.request.uri.path contains "payment")',
+        action: 'block'
+      }
+    ]
+  },
+
+  // Geo-blocking with SADC allowlist
+  geoBlocking: {
+    enabled: true,
+    allowedCountries: [
+      'ZA', 'BW', 'LS', 'NA', 'SZ', // Southern Africa
+      'NG', 'GH', 'KE', 'UG', 'TZ', // Expansion markets
+      'US', 'GB', 'DE' // Operations and development
+    ],
+    blockAction: 'managed_challenge', // Challenge instead of hard block
+    exceptions: [
+      {
+        expression: '(http.request.uri.path eq "/health")',
+        action: 'allow' // Allow health checks globally
+      }
+    ]
+  },
+
+  // Cache Purge Security
+  cachePurge: {
+    requireAuthentication: true,
+    allowedIPs: ['1.2.3.4/32'], // CI/CD IPs only
+    rateLimited: true
+  }
+};
+
+// Export configuration
+module.exports = cloudflareSecurityRules;
+```
+
+### Network Segmentation and VPC Security
+
+**AWS VPC Security Configuration**
+```hcl
+# infrastructure/security/vpc-security.tf
+
+# Security Groups for Network Segmentation
+resource "aws_security_group" "web_tier" {
+  name        = "${var.app_name}-web-tier-${var.environment}"
+  description = "Security group for web tier (ALB)"
+  vpc_id      = var.vpc_id
+
+  # HTTPS from anywhere (through Cloudflare)
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS from Cloudflare"
+  }
+
+  # HTTP redirect to HTTPS
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTP redirect to HTTPS"
+  }
+
+  # Health checks from internal monitoring
+  ingress {
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+    description = "Health checks from monitoring"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.common_tags, {
+    Name = "${var.app_name}-web-tier-${var.environment}"
+    Tier = "web"
+  })
+}
+
+resource "aws_security_group" "app_tier" {
+  name        = "${var.app_name}-app-tier-${var.environment}"
+  description = "Security group for application tier"
+  vpc_id      = var.vpc_id
+
+  # HTTP from ALB only
+  ingress {
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.web_tier.id]
+    description     = "HTTP from load balancer"
+  }
+
+  # Health checks from ALB
+  ingress {
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.web_tier.id]
+    description     = "Health checks from ALB"
+  }
+
+  # Inter-service communication
+  ingress {
+    from_port = 3000
+    to_port   = 3999
+    protocol  = "tcp"
+    self      = true
+    description = "Inter-service communication"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.common_tags, {
+    Name = "${var.app_name}-app-tier-${var.environment}"
+    Tier = "application"
+  })
+}
+
+resource "aws_security_group" "data_tier" {
+  name        = "${var.app_name}-data-tier-${var.environment}"
+  description = "Security group for data tier"
+  vpc_id      = var.vpc_id
+
+  # PostgreSQL from app tier only
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app_tier.id]
+    description     = "PostgreSQL from application tier"
+  }
+
+  # Redis from app tier only
+  ingress {
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app_tier.id]
+    description     = "Redis from application tier"
+  }
+
+  # No outbound internet access for data tier
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS for package updates only"
+  }
+
+  tags = merge(var.common_tags, {
+    Name = "${var.app_name}-data-tier-${var.environment}"
+    Tier = "data"
+  })
+}
+
+# Network ACLs for additional layer of security
+resource "aws_network_acl" "private_subnets" {
+  vpc_id     = var.vpc_id
+  subnet_ids = var.private_subnet_ids
+
+  # Allow inbound traffic from VPC
+  ingress {
+    rule_no    = 100
+    protocol   = "-1"
+    action     = "allow"
+    cidr_block = var.vpc_cidr
+  }
+
+  # Allow outbound HTTPS for external APIs
+  egress {
+    rule_no    = 100
+    protocol   = "tcp"
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 443
+    to_port    = 443
+  }
+
+  # Allow outbound HTTP for redirects
+  egress {
+    rule_no    = 110
+    protocol   = "tcp"
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 80
+    to_port    = 80
+  }
+
+  # Allow outbound traffic within VPC
+  egress {
+    rule_no    = 200
+    protocol   = "-1"
+    action     = "allow"
+    cidr_block = var.vpc_cidr
+  }
+
+  tags = merge(var.common_tags, {
+    Name = "${var.app_name}-private-nacl-${var.environment}"
+  })
+}
+
+# VPC Flow Logs for security monitoring
+resource "aws_flow_log" "vpc_flow_logs" {
+  iam_role_arn    = aws_iam_role.flow_log.arn
+  log_destination = aws_cloudwatch_log_group.vpc_flow_logs.arn
+  traffic_type    = "ALL"
+  vpc_id          = var.vpc_id
+
+  tags = merge(var.common_tags, {
+    Name = "${var.app_name}-vpc-flow-logs-${var.environment}"
+  })
+}
+
+resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
+  name              = "/aws/vpc/flowlogs-${var.app_name}-${var.environment}"
+  retention_in_days = var.environment == "production" ? 90 : 30
+
+  tags = var.common_tags
+}
+
+# IAM role for VPC Flow Logs
+resource "aws_iam_role" "flow_log" {
+  name = "${var.app_name}-flow-log-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "vpc-flow-logs.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = var.common_tags
+}
+
+resource "aws_iam_role_policy" "flow_log" {
+  name = "${var.app_name}-flow-log-policy-${var.environment}"
+  role = aws_iam_role.flow_log.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      }
+    ]
+  })
+}
+```
+
+## Identity and Access Management
+
+### AWS IAM Security Framework
+
+**Role-Based Access Control (RBAC)**
+```hcl
+# infrastructure/security/iam.tf
+
+# Application Role for ECS Tasks
+resource "aws_iam_role" "ecs_task_role" {
+  name = "${var.app_name}-ecs-task-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
+      }
+    ]
+  })
+
+  tags = var.common_tags
+}
+
+# Policy for application database access
+resource "aws_iam_policy" "app_database_policy" {
+  name        = "${var.app_name}-database-access-${var.environment}"
+  description = "Policy for application database access"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "rds:DescribeDBInstances",
+          "rds:DescribeDBClusters"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "rds:DatabaseName" = "awo_${var.environment}"
+          }
+        }
+      }
+    ]
+  })
+}
+
+# Policy for secrets access
+resource "aws_iam_policy" "app_secrets_policy" {
+  name        = "${var.app_name}-secrets-access-${var.environment}"
+  description = "Policy for application secrets access"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = [
+          aws_secretsmanager_secret.database_credentials.arn,
+          aws_secretsmanager_secret.api_keys.arn,
+          aws_secretsmanager_secret.encryption_keys.arn
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt"
+        ]
+        Resource = aws_kms_key.app_encryption.arn
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "secretsmanager.${var.aws_region}.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}
+
+# Policy for CloudWatch logging
+resource "aws_iam_policy" "app_logging_policy" {
+  name        = "${var.app_name}-logging-${var.environment}"
+  description = "Policy for application logging"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/ecs/${var.app_name}-*"
+      }
+    ]
+  })
+}
+
+# Attach policies to application role
+resource "aws_iam_role_policy_attachment" "ecs_task_database" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.app_database_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_secrets" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.app_secrets_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_logging" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.app_logging_policy.arn
+}
+
+# Cross-account access for CI/CD
+resource "aws_iam_role" "cicd_deploy_role" {
+  name = "${var.app_name}-cicd-deploy-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${var.cicd_account_id}:root"
+        }
+        Condition = {
+          StringEquals = {
+            "sts:ExternalId" = var.external_id
+          }
+        }
+      }
+    ]
+  })
+
+  tags = var.common_tags
+}
+
+# Policy for CI/CD deployments
+resource "aws_iam_policy" "cicd_deploy_policy" {
+  name        = "${var.app_name}-cicd-deploy-${var.environment}"
+  description = "Policy for CI/CD deployments"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecs:UpdateService",
+          "ecs:DescribeServices",
+          "ecs:DescribeTaskDefinition",
+          "ecs:RegisterTaskDefinition"
+        ]
+        Resource = "*"
+        Condition = {
+          StringLike = {
+            "ecs:cluster" = "arn:aws:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${var.app_name}-*"
+          }
+        }
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "cicd_deploy" {
+  role       = aws_iam_role.cicd_deploy_role.name
+  policy_arn = aws_iam_policy.cicd_deploy_policy.arn
+}
+```
+
+## Encryption and Key Management
+
+### AWS KMS Configuration
+
+**Comprehensive Encryption Strategy**
+```hcl
+# infrastructure/security/encryption.tf
+
+# Primary encryption key for application data
+resource "aws_kms_key" "app_encryption" {
+  description             = "Primary encryption key for ${var.app_name} ${var.environment}"
+  deletion_window_in_days = var.environment == "production" ? 30 : 7
+  enable_key_rotation     = true
+
+  # Multi-region key for SADC compliance
+  multi_region = var.environment == "production"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Enable IAM User Permissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow use of the key for application services"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.ecs_task_role.arn
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow CloudWatch Logs encryption"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${var.aws_region}.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = merge(var.common_tags, {
+    Name = "${var.app_name}-encryption-${var.environment}"
+    Type = "primary"
+  })
+}
+
+resource "aws_kms_alias" "app_encryption" {
+  name          = "alias/${var.app_name}-encryption-${var.environment}"
+  target_key_id = aws_kms_key.app_encryption.key_id
+}
+
+# Separate key for database encryption
+resource "aws_kms_key" "database_encryption" {
+  description             = "Database encryption key for ${var.app_name} ${var.environment}"
+  deletion_window_in_days = var.environment == "production" ? 30 : 7
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Enable IAM User Permissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow RDS to use the key"
+        Effect = "Allow"
+        Principal = {
+          Service = "rds.amazonaws.com"
+        }
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = merge(var.common_tags, {
+    Name = "${var.app_name}-database-encryption-${var.environment}"
+    Type = "database"
+  })
+}
+
+resource "aws_kms_alias" "database_encryption" {
+  name          = "alias/${var.app_name}-database-encryption-${var.environment}"
+  target_key_id = aws_kms_key.database_encryption.key_id
+}
+
+# Secrets Manager for sensitive configuration
+resource "aws_secretsmanager_secret" "database_credentials" {
+  name        = "${var.app_name}/${var.environment}/database"
+  description = "Database credentials for ${var.app_name} ${var.environment}"
+  kms_key_id  = aws_kms_key.app_encryption.arn
+
+  # Automatic rotation every 30 days
+  rotation_rules {
+    automatically_after_days = 30
+  }
+
+  tags = var.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "database_credentials" {
+  secret_id = aws_secretsmanager_secret.database_credentials.id
+  secret_string = jsonencode({
+    username = var.database_username
+    password = var.database_password
+    host     = var.database_host
+    port     = var.database_port
+    dbname   = var.database_name
+  })
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+resource "aws_secretsmanager_secret" "api_keys" {
+  name        = "${var.app_name}/${var.environment}/api-keys"
+  description = "API keys for external services"
+  kms_key_id  = aws_kms_key.app_encryption.arn
+
+  tags = var.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "api_keys" {
+  secret_id = aws_secretsmanager_secret.api_keys.id
+  secret_string = jsonencode({
+    stitch_api_key      = var.stitch_api_key
+    mono_api_key        = var.mono_api_key
+    flutterwave_api_key = var.flutterwave_api_key
+    smile_id_api_key    = var.smile_id_api_key
+    twilio_auth_token   = var.twilio_auth_token
+    sendgrid_api_key    = var.sendgrid_api_key
+  })
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+# Field-level encryption keys for PII
+resource "aws_secretsmanager_secret" "encryption_keys" {
+  name        = "${var.app_name}/${var.environment}/encryption-keys"
+  description = "Field-level encryption keys for PII data"
+  kms_key_id  = aws_kms_key.app_encryption.arn
+
+  tags = merge(var.common_tags, {
+    DataClassification = "restricted"
+  })
+}
+```
+
+### Application-Level Encryption
+
+**Field-Level Encryption Implementation**
+```typescript
+// services/security/EncryptionService.ts
+import { KMS } from 'aws-sdk';
+import * as crypto from 'crypto';
+
+export class EncryptionService {
+  private kms: KMS;
+  private dataKeyCache: Map<string, { key: Buffer; expiresAt: number }>;
+  private readonly DATA_KEY_TTL = 3600000; // 1 hour
+
+  constructor() {
+    this.kms = new KMS({
+      region: process.env.AWS_REGION || 'af-south-1'
+    });
+    this.dataKeyCache = new Map();
+  }
+
+  // Encrypt sensitive PII data
+  async encryptPII(data: string, keyId: string): Promise<string> {
+    try {
+      const dataKey = await this.getDataKey(keyId);
+      
+      const iv = crypto.randomBytes(16);
+      const cipher = crypto.createCipher('aes-256-gcm', dataKey);
+      
+      let encrypted = cipher.update(data, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      
+      const authTag = cipher.getAuthTag();
+      
+      // Combine IV, auth tag, and encrypted data
+      const result = {
+        iv: iv.toString('hex'),
+        authTag: authTag.toString('hex'),
+        encrypted: encrypted
+      };
+      
+      return Buffer.from(JSON.stringify(result)).toString('base64');
+    } catch (error) {
+      console.error('Encryption failed:', error);
+      throw new Error('Failed to encrypt sensitive data');
+    }
+  }
+
+  // Decrypt sensitive PII data
+  async decryptPII(encryptedData: string, keyId: string): Promise<string> {
+    try {
+      const dataKey = await this.getDataKey(keyId);
+      
+      const data = JSON.parse(Buffer.from(encryptedData, 'base64').toString());
+      
+      const decipher = crypto.createDecipher('aes-256-gcm', dataKey);
+      decipher.setAuthTag(Buffer.from(data.authTag, 'hex'));
+      
+      let decrypted = decipher.update(data.encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      
+      return decrypted;
+    } catch (error) {
+      console.error('Decryption failed:', error);
+      throw new Error('Failed to decrypt sensitive data');
+    }
+  }
+
+  // Get or generate data encryption key
+  private async getDataKey(keyId: string): Promise<Buffer> {
+    const cached = this.dataKeyCache.get(keyId);
+    
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.key;
+    }
+
+    try {
+      const response = await this.kms.generateDataKey({
+        KeyId: keyId,
+        KeySpec: 'AES_256'
+      }).promise();
+
+      if (!response.Plaintext) {
+        throw new Error('Failed to generate data key');
+      }
+
+      const dataKey = Buffer.from(response.Plaintext as Uint8Array);
+      
+      // Cache the data key
+      this.dataKeyCache.set(keyId, {
+        key: dataKey,
+        expiresAt: Date.now() + this.DATA_KEY_TTL
+      });
+
+      return dataKey;
+    } catch (error) {
+      console.error('Failed to generate data key:', error);
+      throw new Error('Encryption service unavailable');
+    }
+  }
+
+  // Encrypt financial transaction data
+  async encryptFinancialData(transaction: any): Promise<any> {
+    const encryptedTransaction = { ...transaction };
+
+    // Encrypt sensitive financial fields
+    if (transaction.accountNumber) {
+      encryptedTransaction.accountNumber = await this.encryptPII(
+        transaction.accountNumber,
+        process.env.FINANCIAL_ENCRYPTION_KEY_ID!
+      );
+    }
+
+    if (transaction.cardNumber) {
+      encryptedTransaction.cardNumber = await this.encryptPII(
+        transaction.cardNumber,
+        process.env.FINANCIAL_ENCRYPTION_KEY_ID!
+      );
+    }
+
+    if (transaction.phoneNumber) {
+      encryptedTransaction.phoneNumber = await this.encryptPII(
+        transaction.phoneNumber,
+        process.env.PII_ENCRYPTION_KEY_ID!
+      );
+    }
+
+    return encryptedTransaction;
+  }
+
+  // Rotate encryption keys
+  async rotateDataKeys(): Promise<void> {
+    console.log('Starting data key rotation...');
+    
+    try {
+      // Clear cache to force new key generation
+      this.dataKeyCache.clear();
+      
+      // Pre-generate new keys for critical operations
+      await this.getDataKey(process.env.PII_ENCRYPTION_KEY_ID!);
+      await this.getDataKey(process.env.FINANCIAL_ENCRYPTION_KEY_ID!);
+      
+      console.log('Data key rotation completed successfully');
+    } catch (error) {
+      console.error('Data key rotation failed:', error);
+      throw error;
+    }
+  }
+}
+
+// Singleton instance
+export const encryptionService = new EncryptionService();
+
+// Middleware for automatic PII encryption
+export const encryptionMiddleware = (req: any, res: any, next: any) => {
+  // Store original json method
+  const originalJson = res.json;
+  
+  // Override json method to encrypt sensitive data
+  res.json = async function(data: any) {
+    try {
+      if (data && typeof data === 'object') {
+        // Encrypt sensitive fields in response
+        const encryptedData = await encryptResponseData(data);
+        return originalJson.call(this, encryptedData);
+      }
+      return originalJson.call(this, data);
+    } catch (error) {
+      console.error('Response encryption failed:', error);
+      return originalJson.call(this, { error: 'Internal server error' });
+    }
+  };
+  
+  next();
+};
+
+// Helper function to encrypt response data
+async function encryptResponseData(data: any): Promise<any> {
+  if (Array.isArray(data)) {
+    return Promise.all(data.map(encryptResponseData));
+  }
+  
+  if (data && typeof data === 'object') {
+    const encrypted = { ...data };
+    
+    // List of fields that should be encrypted in responses
+    const sensitiveFields = ['phoneNumber', 'email', 'accountNumber', 'idNumber'];
+    
+    for (const field of sensitiveFields) {
+      if (encrypted[field]) {
+        encrypted[field] = await encryptionService.encryptPII(
+          encrypted[field],
+          process.env.PII_ENCRYPTION_KEY_ID!
+        );
+      }
+    }
+    
+    return encrypted;
+  }
+  
+  return data;
+}
+```
+
+## Security Monitoring and Incident Response
+
+### Security Operations Center (SOC) Setup
+
+**AWS Security Hub and GuardDuty Configuration**
+```hcl
+# infrastructure/security/monitoring.tf
+
+# Enable AWS Security Hub
+resource "aws_securityhub_account" "main" {
+  enable_default_standards = true
+}
+
+# Enable GuardDuty for threat detection
+resource "aws_guardduty_detector" "main" {
+  enable = true
+  
+  # Enhanced threat detection for African markets
+  datasources {
+    s3_logs {
+      enable = true
+    }
+    kubernetes {
+      audit_logs {
+        enable = true
+      }
+    }
+    malware_protection {
+      scan_ec2_instance_with_findings {
+        ebs_volumes {
+          enable = true
+        }
+      }
+    }
+  }
+
+  tags = merge(var.common_tags, {
+    Name = "${var.app_name}-guardduty-${var.environment}"
+  })
+}
+
+# CloudTrail for audit logging
+resource "aws_cloudtrail" "main" {
+  name           = "${var.app_name}-audit-trail-${var.environment}"
+  s3_bucket_name = aws_s3_bucket.audit_logs.bucket
+
+  # Log all management and data events
+  event_selector {
+    read_write_type                 = "All"
+    include_management_events       = true
+    exclude_management_event_sources = []
+
+    data_resource {
+      type   = "AWS::S3::Object"
+      values = ["arn:aws:s3:::${aws_s3_bucket.audit_logs.bucket}/*"]
+    }
+  }
+
+  # Enable insights for anomaly detection
+  insight_selector {
+    insight_type = "ApiCallRateInsight"
+  }
+
+  tags = var.common_tags
+}
+
+# S3 bucket for audit logs
+resource "aws_s3_bucket" "audit_logs" {
+  bucket        = "${var.app_name}-audit-logs-${var.environment}-${random_string.bucket_suffix.result}"
+  force_destroy = var.environment != "production"
+
+  tags = merge(var.common_tags, {
+    Purpose = "audit-logs"
+  })
+}
+
+resource "aws_s3_bucket_versioning" "audit_logs" {
+  bucket = aws_s3_bucket.audit_logs.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_encryption" "audit_logs" {
+  bucket = aws_s3_bucket.audit_logs.id
+
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        kms_master_key_id = aws_kms_key.app_encryption.arn
+        sse_algorithm     = "aws:kms"
+      }
+    }
+  }
+}
+
+# CloudWatch alarms for security events
+resource "aws_cloudwatch_metric_alarm" "suspicious_api_calls" {
+  alarm_name          = "${var.app_name}-suspicious-api-calls-${var.environment}"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "ErrorCount"
+  namespace           = "AWS/ApiGateway"
+  period              = "300"
+  statistic           = "Sum"
+  threshold           = "100"
+  alarm_description   = "This metric monitors suspicious API activity"
+
+  dimensions = {
+    ApiName = var.app_name
+  }
+
+  alarm_actions = [aws_sns_topic.security_alerts.arn]
+
+  tags = var.common_tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "failed_logins" {
+  alarm_name          = "${var.app_name}-failed-logins-${var.environment}"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "1"
+  metric_name         = "failed_login_count"
+  namespace           = "AWO/Security"
+  period              = "300"
+  statistic           = "Sum"
+  threshold           = "20"
+  alarm_description   = "This metric monitors failed login attempts"
+
+  alarm_actions = [aws_sns_topic.security_alerts.arn]
+
+  tags = var.common_tags
+}
+
+# SNS topic for security alerts
+resource "aws_sns_topic" "security_alerts" {
+  name = "${var.app_name}-security-alerts-${var.environment}"
+
+  tags = var.common_tags
+}
+
+# Lambda function for incident response automation
+resource "aws_lambda_function" "incident_response" {
+  filename         = "incident_response.zip"
+  function_name    = "${var.app_name}-incident-response-${var.environment}"
+  role            = aws_iam_role.incident_response_lambda.arn
+  handler         = "index.handler"
+  runtime         = "python3.9"
+  timeout         = 300
+
+  environment {
+    variables = {
+      SLACK_WEBHOOK_URL = var.slack_webhook_url
+      ENVIRONMENT       = var.environment
+      APP_NAME         = var.app_name
+    }
+  }
+
+  tags = var.common_tags
+}
+
+# Subscribe Lambda to SNS for automated incident response
+resource "aws_sns_topic_subscription" "incident_response" {
+  topic_arn = aws_sns_topic.security_alerts.arn
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.incident_response.arn
+}
+
+resource "aws_lambda_permission" "allow_sns" {
+  statement_id  = "AllowExecutionFromSNS"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.incident_response.function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.security_alerts.arn
+}
+```
+
+**Incident Response Automation**
+```python
+# incident_response.py
+import json
+import boto3
+import requests
+import os
+from datetime import datetime
+
+def handler(event, context):
+    """
+    Automated incident response for AWO Platform security events
+    """
+    
+    # Parse SNS message
+    message = json.loads(event['Records'][0]['Sns']['Message'])
+    alarm_name = message.get('AlarmName', 'Unknown Alarm')
+    region = message.get('Region', 'unknown')
+    
+    # Determine incident severity
+    severity = determine_severity(alarm_name, message)
+    
+    # Create incident response
+    incident_id = create_incident(alarm_name, message, severity)
+    
+    # Execute automated response based on severity
+    if severity == 'critical':
+        execute_critical_response(incident_id, message)
+    elif severity == 'high':
+        execute_high_response(incident_id, message)
+    else:
+        execute_standard_response(incident_id, message)
+    
+    # Send notifications
+    send_notifications(incident_id, alarm_name, severity, message)
+    
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'incident_id': incident_id,
+            'severity': severity,
+            'status': 'response_initiated'
+        })
+    }
+
+def determine_severity(alarm_name, message):
+    """Determine incident severity based on alarm type"""
+    critical_patterns = [
+        'suspicious-api-calls',
+        'failed-logins',
+        'data-breach',
+        'unauthorized-access'
+    ]
+    
+    high_patterns = [
+        'unusual-activity',
+        'security-group-change',
+        'iam-policy-change'
+    ]
+    
+    for pattern in critical_patterns:
+        if pattern in alarm_name.lower():
+            return 'critical'
+    
+    for pattern in high_patterns:
+        if pattern in alarm_name.lower():
+            return 'high'
+    
+    return 'medium'
+
+def create_incident(alarm_name, message, severity):
+    """Create incident record in DynamoDB"""
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table(f"awo-incidents-{os.environ['ENVIRONMENT']}")
+    
+    incident_id = f"INC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    
+    table.put_item(
+        Item={
+            'incident_id': incident_id,
+            'alarm_name': alarm_name,
+            'severity': severity,
+            'created_at': datetime.now().isoformat(),
+            'status': 'investigating',
+            'region': message.get('Region', 'unknown'),
+            'raw_message': json.dumps(message)
+        }
+    )
+    
+    return incident_id
+
+def execute_critical_response(incident_id, message):
+    """Execute critical incident response procedures"""
+    
+    # 1. Immediately block suspicious IPs
+    block_suspicious_ips(message)
+    
+    # 2. Enable enhanced monitoring
+    enable_enhanced_monitoring()
+    
+    # 3. Trigger security team alerting
+    trigger_security_team_alert(incident_id, 'critical')
+    
+    # 4. Initiate threat hunting
+    initiate_threat_hunting(incident_id)
+
+def execute_high_response(incident_id, message):
+    """Execute high-priority incident response"""
+    
+    # 1. Increase logging verbosity
+    increase_logging_verbosity()
+    
+    # 2. Notify security team
+    trigger_security_team_alert(incident_id, 'high')
+    
+    # 3. Begin investigation
+    begin_automated_investigation(incident_id, message)
+
+def execute_standard_response(incident_id, message):
+    """Execute standard incident response"""
+    
+    # 1. Log incident
+    log_incident(incident_id, message)
+    
+    # 2. Queue for manual review
+    queue_for_manual_review(incident_id)
+
+def block_suspicious_ips(message):
+    """Block suspicious IP addresses at WAF level"""
+    try:
+        # Extract IP addresses from CloudWatch logs
+        logs_client = boto3.client('logs')
+        
+        # Query for suspicious IP patterns
+        query = """
+        fields @timestamp, sourceIPAddress, userAgent
+        | filter @message like /failed.*login/
+        | stats count() by sourceIPAddress
+        | sort count desc
+        | limit 10
+        """
+        
+        response = logs_client.start_query(
+            logGroupName=f'/aws/apigateway/{os.environ["APP_NAME"]}',
+            startTime=int((datetime.now().timestamp() - 3600) * 1000),  # Last hour
+            endTime=int(datetime.now().timestamp() * 1000),
+            queryString=query
+        )
+        
+        # Update WAF IP set with suspicious IPs
+        # Implementation depends on your WAF setup
+        
+    except Exception as e:
+        print(f"Failed to block suspicious IPs: {e}")
+
+def send_notifications(incident_id, alarm_name, severity, message):
+    """Send notifications to relevant channels"""
+    
+    # Slack notification
+    slack_webhook = os.environ.get('SLACK_WEBHOOK_URL')
+    if slack_webhook:
+        send_slack_notification(slack_webhook, incident_id, alarm_name, severity)
+    
+    # SMS for critical incidents
+    if severity == 'critical':
+        send_sms_notification(incident_id, alarm_name)
+    
+    # Email notification
+    send_email_notification(incident_id, alarm_name, severity, message)
+
+def send_slack_notification(webhook_url, incident_id, alarm_name, severity):
+    """Send Slack notification"""
+    color_map = {
+        'critical': '#FF0000',
+        'high': '#FF8C00',
+        'medium': '#FFD700'
+    }
+    
+    payload = {
+        'attachments': [{
+            'color': color_map.get(severity, '#808080'),
+            'title': f'🚨 Security Incident: {incident_id}',
+            'fields': [
+                {
+                    'title': 'Alarm',
+                    'value': alarm_name,
+                    'short': True
+                },
+                {
+                    'title': 'Severity',
+                    'value': severity.upper(),
+                    'short': True
+                },
+                {
+                    'title': 'Environment',
+                    'value': os.environ['ENVIRONMENT'],
+                    'short': True
+                }
+            ],
+            'footer': 'AWO Security',
+            'ts': int(datetime.now().timestamp())
+        }]
+    }
+    
+    try:
+        response = requests.post(webhook_url, json=payload)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"Failed to send Slack notification: {e}")
+
+def send_sms_notification(incident_id, alarm_name):
+    """Send SMS for critical incidents"""
+    sns = boto3.client('sns')
+    
+    message = f"CRITICAL: AWO Security Incident {incident_id}\nAlarm: {alarm_name}\nImmediate attention required."
+    
+    # Send to security team phone numbers
+    security_phones = os.environ.get('SECURITY_PHONE_NUMBERS', '').split(',')
+    
+    for phone in security_phones:
+        if phone.strip():
+            try:
+                sns.publish(
+                    PhoneNumber=phone.strip(),
+                    Message=message
+                )
+            except Exception as e:
+                print(f"Failed to send SMS to {phone}: {e}")
+
+def send_email_notification(incident_id, alarm_name, severity, message):
+    """Send email notification"""
+    ses = boto3.client('ses')
+    
+    subject = f"AWO Security Alert: {severity.upper()} - {alarm_name}"
+    
+    body = f"""
+    Security Incident: {incident_id}
+    
+    Alarm: {alarm_name}
+    Severity: {severity.upper()}
+    Environment: {os.environ['ENVIRONMENT']}
+    Time: {datetime.now().isoformat()}
+    
+    Raw Message:
+    {json.dumps(message, indent=2)}
+    
+    Automated response has been initiated.
+    Please review the incident in the AWO Security Dashboard.
+    """
+    
+    try:
+        ses.send_email(
+            Source='security@awo-platform.com',
+            Destination={
+                'ToAddresses': ['security-team@awo-platform.com']
+            },
+            Message={
+                'Subject': {'Data': subject},
+                'Body': {'Text': {'Data': body}}
+            }
+        )
+    except Exception as e:
+        print(f"Failed to send email notification: {e}")
+```
+
+---
+
+*This security infrastructure documentation provides comprehensive guidance for implementing enterprise-grade security controls for AWO Platform, specifically designed for African fintech operations with multi-layered defense, compliance automation, and incident response capabilities.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

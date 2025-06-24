@@ -1,43 +1,1299 @@
----
-title: "Database Deployment"
-description: "AWO Platform database deployment deployment guide"
----
-
-# Database Deployment
+# Database Deployment - Deployment
 
 ## Overview
 
+AWO Platform's database deployment strategy leverages Neon PostgreSQL's serverless architecture to provide scalable, reliable, and cost-effective data storage across the SADC region. This guide covers comprehensive database setup, migration strategies, and production optimization for financial services.
+
 <Info>
-This guide covers database deployment for the AWO Platform.
+Neon PostgreSQL provides serverless scaling, instant database branching, and global edge locations optimized for African markets, ensuring reliable financial data management with enterprise-grade security.
 </Info>
 
-## Deployment Steps
+## Neon PostgreSQL Architecture
 
-<Steps>
-  <Step title="Environment Preparation">
-    Prepare deployment environment
-  </Step>
-  <Step title="Configuration">
-    Configure deployment settings
-  </Step>
-  <Step title="Deployment">
-    Execute deployment process
-  </Step>
-  <Step title="Verification">
-    Verify successful deployment
-  </Step>
-</Steps>
+### Why Neon for AWO Platform
 
-## Configuration
+**Serverless Benefits for African Fintech**:
+<CardGroup cols={2}>
+  <Card title="Cost Efficiency" icon="dollar-sign">
+    **Pay-per-use**: Only pay for actual database usage  
+    **Auto-scaling**: Resources scale with user activity  
+    **Zero idle costs**: Database scales to zero during inactivity  
+    **Predictable pricing**: No surprise bills for African startups
+  </Card>
+  <Card title="Developer Experience" icon="code">
+    **Instant Branching**: Database branches like Git  
+    **Point-in-time Recovery**: 30-day recovery window  
+    **Global Edge**: Better performance for SADC users  
+    **No Maintenance**: Automatic updates and maintenance
+  </Card>
+</CardGroup>
 
-Deployment configuration will be documented here.
+**Technical Advantages**:
+- **Separation of Storage and Compute**: Independent scaling
+- **Read Replicas**: Instant creation for performance optimization
+- **Connection Pooling**: Built-in connection management
+- **Full PostgreSQL Compatibility**: Standard SQL with extensions
 
-## Monitoring
+### Neon Architecture Components
 
-Post-deployment monitoring setup will be covered here.
+**Core Components**:
+<CardGroup cols={3}>
+  <Card title="Compute Nodes" icon="cpu">
+    **Function**: Process SQL queries and transactions  
+    **Scaling**: Automatic scaling based on load  
+    **Location**: Regional compute for reduced latency
+  </Card>
+  <Card title="Pageserver" icon="server">
+    **Function**: Distributed storage backend  
+    **Features**: Automatic backup and replication  
+    **Performance**: SSD-based with caching
+  </Card>
+  <Card title="Safekeepers" icon="shield">
+    **Function**: Write-ahead log (WAL) processing  
+    **Redundancy**: Multiple safekeepers for durability  
+    **Recovery**: Enables point-in-time recovery
+  </Card>
+</CardGroup>
 
-## Rollback Procedures
+## Database Project Setup
 
-<Accordion title="Emergency Rollback">
-Rollback procedures will be documented here.
-</Accordion>
+### Environment-Specific Projects
+
+**Project Structure Strategy**:
+```
+AWO Platform Database Architecture:
+├── awo-platform-development/
+│   ├── main branch (seeded data)
+│   ├── feature branches (per developer)
+│   └── test branches (automated testing)
+├── awo-platform-staging/
+│   ├── main branch (production-like data)
+│   └── preview branches (feature testing)
+└── awo-platform-production/
+    ├── main branch (live data)
+    ├── read replicas (performance)
+    └── backup branches (disaster recovery)
+```
+
+### Development Environment Setup
+
+**Create Development Project**:
+```bash
+# Install Neon CLI
+npm install -g neonctl
+
+# Login to Neon
+neonctl auth
+
+# Create development project
+neonctl projects create \
+  --name "AWO Platform Development" \
+  --region "aws-us-east-2"
+
+# Get project ID and set as default
+export NEON_PROJECT_ID="your-dev-project-id"
+neonctl set-context --project-id $NEON_PROJECT_ID
+
+# Create database
+neonctl databases create --name awo_development
+
+# Get connection string
+neonctl connection-string main
+```
+
+**Developer Branch Strategy**:
+```bash
+# Create personal development branch
+neonctl branches create \
+  --name "dev/john-doe" \
+  --parent main
+
+# Get branch connection string
+neonctl connection-string dev/john-doe
+
+# Example connection string
+postgresql://user:pass@ep-dev-john.us-east-2.aws.neon.tech/awo_development?sslmode=require
+```
+
+### Staging Environment Setup
+
+**Staging Project Configuration**:
+```bash
+# Create staging project
+neonctl projects create \
+  --name "AWO Platform Staging" \
+  --region "aws-us-east-2"
+
+# Configure staging database
+neonctl databases create --name awo_staging
+
+# Create preview branch for feature testing
+neonctl branches create \
+  --name "preview" \
+  --parent main
+
+# Set up read replica for performance testing
+neonctl branches create \
+  --name "staging-read-replica" \
+  --parent main \
+  --type read_only
+```
+
+### Production Environment Setup
+
+**Production Project Configuration**:
+```bash
+# Create production project with enhanced configuration
+neonctl projects create \
+  --name "AWO Platform Production" \
+  --region "aws-us-east-2" \
+  --compute-units 4 \
+  --storage-size 100GB
+
+# Create production database
+neonctl databases create --name awo_production
+
+# Set up read replicas for different regions
+neonctl branches create \
+  --name "prod-read-replica-cape-town" \
+  --parent main \
+  --type read_only \
+  --region "aws-af-south-1"
+
+neonctl branches create \
+  --name "prod-read-replica-eu-west" \
+  --parent main \
+  --type read_only \
+  --region "aws-eu-west-1"
+
+# Configure automated backups
+neonctl projects update \
+  --backup-retention-period 30 \
+  --point-in-time-recovery-retention 30
+```
+
+## Database Schema Management
+
+### Schema Structure
+
+**Core Database Schema**:
+```sql
+-- migrations/001_initial_schema.sql
+BEGIN;
+
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+
+-- Users and Authentication
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    phone_number VARCHAR(20) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    kyc_level INTEGER DEFAULT 1 CHECK (kyc_level IN (1, 2, 3)),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_login_at TIMESTAMP WITH TIME ZONE,
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+-- User Profiles
+CREATE TABLE user_profiles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    date_of_birth DATE,
+    country_code VARCHAR(3) NOT NULL,
+    city VARCHAR(100),
+    occupation VARCHAR(100),
+    monthly_income DECIMAL(15,2),
+    profile_image_url VARCHAR(500),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- DIVA Scores
+CREATE TABLE diva_scores (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    overall_score INTEGER NOT NULL CHECK (overall_score >= 0 AND overall_score <= 1000),
+    discipline_score INTEGER NOT NULL CHECK (discipline_score >= 0 AND discipline_score <= 250),
+    income_score INTEGER NOT NULL CHECK (income_score >= 0 AND income_score <= 250),
+    velocity_score INTEGER NOT NULL CHECK (velocity_score >= 0 AND velocity_score <= 250),
+    assets_score INTEGER NOT NULL CHECK (assets_score >= 0 AND assets_score <= 250),
+    portfolio_tier VARCHAR(20) NOT NULL CHECK (portfolio_tier IN ('bronze', 'silver', 'gold', 'platinum')),
+    calculated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    next_update_due TIMESTAMP WITH TIME ZONE NOT NULL,
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+-- Chamas (Savings Groups)
+CREATE TABLE chamas (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
+    creator_id UUID NOT NULL REFERENCES users(id),
+    contribution_amount DECIMAL(15,2) NOT NULL,
+    contribution_frequency VARCHAR(20) NOT NULL CHECK (contribution_frequency IN ('weekly', 'monthly')),
+    max_members INTEGER DEFAULT 20,
+    current_members INTEGER DEFAULT 1,
+    is_active BOOLEAN DEFAULT true,
+    governance_rules JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Chama Memberships
+CREATE TABLE chama_memberships (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    chama_id UUID NOT NULL REFERENCES chamas(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role VARCHAR(20) DEFAULT 'member' CHECK (role IN ('member', 'treasurer', 'admin')),
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    is_active BOOLEAN DEFAULT true,
+    total_contributed DECIMAL(15,2) DEFAULT 0,
+    UNIQUE(chama_id, user_id)
+);
+
+-- Transactions
+CREATE TABLE transactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    transaction_type VARCHAR(50) NOT NULL,
+    amount DECIMAL(15,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'ZAR',
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'cancelled')),
+    description TEXT,
+    external_transaction_id VARCHAR(255),
+    payment_method VARCHAR(50),
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Investments
+CREATE TABLE investments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    investment_type VARCHAR(50) NOT NULL,
+    amount DECIMAL(15,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'ZAR',
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'redeemed', 'cancelled')),
+    investment_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    maturity_date TIMESTAMP WITH TIME ZONE,
+    current_value DECIMAL(15,2),
+    returns DECIMAL(15,2) DEFAULT 0,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Audit Log
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id),
+    action VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id UUID,
+    old_values JSONB,
+    new_values JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_phone ON users(phone_number);
+CREATE INDEX idx_users_kyc_level ON users(kyc_level);
+CREATE INDEX idx_diva_scores_user_id ON diva_scores(user_id);
+CREATE INDEX idx_diva_scores_calculated_at ON diva_scores(calculated_at DESC);
+CREATE INDEX idx_chama_memberships_user_id ON chama_memberships(user_id);
+CREATE INDEX idx_chama_memberships_chama_id ON chama_memberships(chama_id);
+CREATE INDEX idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX idx_transactions_created_at ON transactions(created_at DESC);
+CREATE INDEX idx_investments_user_id ON investments(user_id);
+CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at DESC);
+
+-- Full-text search indexes
+CREATE INDEX idx_users_search ON users USING gin(to_tsvector('english', email || ' ' || phone_number));
+CREATE INDEX idx_chamas_search ON chamas USING gin(to_tsvector('english', name || ' ' || coalesce(description, '')));
+
+COMMIT;
+```
+
+### Migration Management
+
+**Migration Strategy**:
+```javascript
+// migrations/migrate.js
+const { Pool } = require('pg');
+const fs = require('fs').promises;
+const path = require('path');
+
+class MigrationManager {
+  constructor(connectionString) {
+    this.pool = new Pool({
+      connectionString,
+      ssl: { rejectUnauthorized: false }
+    });
+  }
+
+  async init() {
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        version VARCHAR(255) PRIMARY KEY,
+        executed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        checksum VARCHAR(64) NOT NULL
+      )
+    `);
+  }
+
+  async getExecutedMigrations() {
+    const result = await this.pool.query(
+      'SELECT version FROM schema_migrations ORDER BY version'
+    );
+    return result.rows.map(row => row.version);
+  }
+
+  async executeMigration(filename, content) {
+    const version = filename.replace('.sql', '');
+    const checksum = require('crypto').createHash('sha256').update(content).digest('hex');
+    
+    console.log(`Executing migration: ${version}`);
+    
+    await this.pool.query('BEGIN');
+    
+    try {
+      // Execute migration
+      await this.pool.query(content);
+      
+      // Record migration
+      await this.pool.query(
+        'INSERT INTO schema_migrations (version, checksum) VALUES ($1, $2)',
+        [version, checksum]
+      );
+      
+      await this.pool.query('COMMIT');
+      console.log(`✅ Migration ${version} completed successfully`);
+    } catch (error) {
+      await this.pool.query('ROLLBACK');
+      throw new Error(`Migration ${version} failed: ${error.message}`);
+    }
+  }
+
+  async runMigrations() {
+    const migrationsDir = path.join(__dirname, '../migrations');
+    const migrationFiles = (await fs.readdir(migrationsDir))
+      .filter(file => file.endsWith('.sql'))
+      .sort();
+
+    const executedMigrations = await this.getExecutedMigrations();
+
+    for (const file of migrationFiles) {
+      const version = file.replace('.sql', '');
+      
+      if (!executedMigrations.includes(version)) {
+        const content = await fs.readFile(path.join(migrationsDir, file), 'utf8');
+        await this.executeMigration(file, content);
+      } else {
+        console.log(`⏭️  Skipping already executed migration: ${version}`);
+      }
+    }
+  }
+
+  async close() {
+    await this.pool.end();
+  }
+}
+
+// Usage
+async function runMigrations() {
+  const manager = new MigrationManager(process.env.DATABASE_URL);
+  
+  try {
+    await manager.init();
+    await manager.runMigrations();
+    console.log('🎉 All migrations completed successfully');
+  } catch (error) {
+    console.error('❌ Migration failed:', error);
+    process.exit(1);
+  } finally {
+    await manager.close();
+  }
+}
+
+if (require.main === module) {
+  runMigrations();
+}
+
+module.exports = { MigrationManager };
+```
+
+## Data Seeding and Initialization
+
+### Development Data Seeding
+
+**Seed Script for Development**:
+```javascript
+// scripts/seed-development.js
+const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+async function seedDevelopmentData() {
+  console.log('🌱 Seeding development data...');
+
+  try {
+    await pool.query('BEGIN');
+
+    // Create test users
+    const users = [
+      {
+        email: 'admin@awo-platform.com',
+        phone: '+27123456789',
+        password: 'DevPassword123!',
+        kyc_level: 3
+      },
+      {
+        email: 'user1@example.com',
+        phone: '+27123456790',
+        password: 'UserPassword123!',
+        kyc_level: 2
+      },
+      {
+        email: 'user2@example.com',
+        phone: '+27123456791',
+        password: 'UserPassword123!',
+        kyc_level: 1
+      }
+    ];
+
+    const userIds = [];
+    for (const user of users) {
+      const hashedPassword = await bcrypt.hash(user.password, 12);
+      
+      const result = await pool.query(`
+        INSERT INTO users (email, phone_number, password_hash, kyc_level)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id
+      `, [user.email, user.phone, hashedPassword, user.kyc_level]);
+      
+      userIds.push(result.rows[0].id);
+      
+      // Create user profile
+      await pool.query(`
+        INSERT INTO user_profiles (user_id, first_name, last_name, country_code, city, occupation, monthly_income)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [
+        result.rows[0].id,
+        user.email.split('@')[0],
+        'TestUser',
+        'ZAF',
+        'Cape Town',
+        'Software Developer',
+        50000
+      ]);
+    }
+
+    // Create sample DIVA scores
+    for (const userId of userIds) {
+      await pool.query(`
+        INSERT INTO diva_scores (
+          user_id, overall_score, discipline_score, income_score, 
+          velocity_score, assets_score, portfolio_tier, next_update_due
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `, [
+        userId,
+        Math.floor(Math.random() * 800) + 200, // 200-1000
+        Math.floor(Math.random() * 200) + 50,  // 50-250
+        Math.floor(Math.random() * 200) + 50,  // 50-250
+        Math.floor(Math.random() * 200) + 50,  // 50-250
+        Math.floor(Math.random() * 200) + 50,  // 50-250
+        ['bronze', 'silver', 'gold', 'platinum'][Math.floor(Math.random() * 4)],
+        new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days from now
+      ]);
+    }
+
+    // Create sample Chama
+    const chamaResult = await pool.query(`
+      INSERT INTO chamas (name, description, creator_id, contribution_amount, contribution_frequency)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id
+    `, [
+      'Cape Town Women Investors',
+      'A group of women focused on building wealth through collective savings and investments',
+      userIds[0],
+      1000,
+      'monthly'
+    ]);
+
+    // Add members to Chama
+    for (let i = 0; i < userIds.length; i++) {
+      await pool.query(`
+        INSERT INTO chama_memberships (chama_id, user_id, role, total_contributed)
+        VALUES ($1, $2, $3, $4)
+      `, [
+        chamaResult.rows[0].id,
+        userIds[i],
+        i === 0 ? 'admin' : 'member',
+        Math.floor(Math.random() * 5000) + 1000
+      ]);
+    }
+
+    // Create sample transactions
+    for (const userId of userIds) {
+      const transactionTypes = ['deposit', 'withdrawal', 'transfer', 'chama_contribution'];
+      
+      for (let i = 0; i < 10; i++) {
+        await pool.query(`
+          INSERT INTO transactions (
+            user_id, transaction_type, amount, status, description, payment_method
+          )
+          VALUES ($1, $2, $3, $4, $5, $6)
+        `, [
+          userId,
+          transactionTypes[Math.floor(Math.random() * transactionTypes.length)],
+          Math.floor(Math.random() * 5000) + 100,
+          Math.random() > 0.1 ? 'completed' : 'pending',
+          'Sample transaction for development',
+          Math.random() > 0.5 ? 'mobile_money' : 'bank_transfer'
+        ]);
+      }
+    }
+
+    await pool.query('COMMIT');
+    console.log('✅ Development data seeded successfully');
+  } catch (error) {
+    await pool.query('ROLLBACK');
+    console.error('❌ Seeding failed:', error);
+    throw error;
+  } finally {
+    await pool.end();
+  }
+}
+
+if (require.main === module) {
+  seedDevelopmentData();
+}
+
+module.exports = { seedDevelopmentData };
+```
+
+### Production Data Initialization
+
+**Production Setup Script**:
+```javascript
+// scripts/setup-production.js
+const { Pool } = require('pg');
+
+async function setupProduction() {
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+
+  try {
+    console.log('🚀 Setting up production environment...');
+
+    // Create application roles
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'awo_app_user') THEN
+          CREATE ROLE awo_app_user LOGIN PASSWORD '${process.env.DB_APP_PASSWORD}';
+        END IF;
+        
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'awo_readonly') THEN
+          CREATE ROLE awo_readonly LOGIN PASSWORD '${process.env.DB_READONLY_PASSWORD}';
+        END IF;
+      END
+      $$;
+    `);
+
+    // Grant appropriate permissions
+    await pool.query(`
+      -- Application user permissions
+      GRANT CONNECT ON DATABASE ${process.env.DB_NAME} TO awo_app_user;
+      GRANT USAGE ON SCHEMA public TO awo_app_user;
+      GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO awo_app_user;
+      GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO awo_app_user;
+      
+      -- Read-only user permissions
+      GRANT CONNECT ON DATABASE ${process.env.DB_NAME} TO awo_readonly;
+      GRANT USAGE ON SCHEMA public TO awo_readonly;
+      GRANT SELECT ON ALL TABLES IN SCHEMA public TO awo_readonly;
+      
+      -- Set default permissions for future tables
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO awo_app_user;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO awo_app_user;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO awo_readonly;
+    `);
+
+    // Create essential configuration data
+    await pool.query(`
+      INSERT INTO system_config (key, value, description) VALUES
+      ('maintenance_mode', 'false', 'System maintenance mode toggle'),
+      ('max_chama_members', '20', 'Maximum number of members per Chama'),
+      ('diva_update_frequency_days', '90', 'Days between mandatory DIVA score updates'),
+      ('supported_currencies', '["ZAR", "BWP", "NAD", "ZMW"]', 'List of supported currencies')
+      ON CONFLICT (key) DO NOTHING;
+    `);
+
+    console.log('✅ Production environment setup completed');
+  } catch (error) {
+    console.error('❌ Production setup failed:', error);
+    throw error;
+  } finally {
+    await pool.end();
+  }
+}
+
+if (require.main === module) {
+  setupProduction();
+}
+```
+
+## Performance Optimization
+
+### Database Optimization
+
+**Connection Pool Configuration**:
+```javascript
+// config/database.js
+const { Pool } = require('pg');
+
+const createPool = (connectionString, options = {}) => {
+  const defaultConfig = {
+    connectionString,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    
+    // Connection pool settings
+    max: process.env.DB_POOL_MAX || 20,
+    min: process.env.DB_POOL_MIN || 5,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+    
+    // Performance settings
+    statement_timeout: 30000,
+    query_timeout: 30000,
+    
+    // Monitoring
+    log: (msg) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('DB:', msg);
+      }
+    }
+  };
+
+  return new Pool({ ...defaultConfig, ...options });
+};
+
+// Primary write connection
+const writePool = createPool(process.env.DATABASE_URL);
+
+// Read replica connection (if available)
+const readPool = process.env.DATABASE_READ_URL 
+  ? createPool(process.env.DATABASE_READ_URL, { max: 10 })
+  : writePool;
+
+// Query functions with automatic retry
+const queryWithRetry = async (pool, text, params, retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const start = Date.now();
+      const result = await pool.query(text, params);
+      const duration = Date.now() - start;
+      
+      // Log slow queries
+      if (duration > 1000) {
+        console.warn(`Slow query (${duration}ms):`, text.substring(0, 100));
+      }
+      
+      return result;
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
+    }
+  }
+};
+
+module.exports = {
+  // Write operations
+  query: (text, params) => queryWithRetry(writePool, text, params),
+  
+  // Read operations (uses read replica if available)
+  queryRead: (text, params) => queryWithRetry(readPool, text, params),
+  
+  // Transaction helper
+  transaction: async (callback) => {
+    const client = await writePool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await callback(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+  
+  // Pool monitoring
+  getPoolStats: () => ({
+    write: {
+      total: writePool.totalCount,
+      idle: writePool.idleCount,
+      waiting: writePool.waitingCount
+    },
+    read: readPool !== writePool ? {
+      total: readPool.totalCount,
+      idle: readPool.idleCount,
+      waiting: readPool.waitingCount
+    } : null
+  })
+};
+```
+
+### Query Optimization
+
+**Optimized Query Patterns**:
+```sql
+-- Efficient DIVA score calculation with window functions
+WITH user_metrics AS (
+  SELECT 
+    u.id,
+    COUNT(t.id) as transaction_count,
+    AVG(CASE WHEN t.amount > 0 THEN t.amount END) as avg_income,
+    STDDEV(t.amount) as income_volatility,
+    COUNT(CASE WHEN t.transaction_type = 'chama_contribution' THEN 1 END) as chama_activity
+  FROM users u
+  LEFT JOIN transactions t ON u.id = t.user_id 
+    AND t.created_at > NOW() - INTERVAL '90 days'
+    AND t.status = 'completed'
+  GROUP BY u.id
+),
+score_calculations AS (
+  SELECT 
+    id,
+    -- Discipline score (0-250)
+    LEAST(250, GREATEST(0, 
+      (transaction_count * 10) + 
+      (chama_activity * 20)
+    )) as discipline_score,
+    
+    -- Income score (0-250) 
+    LEAST(250, GREATEST(0,
+      (avg_income / 1000 * 50) +
+      (CASE WHEN income_volatility < 1000 THEN 50 ELSE 0 END)
+    )) as income_score
+    
+  FROM user_metrics
+)
+SELECT 
+  id,
+  discipline_score,
+  income_score,
+  discipline_score + income_score as partial_diva_score
+FROM score_calculations;
+
+-- Efficient Chama member lookup with pagination
+SELECT 
+  c.id,
+  c.name,
+  c.contribution_amount,
+  COUNT(cm.user_id) as member_count,
+  SUM(cm.total_contributed) as total_pool
+FROM chamas c
+LEFT JOIN chama_memberships cm ON c.id = cm.chama_id AND cm.is_active = true
+WHERE c.is_active = true
+GROUP BY c.id, c.name, c.contribution_amount
+ORDER BY c.created_at DESC
+LIMIT 20 OFFSET $1;
+
+-- Investment portfolio summary with returns
+SELECT 
+  u.id as user_id,
+  up.first_name || ' ' || up.last_name as full_name,
+  ds.portfolio_tier,
+  COUNT(i.id) as investment_count,
+  SUM(i.amount) as total_invested,
+  SUM(i.current_value) as current_value,
+  SUM(i.returns) as total_returns,
+  ROUND(
+    (SUM(i.current_value) - SUM(i.amount)) / 
+    NULLIF(SUM(i.amount), 0) * 100, 2
+  ) as return_percentage
+FROM users u
+JOIN user_profiles up ON u.id = up.user_id
+LEFT JOIN diva_scores ds ON u.id = ds.user_id
+LEFT JOIN investments i ON u.id = i.user_id AND i.status = 'active'
+WHERE u.is_active = true
+GROUP BY u.id, up.first_name, up.last_name, ds.portfolio_tier
+HAVING COUNT(i.id) > 0
+ORDER BY total_invested DESC;
+```
+
+## Backup and Recovery
+
+### Automated Backup Strategy
+
+**Neon Backup Configuration**:
+```bash
+# Configure automated backups
+neonctl projects update \
+  --project-id $NEON_PROJECT_ID \
+  --backup-retention-period 30 \
+  --point-in-time-recovery-retention 30
+
+# Create manual backup before major changes
+neonctl backup create \
+  --name "pre-deployment-$(date +%Y%m%d-%H%M%S)" \
+  --branch main
+
+# List available backups
+neonctl backup list
+
+# Restore from backup
+neonctl restore \
+  --timestamp "2024-01-15 10:30:00 UTC" \
+  --target-branch "restored-$(date +%Y%m%d)"
+```
+
+**Backup Monitoring Script**:
+```javascript
+// scripts/backup-monitor.js
+const { neonctl } = require('@neondatabase/api-client');
+
+class BackupMonitor {
+  constructor(apiKey, projectId) {
+    this.client = new neonctl(apiKey);
+    this.projectId = projectId;
+  }
+
+  async checkBackupHealth() {
+    try {
+      const backups = await this.client.getProjectBackups(this.projectId);
+      const latestBackup = backups[0];
+      
+      if (!latestBackup) {
+        throw new Error('No backups found');
+      }
+
+      const backupAge = Date.now() - new Date(latestBackup.created_at).getTime();
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+
+      if (backupAge > maxAge) {
+        throw new Error(`Latest backup is ${Math.round(backupAge / 1000 / 60 / 60)} hours old`);
+      }
+
+      console.log('✅ Backup health check passed');
+      return true;
+    } catch (error) {
+      console.error('❌ Backup health check failed:', error.message);
+      
+      // Send alert to monitoring system
+      if (process.env.SLACK_WEBHOOK_URL) {
+        await this.sendAlert(error.message);
+      }
+      
+      return false;
+    }
+  }
+
+  async sendAlert(message) {
+    const fetch = require('node-fetch');
+    
+    await fetch(process.env.SLACK_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: `🚨 AWO Database Backup Alert: ${message}`,
+        channel: '#alerts'
+      })
+    });
+  }
+}
+
+// Run backup health check
+if (require.main === module) {
+  const monitor = new BackupMonitor(
+    process.env.NEON_API_KEY,
+    process.env.NEON_PROJECT_ID
+  );
+  
+  monitor.checkBackupHealth();
+}
+```
+
+### Disaster Recovery Procedures
+
+**Recovery Playbook**:
+```bash
+#!/bin/bash
+# disaster-recovery.sh
+
+echo "🚨 AWO Database Disaster Recovery"
+echo "================================="
+
+# Step 1: Assess the situation
+echo "1. Checking current database status..."
+if ! psql $DATABASE_URL -c "SELECT 1;" >/dev/null 2>&1; then
+  echo "❌ Primary database is unreachable"
+  RECOVERY_NEEDED=true
+else
+  echo "✅ Primary database is accessible"
+  RECOVERY_NEEDED=false
+fi
+
+if [ "$RECOVERY_NEEDED" = true ]; then
+  echo "2. Initiating recovery process..."
+  
+  # Get latest good backup
+  LATEST_BACKUP=$(neonctl backup list --format json | jq -r '.[0].created_at')
+  echo "Latest backup: $LATEST_BACKUP"
+  
+  # Create recovery branch
+  RECOVERY_BRANCH="recovery-$(date +%Y%m%d-%H%M%S)"
+  neonctl restore \
+    --timestamp "$LATEST_BACKUP" \
+    --target-branch "$RECOVERY_BRANCH"
+  
+  echo "Recovery branch created: $RECOVERY_BRANCH"
+  
+  # Get new connection string
+  RECOVERY_URL=$(neonctl connection-string $RECOVERY_BRANCH)
+  echo "Recovery database URL: $RECOVERY_URL"
+  
+  echo "3. Update application configuration with recovery URL"
+  echo "4. Verify data integrity"
+  echo "5. Switch traffic to recovery database"
+  echo "6. Investigate root cause of failure"
+fi
+```
+
+## Security and Compliance
+
+### Database Security
+
+**Security Configuration**:
+```sql
+-- Enable row-level security for sensitive tables
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE diva_scores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+
+-- Create security policies
+CREATE POLICY users_own_data ON users
+  FOR ALL
+  USING (id = current_setting('app.current_user_id')::uuid);
+
+CREATE POLICY profiles_own_data ON user_profiles
+  FOR ALL
+  USING (user_id = current_setting('app.current_user_id')::uuid);
+
+CREATE POLICY transactions_own_data ON transactions
+  FOR ALL
+  USING (user_id = current_setting('app.current_user_id')::uuid);
+
+-- Admin bypass policy
+CREATE POLICY admin_access ON users
+  FOR ALL
+  USING (current_setting('app.user_role') = 'admin');
+
+-- Audit trigger function
+CREATE OR REPLACE FUNCTION audit_trigger_function()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO audit_logs (
+    user_id,
+    action,
+    resource_type,
+    resource_id,
+    old_values,
+    new_values,
+    created_at
+  ) VALUES (
+    current_setting('app.current_user_id', true)::uuid,
+    TG_OP,
+    TG_TABLE_NAME,
+    COALESCE(NEW.id, OLD.id),
+    CASE WHEN TG_OP = 'DELETE' THEN row_to_json(OLD) ELSE NULL END,
+    CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN row_to_json(NEW) ELSE NULL END,
+    NOW()
+  );
+  
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply audit triggers to sensitive tables
+CREATE TRIGGER audit_users
+  AFTER INSERT OR UPDATE OR DELETE ON users
+  FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
+
+CREATE TRIGGER audit_transactions
+  AFTER INSERT OR UPDATE OR DELETE ON transactions
+  FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
+```
+
+### Data Encryption
+
+**Encryption Setup**:
+```sql
+-- Create encryption functions
+CREATE OR REPLACE FUNCTION encrypt_pii(data TEXT)
+RETURNS TEXT AS $$
+BEGIN
+  RETURN encode(
+    pgp_sym_encrypt(data, current_setting('app.encryption_key')),
+    'base64'
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION decrypt_pii(encrypted_data TEXT)
+RETURNS TEXT AS $$
+BEGIN
+  RETURN pgp_sym_decrypt(
+    decode(encrypted_data, 'base64'),
+    current_setting('app.encryption_key')
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+-- Add encrypted columns for sensitive data
+ALTER TABLE user_profiles 
+ADD COLUMN phone_encrypted TEXT,
+ADD COLUMN id_number_encrypted TEXT;
+
+-- Migration to encrypt existing data
+UPDATE user_profiles 
+SET phone_encrypted = encrypt_pii(phone_number)
+WHERE phone_number IS NOT NULL;
+```
+
+## Monitoring and Alerts
+
+### Database Monitoring
+
+**Performance Monitoring**:
+```javascript
+// monitoring/database-monitor.js
+const { Pool } = require('pg');
+
+class DatabaseMonitor {
+  constructor(connectionString) {
+    this.pool = new Pool({ connectionString });
+  }
+
+  async getMetrics() {
+    const metrics = {};
+
+    try {
+      // Connection metrics
+      const connectionStats = await this.pool.query(`
+        SELECT 
+          count(*) as total_connections,
+          count(*) FILTER (WHERE state = 'active') as active_connections,
+          count(*) FILTER (WHERE state = 'idle') as idle_connections
+        FROM pg_stat_activity
+        WHERE datname = current_database()
+      `);
+      metrics.connections = connectionStats.rows[0];
+
+      // Query performance
+      const queryStats = await this.pool.query(`
+        SELECT 
+          calls,
+          total_exec_time,
+          mean_exec_time,
+          query
+        FROM pg_stat_statements
+        ORDER BY mean_exec_time DESC
+        LIMIT 10
+      `);
+      metrics.slowQueries = queryStats.rows;
+
+      // Database size
+      const sizeStats = await this.pool.query(`
+        SELECT 
+          pg_size_pretty(pg_database_size(current_database())) as database_size,
+          pg_size_pretty(sum(pg_total_relation_size(schemaname||'.'||tablename))::bigint) as total_table_size
+        FROM pg_tables
+        WHERE schemaname = 'public'
+      `);
+      metrics.size = sizeStats.rows[0];
+
+      // Table statistics
+      const tableStats = await this.pool.query(`
+        SELECT 
+          relname as table_name,
+          n_tup_ins as inserts,
+          n_tup_upd as updates,
+          n_tup_del as deletes,
+          n_live_tup as live_tuples,
+          pg_size_pretty(pg_total_relation_size(relid)) as size
+        FROM pg_stat_user_tables
+        ORDER BY n_tup_ins + n_tup_upd + n_tup_del DESC
+      `);
+      metrics.tables = tableStats.rows;
+
+      return metrics;
+    } catch (error) {
+      console.error('Error collecting database metrics:', error);
+      throw error;
+    }
+  }
+
+  async checkHealth() {
+    const health = {
+      status: 'healthy',
+      checks: {},
+      timestamp: new Date().toISOString()
+    };
+
+    try {
+      // Basic connectivity
+      const start = Date.now();
+      await this.pool.query('SELECT 1');
+      health.checks.connectivity = {
+        status: 'healthy',
+        responseTime: Date.now() - start
+      };
+
+      // Check for long-running queries
+      const longQueries = await this.pool.query(`
+        SELECT count(*) as count
+        FROM pg_stat_activity
+        WHERE state = 'active'
+        AND query_start < NOW() - INTERVAL '5 minutes'
+        AND query NOT LIKE '%pg_stat_activity%'
+      `);
+      
+      const longQueryCount = parseInt(longQueries.rows[0].count);
+      health.checks.longQueries = {
+        status: longQueryCount > 5 ? 'warning' : 'healthy',
+        count: longQueryCount
+      };
+
+      // Check connection usage
+      const connections = await this.pool.query(`
+        SELECT 
+          count(*) as current_connections,
+          setting::int as max_connections
+        FROM pg_stat_activity, pg_settings
+        WHERE pg_settings.name = 'max_connections'
+      `);
+      
+      const connUsage = connections.rows[0].current_connections / connections.rows[0].max_connections;
+      health.checks.connections = {
+        status: connUsage > 0.8 ? 'warning' : 'healthy',
+        usage: Math.round(connUsage * 100)
+      };
+
+      // Determine overall status
+      const hasWarnings = Object.values(health.checks).some(check => check.status === 'warning');
+      const hasErrors = Object.values(health.checks).some(check => check.status === 'error');
+      
+      if (hasErrors) health.status = 'unhealthy';
+      else if (hasWarnings) health.status = 'degraded';
+
+      return health;
+    } catch (error) {
+      health.status = 'unhealthy';
+      health.error = error.message;
+      return health;
+    }
+  }
+}
+
+module.exports = { DatabaseMonitor };
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+**Connection Issues**:
+<CardGroup cols={2}>
+  <Card title="SSL Connection Errors" icon="exclamation-triangle">
+    **Symptoms**: SSL connection failed  
+    **Solution**: Ensure `?sslmode=require` in connection string  
+    **Command**: `neonctl connection-string main`
+  </Card>
+  <Card title="Connection Pool Exhaustion" icon="server">
+    **Symptoms**: "too many connections" error  
+    **Solution**: Optimize pool size, check for connection leaks  
+    **Monitoring**: Track connection metrics
+  </Card>
+</CardGroup>
+
+**Performance Issues**:
+```sql
+-- Identify slow queries
+SELECT 
+  query,
+  calls,
+  total_exec_time,
+  mean_exec_time,
+  (total_exec_time / calls) as avg_time
+FROM pg_stat_statements
+ORDER BY mean_exec_time DESC
+LIMIT 10;
+
+-- Check for missing indexes
+SELECT 
+  schemaname,
+  tablename,
+  seq_scan,
+  seq_tup_read,
+  seq_tup_read / seq_scan as avg_tup_read
+FROM pg_stat_user_tables
+WHERE seq_scan > 0
+ORDER BY seq_tup_read DESC;
+
+-- Analyze table bloat
+SELECT 
+  schemaname,
+  tablename,
+  n_dead_tup,
+  n_live_tup,
+  (n_dead_tup::float / (n_live_tup + n_dead_tup)) * 100 as bloat_percentage
+FROM pg_stat_user_tables
+WHERE n_live_tup > 0
+ORDER BY bloat_percentage DESC;
+```
+
+### Recovery Procedures
+
+**Database Recovery Checklist**:
+1. **Assess Impact**: Determine scope of data loss or corruption
+2. **Identify Recovery Point**: Choose appropriate backup timestamp
+3. **Create Recovery Branch**: Restore from backup to new branch
+4. **Validate Data**: Verify data integrity and completeness
+5. **Update Application**: Switch connection strings
+6. **Monitor**: Watch for issues post-recovery
+7. **Document**: Record incident and lessons learned
+
+---
+
+*This database deployment guide provides comprehensive instructions for deploying and managing AWO Platform's Neon PostgreSQL database with production-grade performance, security, and reliability for African financial services.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

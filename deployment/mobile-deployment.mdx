@@ -1,43 +1,1018 @@
----
-title: "Mobile Deployment"
-description: "AWO Platform mobile deployment deployment guide"
----
-
-# Mobile Deployment
+# Mobile Deployment - Deployment
 
 ## Overview
 
+AWO Platform's mobile deployment strategy leverages Expo Application Services (EAS) for streamlined React Native app builds and distribution across iOS and Android platforms. This guide covers the complete mobile deployment pipeline from development builds to app store publication.
+
 <Info>
-This guide covers mobile deployment for the AWO Platform.
+Our mobile deployment emphasizes rapid iteration, comprehensive testing, and seamless distribution to serve AWO's target markets across the SADC region with reliable financial services.
 </Info>
 
-## Deployment Steps
+## Expo Application Services (EAS)
+
+### Why EAS for AWO Platform
+
+**Key Benefits for African Fintech**:
+<CardGroup cols={2}>
+  <Card title="Cloud-Based Builds" icon="cloud">
+    **No Local Dependencies**: Build iOS apps without owning a Mac  
+    **Consistent Environment**: Reproducible builds across team  
+    **Parallel Processing**: Faster builds with cloud resources  
+    **Global Infrastructure**: Build servers closer to development teams
+  </Card>
+  <Card title="Enterprise Features" icon="shield">
+    **Code Signing**: Automatic iOS/Android credential management  
+    **Internal Distribution**: TestFlight and internal app sharing  
+    **Over-the-Air Updates**: Instant updates without app store approval  
+    **Advanced Analytics**: Build performance and usage metrics
+  </Card>
+</CardGroup>
+
+**EAS Services Used**:
+- **EAS Build**: Cloud-based app compilation and signing
+- **EAS Submit**: Automated app store submission
+- **EAS Update**: Over-the-air JavaScript updates
+- **EAS Metadata**: App store metadata management
+
+## Mobile Application Structure
+
+### Project Configuration
+
+**App Configuration (app.config.js)**:
+```javascript
+const IS_DEV = process.env.APP_VARIANT === 'development';
+const IS_PREVIEW = process.env.APP_VARIANT === 'preview';
+
+export default {
+  expo: {
+    name: IS_DEV ? 'AWO Platform (Dev)' : 'AWO Platform',
+    slug: 'awo-platform',
+    version: '1.0.0',
+    orientation: 'portrait',
+    icon: './assets/icon.png',
+    userInterfaceStyle: 'light',
+    splash: {
+      image: './assets/splash.png',
+      resizeMode: 'contain',
+      backgroundColor: '#bc9b25'
+    },
+    assetBundlePatterns: ['**/*'],
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: IS_DEV 
+        ? 'com.awo.platform.dev' 
+        : IS_PREVIEW 
+        ? 'com.awo.platform.preview' 
+        : 'com.awo.platform',
+      buildNumber: '1',
+      config: {
+        usesNonExemptEncryption: false
+      },
+      associatedDomains: ['applinks:awo-platform.com'],
+      infoPlist: {
+        NSCameraUsageDescription: 'AWO Platform uses camera for KYC document verification',
+        NSFaceIDUsageDescription: 'AWO Platform uses Face ID for secure authentication',
+        NSLocationWhenInUseUsageDescription: 'AWO Platform uses location for fraud prevention'
+      }
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: './assets/adaptive-icon.png',
+        backgroundColor: '#FFFFFF'
+      },
+      package: IS_DEV 
+        ? 'com.awo.platform.dev' 
+        : IS_PREVIEW 
+        ? 'com.awo.platform.preview' 
+        : 'com.awo.platform',
+      versionCode: 1,
+      permissions: [
+        'CAMERA',
+        'USE_BIOMETRIC',
+        'USE_FINGERPRINT',
+        'ACCESS_COARSE_LOCATION',
+        'ACCESS_FINE_LOCATION'
+      ],
+      intentFilters: [
+        {
+          action: 'VIEW',
+          data: [
+            {
+              scheme: 'https',
+              host: 'awo-platform.com'
+            }
+          ],
+          category: ['BROWSABLE', 'DEFAULT']
+        }
+      ]
+    },
+    web: {
+      favicon: './assets/favicon.png',
+      bundler: 'metro'
+    },
+    plugins: [
+      'expo-router',
+      'expo-font',
+      'expo-secure-store',
+      'expo-local-authentication',
+      'expo-camera',
+      'expo-location',
+      [
+        'expo-notifications',
+        {
+          icon: './assets/notification-icon.png',
+          color: '#bc9b25'
+        }
+      ],
+      [
+        'expo-build-properties',
+        {
+          android: {
+            enableProguardInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true
+          },
+          ios: {
+            flipper: false
+          }
+        }
+      ]
+    ],
+    extra: {
+      router: {
+        origin: false
+      },
+      eas: {
+        projectId: 'your-eas-project-id'
+      },
+      apiUrl: process.env.EXPO_PUBLIC_API_URL,
+      environment: process.env.EXPO_PUBLIC_ENVIRONMENT || 'development',
+      sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN
+    },
+    owner: 'awo-platform'
+  }
+};
+```
+
+### EAS Build Configuration
+
+**EAS Configuration (eas.json)**:
+```json
+{
+  "cli": {
+    "version": ">= 5.0.0",
+    "requireCommit": true
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m1-medium",
+        "simulator": true
+      },
+      "android": {
+        "buildType": "developmentClient",
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:3000",
+        "EXPO_PUBLIC_ENVIRONMENT": "development",
+        "APP_VARIANT": "development"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m1-medium"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api-staging.awo-platform.com",
+        "EXPO_PUBLIC_ENVIRONMENT": "staging",
+        "APP_VARIANT": "preview"
+      },
+      "channel": "preview"
+    },
+    "production": {
+      "ios": {
+        "resourceClass": "m1-medium"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.awo-platform.com",
+        "EXPO_PUBLIC_ENVIRONMENT": "production",
+        "APP_VARIANT": "production"
+      },
+      "channel": "production"
+    },
+    "production-apk": {
+      "extends": "production",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "your-apple-id@example.com",
+        "ascAppId": "your-app-store-connect-app-id",
+        "appleTeamId": "your-apple-team-id"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "internal"
+      }
+    }
+  }
+}
+```
+
+## Build Types and Deployment Strategy
+
+### Development Builds
+
+**Purpose**: Local development with custom native code and debugging capabilities.
+
+**Configuration**:
+```bash
+# Install development build on local device/simulator
+eas build --profile development --platform all
+
+# Install on iOS Simulator
+eas build --profile development --platform ios --local
+
+# Install on Android Emulator
+eas build --profile development --platform android --local
+```
+
+**Features**:
+- **Development Client**: Includes expo-dev-client for debugging
+- **Hot Reload**: Fast refresh for JavaScript changes
+- **Native Debugging**: Full native debugging capabilities
+- **Local Network**: Connects to local development server
+
+### Preview Builds
+
+**Purpose**: Internal testing and stakeholder review before production release.
+
+<CardGroup cols={2}>
+  <Card title="QA Testing" icon="flask">
+    **Distribution**: Internal TestFlight/App Sharing  
+    **Environment**: Staging API endpoints  
+    **Features**: Production-like but with debug info  
+    **Frequency**: Weekly or per feature completion
+  </Card>
+  <Card title="Stakeholder Review" icon="users">
+    **Distribution**: Email invitations with install links  
+    **Environment**: Staging with demo data  
+    **Features**: Full feature set for review  
+    **Feedback**: In-app feedback collection
+  </Card>
+</CardGroup>
+
+**Build Commands**:
+```bash
+# Create preview build for all platforms
+eas build --profile preview --platform all
+
+# Create iOS preview build
+eas build --profile preview --platform ios
+
+# Create Android preview build (APK for easy distribution)
+eas build --profile preview --platform android
+
+# Update preview build with latest JavaScript
+eas update --branch preview --message "Preview update with latest features"
+```
+
+### Production Builds
+
+**Purpose**: App store submission and public distribution.
+
+**Build Process**:
+```bash
+# Production build for app stores
+eas build --profile production --platform all
+
+# Submit to app stores
+eas submit --profile production --platform all
+
+# Create APK for direct distribution (if needed)
+eas build --profile production-apk --platform android
+```
+
+**Features**:
+- **Optimized Bundle**: Minified and optimized for performance
+- **Code Obfuscation**: Android ProGuard enabled
+- **App Store Ready**: Meets all store requirements
+- **Analytics**: Production analytics and crash reporting
+
+## Deployment Workflows
+
+### Automated Build Pipeline
+
+**GitHub Actions Workflow (.github/workflows/mobile-deploy.yml)**:
+```yaml
+name: Mobile App Deployment
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v3
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: npm
+
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧪 Run tests
+        run: npm test
+
+      - name: 🔍 TypeScript check
+        run: npx tsc --noEmit
+
+      - name: 📱 Check Expo config
+        run: npx expo config --type public
+
+  build-preview:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v3
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: npm
+
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🚀 Build preview
+        run: eas build --profile preview --platform all --non-interactive
+
+      - name: 📱 Update preview
+        run: eas update --branch preview --message "Automated preview update"
+
+      - name: 📬 Notify team
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#mobile-builds'
+          text: 'Preview build completed'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  build-production:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v3
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: npm
+
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🚀 Build production
+        run: eas build --profile production --platform all --non-interactive
+
+      - name: 📱 Submit to stores
+        run: eas submit --profile production --platform all --non-interactive
+
+      - name: 📬 Notify team
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#mobile-builds'
+          text: 'Production build and submission completed'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+```
+
+### Manual Build Commands
+
+**Development Workflow**:
+```bash
+# Start development server
+npm start
+# or
+npx expo start
+
+# Build development client
+eas build --profile development --platform ios
+eas build --profile development --platform android
+
+# Install on device
+# iOS: Drag .app to simulator or use Expo Orbit
+# Android: Install .apk file directly
+```
+
+**Release Workflow**:
+```bash
+# 1. Update version in app.config.js
+# 2. Create preview build for testing
+eas build --profile preview --platform all
+
+# 3. Test preview build thoroughly
+# 4. Create production build
+eas build --profile production --platform all
+
+# 5. Submit to app stores
+eas submit --profile production --platform all
+
+# 6. Monitor build status
+eas build:list
+eas submit:list
+```
+
+## App Store Configuration
+
+### iOS App Store Setup
+
+**App Store Connect Configuration**:
+
+1. **App Information**:
+   - **Name**: AWO Platform
+   - **Bundle ID**: com.awo.platform
+   - **SKU**: awo-platform-ios
+   - **Language**: English (Primary), others as needed
+
+2. **App Review Information**:
+   ```text
+   App Description:
+   AWO Platform is a comprehensive financial services platform designed specifically for African women across the SADC region. Our app provides:
+   
+   - Digital wallet for secure money management
+   - Chama (traditional savings group) management
+   - Investment opportunities tailored to African markets
+   - Financial education and literacy programs
+   - Personalized financial coaching
+   
+   The app uses camera permissions for KYC (Know Your Customer) document verification, which is required for financial services compliance. Location services are used for fraud prevention and to provide region-specific features.
+   
+   Test Account:
+   Email: reviewer@awo-platform.com
+   Password: TestAccount2024!
+   
+   Demo Instructions:
+   1. Download and install the app
+   2. Use the test account credentials to log in
+   3. Explore the dashboard to see financial overview
+   4. Test the Chama creation feature
+   5. Browse investment opportunities
+   6. Access financial education content
+   ```
+
+3. **Privacy Policy**: https://awo-platform.com/privacy
+4. **Terms of Service**: https://awo-platform.com/terms
+
+**iOS Build Configuration**:
+```json
+{
+  "ios": {
+    "supportsTablet": true,
+    "bundleIdentifier": "com.awo.platform",
+    "buildNumber": "1",
+    "config": {
+      "usesNonExemptEncryption": false
+    },
+    "associatedDomains": ["applinks:awo-platform.com"],
+    "infoPlist": {
+      "NSCameraUsageDescription": "AWO Platform uses camera for secure document verification during the KYC process, which is required for financial services compliance.",
+      "NSFaceIDUsageDescription": "AWO Platform uses Face ID to provide secure and convenient authentication for accessing your financial information.",
+      "NSLocationWhenInUseUsageDescription": "AWO Platform uses location information for fraud prevention and to provide region-specific financial services."
+    }
+  }
+}
+```
+
+### Android Google Play Setup
+
+**Google Play Console Configuration**:
+
+1. **App Information**:
+   - **App Name**: AWO Platform
+   - **Package Name**: com.awo.platform
+   - **Category**: Finance
+   - **Content Rating**: Everyone
+
+2. **Store Listing**:
+   ```text
+   Short Description:
+   Financial empowerment for African women - savings, investments, and financial education in one platform.
+   
+   Full Description:
+   AWO Platform is revolutionizing financial inclusion for African women across the SADC region. Our comprehensive platform offers:
+   
+   💰 DIGITAL WALLET
+   • Secure money management with multi-currency support
+   • Instant transfers and payments via mobile money integration
+   • Real-time transaction tracking and budgeting tools
+   
+   👥 CHAMA MANAGEMENT
+   • Digitize traditional savings groups (Chamas/Stokvels)
+   • Transparent contribution tracking and democratic governance
+   • Automated savings and payout management
+   
+   📈 INVESTMENT OPPORTUNITIES
+   • Tiered investment platform based on financial capacity
+   • Curated women-led business investment opportunities
+   • Portfolio management with real-time performance tracking
+   
+   🎓 FINANCIAL EDUCATION
+   • Comprehensive financial literacy programs
+   • Interactive courses and expert-led masterclasses
+   • Personalized financial coaching and guidance
+   
+   🔒 SECURITY & COMPLIANCE
+   • Bank-grade security with biometric authentication
+   • GDPR/POPIA compliant data protection
+   • Comprehensive KYC verification for regulatory compliance
+   
+   Join thousands of African women taking control of their financial future with AWO Platform.
+   ```
+
+3. **Screenshots**: 
+   - Phone screenshots (8 required)
+   - Tablet screenshots (optional but recommended)
+   - Feature graphic (1024 x 500)
+
+**Android Build Configuration**:
+```json
+{
+  "android": {
+    "adaptiveIcon": {
+      "foregroundImage": "./assets/adaptive-icon.png",
+      "backgroundColor": "#FFFFFF"
+    },
+    "package": "com.awo.platform",
+    "versionCode": 1,
+    "compileSdkVersion": 34,
+    "targetSdkVersion": 34,
+    "buildToolsVersion": "34.0.0",
+    "permissions": [
+      "CAMERA",
+      "USE_BIOMETRIC",
+      "USE_FINGERPRINT",
+      "ACCESS_COARSE_LOCATION",
+      "ACCESS_FINE_LOCATION",
+      "INTERNET",
+      "VIBRATE",
+      "WAKE_LOCK"
+    ],
+    "blockedPermissions": [
+      "READ_PHONE_STATE",
+      "READ_EXTERNAL_STORAGE",
+      "WRITE_EXTERNAL_STORAGE"
+    ]
+  }
+}
+```
+
+## Over-the-Air Updates
+
+### EAS Update Configuration
+
+**Update Strategy**:
+<CardGroup cols={2}>
+  <Card title="JavaScript Updates" icon="code">
+    **What**: JavaScript code, assets, and configuration  
+    **When**: Bug fixes, feature updates, content changes  
+    **Speed**: Instant deployment without app store approval  
+    **Limitation**: Cannot update native code or dependencies
+  </Card>
+  <Card title="Native Updates" icon="smartphone">
+    **What**: Native code, new dependencies, permissions  
+    **When**: Major features requiring native changes  
+    **Speed**: Requires app store review (1-7 days)  
+    **Process**: New app version submission required
+  </Card>
+</CardGroup>
+
+**Update Channels Configuration**:
+```javascript
+// Configure update channels in app.config.js
+export default {
+  expo: {
+    updates: {
+      url: 'https://u.expo.dev/your-project-id'
+    },
+    runtimeVersion: {
+      policy: 'sdkVersion'
+    }
+  }
+};
+```
+
+**Deploy Updates**:
+```bash
+# Deploy to preview channel
+eas update --branch preview --message "Bug fixes and UI improvements"
+
+# Deploy to production channel
+eas update --branch production --message "Critical security update"
+
+# Deploy with specific platform
+eas update --branch production --platform ios --message "iOS-specific fix"
+
+# Check update status
+eas update:list --branch production
+```
+
+### Update Rollout Strategy
+
+**Staged Rollout Process**:
 
 <Steps>
-  <Step title="Environment Preparation">
-    Prepare deployment environment
+  <Step title="Internal Testing">
+    Deploy updates to preview channel for internal team testing
   </Step>
-  <Step title="Configuration">
-    Configure deployment settings
+  <Step title="Beta Release">
+    Deploy to production channel with 10% user rollout
   </Step>
-  <Step title="Deployment">
-    Execute deployment process
+  <Step title="Gradual Rollout">
+    Increase rollout percentage: 25% → 50% → 75% → 100%
   </Step>
-  <Step title="Verification">
-    Verify successful deployment
+  <Step title="Monitoring">
+    Monitor crash rates, user feedback, and performance metrics
+  </Step>
+  <Step title="Rollback Plan">
+    Ability to quickly rollback if issues are detected
   </Step>
 </Steps>
 
-## Configuration
+**Update Monitoring**:
+```javascript
+// Add update monitoring to app
+import * as Updates from 'expo-updates';
 
-Deployment configuration will be documented here.
+export async function checkForUpdates() {
+  try {
+    const update = await Updates.checkForUpdateAsync();
+    
+    if (update.isAvailable) {
+      await Updates.fetchUpdateAsync();
+      
+      // Notify user about update
+      Alert.alert(
+        'Update Available',
+        'A new version of the app is available. Restart to apply the update.',
+        [
+          { text: 'Later', style: 'cancel' },
+          { text: 'Restart', onPress: () => Updates.reloadAsync() }
+        ]
+      );
+    }
+  } catch (error) {
+    console.error('Error checking for updates:', error);
+  }
+}
+```
 
-## Monitoring
+## Testing and Quality Assurance
 
-Post-deployment monitoring setup will be covered here.
+### Automated Testing
 
-## Rollback Procedures
+**Test Configuration (jest.config.js)**:
+```javascript
+module.exports = {
+  preset: 'jest-expo',
+  setupFilesAfterEnv: ['<rootDir>/src/test-utils/setup.js'],
+  testMatch: [
+    '**/__tests__/**/*.(ts|tsx|js)',
+    '**/*.(test|spec).(ts|tsx|js)'
+  ],
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/test-utils/**'
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 70,
+      lines: 70,
+      statements: 70
+    }
+  },
+  moduleNameMapping: {
+    '^@/(.*)$': '<rootDir>/src/$1'
+  }
+};
+```
 
-<Accordion title="Emergency Rollback">
-Rollback procedures will be documented here.
-</Accordion>
+**Testing Strategy**:
+<CardGroup cols={3}>
+  <Card title="Unit Tests" icon="cog">
+    **Coverage**: Individual components and utilities  
+    **Tools**: Jest, React Native Testing Library  
+    **Target**: &gt;80% code coverage  
+    **Run**: On every commit
+  </Card>
+  <Card title="Integration Tests" icon="link">
+    **Coverage**: API integration, navigation flows  
+    **Tools**: Detox, Maestro  
+    **Target**: Critical user journeys  
+    **Run**: Before preview builds
+  </Card>
+  <Card title="E2E Tests" icon="smartphone">
+    **Coverage**: Complete user workflows  
+    **Tools**: Maestro, Detox  
+    **Target**: Core financial features  
+    **Run**: Before production builds
+  </Card>
+</CardGroup>
+
+### Device Testing
+
+**Physical Device Testing**:
+```bash
+# Install on development devices
+eas device:create
+
+# Install development build
+eas build --profile development --platform ios
+eas install --build-id [BUILD_ID]
+
+# Test on multiple Android devices
+eas build --profile development --platform android
+# Install .apk on various Android devices
+```
+
+**Testing Checklist**:
+
+**Pre-Release Testing**:
+- [ ] **Authentication Flow**: Login, logout, biometric auth
+- [ ] **Core Features**: Wallet, Chama creation, investments
+- [ ] **Network Conditions**: Offline mode, poor connectivity
+- [ ] **Device Compatibility**: iOS 13+, Android 8+
+- [ ] **Performance**: App startup time, navigation smoothness
+- [ ] **Security**: Biometric authentication, secure storage
+
+## Performance Optimization
+
+### Build Optimization
+
+**Bundle Size Optimization**:
+```javascript
+// metro.config.js
+const { getDefaultConfig } = require('expo/metro-config');
+
+const config = getDefaultConfig(__dirname);
+
+// Enable bundle splitting
+config.resolver.platforms = ['ios', 'android', 'native', 'web'];
+
+// Optimize images
+config.transformer.assetPlugins = ['expo-asset/tools/hashAssetFiles'];
+
+// Enable Hermes for Android
+config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
+
+module.exports = config;
+```
+
+**Performance Monitoring**:
+```javascript
+// Add performance monitoring
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  environment: process.env.EXPO_PUBLIC_ENVIRONMENT,
+  tracesSampleRate: 0.1,
+  enableAutoSessionTracking: true,
+  enableOutOfMemoryTracking: true
+});
+
+// Monitor app startup performance
+const AppStartupProfiler = Sentry.withProfiler(App);
+```
+
+### Network Optimization
+
+**API Request Optimization**:
+```javascript
+// Configure API client for mobile optimization
+import axios from 'axios';
+
+const apiClient = axios.create({
+  baseURL: process.env.EXPO_PUBLIC_API_URL,
+  timeout: 10000,
+  headers: {
+    'Accept-Encoding': 'gzip, deflate',
+    'Content-Type': 'application/json'
+  }
+});
+
+// Add request/response compression
+apiClient.interceptors.request.use(config => {
+  if (config.data && typeof config.data === 'object') {
+    config.headers['Content-Encoding'] = 'gzip';
+  }
+  return config;
+});
+
+// Implement request retrying for poor network conditions
+apiClient.interceptors.response.use(
+  response => response,
+  async error => {
+    if (error.code === 'ECONNABORTED' && error.config && !error.config.__isRetryRequest) {
+      error.config.__isRetryRequest = true;
+      return apiClient(error.config);
+    }
+    throw error;
+  }
+);
+```
+
+## Monitoring and Analytics
+
+### Crash Reporting
+
+**Sentry Integration**:
+```javascript
+// sentry.config.js
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  environment: process.env.EXPO_PUBLIC_ENVIRONMENT,
+  beforeSend: (event) => {
+    // Filter out non-critical errors in development
+    if (__DEV__ && event.level === 'warning') {
+      return null;
+    }
+    return event;
+  },
+  integrations: [
+    new Sentry.ReactNativeTracing({
+      routingInstrumentation: new Sentry.ReactNavigationInstrumentation(),
+    }),
+  ],
+  tracesSampleRate: process.env.EXPO_PUBLIC_ENVIRONMENT === 'production' ? 0.1 : 1.0,
+});
+```
+
+### Analytics Implementation
+
+**Usage Analytics**:
+```javascript
+// analytics.js
+import { Analytics } from '@aws-amplify/analytics';
+
+export const trackEvent = (eventName, properties = {}) => {
+  if (process.env.EXPO_PUBLIC_ENVIRONMENT === 'production') {
+    Analytics.record({
+      name: eventName,
+      attributes: {
+        ...properties,
+        timestamp: new Date().toISOString(),
+        platform: Platform.OS,
+        appVersion: Constants.expoConfig.version
+      }
+    });
+  }
+};
+
+// Usage examples
+trackEvent('user_login', { method: 'biometric' });
+trackEvent('chama_created', { memberCount: 5 });
+trackEvent('investment_made', { amount: 1000, portfolio: 'gold' });
+```
+
+## Troubleshooting
+
+### Common Build Issues
+
+**EAS Build Failures**:
+
+<CardGroup cols={2}>
+  <Card title="Dependency Conflicts" icon="exclamation-triangle">
+    **Issue**: Native dependency version conflicts  
+    **Solution**: Use compatible versions, check peer dependencies  
+    **Command**: `npx expo install --fix`
+  </Card>
+  <Card title="Build Timeouts" icon="clock">
+    **Issue**: Build takes too long and times out  
+    **Solution**: Optimize dependencies, use build caching  
+    **Command**: `eas build --clear-cache`
+  </Card>
+</CardGroup>
+
+**iOS Build Issues**:
+```bash
+# Check iOS build logs
+eas build:list --platform ios
+eas build:view [BUILD_ID]
+
+# Common issues:
+# 1. Provisioning profile issues
+# 2. Missing permissions in Info.plist
+# 3. Icon/splash screen format issues
+
+# Fix provisioning issues
+eas credentials --platform ios
+```
+
+**Android Build Issues**:
+```bash
+# Check Android build logs
+eas build:list --platform android
+eas build:view [BUILD_ID]
+
+# Common issues:
+# 1. Gradle build failures
+# 2. Missing permissions
+# 3. APK/AAB generation issues
+
+# Clear Gradle cache
+eas build --platform android --clear-cache
+```
+
+### Performance Issues
+
+**App Performance Debugging**:
+```bash
+# Profile app performance
+npx react-native run-android --variant=release
+npx react-native run-ios --configuration Release
+
+# Monitor memory usage
+# Use Flipper or React Native Debugger
+
+# Analyze bundle size
+npx expo export --platform web
+npx bundlesize
+```
+
+### Recovery Procedures
+
+**Build Recovery**:
+```bash
+# Rollback to previous working build
+eas build:list
+eas submit --build-id [PREVIOUS_WORKING_BUILD_ID]
+
+# Emergency update deployment
+eas update --branch production --message "Emergency fix"
+
+# Disable problematic update
+eas update:delete --group-id [UPDATE_GROUP_ID]
+```
+
+---
+
+*This mobile deployment guide provides comprehensive instructions for deploying AWO Platform's React Native application using Expo Application Services, covering development builds through app store distribution with enterprise-grade monitoring and optimization.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*
