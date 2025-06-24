@@ -1,67 +1,682 @@
 ---
-title: "Mfa"
-description: "AWO Platform Mfa API endpoint"
+title: "Multi-Factor Authentication (MFA)"
+api: "POST https://api.awo-platform.com/v1/auth/mfa"
+description: "Enable, disable, and verify multi-factor authentication for enhanced account security across African mobile networks"
 ---
 
-# Mfa
+# Multi-Factor Authentication (MFA)
 
-## Overview
+Configure and verify multi-factor authentication for enhanced account security. AWO Platform supports SMS OTP, email verification, and authenticator apps optimized for African mobile networks.
 
 <Info>
-This endpoint provides mfa functionality for the AWO Platform.
+MFA is mandatory for Tier 2 KYC users and highly recommended for all users accessing investment features. SMS OTP is the most popular method across SADC countries due to widespread mobile coverage.
 </Info>
 
-## Authentication
+## MFA Methods Supported
 
-All API requests require authentication:
+<CardGroup cols={3}>
+  <Card title="SMS OTP" icon="mobile-alt">
+    **Primary Method**: 6-digit SMS codes  
+    **Coverage**: All SADC countries  
+    **Delivery Time**: 30-60 seconds  
+    **Fallback**: Voice call option
+  </Card>
+  <Card title="Email OTP" icon="envelope">
+    **Secondary Method**: Email verification codes  
+    **Format**: 6-digit alphanumeric  
+    **Validity**: 10 minutes  
+    **Languages**: Multiple African languages
+  </Card>
+  <Card title="Authenticator App" icon="shield-alt">
+    **Advanced Method**: TOTP authentication  
+    **Apps**: Google Authenticator, Authy  
+    **Offline**: Works without internet  
+    **Backup**: Recovery codes provided
+  </Card>
+</CardGroup>
 
-```bash
-Authorization: Bearer YOUR_JWT_TOKEN
+## Endpoints
+
+### Setup MFA
+
+<CardGroup cols={1}>
+  <Card title="POST /auth/mfa/setup" icon="cog">
+    **URL**: `https://api.awo-platform.com/v1/auth/mfa/setup`  
+    **Authentication**: Bearer token required  
+    **Rate Limit**: 5 requests per minute
+  </Card>
+</CardGroup>
+
+### Verify MFA
+
+<CardGroup cols={1}>
+  <Card title="POST /auth/mfa/verify" icon="check-circle">
+    **URL**: `https://api.awo-platform.com/v1/auth/mfa/verify`  
+    **Authentication**: Bearer token required  
+    **Rate Limit**: 10 requests per minute
+  </Card>
+</CardGroup>
+
+### Disable MFA
+
+<CardGroup cols={1}>
+  <Card title="POST /auth/mfa/disable" icon="times-circle">
+    **URL**: `https://api.awo-platform.com/v1/auth/mfa/disable`  
+    **Authentication**: Bearer token required  
+    **Rate Limit**: 3 requests per minute
+  </Card>
+</CardGroup>
+
+## Setup MFA Request
+
+### Setup SMS OTP
+
+```json
+{
+  "method": "sms",
+  "phone_number": "+27821234567",
+  "backup_method": "email",
+  "preferences": {
+    "language": "en",
+    "carrier": "MTN",
+    "delivery_preference": "sms_priority"
+  }
+}
 ```
 
-## Request
+### Setup Email OTP
 
-```bash
-curl -X POST "https://api.awo-platform.com/v1/mfa" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "example": "data"
-  }'
+```json
+{
+  "method": "email",
+  "email_address": "nomsa@example.com",
+  "backup_method": "sms",
+  "preferences": {
+    "language": "en",
+    "email_format": "text"
+  }
+}
 ```
 
-## Response
+### Setup Authenticator App
+
+```json
+{
+  "method": "authenticator",
+  "app_name": "google_authenticator",
+  "backup_method": "sms",
+  "generate_backup_codes": true
+}
+```
+
+## Setup MFA Response
+
+### SMS Setup Success (200 OK)
 
 ```json
 {
   "success": true,
   "data": {
-    "id": "example",
-    "status": "completed"
+    "mfa_method": "sms",
+    "setup_status": "pending_verification",
+    "phone_number": "+27821234***",
+    "verification_code_sent": true,
+    "code_expires_in": 300,
+    "backup_method": "email",
+    "next_steps": [
+      "Check SMS for verification code",
+      "Enter code using /auth/mfa/verify endpoint",
+      "Save backup codes securely"
+    ],
+    "delivery_info": {
+      "estimated_delivery": "30-60 seconds",
+      "carrier": "MTN",
+      "delivery_status": "sent",
+      "message_id": "msg_abc123xyz"
+    }
   },
-  "timestamp": "2025-01-20T10:00:00Z"
+  "metadata": {
+    "request_id": "req_mfa_setup_1234567890",
+    "response_time_ms": 1250,
+    "api_version": "1.0.0"
+  }
 }
 ```
 
-## Error Handling
+### Authenticator Setup Success (200 OK)
 
-<Accordion title="Common Error Responses">
-Error codes and responses will be documented here.
-</Accordion>
+```json
+{
+  "success": true,
+  "data": {
+    "mfa_method": "authenticator",
+    "setup_status": "pending_verification",
+    "qr_code": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+    "manual_entry_key": "JBSWY3DPEHPK3PXP",
+    "backup_codes": [
+      "abc123def",
+      "ghi456jkl",
+      "mno789pqr",
+      "stu012vwx",
+      "yz345abc6"
+    ],
+    "app_instructions": {
+      "step_1": "Download Google Authenticator or Authy",
+      "step_2": "Scan QR code or enter manual key",
+      "step_3": "Enter 6-digit code to verify setup"
+    }
+  }
+}
+```
 
-## Rate Limits
+## Verify MFA Request
 
-This endpoint has the following rate limits:
-- 100 requests per minute per user
-- 1000 requests per hour per user
+### SMS/Email Verification
 
-## Related Endpoints
+```json
+{
+  "method": "sms",
+  "verification_code": "123456",
+  "setup_completion": true
+}
+```
+
+### Authenticator Verification
+
+```json
+{
+  "method": "authenticator", 
+  "verification_code": "654321",
+  "setup_completion": true
+}
+```
+
+## Verify MFA Response
+
+### Verification Success (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "mfa_enabled": true,
+    "method": "sms",
+    "phone_number": "+27821234***",
+    "backup_method": "email",
+    "verification_status": "verified",
+    "enabled_at": "2025-01-20T10:30:00Z",
+    "security_level": "high",
+    "backup_codes_remaining": 5,
+    "next_backup_codes_refresh": "2025-07-20T10:30:00Z"
+  }
+}
+```
+
+### Verification Failed (400 Bad Request)
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_MFA_CODE",
+    "message": "The verification code is incorrect or expired",
+    "details": {
+      "attempts_remaining": 2,
+      "max_attempts": 3,
+      "code_expired": false,
+      "last_attempt": "2025-01-20T10:29:45Z",
+      "lockout_threshold": 3
+    },
+    "suggestion": "Check your SMS/email for the latest code or request a new one"
+  }
+}
+```
+
+## MFA Challenge During Login
+
+### Login with MFA Required
+
+When MFA is enabled, the login response indicates MFA challenge required:
+
+```json
+{
+  "success": false,
+  "mfa_required": true,
+  "data": {
+    "challenge_id": "chall_mfa_9k7n4m2p",
+    "available_methods": ["sms", "email"],
+    "primary_method": "sms",
+    "masked_contact": {
+      "sms": "+27821234***",
+      "email": "nom***@example.com"
+    },
+    "challenge_expires_in": 300
+  }
+}
+```
+
+### Complete MFA Challenge
+
+```json
+{
+  "challenge_id": "chall_mfa_9k7n4m2p", 
+  "method": "sms",
+  "verification_code": "123456",
+  "device_info": {
+    "device_id": "device_12345",
+    "remember_device": true,
+    "trust_duration": 2592000
+  }
+}
+```
+
+### MFA Challenge Success
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "usr_7n4m2k8p9q1r",
+      "email": "nomsa@example.com",
+      "mfa_verified": true,
+      "security_level": "high"
+    },
+    "tokens": {
+      "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "refresh_token": "rt_8h5j3m9n7p2q4r6s1t8v0w2x4y6z",
+      "token_type": "Bearer"
+    },
+    "device_trust": {
+      "device_trusted": true,
+      "trust_expires_at": "2025-02-19T10:30:00Z",
+      "skip_mfa_until": "2025-02-19T10:30:00Z"
+    }
+  }
+}
+```
+
+## Request Examples
+
+### Setup SMS MFA (cURL)
+
+```bash
+curl -X POST "https://api.awo-platform.com/v1/auth/mfa/setup" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -d '{
+    "method": "sms",
+    "phone_number": "+27821234567",
+    "backup_method": "email",
+    "preferences": {
+      "language": "en",
+      "carrier": "MTN"
+    }
+  }'
+```
+
+### Verify MFA Setup (JavaScript)
+
+```javascript
+const setupMFA = async (method, contact) => {
+  try {
+    // Step 1: Setup MFA
+    const setupResponse = await fetch('/api/v1/auth/mfa/setup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        method: method,
+        [method === 'sms' ? 'phone_number' : 'email_address']: contact,
+        backup_method: method === 'sms' ? 'email' : 'sms'
+      })
+    });
+
+    const setupData = await setupResponse.json();
+
+    if (setupData.success) {
+      // Step 2: Wait for user to enter verification code
+      const verificationCode = await promptUserForCode();
+
+      // Step 3: Verify the setup
+      const verifyResponse = await fetch('/api/v1/auth/mfa/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          method: method,
+          verification_code: verificationCode,
+          setup_completion: true
+        })
+      });
+
+      const verifyData = await verifyResponse.json();
+
+      if (verifyData.success) {
+        console.log('MFA successfully enabled!');
+        // Store backup codes securely
+        if (verifyData.data.backup_codes) {
+          storeBackupCodes(verifyData.data.backup_codes);
+        }
+        return { success: true, mfaEnabled: true };
+      }
+    }
+  } catch (error) {
+    console.error('MFA setup failed:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Helper function to prompt user for verification code
+const promptUserForCode = () => {
+  return new Promise((resolve) => {
+    const code = prompt('Enter the verification code from SMS/Email:');
+    resolve(code);
+  });
+};
+
+// Store backup codes securely
+const storeBackupCodes = (codes) => {
+  // In a real app, store these in a secure location
+  console.log('Save these backup codes:', codes);
+  localStorage.setItem('mfa_backup_codes', JSON.stringify(codes));
+};
+```
+
+### React Native MFA Setup
+
+```javascript
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
+
+const MFASetupScreen = () => {
+  const [selectedMethod, setSelectedMethod] = useState('sms');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [setupInProgress, setSetupInProgress] = useState(false);
+
+  const setupMFA = async () => {
+    try {
+      setSetupInProgress(true);
+
+      const response = await fetch('https://api.awo-platform.com/v1/auth/mfa/setup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await AsyncStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify({
+          method: selectedMethod,
+          phone_number: phoneNumber,
+          backup_method: 'email',
+          preferences: {
+            language: 'en',
+            delivery_preference: 'sms_priority'
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        Alert.alert(
+          'Verification Code Sent',
+          `Please check your ${selectedMethod} for a verification code`,
+          [{ text: 'OK' }]
+        );
+        setSetupInProgress(false);
+        // Show verification code input
+        setShowVerificationInput(true);
+      } else {
+        throw new Error(data.error.message);
+      }
+    } catch (error) {
+      setSetupInProgress(false);
+      Alert.alert('Setup Failed', error.message);
+    }
+  };
+
+  const verifyMFA = async () => {
+    try {
+      const response = await fetch('https://api.awo-platform.com/v1/auth/mfa/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await AsyncStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify({
+          method: selectedMethod,
+          verification_code: verificationCode,
+          setup_completion: true
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        Alert.alert(
+          'MFA Enabled!',
+          'Multi-factor authentication has been successfully enabled for your account',
+          [{ text: 'Great!', onPress: () => navigation.goBack() }]
+        );
+        
+        // Store backup codes if provided
+        if (data.data.backup_codes) {
+          await AsyncStorage.setItem(
+            'mfa_backup_codes',
+            JSON.stringify(data.data.backup_codes)
+          );
+        }
+      } else {
+        Alert.alert('Verification Failed', data.error.message);
+      }
+    } catch (error) {
+      Alert.alert('Verification Error', error.message);
+    }
+  };
+
+  // Component render logic here...
+};
+```
+
+## MFA Status and Management
+
+### Check MFA Status
+
+```bash
+curl -X GET "https://api.awo-platform.com/v1/auth/mfa/status" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### MFA Status Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "mfa_enabled": true,
+    "primary_method": "sms",
+    "backup_method": "email",
+    "phone_number": "+27821234***",
+    "email": "nom***@example.com",
+    "backup_codes_remaining": 3,
+    "last_used": "2025-01-19T16:45:00Z",
+    "trusted_devices": [
+      {
+        "device_id": "device_12345",
+        "device_name": "iPhone 13",
+        "last_used": "2025-01-20T10:15:00Z",
+        "trust_expires": "2025-02-19T10:15:00Z"
+      }
+    ]
+  }
+}
+```
+
+## African Market Optimizations
+
+### SMS Delivery Optimization
 
 <CardGroup cols={2}>
-  <Card title="Authentication" href="/api-reference/auth/login">
-    User authentication endpoints
+  <Card title="Carrier Integration" icon="signal">
+    **Direct Routes**: Direct connections with MTN, Vodacom, Cell C, Airtel  
+    **Priority Delivery**: Premium SMS routes for faster delivery  
+    **Fallback Options**: Multiple carrier routes for reliability
   </Card>
-  <Card title="User Management" href="/api-reference/users/profile">
-    User profile management
+  <Card title="Regional Adaptation" icon="globe-africa">
+    **Local Numbers**: Local SMS sender IDs for better delivery rates  
+    **Language Support**: SMS in English, Afrikaans, Zulu, Portuguese  
+    **Time Optimization**: SMS sent during optimal carrier windows
   </Card>
 </CardGroup>
+
+### Network Resilience
+
+<Info>
+MFA codes have extended validity periods (10 minutes vs standard 5 minutes) to accommodate slower SMS delivery in some African regions.
+</Info>
+
+<CardGroup cols={2}>
+  <Card title="Delivery Monitoring" icon="eye">
+    **Real-time Tracking**: Monitor SMS delivery status  
+    **Retry Logic**: Automatic resend if delivery fails  
+    **Alternative Routes**: Switch carriers if primary fails
+  </Card>
+  <Card title="User Experience" icon="user-check">
+    **Status Updates**: Real-time delivery status in app  
+    **Manual Resend**: User can request new code  
+    **Voice Fallback**: Voice call option for SMS failures
+  </Card>
+</CardGroup>
+
+## Security Features
+
+### Fraud Protection
+
+<CardGroup cols={2}>
+  <Card title="Rate Limiting" icon="shield-alt">
+    **Setup Attempts**: 5 per hour per user  
+    **Verification Attempts**: 3 per code  
+    **Failed Attempts**: Progressive delays
+  </Card>
+  <Card title="Anomaly Detection" icon="search">
+    **Location Changes**: Detect unusual login locations  
+    **Device Changes**: Monitor new device usage  
+    **Time Patterns**: Flag unusual time-based activity
+  </Card>
+</CardGroup>
+
+### Backup and Recovery
+
+<Steps>
+  <Step title="Backup Codes">
+    Generate 5 single-use backup codes during setup for emergency access
+  </Step>
+  <Step title="Account Recovery">
+    Alternative verification methods if primary MFA method is unavailable
+  </Step>
+  <Step title="Support Assistance">
+    Human verification process for users who lose access to all MFA methods
+  </Step>
+</Steps>
+
+## Error Handling
+
+### Common MFA Errors
+
+| Error Code | HTTP Status | Description | Resolution |
+|------------|-------------|-------------|------------|
+| `MFA_ALREADY_ENABLED` | 409 | MFA already configured | Use modify endpoint instead |
+| `INVALID_PHONE_NUMBER` | 400 | Phone number format invalid | Use E.164 format |
+| `SMS_DELIVERY_FAILED` | 502 | SMS could not be delivered | Try email or voice fallback |
+| `INVALID_MFA_CODE` | 400 | Verification code incorrect | Check code and try again |
+| `MFA_CODE_EXPIRED` | 400 | Verification code expired | Request new code |
+| `MFA_LOCKED` | 423 | Too many failed attempts | Wait for lockout period to expire |
+| `BACKUP_CODE_INVALID` | 400 | Backup code already used | Use different backup code |
+
+### MFA Recovery Process
+
+<CardGroup cols={2}>
+  <Card title="Self-Service Recovery" icon="key">
+    **Backup Codes**: Use saved backup codes  
+    **Alternative Method**: Use backup email/SMS  
+    **Device Trust**: Use previously trusted device
+  </Card>
+  <Card title="Assisted Recovery" icon="headset">
+    **Identity Verification**: Additional ID checks  
+    **Support Contact**: Human verification process  
+    **Security Questions**: Fallback verification
+  </Card>
+</CardGroup>
+
+## Integration Guidelines
+
+### Mobile App Integration
+
+<Steps>
+  <Step title="MFA Setup Flow">
+    Integrate MFA setup during onboarding or in security settings
+  </Step>
+  <Step title="Auto-Code Detection">
+    Implement SMS auto-reading for better user experience
+  </Step>
+  <Step title="Biometric Integration">
+    Use device biometrics to remember MFA verification
+  </Step>
+  <Step title="Offline Fallback">
+    Support authenticator apps for offline verification
+  </Step>
+</Steps>
+
+### Web Integration
+
+```javascript
+// MFA component example
+const MFAChallenge = ({ challengeId, availableMethods, onSuccess }) => {
+  const [selectedMethod, setSelectedMethod] = useState('sms');
+  const [verificationCode, setVerificationCode] = useState('');
+
+  const handleVerification = async () => {
+    const response = await fetch('/api/v1/auth/mfa/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        challenge_id: challengeId,
+        method: selectedMethod,
+        verification_code: verificationCode
+      })
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      onSuccess(data.data.tokens);
+    }
+  };
+
+  return (
+    <div className="mfa-challenge">
+      <h3>Security Verification Required</h3>
+      <p>Enter the verification code sent to your {selectedMethod}</p>
+      <input 
+        type="text" 
+        value={verificationCode}
+        onChange={(e) => setVerificationCode(e.target.value)}
+        placeholder="Enter 6-digit code"
+        maxLength={6}
+      />
+      <button onClick={handleVerification}>Verify</button>
+    </div>
+  );
+};
+```
+
+---
+
+*Multi-factor authentication enhances AWO Platform security while being optimized for African mobile infrastructure and user experience patterns.*
