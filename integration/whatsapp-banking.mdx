@@ -1,52 +1,1984 @@
----
-title: "Whatsapp Banking"
-description: "AWO Platform whatsapp banking integration guide"
----
+# WhatsApp Banking
 
-# Whatsapp Banking
+Implement WhatsApp Business API integration for AWO Platform to provide banking services, account management, and financial assistance through the world's most popular messaging platform across Africa.
+
+<Info>
+This guide covers the complete implementation of WhatsApp Banking using Meta's WhatsApp Business API, enabling AWO Platform users to access financial services through conversational interfaces on the platform they use most.
+</Info>
 
 ## Overview
 
-<Info>
-This guide covers whatsapp banking integration with the AWO Platform.
-</Info>
+WhatsApp Banking transforms AWO Platform's accessibility by bringing financial services directly to users' preferred messaging platform, particularly important in African markets where WhatsApp has massive adoption:
+
+<CardGroup cols={2}>
+  <Card title="Conversational Banking" icon="message-circle">
+    **Natural Interactions**  
+    • Account balance inquiries  
+    • Transaction history  
+    • DIVA score checks  
+    • Chama management
+  </Card>
+  <Card title="African Market Focus" icon="globe">
+    **Regional Advantages**  
+    • 2B+ WhatsApp users globally  
+    • High adoption in SADC region  
+    • Works on feature phones  
+    • Low data usage
+  </Card>
+</CardGroup>
+
+### WhatsApp Banking Use Cases for AWO
+
+| Service Category | Commands | User Experience |
+|-----------------|----------|----------------|
+| **Account Management** | `balance`, `profile`, `help` | Instant account information |
+| **Transactions** | `send money`, `deposit`, `withdraw` | Guided transaction flows |
+| **DIVA Services** | `my score`, `improve score`, `tier info` | Personalized financial insights |
+| **Chama Operations** | `my chamas`, `contribute`, `vote` | Group savings management |
+| **Customer Support** | `support`, `speak to agent`, `faq` | 24/7 assistance |
 
 ## Prerequisites
 
-Integration requirements will be listed here.
-
-## Setup Instructions
+Before implementing WhatsApp Banking, ensure you have:
 
 <Steps>
-  <Step title="API Configuration">
-    Configure API credentials and endpoints
+  <Step title="WhatsApp Business API Access">
+    • Meta Business account setup  
+    • WhatsApp Business API approval  
+    • Phone number verification  
+    • Webhook URL configuration
   </Step>
-  <Step title="Webhook Setup">
-    Set up webhooks for real-time updates
+  <Step title="Development Environment">
+    • Node.js 16+ environment  
+    • Express.js backend setup  
+    • Database with user management  
+    • Message queue system (Redis/Bull)
   </Step>
-  <Step title="Testing">
-    Test the integration in sandbox environment
+  <Step title="Compliance Requirements">
+    • GDPR/POPIA compliance framework  
+    • Financial services regulations  
+    • WhatsApp Business Policy adherence  
+    • Message template approvals
   </Step>
 </Steps>
 
-## Code Examples
+## Meta WhatsApp Business API Setup
+
+### 1. Meta Business Account Configuration
+
+**Create Meta Business Account:**
+1. Go to [business.facebook.com](https://business.facebook.com)
+2. Create business account for AWO Platform
+3. Add WhatsApp Business API product
+4. Complete business verification process
+
+**Phone Number Setup:**
+<CardGroup cols={2}>
+  <Card title="Primary Number" icon="phone">
+    **South Africa**: +27 XXX XXX XXXX  
+    Primary market and regulatory compliance base
+  </Card>
+  <Card title="Regional Numbers" icon="globe">
+    **Multi-Country**: Consider additional numbers for  
+    Botswana, Namibia, Zambia based on user growth
+  </Card>
+</CardGroup>
+
+### 2. Environment Configuration
+
+```bash
+# WhatsApp Business API Configuration
+WA_PHONE_NUMBER_ID=123456789012345
+WA_BUSINESS_ACCOUNT_ID=123456789012345
+CLOUD_API_ACCESS_TOKEN=EAAxxxxxxxxxxxxxxxxxxxxxxx
+CLOUD_API_VERSION=v19.0
+WA_BASE_URL=https://graph.facebook.com
+
+# Webhook Configuration
+WEBHOOK_ENDPOINT=/webhook/whatsapp
+WEBHOOK_VERIFICATION_TOKEN=your_webhook_verification_token_here
+
+# Message Configuration
+WA_RATE_LIMIT=1000
+WA_TIMEOUT_MS=30000
+WA_MAX_RETRIES=3
+
+# Templates (create these in Meta Business Manager)
+WA_WELCOME_TEMPLATE=awo_welcome
+WA_OTP_TEMPLATE=awo_otp_verification
+WA_BALANCE_TEMPLATE=awo_balance_inquiry
+WA_TRANSACTION_TEMPLATE=awo_transaction_alert
+```
+
+### 3. Install Dependencies
+
+```bash
+npm install whatsapp-business-sdk axios express-validator
+npm install bull redis ioredis
+npm install express-rate-limit helmet cors
+```
+
+## WhatsApp Service Implementation
+
+### 1. Core WhatsApp Service
 
 ```typescript
-// Integration example
-import { WhatsappBankingClient } from '@awo-platform/integrations';
+// services/WhatsAppService.ts
+import { WABAClient } from 'whatsapp-business-sdk';
+import { createLogger } from '../utils/logger';
+import { MessageQueue } from './MessageQueue';
 
-const client = new WhatsappBankingClient({
-  apiKey: process.env.API_KEY,
-  environment: 'sandbox'
+const logger = createLogger('WhatsAppService');
+
+export interface WhatsAppMessage {
+  to: string;
+  type: 'text' | 'template' | 'interactive' | 'media';
+  content: any;
+  context?: {
+    message_id?: string;
+  };
+}
+
+export interface WhatsAppUser {
+  phoneNumber: string;
+  userId?: string;
+  sessionState?: string;
+  lastInteraction?: Date;
+  preferences?: {
+    language: string;
+    notifications: boolean;
+  };
+}
+
+export class WhatsAppService {
+  private client: WABAClient;
+  private messageQueue: MessageQueue;
+  private userSessions: Map<string, WhatsAppUser> = new Map();
+
+  constructor() {
+    this.client = new WABAClient({
+      accountId: process.env.WA_BUSINESS_ACCOUNT_ID!,
+      apiToken: process.env.CLOUD_API_ACCESS_TOKEN!,
+      phoneId: process.env.WA_PHONE_NUMBER_ID!,
+      version: process.env.CLOUD_API_VERSION || 'v19.0',
+    });
+
+    this.messageQueue = new MessageQueue();
+    this.initializeSession();
+  }
+
+  private initializeSession(): void {
+    // Load active sessions from Redis or database
+    // Implementation depends on your session storage strategy
+  }
+
+  async sendMessage(message: WhatsAppMessage): Promise<string> {
+    try {
+      let response;
+
+      switch (message.type) {
+        case 'text':
+          response = await this.client.sendMessage({
+            to: message.to,
+            type: 'text',
+            text: { body: message.content.text },
+            context: message.context,
+          });
+          break;
+
+        case 'template':
+          response = await this.client.sendMessage({
+            to: message.to,
+            type: 'template',
+            template: {
+              name: message.content.name,
+              language: { code: message.content.language || 'en' },
+              components: message.content.components || [],
+            },
+          });
+          break;
+
+        case 'interactive':
+          response = await this.client.sendMessage({
+            to: message.to,
+            type: 'interactive',
+            interactive: message.content,
+          });
+          break;
+
+        case 'media':
+          response = await this.client.sendMessage({
+            to: message.to,
+            type: message.content.mediaType,
+            [message.content.mediaType]: {
+              id: message.content.mediaId,
+              caption: message.content.caption,
+            },
+          });
+          break;
+
+        default:
+          throw new Error(`Unsupported message type: ${message.type}`);
+      }
+
+      logger.info('WhatsApp message sent successfully', {
+        to: message.to,
+        type: message.type,
+        messageId: response.messages[0].id,
+      });
+
+      return response.messages[0].id;
+    } catch (error) {
+      logger.error('Failed to send WhatsApp message', {
+        to: message.to,
+        type: message.type,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  async sendTextMessage(to: string, text: string, context?: any): Promise<string> {
+    return this.sendMessage({
+      to,
+      type: 'text',
+      content: { text },
+      context,
+    });
+  }
+
+  async sendTemplate(to: string, templateName: string, components?: any[], language = 'en'): Promise<string> {
+    return this.sendMessage({
+      to,
+      type: 'template',
+      content: {
+        name: templateName,
+        language,
+        components,
+      },
+    });
+  }
+
+  async sendInteractiveMenu(to: string, menuData: any): Promise<string> {
+    const interactive = {
+      type: 'list',
+      header: menuData.header ? { type: 'text', text: menuData.header } : undefined,
+      body: { text: menuData.body },
+      footer: menuData.footer ? { text: menuData.footer } : undefined,
+      action: {
+        button: menuData.buttonText || 'Options',
+        sections: menuData.sections,
+      },
+    };
+
+    return this.sendMessage({
+      to,
+      type: 'interactive',
+      content: interactive,
+    });
+  }
+
+  async sendQuickReplyButtons(to: string, text: string, buttons: Array<{ id: string; title: string }>): Promise<string> {
+    const interactive = {
+      type: 'button',
+      body: { text },
+      action: {
+        buttons: buttons.map(button => ({
+          type: 'reply',
+          reply: {
+            id: button.id,
+            title: button.title,
+          },
+        })),
+      },
+    };
+
+    return this.sendMessage({
+      to,
+      type: 'interactive',
+      content: interactive,
+    });
+  }
+
+  async markMessageAsRead(messageId: string): Promise<void> {
+    try {
+      await this.client.markMessageAsRead(messageId);
+    } catch (error) {
+      logger.error('Failed to mark message as read', {
+        messageId,
+        error: error.message,
+      });
+    }
+  }
+
+  // Session management
+  getUserSession(phoneNumber: string): WhatsAppUser | null {
+    return this.userSessions.get(phoneNumber) || null;
+  }
+
+  setUserSession(phoneNumber: string, session: WhatsAppUser): void {
+    this.userSessions.set(phoneNumber, {
+      ...session,
+      lastInteraction: new Date(),
+    });
+  }
+
+  clearUserSession(phoneNumber: string): void {
+    this.userSessions.delete(phoneNumber);
+  }
+
+  // Queue message for delayed sending
+  async queueMessage(message: WhatsAppMessage, delay = 0): Promise<void> {
+    await this.messageQueue.add('whatsapp-message', message, {
+      delay,
+      attempts: 3,
+      backoff: 'exponential',
+    });
+  }
+}
+
+// Export singleton instance
+export const whatsAppService = new WhatsAppService();
+```
+
+### 2. Message Handler Service
+
+```typescript
+// services/WhatsAppMessageHandler.ts
+import { whatsAppService, WhatsAppUser } from './WhatsAppService';
+import { UserService } from './UserService';
+import { BankingService } from './BankingService';
+import { DIVAService } from './DIVAService';
+import { ChamaService } from './ChamaService';
+
+export interface IncomingMessage {
+  from: string;
+  messageId: string;
+  timestamp: string;
+  type: 'text' | 'interactive' | 'button' | 'location' | 'media';
+  content: any;
+  context?: {
+    from?: string;
+    id?: string;
+  };
+}
+
+export class WhatsAppMessageHandler {
+  private userService: UserService;
+  private bankingService: BankingService;
+  private divaService: DIVAService;
+  private chamaService: ChamaService;
+
+  constructor() {
+    this.userService = new UserService();
+    this.bankingService = new BankingService();
+    this.divaService = new DIVAService();
+    this.chamaService = new ChamaService();
+  }
+
+  async handleIncomingMessage(message: IncomingMessage): Promise<void> {
+    try {
+      const phoneNumber = message.from;
+      
+      // Mark message as read
+      await whatsAppService.markMessageAsRead(message.messageId);
+
+      // Get or create user session
+      let session = whatsAppService.getUserSession(phoneNumber);
+      if (!session) {
+        session = await this.initializeUserSession(phoneNumber);
+      }
+
+      // Update last interaction
+      session.lastInteraction = new Date();
+      whatsAppService.setUserSession(phoneNumber, session);
+
+      // Route message based on type and content
+      await this.routeMessage(message, session);
+
+    } catch (error) {
+      logger.error('Error handling incoming WhatsApp message', {
+        from: message.from,
+        messageId: message.messageId,
+        error: error.message,
+      });
+
+      // Send error message to user
+      await whatsAppService.sendTextMessage(
+        message.from,
+        "I'm having trouble processing your request right now. Please try again in a few moments or type 'help' for assistance."
+      );
+    }
+  }
+
+  private async initializeUserSession(phoneNumber: string): Promise<WhatsAppUser> {
+    // Check if user exists in database
+    const user = await this.userService.findByPhoneNumber(phoneNumber);
+    
+    const session: WhatsAppUser = {
+      phoneNumber,
+      userId: user?.id,
+      sessionState: user ? 'authenticated' : 'unauthenticated',
+      lastInteraction: new Date(),
+      preferences: {
+        language: 'en',
+        notifications: true,
+      },
+    };
+
+    whatsAppService.setUserSession(phoneNumber, session);
+
+    // Send welcome message for new users
+    if (!user) {
+      await this.sendWelcomeMessage(phoneNumber);
+    }
+
+    return session;
+  }
+
+  private async routeMessage(message: IncomingMessage, session: WhatsAppUser): Promise<void> {
+    const content = this.extractMessageContent(message);
+    const command = this.parseCommand(content);
+
+    // Handle different session states
+    if (session.sessionState === 'unauthenticated') {
+      await this.handleUnauthenticatedUser(message, session, command);
+      return;
+    }
+
+    // Handle authenticated user commands
+    switch (command.action) {
+      case 'balance':
+        await this.handleBalanceInquiry(message, session);
+        break;
+      case 'transactions':
+        await this.handleTransactionHistory(message, session);
+        break;
+      case 'diva':
+      case 'score':
+        await this.handleDIVAScore(message, session);
+        break;
+      case 'chama':
+      case 'chamas':
+        await this.handleChamaOperations(message, session, command);
+        break;
+      case 'send':
+      case 'transfer':
+        await this.handleMoneyTransfer(message, session, command);
+        break;
+      case 'help':
+        await this.sendHelpMenu(message.from);
+        break;
+      case 'support':
+        await this.handleCustomerSupport(message, session);
+        break;
+      default:
+        await this.handleUnknownCommand(message, session);
+        break;
+    }
+  }
+
+  private extractMessageContent(message: IncomingMessage): string {
+    switch (message.type) {
+      case 'text':
+        return message.content.body || '';
+      case 'interactive':
+        return message.content.list_reply?.title || 
+               message.content.button_reply?.title || '';
+      case 'button':
+        return message.content.payload || '';
+      default:
+        return '';
+    }
+  }
+
+  private parseCommand(content: string): { action: string; params: string[] } {
+    const parts = content.toLowerCase().trim().split(/\s+/);
+    const action = parts[0];
+    const params = parts.slice(1);
+
+    // Handle common variations
+    const commandMap = {
+      'bal': 'balance',
+      'my': parts[1] === 'score' ? 'diva' : parts[1] === 'chamas' ? 'chama' : 'balance',
+      'hi': 'help',
+      'hello': 'help',
+      'hey': 'help',
+      'menu': 'help',
+    };
+
+    return {
+      action: commandMap[action] || action,
+      params,
+    };
+  }
+
+  private async handleUnauthenticatedUser(message: IncomingMessage, session: WhatsAppUser, command: any): Promise<void> {
+    const content = this.extractMessageContent(message);
+
+    if (command.action === 'register' || content.includes('register')) {
+      await this.startRegistrationFlow(message.from, session);
+    } else if (command.action === 'login' || content.includes('login')) {
+      await this.startLoginFlow(message.from, session);
+    } else {
+      await whatsAppService.sendQuickReplyButtons(
+        message.from,
+        "Welcome to AWO Platform! 🏦\n\nTo get started, please choose an option:",
+        [
+          { id: 'register', title: '📝 Register' },
+          { id: 'login', title: '🔐 Login' },
+          { id: 'help', title: '❓ Help' },
+        ]
+      );
+    }
+  }
+
+  private async handleBalanceInquiry(message: IncomingMessage, session: WhatsAppUser): Promise<void> {
+    try {
+      const balanceData = await this.bankingService.getAccountBalance(session.userId!);
+      
+      const balanceText = `💰 *Account Balance*\n\n` +
+        `Main Wallet: R${balanceData.mainBalance.toFixed(2)}\n` +
+        `Savings: R${balanceData.savingsBalance.toFixed(2)}\n` +
+        `Investments: R${balanceData.investmentBalance.toFixed(2)}\n\n` +
+        `Total: R${balanceData.totalBalance.toFixed(2)}`;
+
+      await whatsAppService.sendTextMessage(message.from, balanceText);
+
+      // Offer quick actions
+      await whatsAppService.sendQuickReplyButtons(
+        message.from,
+        "What would you like to do next?",
+        [
+          { id: 'transactions', title: '📋 View Transactions' },
+          { id: 'diva', title: '📊 DIVA Score' },
+          { id: 'help', title: '❓ More Options' },
+        ]
+      );
+    } catch (error) {
+      await whatsAppService.sendTextMessage(
+        message.from,
+        "I couldn't retrieve your balance right now. Please try again later or contact support."
+      );
+    }
+  }
+
+  private async handleDIVAScore(message: IncomingMessage, session: WhatsAppUser): Promise<void> {
+    try {
+      const divaData = await this.divaService.getUserDIVAScore(session.userId!);
+      
+      const scoreText = `📊 *Your DIVA Score*\n\n` +
+        `Current Score: ${divaData.overallScore}/1000\n` +
+        `Tier: ${divaData.tier}\n\n` +
+        `Components:\n` +
+        `• Discipline: ${divaData.components.discipline}/250\n` +
+        `• Income: ${divaData.components.income}/250\n` +
+        `• Velocity: ${divaData.components.velocity}/250\n` +
+        `• Assets: ${divaData.components.assets}/250\n\n` +
+        `Next update: ${divaData.nextUpdateDue}`;
+
+      await whatsAppService.sendTextMessage(message.from, scoreText);
+
+      if (divaData.improvementTips?.length > 0) {
+        const tipsText = `💡 *Ways to Improve Your Score:*\n\n` +
+          divaData.improvementTips.slice(0, 3).map((tip, i) => `${i + 1}. ${tip}`).join('\n');
+        
+        await whatsAppService.sendTextMessage(message.from, tipsText);
+      }
+    } catch (error) {
+      await whatsAppService.sendTextMessage(
+        message.from,
+        "I couldn't retrieve your DIVA score right now. Please try again later."
+      );
+    }
+  }
+
+  private async handleChamaOperations(message: IncomingMessage, session: WhatsAppUser, command: any): Promise<void> {
+    try {
+      const userChamas = await this.chamaService.getUserChamas(session.userId!);
+      
+      if (userChamas.length === 0) {
+        await whatsAppService.sendQuickReplyButtons(
+          message.from,
+          "You're not part of any Chamas yet. Would you like to:",
+          [
+            { id: 'create_chama', title: '➕ Create Chama' },
+            { id: 'join_chama', title: '🤝 Join Chama' },
+            { id: 'learn_chama', title: '📚 Learn About Chamas' },
+          ]
+        );
+        return;
+      }
+
+      // Show Chama list
+      const chamaText = `🤝 *Your Chamas (${userChamas.length})*\n\n` +
+        userChamas.map((chama, i) => 
+          `${i + 1}. ${chama.name}\n` +
+          `   Balance: R${chama.userBalance.toFixed(2)}\n` +
+          `   Members: ${chama.memberCount}`
+        ).join('\n\n');
+
+      await whatsAppService.sendTextMessage(message.from, chamaText);
+
+      // Offer Chama actions
+      await whatsAppService.sendInteractiveMenu(
+        message.from,
+        {
+          header: 'Chama Actions',
+          body: 'Choose what you\'d like to do:',
+          buttonText: 'Select Action',
+          sections: [
+            {
+              title: 'Quick Actions',
+              rows: [
+                { id: 'contribute', title: '💰 Make Contribution', description: 'Add money to your Chamas' },
+                { id: 'chama_balance', title: '💳 Check Balances', description: 'View detailed balances' },
+                { id: 'chama_activity', title: '📋 Recent Activity', description: 'See latest transactions' },
+              ],
+            },
+            {
+              title: 'Management',
+              rows: [
+                { id: 'voting', title: '🗳️ Pending Votes', description: 'View proposals to vote on' },
+                { id: 'create_chama', title: '➕ Create New Chama', description: 'Start a new savings group' },
+              ],
+            },
+          ],
+        }
+      );
+    } catch (error) {
+      await whatsAppService.sendTextMessage(
+        message.from,
+        "I couldn't retrieve your Chama information right now. Please try again later."
+      );
+    }
+  }
+
+  private async sendWelcomeMessage(phoneNumber: string): Promise<void> {
+    const welcomeText = `Welcome to AWO Platform! 🎉\n\n` +
+      `I'm your personal banking assistant. I can help you with:\n\n` +
+      `💰 Check account balances\n` +
+      `📊 View your DIVA score\n` +
+      `🤝 Manage your Chamas\n` +
+      `💸 Send money\n` +
+      `📋 Transaction history\n` +
+      `❓ Get support\n\n` +
+      `To get started, please register or login to your account.`;
+
+    await whatsAppService.sendTextMessage(phoneNumber, welcomeText);
+
+    await whatsAppService.sendQuickReplyButtons(
+      phoneNumber,
+      "Choose an option to continue:",
+      [
+        { id: 'register', title: '📝 Register' },
+        { id: 'login', title: '🔐 Login' },
+        { id: 'help', title: '❓ Learn More' },
+      ]
+    );
+  }
+
+  private async sendHelpMenu(phoneNumber: string): Promise<void> {
+    await whatsAppService.sendInteractiveMenu(
+      phoneNumber,
+      {
+        header: 'AWO Platform Help',
+        body: 'Here\'s what I can help you with:',
+        footer: 'Select any option to get started',
+        buttonText: 'Choose Service',
+        sections: [
+          {
+            title: 'Account Services',
+            rows: [
+              { id: 'balance', title: '💰 Check Balance', description: 'View your account balances' },
+              { id: 'transactions', title: '📋 Transaction History', description: 'See recent transactions' },
+              { id: 'diva', title: '📊 DIVA Score', description: 'Check your financial score' },
+            ],
+          },
+          {
+            title: 'Money Services',
+            rows: [
+              { id: 'send_money_help', title: '💸 Send Money', description: 'Learn how to transfer funds' },
+              { id: 'chama_help', title: '🤝 Chama Management', description: 'Manage your savings groups' },
+              { id: 'investment_help', title: '📈 Investments', description: 'Investment opportunities' },
+            ],
+          },
+          {
+            title: 'Support',
+            rows: [
+              { id: 'faq', title: '❓ FAQ', description: 'Frequently asked questions' },
+              { id: 'support', title: '🆘 Contact Support', description: 'Speak with our team' },
+              { id: 'security', title: '🔒 Security Tips', description: 'Keep your account safe' },
+            ],
+          },
+        ],
+      }
+    );
+  }
+
+  private async handleUnknownCommand(message: IncomingMessage, session: WhatsAppUser): Promise<void> {
+    const content = this.extractMessageContent(message);
+    
+    // Try to suggest similar commands
+    const suggestions = this.getSuggestions(content);
+    
+    let responseText = "I didn't understand that command. 🤔\n\n";
+    
+    if (suggestions.length > 0) {
+      responseText += "Did you mean:\n" + suggestions.map(s => `• ${s}`).join('\n') + "\n\n";
+    }
+    
+    responseText += "Type 'help' to see all available commands.";
+    
+    await whatsAppService.sendTextMessage(message.from, responseText);
+  }
+
+  private getSuggestions(input: string): string[] {
+    const commands = ['balance', 'transactions', 'diva score', 'chamas', 'send money', 'help'];
+    const suggestions = [];
+    
+    for (const command of commands) {
+      if (this.isStringSimilar(input.toLowerCase(), command.toLowerCase())) {
+        suggestions.push(command);
+      }
+    }
+    
+    return suggestions.slice(0, 3); // Return top 3 suggestions
+  }
+
+  private isStringSimilar(str1: string, str2: string): boolean {
+    // Simple similarity check - could be enhanced with Levenshtein distance
+    return str2.includes(str1) || str1.includes(str2) || 
+           str1.split('').some(char => str2.includes(char));
+  }
+}
+
+// Export singleton instance
+export const messageHandler = new WhatsAppMessageHandler();
+```
+
+### 3. Webhook Handler
+
+```typescript
+// webhooks/whatsappWebhook.ts
+import { Request, Response } from 'express';
+import { messageHandler } from '../services/WhatsAppMessageHandler';
+import { whatsAppService } from '../services/WhatsAppService';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('WhatsAppWebhook');
+
+export class WhatsAppWebhookHandler {
+  // Verify webhook (Meta requirement)
+  static verifyWebhook(req: Request, res: Response): void {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    if (mode === 'subscribe' && token === process.env.WEBHOOK_VERIFICATION_TOKEN) {
+      logger.info('Webhook verified successfully');
+      res.status(200).send(challenge);
+    } else {
+      logger.error('Webhook verification failed', { mode, token });
+      res.status(403).send('Forbidden');
+    }
+  }
+
+  // Handle incoming webhook events
+  static async handleWebhook(req: Request, res: Response): Promise<void> {
+    try {
+      const body = req.body;
+
+      // Verify webhook signature (recommended for production)
+      if (!WhatsAppWebhookHandler.verifySignature(req)) {
+        return res.status(401).send('Unauthorized');
+      }
+
+      // Process webhook payload
+      if (body.object === 'whatsapp_business_account') {
+        for (const entry of body.entry || []) {
+          for (const change of entry.changes || []) {
+            if (change.field === 'messages') {
+              await WhatsAppWebhookHandler.processMessageChange(change.value);
+            }
+          }
+        }
+      }
+
+      res.status(200).send('OK');
+    } catch (error) {
+      logger.error('Error processing webhook', { error: error.message });
+      res.status(500).send('Internal Server Error');
+    }
+  }
+
+  private static verifySignature(req: Request): boolean {
+    // Implement webhook signature verification
+    // This is crucial for production security
+    const signature = req.headers['x-hub-signature-256'];
+    if (!signature) return false;
+
+    // Verify signature using your app secret
+    // Implementation depends on your security requirements
+    return true; // Simplified for this example
+  }
+
+  private static async processMessageChange(value: any): Promise<void> {
+    try {
+      // Handle incoming messages
+      if (value.messages) {
+        for (const message of value.messages) {
+          await WhatsAppWebhookHandler.handleIncomingMessage(message, value.contacts?.[0]);
+        }
+      }
+
+      // Handle message status updates
+      if (value.statuses) {
+        for (const status of value.statuses) {
+          await WhatsAppWebhookHandler.handleMessageStatus(status);
+        }
+      }
+
+      // Handle errors
+      if (value.errors) {
+        for (const error of value.errors) {
+          logger.error('WhatsApp API error received', error);
+        }
+      }
+    } catch (error) {
+      logger.error('Error processing message change', { error: error.message });
+    }
+  }
+
+  private static async handleIncomingMessage(message: any, contact: any): Promise<void> {
+    try {
+      const incomingMessage = {
+        from: message.from,
+        messageId: message.id,
+        timestamp: message.timestamp,
+        type: message.type,
+        content: WhatsAppWebhookHandler.extractMessageContent(message),
+        context: message.context,
+      };
+
+      // Process message through handler
+      await messageHandler.handleIncomingMessage(incomingMessage);
+
+      // Log message for analytics
+      logger.info('Processed incoming WhatsApp message', {
+        from: message.from,
+        messageId: message.id,
+        type: message.type,
+      });
+    } catch (error) {
+      logger.error('Error handling incoming message', {
+        messageId: message.id,
+        error: error.message,
+      });
+    }
+  }
+
+  private static extractMessageContent(message: any): any {
+    switch (message.type) {
+      case 'text':
+        return { body: message.text?.body };
+      case 'interactive':
+        return {
+          list_reply: message.interactive?.list_reply,
+          button_reply: message.interactive?.button_reply,
+        };
+      case 'button':
+        return { payload: message.button?.payload };
+      case 'image':
+      case 'video':
+      case 'audio':
+      case 'document':
+        return {
+          id: message[message.type]?.id,
+          caption: message[message.type]?.caption,
+          mime_type: message[message.type]?.mime_type,
+        };
+      case 'location':
+        return {
+          latitude: message.location?.latitude,
+          longitude: message.location?.longitude,
+          name: message.location?.name,
+          address: message.location?.address,
+        };
+      default:
+        return {};
+    }
+  }
+
+  private static async handleMessageStatus(status: any): Promise<void> {
+    try {
+      logger.info('Message status update', {
+        messageId: status.id,
+        status: status.status,
+        timestamp: status.timestamp,
+        recipientId: status.recipient_id,
+      });
+
+      // Update message status in database
+      // Implementation depends on your message tracking needs
+      
+      // Handle specific statuses
+      switch (status.status) {
+        case 'sent':
+          // Message sent to WhatsApp servers
+          break;
+        case 'delivered':
+          // Message delivered to user's device
+          break;
+        case 'read':
+          // Message read by user
+          break;
+        case 'failed':
+          // Message failed to deliver
+          logger.error('Message delivery failed', {
+            messageId: status.id,
+            error: status.errors?.[0],
+          });
+          break;
+      }
+    } catch (error) {
+      logger.error('Error handling message status', {
+        statusId: status.id,
+        error: error.message,
+      });
+    }
+  }
+}
+```
+
+## Advanced Features Implementation
+
+### 1. Template Message System
+
+```typescript
+// services/WhatsAppTemplateService.ts
+export class WhatsAppTemplateService {
+  static async sendWelcomeTemplate(phoneNumber: string, userName: string): Promise<string> {
+    return whatsAppService.sendTemplate(
+      phoneNumber,
+      'awo_welcome',
+      [
+        {
+          type: 'header',
+          parameters: [
+            { type: 'text', text: userName }
+          ]
+        },
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: userName },
+            { type: 'text', text: 'AWO Platform' }
+          ]
+        },
+        {
+          type: 'button',
+          sub_type: 'url',
+          index: '0',
+          parameters: [
+            { type: 'text', text: 'dashboard' }
+          ]
+        }
+      ]
+    );
+  }
+
+  static async sendOTPTemplate(phoneNumber: string, otp: string): Promise<string> {
+    return whatsAppService.sendTemplate(
+      phoneNumber,
+      'awo_otp_verification',
+      [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: otp },
+            { type: 'text', text: '5' } // Minutes
+          ]
+        }
+      ]
+    );
+  }
+
+  static async sendTransactionAlert(
+    phoneNumber: string, 
+    amount: string, 
+    type: string, 
+    balance: string
+  ): Promise<string> {
+    return whatsAppService.sendTemplate(
+      phoneNumber,
+      'awo_transaction_alert',
+      [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: type },
+            { type: 'text', text: amount },
+            { type: 'text', text: balance }
+          ]
+        }
+      ]
+    );
+  }
+
+  static async sendChamaReminder(
+    phoneNumber: string, 
+    chamaName: string, 
+    amount: string, 
+    dueDate: string
+  ): Promise<string> {
+    return whatsAppService.sendTemplate(
+      phoneNumber,
+      'awo_chama_reminder',
+      [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: chamaName },
+            { type: 'text', text: amount },
+            { type: 'text', text: dueDate }
+          ]
+        }
+      ]
+    );
+  }
+
+  static async sendDIVAScoreUpdate(
+    phoneNumber: string, 
+    newScore: string, 
+    tier: string, 
+    improvement: string
+  ): Promise<string> {
+    return whatsAppService.sendTemplate(
+      phoneNumber,
+      'awo_diva_update',
+      [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: newScore },
+            { type: 'text', text: tier },
+            { type: 'text', text: improvement }
+          ]
+        }
+      ]
+    );
+  }
+}
+```
+
+### 2. Payment Flow Integration
+
+```typescript
+// services/WhatsAppPaymentService.ts
+export class WhatsAppPaymentService {
+  async initiateMoneyTransfer(session: WhatsAppUser, params: string[]): Promise<void> {
+    const phoneNumber = session.phoneNumber;
+    
+    // Start payment flow
+    session.sessionState = 'transfer_amount';
+    whatsAppService.setUserSession(phoneNumber, session);
+
+    await whatsAppService.sendTextMessage(
+      phoneNumber,
+      "💸 *Send Money*\n\nHow much would you like to send?\n\nPlease enter the amount (e.g., 100 or R100):"
+    );
+  }
+
+  async handleTransferAmount(session: WhatsAppUser, amount: string): Promise<void> {
+    const phoneNumber = session.phoneNumber;
+    
+    // Validate amount
+    const numericAmount = this.parseAmount(amount);
+    if (!numericAmount || numericAmount <= 0) {
+      await whatsAppService.sendTextMessage(
+        phoneNumber,
+        "❌ Invalid amount. Please enter a valid amount (e.g., 100 or R100):"
+      );
+      return;
+    }
+
+    // Check balance
+    const balance = await this.bankingService.getAccountBalance(session.userId!);
+    if (numericAmount > balance.mainBalance) {
+      await whatsAppService.sendTextMessage(
+        phoneNumber,
+        `❌ Insufficient funds. Your current balance is R${balance.mainBalance.toFixed(2)}.`
+      );
+      return;
+    }
+
+    // Store amount and ask for recipient
+    session.sessionState = 'transfer_recipient';
+    session.transferData = { amount: numericAmount };
+    whatsAppService.setUserSession(phoneNumber, session);
+
+    await whatsAppService.sendTextMessage(
+      phoneNumber,
+      `💸 *Send R${numericAmount.toFixed(2)}*\n\nWho would you like to send money to?\n\nEnter their phone number (e.g., 0123456789):`
+    );
+  }
+
+  async handleTransferRecipient(session: WhatsAppUser, recipient: string): Promise<void> {
+    const phoneNumber = session.phoneNumber;
+    
+    // Validate recipient
+    const cleanRecipient = this.cleanPhoneNumber(recipient);
+    if (!this.isValidPhoneNumber(cleanRecipient)) {
+      await whatsAppService.sendTextMessage(
+        phoneNumber,
+        "❌ Invalid phone number. Please enter a valid phone number (e.g., 0123456789):"
+      );
+      return;
+    }
+
+    // Check if recipient exists
+    const recipientUser = await this.userService.findByPhoneNumber(cleanRecipient);
+    if (!recipientUser) {
+      await whatsAppService.sendTextMessage(
+        phoneNumber,
+        "❌ Recipient not found. They need to be registered with AWO Platform first."
+      );
+      return;
+    }
+
+    // Update session with recipient info
+    session.transferData.recipient = cleanRecipient;
+    session.transferData.recipientName = recipientUser.fullName;
+    session.sessionState = 'transfer_confirm';
+    whatsAppService.setUserSession(phoneNumber, session);
+
+    // Show confirmation
+    await whatsAppService.sendQuickReplyButtons(
+      phoneNumber,
+      `💸 *Confirm Transfer*\n\n` +
+      `Amount: R${session.transferData.amount.toFixed(2)}\n` +
+      `To: ${recipientUser.fullName} (${cleanRecipient})\n\n` +
+      `Confirm this transfer?`,
+      [
+        { id: 'confirm_transfer', title: '✅ Confirm' },
+        { id: 'cancel_transfer', title: '❌ Cancel' },
+      ]
+    );
+  }
+
+  async processTransferConfirmation(session: WhatsAppUser, confirmed: boolean): Promise<void> {
+    const phoneNumber = session.phoneNumber;
+    
+    if (!confirmed) {
+      // Cancel transfer
+      session.sessionState = 'authenticated';
+      delete session.transferData;
+      whatsAppService.setUserSession(phoneNumber, session);
+
+      await whatsAppService.sendTextMessage(phoneNumber, "❌ Transfer cancelled.");
+      return;
+    }
+
+    try {
+      // Process the transfer
+      const transfer = await this.bankingService.processTransfer({
+        fromUserId: session.userId!,
+        toPhoneNumber: session.transferData.recipient,
+        amount: session.transferData.amount,
+        description: 'WhatsApp transfer',
+      });
+
+      // Clear session state
+      session.sessionState = 'authenticated';
+      delete session.transferData;
+      whatsAppService.setUserSession(phoneNumber, session);
+
+      // Send success message
+      await whatsAppService.sendTextMessage(
+        phoneNumber,
+        `✅ *Transfer Successful*\n\n` +
+        `R${transfer.amount.toFixed(2)} sent to ${session.transferData.recipientName}\n` +
+        `Reference: ${transfer.reference}\n` +
+        `New balance: R${transfer.newBalance.toFixed(2)}`
+      );
+
+      // Send notification to recipient
+      await WhatsAppTemplateService.sendTransactionAlert(
+        session.transferData.recipient,
+        transfer.amount.toString(),
+        'Received',
+        transfer.recipientNewBalance.toString()
+      );
+
+    } catch (error) {
+      // Handle transfer error
+      await whatsAppService.sendTextMessage(
+        phoneNumber,
+        "❌ Transfer failed. Please try again later or contact support."
+      );
+
+      logger.error('WhatsApp transfer failed', {
+        userId: session.userId,
+        amount: session.transferData.amount,
+        recipient: session.transferData.recipient,
+        error: error.message,
+      });
+    }
+  }
+
+  private parseAmount(input: string): number | null {
+    // Remove currency symbols and spaces
+    const cleaned = input.replace(/[R$,\s]/g, '');
+    const amount = parseFloat(cleaned);
+    return isNaN(amount) ? null : amount;
+  }
+
+  private cleanPhoneNumber(phone: string): string {
+    // Remove spaces, dashes, and format to +27 format
+    let cleaned = phone.replace(/[\s\-\(\)]/g, '');
+    
+    if (cleaned.startsWith('0')) {
+      cleaned = '+27' + cleaned.substring(1);
+    } else if (cleaned.startsWith('27')) {
+      cleaned = '+' + cleaned;
+    } else if (!cleaned.startsWith('+')) {
+      cleaned = '+27' + cleaned;
+    }
+    
+    return cleaned;
+  }
+
+  private isValidPhoneNumber(phone: string): boolean {
+    // Basic validation for South African numbers
+    const saPattern = /^\+27[6-8][0-9]{8}$/;
+    return saPattern.test(phone);
+  }
+}
+```
+
+### 3. Session Management
+
+```typescript
+// services/WhatsAppSessionService.ts
+import Redis from 'ioredis';
+
+export class WhatsAppSessionService {
+  private redis: Redis;
+  private sessionTTL = 24 * 60 * 60; // 24 hours
+
+  constructor() {
+    this.redis = new Redis(process.env.REDIS_URL);
+  }
+
+  async getSession(phoneNumber: string): Promise<WhatsAppUser | null> {
+    try {
+      const sessionData = await this.redis.get(`whatsapp:session:${phoneNumber}`);
+      return sessionData ? JSON.parse(sessionData) : null;
+    } catch (error) {
+      logger.error('Error getting WhatsApp session', { phoneNumber, error });
+      return null;
+    }
+  }
+
+  async setSession(phoneNumber: string, session: WhatsAppUser): Promise<void> {
+    try {
+      await this.redis.setex(
+        `whatsapp:session:${phoneNumber}`,
+        this.sessionTTL,
+        JSON.stringify(session)
+      );
+    } catch (error) {
+      logger.error('Error setting WhatsApp session', { phoneNumber, error });
+    }
+  }
+
+  async clearSession(phoneNumber: string): Promise<void> {
+    try {
+      await this.redis.del(`whatsapp:session:${phoneNumber}`);
+    } catch (error) {
+      logger.error('Error clearing WhatsApp session', { phoneNumber, error });
+    }
+  }
+
+  async extendSession(phoneNumber: string): Promise<void> {
+    try {
+      await this.redis.expire(`whatsapp:session:${phoneNumber}`, this.sessionTTL);
+    } catch (error) {
+      logger.error('Error extending WhatsApp session', { phoneNumber, error });
+    }
+  }
+
+  // Rate limiting
+  async checkRateLimit(phoneNumber: string, action: string): Promise<boolean> {
+    const key = `whatsapp:ratelimit:${phoneNumber}:${action}`;
+    const current = await this.redis.incr(key);
+    
+    if (current === 1) {
+      await this.redis.expire(key, 60); // 1 minute window
+    }
+    
+    const limits = {
+      message: 20,        // 20 messages per minute
+      transfer: 5,        // 5 transfers per minute
+      balance_check: 10,  // 10 balance checks per minute
+    };
+    
+    return current <= (limits[action] || 10);
+  }
+}
+```
+
+## Express Routes Configuration
+
+```typescript
+// routes/whatsapp.ts
+import { Router } from 'express';
+import { WhatsAppWebhookHandler } from '../webhooks/whatsappWebhook';
+import { body, validationResult } from 'express-validator';
+import { authMiddleware } from '../middleware/auth';
+import rateLimit from 'express-rate-limit';
+
+const router = Router();
+
+// Webhook verification (GET)
+router.get('/webhook', WhatsAppWebhookHandler.verifyWebhook);
+
+// Webhook events (POST)
+router.post('/webhook', WhatsAppWebhookHandler.handleWebhook);
+
+// Rate limiting for manual message sending
+const messageRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // 10 messages per minute
+  message: 'Too many messages sent, please try again later.',
+});
+
+// Send manual message (for admin/support use)
+router.post('/send-message',
+  authMiddleware,
+  messageRateLimit,
+  [
+    body('phoneNumber').isMobilePhone().withMessage('Valid phone number required'),
+    body('message').isLength({ min: 1, max: 4096 }).withMessage('Message must be between 1 and 4096 characters'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { phoneNumber, message } = req.body;
+      
+      const messageId = await whatsAppService.sendTextMessage(phoneNumber, message);
+      
+      res.json({
+        success: true,
+        messageId,
+        message: 'Message sent successfully',
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+);
+
+// Send template message
+router.post('/send-template',
+  authMiddleware,
+  [
+    body('phoneNumber').isMobilePhone().withMessage('Valid phone number required'),
+    body('templateName').notEmpty().withMessage('Template name is required'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { phoneNumber, templateName, components, language = 'en' } = req.body;
+      
+      const messageId = await whatsAppService.sendTemplate(
+        phoneNumber,
+        templateName,
+        components,
+        language
+      );
+      
+      res.json({
+        success: true,
+        messageId,
+        message: 'Template message sent successfully',
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+);
+
+// Get user session info (for debugging)
+router.get('/session/:phoneNumber',
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const { phoneNumber } = req.params;
+      const session = whatsAppService.getUserSession(phoneNumber);
+      
+      res.json({
+        success: true,
+        session: session ? {
+          phoneNumber: session.phoneNumber,
+          userId: session.userId,
+          sessionState: session.sessionState,
+          lastInteraction: session.lastInteraction,
+        } : null,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+);
+
+export default router;
+```
+
+## Testing & Validation
+
+### 1. Local Testing with ngrok
+
+```bash
+# Install ngrok for webhook testing
+npm install -g ngrok
+
+# Expose local server
+ngrok http 3000
+
+# Update webhook URL in Meta Business Manager
+# Use the ngrok URL: https://xxxxx.ngrok.io/webhook/whatsapp
+```
+
+### 2. Automated Testing
+
+```typescript
+// tests/whatsappService.test.ts
+import { WhatsAppService } from '../services/WhatsAppService';
+import { WhatsAppMessageHandler } from '../services/WhatsAppMessageHandler';
+
+describe('WhatsApp Service', () => {
+  let whatsAppService: WhatsAppService;
+  let messageHandler: WhatsAppMessageHandler;
+
+  beforeEach(() => {
+    whatsAppService = new WhatsAppService();
+    messageHandler = new WhatsAppMessageHandler();
+  });
+
+  test('should send text message successfully', async () => {
+    const mockResponse = {
+      messages: [{ id: 'message_id_123' }]
+    };
+
+    jest.spyOn(whatsAppService['client'], 'sendMessage').mockResolvedValue(mockResponse);
+
+    const messageId = await whatsAppService.sendTextMessage('+27123456789', 'Test message');
+    
+    expect(messageId).toBe('message_id_123');
+  });
+
+  test('should handle balance inquiry', async () => {
+    const mockMessage = {
+      from: '+27123456789',
+      messageId: 'msg_123',
+      timestamp: '1640995200',
+      type: 'text',
+      content: { body: 'balance' },
+    };
+
+    const mockSession = {
+      phoneNumber: '+27123456789',
+      userId: 'user_123',
+      sessionState: 'authenticated',
+      lastInteraction: new Date(),
+    };
+
+    jest.spyOn(whatsAppService, 'getUserSession').mockReturnValue(mockSession);
+    jest.spyOn(whatsAppService, 'sendTextMessage').mockResolvedValue('response_123');
+
+    await messageHandler.handleIncomingMessage(mockMessage);
+
+    expect(whatsAppService.sendTextMessage).toHaveBeenCalled();
+  });
+
+  test('should handle rate limiting', async () => {
+    const phoneNumber = '+27123456789';
+    
+    // Simulate rapid requests
+    const requests = Array(25).fill(null).map(() => 
+      whatsAppService.sendTextMessage(phoneNumber, 'Test')
+    );
+
+    const results = await Promise.allSettled(requests);
+    const failures = results.filter(r => r.status === 'rejected');
+    
+    expect(failures.length).toBeGreaterThan(0);
+  });
 });
 ```
 
-## Webhooks
+### 3. Integration Testing
 
-Webhook configuration and handling will be documented here.
+```bash
+# Test webhook endpoint
+curl -X POST http://localhost:3000/api/whatsapp/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "object": "whatsapp_business_account",
+    "entry": [{
+      "id": "entry_id",
+      "changes": [{
+        "field": "messages",
+        "value": {
+          "messages": [{
+            "from": "27123456789",
+            "id": "message_id",
+            "timestamp": "1640995200",
+            "type": "text",
+            "text": { "body": "balance" }
+          }],
+          "contacts": [{
+            "profile": { "name": "Test User" },
+            "wa_id": "27123456789"
+          }]
+        }
+      }]
+    }]
+  }'
+```
+
+## Security & Compliance
+
+### 1. Security Best Practices
+
+```typescript
+// middleware/whatsappSecurity.ts
+import crypto from 'crypto';
+import { Request, Response, NextFunction } from 'express';
+
+export const verifyWhatsAppSignature = (req: Request, res: Response, next: NextFunction) => {
+  const signature = req.headers['x-hub-signature-256'] as string;
+  const payload = JSON.stringify(req.body);
+  const appSecret = process.env.META_APP_SECRET;
+
+  if (!signature || !appSecret) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const expectedSignature = 'sha256=' + crypto
+    .createHmac('sha256', appSecret)
+    .update(payload)
+    .digest('hex');
+
+  if (signature !== expectedSignature) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  next();
+};
+
+export const sanitizePhoneNumber = (phoneNumber: string): string => {
+  // Remove any non-numeric characters except +
+  return phoneNumber.replace(/[^\d+]/g, '');
+};
+
+export const validateMessageContent = (content: string): boolean => {
+  // Check for malicious content, spam patterns, etc.
+  const blockedPatterns = [
+    /(?:http|https):\/\/[^\s]+/i, // URLs (if not allowed)
+    /\b(?:spam|scam|phishing)\b/i, // Common spam keywords
+  ];
+
+  return !blockedPatterns.some(pattern => pattern.test(content));
+};
+```
+
+### 2. Data Privacy Compliance
+
+```typescript
+// services/WhatsAppPrivacyService.ts
+export class WhatsAppPrivacyService {
+  async logUserConsent(phoneNumber: string, consentType: string): Promise<void> {
+    // Log user consent for GDPR/POPIA compliance
+    await this.auditLogRepo.save({
+      phoneNumber,
+      action: 'consent_given',
+      consentType,
+      timestamp: new Date(),
+      ipAddress: 'WhatsApp', // WhatsApp doesn't provide IP
+    });
+  }
+
+  async handleDataDeletionRequest(phoneNumber: string): Promise<void> {
+    try {
+      // Delete user session
+      await whatsAppSessionService.clearSession(phoneNumber);
+      
+      // Delete stored messages (if any)
+      await this.messageLogRepo.delete({ phoneNumber });
+      
+      // Log deletion
+      await this.auditLogRepo.save({
+        phoneNumber,
+        action: 'data_deleted',
+        timestamp: new Date(),
+      });
+
+      logger.info('User data deleted for WhatsApp', { phoneNumber });
+    } catch (error) {
+      logger.error('Error deleting user data', { phoneNumber, error });
+      throw error;
+    }
+  }
+
+  async getStoredUserData(phoneNumber: string): Promise<any> {
+    // Return all stored data for user (GDPR data portability)
+    const session = await whatsAppSessionService.getSession(phoneNumber);
+    const messages = await this.messageLogRepo.find({ phoneNumber });
+    
+    return {
+      session,
+      messageHistory: messages,
+      dataCollectedAt: new Date(),
+    };
+  }
+}
+```
+
+## Monitoring & Analytics
+
+### 1. WhatsApp Analytics Dashboard
+
+```typescript
+// services/WhatsAppAnalyticsService.ts
+export class WhatsAppAnalyticsService {
+  async getUsageStats(period: string = '7d') {
+    const endDate = new Date();
+    const startDate = new Date();
+    
+    switch (period) {
+      case '24h':
+        startDate.setHours(startDate.getHours() - 24);
+        break;
+      case '7d':
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case '30d':
+        startDate.setDate(startDate.getDate() - 30);
+        break;
+    }
+
+    const stats = await this.messageLogRepo
+      .createQueryBuilder('log')
+      .select([
+        'DATE(log.timestamp) as date',
+        'COUNT(*) as messageCount',
+        'COUNT(DISTINCT log.phone_number) as uniqueUsers',
+        'log.message_type as type',
+      ])
+      .where('log.timestamp BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      })
+      .groupBy('DATE(log.timestamp), log.message_type')
+      .getRawMany();
+
+    return this.formatAnalyticsData(stats);
+  }
+
+  async getPopularCommands(): Promise<Array<{ command: string; count: number }>> {
+    return this.messageLogRepo
+      .createQueryBuilder('log')
+      .select([
+        'log.command as command',
+        'COUNT(*) as count',
+      ])
+      .where('log.direction = :direction', { direction: 'incoming' })
+      .andWhere('log.command IS NOT NULL')
+      .groupBy('log.command')
+      .orderBy('count', 'DESC')
+      .limit(10)
+      .getRawMany();
+  }
+
+  async getUserEngagementMetrics() {
+    const totalUsers = await this.getUserCount();
+    const activeUsers24h = await this.getActiveUserCount('24h');
+    const activeUsers7d = await this.getActiveUserCount('7d');
+    
+    return {
+      totalUsers,
+      activeUsers24h,
+      activeUsers7d,
+      engagementRate24h: (activeUsers24h / totalUsers) * 100,
+      engagementRate7d: (activeUsers7d / totalUsers) * 100,
+    };
+  }
+
+  private async getUserCount(): Promise<number> {
+    return this.messageLogRepo
+      .createQueryBuilder('log')
+      .select('COUNT(DISTINCT log.phone_number)')
+      .getRawOne()
+      .then(result => parseInt(result.count));
+  }
+
+  private async getActiveUserCount(period: string): Promise<number> {
+    const cutoff = new Date();
+    
+    if (period === '24h') {
+      cutoff.setHours(cutoff.getHours() - 24);
+    } else if (period === '7d') {
+      cutoff.setDate(cutoff.getDate() - 7);
+    }
+
+    return this.messageLogRepo
+      .createQueryBuilder('log')
+      .select('COUNT(DISTINCT log.phone_number)')
+      .where('log.timestamp > :cutoff', { cutoff })
+      .getRawOne()
+      .then(result => parseInt(result.count));
+  }
+}
+```
+
+### 2. Performance Monitoring
+
+```typescript
+// monitoring/whatsappMonitoring.ts
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('WhatsAppMonitoring');
+
+export class WhatsAppMonitoring {
+  static async trackMessageResponse(startTime: number, success: boolean, messageType: string): Promise<void> {
+    const duration = Date.now() - startTime;
+    
+    logger.info('WhatsApp message processed', {
+      duration,
+      success,
+      messageType,
+      metric: 'message_response_time',
+    });
+
+    // Send to monitoring service (e.g., DataDog, New Relic)
+    // this.sendMetric('whatsapp.message.response_time', duration, { success, messageType });
+  }
+
+  static async trackAPICall(endpoint: string, statusCode: number, duration: number): Promise<void> {
+    logger.info('WhatsApp API call', {
+      endpoint,
+      statusCode,
+      duration,
+      metric: 'api_call',
+    });
+
+    // Track API performance
+    // this.sendMetric('whatsapp.api.response_time', duration, { endpoint, statusCode });
+  }
+
+  static async trackUserActivity(phoneNumber: string, action: string): Promise<void> {
+    logger.info('User activity', {
+      phoneNumber: phoneNumber.substring(0, 8) + '***', // Mask for privacy
+      action,
+      timestamp: new Date(),
+      metric: 'user_activity',
+    });
+  }
+
+  static async alertOnHighErrorRate(errorRate: number): Promise<void> {
+    if (errorRate > 5) { // 5% error rate threshold
+      logger.error('High WhatsApp error rate detected', {
+        errorRate,
+        alert: 'high_error_rate',
+      });
+
+      // Send alert to ops team
+      // await this.sendAlert('WhatsApp Error Rate Alert', `Error rate: ${errorRate}%`);
+    }
+  }
+}
+```
 
 ## Troubleshooting
 
-<Accordion title="Common Integration Issues">
-Common problems and solutions will be provided here.
+### Common Issues
+
+<Accordion title="Webhook Not Receiving Messages">
+**Symptoms**: Messages sent to WhatsApp number but webhook not triggered
+
+**Possible Causes**:
+- Incorrect webhook URL configuration
+- Webhook verification token mismatch
+- HTTPS not properly configured
+- Rate limiting or blocking
+
+**Solutions**:
+1. Verify webhook URL in Meta Business Manager
+2. Check webhook verification token matches
+3. Ensure HTTPS with valid SSL certificate
+4. Test webhook with ngrok for local development
+5. Check server logs for errors
 </Accordion>
+
+<Accordion title="Template Messages Not Sending">
+**Symptoms**: Template message API calls fail or messages not delivered
+
+**Possible Causes**:
+- Template not approved by Meta
+- Incorrect template parameter format
+- Rate limiting exceeded
+- Invalid phone number format
+
+**Solutions**:
+1. Check template approval status in Business Manager
+2. Verify parameter types and order match template
+3. Implement proper rate limiting
+4. Validate phone number format (+country code)
+</Accordion>
+
+<Accordion title="High Message Failure Rate">
+**Symptoms**: Many messages showing as failed in logs
+
+**Possible Causes**:
+- Invalid phone numbers
+- Users opted out of WhatsApp Business
+- Message content violates policies
+- API token expired or invalid
+
+**Solutions**:
+1. Validate phone numbers before sending
+2. Handle opt-out scenarios gracefully
+3. Review message content for policy compliance
+4. Refresh API tokens regularly
+5. Implement retry logic with exponential backoff
+</Accordion>
+
+## Performance Optimization
+
+### 1. Message Queue Implementation
+
+```typescript
+// services/WhatsAppMessageQueue.ts
+import Queue from 'bull';
+import { whatsAppService } from './WhatsAppService';
+
+const messageQueue = new Queue('WhatsApp messages', {
+  redis: {
+    port: parseInt(process.env.REDIS_PORT || '6379'),
+    host: process.env.REDIS_HOST || 'localhost',
+  },
+});
+
+// Process individual messages
+messageQueue.process('send-message', async (job) => {
+  const { message } = job.data;
+  return await whatsAppService.sendMessage(message);
+});
+
+// Process bulk messages
+messageQueue.process('send-bulk', async (job) => {
+  const { messages } = job.data;
+  const results = [];
+  
+  for (const message of messages) {
+    try {
+      const result = await whatsAppService.sendMessage(message);
+      results.push({ success: true, messageId: result });
+    } catch (error) {
+      results.push({ success: false, error: error.message });
+    }
+    
+    // Respect rate limits
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  return results;
+});
+
+export const queueMessage = (message: any, priority = 0) => {
+  return messageQueue.add('send-message', { message }, {
+    priority,
+    attempts: 3,
+    backoff: 'exponential',
+  });
+};
+
+export const queueBulkMessages = (messages: any[]) => {
+  return messageQueue.add('send-bulk', { messages }, {
+    attempts: 2,
+    backoff: 'exponential',
+  });
+};
+```
+
+### 2. Caching Strategy
+
+```typescript
+// services/WhatsAppCacheService.ts
+import Redis from 'ioredis';
+
+export class WhatsAppCacheService {
+  private redis: Redis;
+
+  constructor() {
+    this.redis = new Redis(process.env.REDIS_URL);
+  }
+
+  // Cache user profile data
+  async cacheUserProfile(phoneNumber: string, profile: any): Promise<void> {
+    await this.redis.setex(`wa:profile:${phoneNumber}`, 3600, JSON.stringify(profile));
+  }
+
+  async getUserProfile(phoneNumber: string): Promise<any | null> {
+    const cached = await this.redis.get(`wa:profile:${phoneNumber}`);
+    return cached ? JSON.parse(cached) : null;
+  }
+
+  // Cache frequently requested data
+  async cacheBalanceData(userId: string, balanceData: any): Promise<void> {
+    await this.redis.setex(`wa:balance:${userId}`, 300, JSON.stringify(balanceData)); // 5 min cache
+  }
+
+  async getCachedBalance(userId: string): Promise<any | null> {
+    const cached = await this.redis.get(`wa:balance:${userId}`);
+    return cached ? JSON.parse(cached) : null;
+  }
+
+  // Cache menu structures
+  async cacheMenu(menuKey: string, menuData: any): Promise<void> {
+    await this.redis.setex(`wa:menu:${menuKey}`, 3600, JSON.stringify(menuData));
+  }
+
+  async getCachedMenu(menuKey: string): Promise<any | null> {
+    const cached = await this.redis.get(`wa:menu:${menuKey}`);
+    return cached ? JSON.parse(cached) : null;
+  }
+}
+```
+
+---
+
+*This WhatsApp Banking implementation provides AWO Platform with a comprehensive conversational banking interface, making financial services accessible through the most popular messaging platform in Africa while maintaining security, compliance, and scalability.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

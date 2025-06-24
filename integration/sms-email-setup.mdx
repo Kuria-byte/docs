@@ -1,52 +1,1128 @@
----
-title: "Sms Email Setup"
-description: "AWO Platform sms email setup integration guide"
----
+# SMS Email Setup
 
-# Sms Email Setup
+Configure SMS and email notifications for AWO Platform using Twilio and SendGrid services to enable OTP verification, transaction alerts, and customer communications across the SADC region.
+
+<Info>
+This integration guide covers setting up both SMS (via Twilio) and email (via SendGrid) services for AWO Platform's notification system, enabling seamless communication with users across African markets.
+</Info>
 
 ## Overview
 
-<Info>
-This guide covers sms email setup integration with the AWO Platform.
-</Info>
+AWO Platform uses a dual-channel communication strategy to ensure reliable message delivery across diverse African markets:
+
+<CardGroup cols={2}>
+  <Card title="SMS via Twilio" icon="mobile">
+    **Primary Use Cases**  
+    • OTP verification and 2FA  
+    • Transaction confirmations  
+    • Payment alerts  
+    • Account security notifications
+  </Card>
+  <Card title="Email via SendGrid" icon="envelope">
+    **Primary Use Cases**  
+    • Welcome emails and onboarding  
+    • Monthly statements  
+    • DIVA score updates  
+    • Regulatory notifications
+  </Card>
+</CardGroup>
 
 ## Prerequisites
 
-Integration requirements will be listed here.
-
-## Setup Instructions
+Before starting the integration, ensure you have:
 
 <Steps>
-  <Step title="API Configuration">
-    Configure API credentials and endpoints
+  <Step title="Service Accounts">
+    • Active Twilio account with SMS capabilities  
+    • SendGrid account with email sending permissions  
+    • Verified phone numbers and email domains
   </Step>
-  <Step title="Webhook Setup">
-    Set up webhooks for real-time updates
+  <Step title="Development Environment">
+    • Node.js 16+ installed  
+    • AWO backend repository access  
+    • Environment variable management setup
   </Step>
-  <Step title="Testing">
-    Test the integration in sandbox environment
+  <Step title="Compliance Requirements">
+    • GDPR/POPIA compliance understanding  
+    • African telecommunications regulations awareness  
+    • Anti-spam policy comprehension
   </Step>
 </Steps>
 
-## Code Examples
+## Twilio SMS Setup
 
+### 1. Account Configuration
+
+**Create Twilio Account:**
+1. Sign up at [twilio.com](https://www.twilio.com)
+2. Complete phone number verification
+3. Navigate to Console Dashboard
+4. Note your Account SID and Auth Token
+
+**Purchase Phone Numbers:**
+<CardGroup cols={3}>
+  <Card title="South Africa" icon="flag">
+    Purchase a South African number (+27) for local SMS delivery and compliance
+  </Card>
+  <Card title="Regional Coverage" icon="globe">
+    Consider additional numbers for Botswana (+267), Namibia (+264), Zambia (+260)
+  </Card>
+  <Card title="Toll-Free Options" icon="phone">
+    Evaluate toll-free numbers for premium user communications
+  </Card>
+</CardGroup>
+
+### 2. Environment Configuration
+
+Create or update your `.env` file:
+
+```bash
+# Twilio Configuration
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_PHONE_NUMBER=+27XXXXXXXXX
+
+# Optional: Multiple region support
+TWILIO_SA_NUMBER=+27XXXXXXXXX
+TWILIO_BW_NUMBER=+267XXXXXXXX
+TWILIO_NA_NUMBER=+264XXXXXXXX
+TWILIO_ZM_NUMBER=+260XXXXXXXX
+
+# SMS Configuration
+SMS_RATE_LIMIT=10
+SMS_RETRY_ATTEMPTS=3
+SMS_TIMEOUT_MS=30000
+```
+
+### 3. Node.js Implementation
+
+**Install Dependencies:**
+```bash
+npm install twilio express-rate-limit
+```
+
+**SMS Service Implementation:**
 ```typescript
-// Integration example
-import { SmsEmailSetupClient } from '@awo-platform/integrations';
+// services/smsService.ts
+import { Twilio } from 'twilio';
+import { createLogger } from '../utils/logger';
 
-const client = new SmsEmailSetupClient({
-  apiKey: process.env.API_KEY,
-  environment: 'sandbox'
+const logger = createLogger('SMSService');
+
+interface SMSConfig {
+  accountSid: string;
+  authToken: string;
+  fromNumber: string;
+}
+
+interface SMSMessage {
+  to: string;
+  body: string;
+  from?: string;
+}
+
+export class SMSService {
+  private client: Twilio;
+  private defaultFrom: string;
+
+  constructor(config: SMSConfig) {
+    this.client = new Twilio(config.accountSid, config.authToken);
+    this.defaultFrom = config.fromNumber;
+  }
+
+  async sendSMS(message: SMSMessage): Promise<string> {
+    try {
+      const response = await this.client.messages.create({
+        body: message.body,
+        from: message.from || this.defaultFrom,
+        to: message.to
+      });
+
+      logger.info(`SMS sent successfully`, {
+        messageId: response.sid,
+        to: message.to,
+        status: response.status
+      });
+
+      return response.sid;
+    } catch (error) {
+      logger.error(`SMS sending failed`, {
+        to: message.to,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  async sendOTP(phoneNumber: string, otp: string): Promise<string> {
+    const message = `Your AWO verification code is: ${otp}. This code expires in 5 minutes. Do not share this code with anyone.`;
+    
+    return this.sendSMS({
+      to: phoneNumber,
+      body: message
+    });
+  }
+
+  async sendTransactionAlert(phoneNumber: string, amount: number, type: string): Promise<string> {
+    const message = `AWO Alert: ${type} of R${amount.toFixed(2)} processed successfully. Check your app for details.`;
+    
+    return this.sendSMS({
+      to: phoneNumber,
+      body: message
+    });
+  }
+
+  async sendDIVAScoreUpdate(phoneNumber: string, newScore: number): Promise<string> {
+    const message = `AWO: Your DIVA Score has been updated to ${newScore}. Log in to see your new investment tier and opportunities.`;
+    
+    return this.sendSMS({
+      to: phoneNumber,
+      body: message
+    });
+  }
+
+  // Bulk SMS for Chama notifications
+  async sendBulkSMS(messages: SMSMessage[]): Promise<string[]> {
+    const results = await Promise.allSettled(
+      messages.map(message => this.sendSMS(message))
+    );
+
+    return results.map((result, index) => {
+      if (result.status === 'fulfilled') {
+        return result.value;
+      } else {
+        logger.error(`Bulk SMS failed for message ${index}`, {
+          error: result.reason
+        });
+        return null;
+      }
+    }).filter(Boolean);
+  }
+}
+
+// Initialize SMS service
+export const smsService = new SMSService({
+  accountSid: process.env.TWILIO_ACCOUNT_SID!,
+  authToken: process.env.TWILIO_AUTH_TOKEN!,
+  fromNumber: process.env.TWILIO_PHONE_NUMBER!
 });
 ```
 
-## Webhooks
+### 4. Rate Limiting & Error Handling
 
-Webhook configuration and handling will be documented here.
+**Rate Limiting Implementation:**
+```typescript
+// middleware/smsRateLimit.ts
+import rateLimit from 'express-rate-limit';
+
+export const smsRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each phone number to 5 SMS requests per windowMs
+  message: 'Too many SMS requests, please try again later.',
+  keyGenerator: (req) => req.body.phoneNumber || req.ip,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export const otpRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 1, // Only 1 OTP request per minute per phone number
+  message: 'OTP request too frequent, please wait before requesting another.',
+  keyGenerator: (req) => req.body.phoneNumber,
+});
+```
+
+**Error Handling:**
+```typescript
+// utils/smsErrorHandler.ts
+export interface SMSError {
+  code: string;
+  message: string;
+  userMessage: string;
+}
+
+export const handleSMSError = (error: any): SMSError => {
+  // Twilio error codes mapping
+  const errorMappings = {
+    '21211': {
+      code: 'INVALID_PHONE_NUMBER',
+      message: 'Invalid phone number format',
+      userMessage: 'Please check your phone number format'
+    },
+    '21408': {
+      code: 'PERMISSION_DENIED',
+      message: 'Permission to send to this number denied',
+      userMessage: 'Unable to send SMS to this number'
+    },
+    '21610': {
+      code: 'BLOCKED_NUMBER',
+      message: 'Number is blocked from receiving messages',
+      userMessage: 'This number cannot receive SMS messages'
+    },
+    '30008': {
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'Rate limit exceeded',
+      userMessage: 'Too many messages sent, please try again later'
+    }
+  };
+
+  const twilioCode = error.code?.toString();
+  const mapping = errorMappings[twilioCode];
+
+  if (mapping) {
+    return mapping;
+  }
+
+  return {
+    code: 'SMS_GENERAL_ERROR',
+    message: error.message || 'Unknown SMS error',
+    userMessage: 'Unable to send SMS at this time'
+  };
+};
+```
+
+## SendGrid Email Setup
+
+### 1. Account Configuration
+
+**Setup SendGrid Account:**
+1. Sign up at [sendgrid.com](https://sendgrid.com)
+2. Complete email verification
+3. Set up domain authentication
+4. Create API key with Mail Send permissions
+
+**Domain Authentication:**
+```bash
+# Add DNS records for your domain (example for awo-platform.com)
+TXT: em123.awo-platform.com -> "v=spf1 include:sendgrid.net ~all"
+CNAME: s1._domainkey.awo-platform.com -> s1.domainkey.u123456.wl.sendgrid.net
+CNAME: s2._domainkey.awo-platform.com -> s2.domainkey.u123456.wl.sendgrid.net
+```
+
+### 2. Environment Configuration
+
+Add to your `.env` file:
+
+```bash
+# SendGrid Configuration
+SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+SENDGRID_FROM_EMAIL=no-reply@awo-platform.com
+SENDGRID_FROM_NAME=AWO Platform
+
+# Email Configuration
+EMAIL_RATE_LIMIT=100
+EMAIL_RETRY_ATTEMPTS=3
+EMAIL_TIMEOUT_MS=60000
+
+# Template IDs (create these in SendGrid)
+SENDGRID_WELCOME_TEMPLATE=d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+SENDGRID_OTP_TEMPLATE=d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+SENDGRID_STATEMENT_TEMPLATE=d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+SENDGRID_DIVA_UPDATE_TEMPLATE=d-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+### 3. Node.js Implementation
+
+**Install Dependencies:**
+```bash
+npm install @sendgrid/mail
+```
+
+**Email Service Implementation:**
+```typescript
+// services/emailService.ts
+import sgMail from '@sendgrid/mail';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('EmailService');
+
+interface EmailConfig {
+  apiKey: string;
+  fromEmail: string;
+  fromName: string;
+}
+
+interface EmailMessage {
+  to: string | string[];
+  subject: string;
+  html?: string;
+  text?: string;
+  templateId?: string;
+  dynamicTemplateData?: any;
+  attachments?: Array<{
+    content: string;
+    filename: string;
+    type: string;
+  }>;
+}
+
+export class EmailService {
+  private fromEmail: string;
+  private fromName: string;
+
+  constructor(config: EmailConfig) {
+    sgMail.setApiKey(config.apiKey);
+    this.fromEmail = config.fromEmail;
+    this.fromName = config.fromName;
+  }
+
+  async sendEmail(message: EmailMessage): Promise<string> {
+    try {
+      const emailData = {
+        to: message.to,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject: message.subject,
+        html: message.html,
+        text: message.text,
+        templateId: message.templateId,
+        dynamicTemplateData: message.dynamicTemplateData,
+        attachments: message.attachments
+      };
+
+      const [response] = await sgMail.send(emailData);
+
+      logger.info(`Email sent successfully`, {
+        messageId: response.headers['x-message-id'],
+        to: message.to,
+        subject: message.subject
+      });
+
+      return response.headers['x-message-id'];
+    } catch (error) {
+      logger.error(`Email sending failed`, {
+        to: message.to,
+        subject: message.subject,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  async sendWelcomeEmail(email: string, firstName: string): Promise<string> {
+    return this.sendEmail({
+      to: email,
+      subject: 'Welcome to AWO Platform',
+      templateId: process.env.SENDGRID_WELCOME_TEMPLATE,
+      dynamicTemplateData: {
+        firstName,
+        dashboardUrl: `${process.env.FRONTEND_URL}/dashboard`,
+        supportEmail: process.env.SUPPORT_EMAIL
+      }
+    });
+  }
+
+  async sendOTPEmail(email: string, otp: string): Promise<string> {
+    return this.sendEmail({
+      to: email,
+      subject: 'AWO Platform - Email Verification',
+      templateId: process.env.SENDGRID_OTP_TEMPLATE,
+      dynamicTemplateData: {
+        otp,
+        expiryMinutes: 5
+      }
+    });
+  }
+
+  async sendMonthlyStatement(email: string, statementData: any): Promise<string> {
+    return this.sendEmail({
+      to: email,
+      subject: `AWO Monthly Statement - ${statementData.month}`,
+      templateId: process.env.SENDGRID_STATEMENT_TEMPLATE,
+      dynamicTemplateData: statementData,
+      attachments: statementData.pdfAttachment ? [{
+        content: statementData.pdfAttachment.content,
+        filename: `awo-statement-${statementData.month}.pdf`,
+        type: 'application/pdf'
+      }] : undefined
+    });
+  }
+
+  async sendDIVAScoreUpdate(email: string, scoreData: any): Promise<string> {
+    return this.sendEmail({
+      to: email,
+      subject: 'Your DIVA Score Has Been Updated',
+      templateId: process.env.SENDGRID_DIVA_UPDATE_TEMPLATE,
+      dynamicTemplateData: {
+        ...scoreData,
+        appUrl: process.env.FRONTEND_URL
+      }
+    });
+  }
+
+  // Bulk email for Chama communications
+  async sendBulkEmail(messages: EmailMessage[]): Promise<string[]> {
+    try {
+      const emailsData = messages.map(message => ({
+        to: message.to,
+        from: {
+          email: this.fromEmail,
+          name: this.fromName
+        },
+        subject: message.subject,
+        html: message.html,
+        text: message.text,
+        templateId: message.templateId,
+        dynamicTemplateData: message.dynamicTemplateData
+      }));
+
+      const response = await sgMail.send(emailsData as any);
+      
+      logger.info(`Bulk email sent successfully`, {
+        count: messages.length
+      });
+
+      return response.map(r => r.headers['x-message-id']);
+    } catch (error) {
+      logger.error(`Bulk email sending failed`, {
+        count: messages.length,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+}
+
+// Initialize email service
+export const emailService = new EmailService({
+  apiKey: process.env.SENDGRID_API_KEY!,
+  fromEmail: process.env.SENDGRID_FROM_EMAIL!,
+  fromName: process.env.SENDGRID_FROM_NAME!
+});
+```
+
+### 4. Dynamic Templates
+
+**Create SendGrid Templates:**
+
+<Accordion title="Welcome Email Template">
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Welcome to AWO Platform</title>
+</head>
+<body>
+    <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif;">
+        <div style="background: linear-gradient(135deg, #bc9b25, #010101); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Welcome to AWO Platform</h1>
+        </div>
+        
+        <div style="padding: 30px;">
+            <h2>Hi {{firstName}},</h2>
+            
+            <p>Welcome to AWO Platform - Africa's leading financial empowerment platform for women!</p>
+            
+            <p>You're now part of a community focused on:</p>
+            <ul>
+                <li>Building wealth through intelligent investing</li>
+                <li>Participating in digital Chamas (savings groups)</li>
+                <li>Accessing personalized financial coaching</li>
+                <li>Growing your DIVA Score for better opportunities</li>
+            </ul>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{dashboardUrl}}" style="background: #bc9b25; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                    Access Your Dashboard
+                </a>
+            </div>
+            
+            <p>Need help? Contact our support team at <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+            
+            <p>Best regards,<br>The AWO Team</p>
+        </div>
+    </div>
+</body>
+</html>
+```
+</Accordion>
+
+<Accordion title="OTP Email Template">
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AWO Platform - Email Verification</title>
+</head>
+<body>
+    <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif;">
+        <div style="background: #bc9b25; padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Email Verification</h1>
+        </div>
+        
+        <div style="padding: 30px; text-align: center;">
+            <h2>Verify Your Email Address</h2>
+            
+            <p>Please use the following verification code to complete your registration:</p>
+            
+            <div style="background: #f8f9fa; border: 2px solid #bc9b25; border-radius: 10px; padding: 20px; margin: 20px 0;">
+                <h1 style="color: #bc9b25; font-size: 36px; margin: 0; letter-spacing: 10px;">{{otp}}</h1>
+            </div>
+            
+            <p>This code will expire in {{expiryMinutes}} minutes.</p>
+            
+            <p><strong>Security Note:</strong> Never share this code with anyone. AWO staff will never ask for your verification code.</p>
+        </div>
+    </div>
+</body>
+</html>
+```
+</Accordion>
+
+## Unified Notification Controller
+
+### Express.js Routes Implementation
+
+```typescript
+// controllers/notificationController.ts
+import { Request, Response } from 'express';
+import { smsService } from '../services/smsService';
+import { emailService } from '../services/emailService';
+import { smsRateLimit, otpRateLimit } from '../middleware/smsRateLimit';
+import { handleSMSError } from '../utils/smsErrorHandler';
+
+export class NotificationController {
+  
+  // Send OTP via SMS
+  static sendSMSOTP = [
+    otpRateLimit,
+    async (req: Request, res: Response) => {
+      try {
+        const { phoneNumber, otp } = req.body;
+        
+        if (!phoneNumber || !otp) {
+          return res.status(400).json({
+            success: false,
+            message: 'Phone number and OTP are required'
+          });
+        }
+
+        const messageId = await smsService.sendOTP(phoneNumber, otp);
+        
+        res.json({
+          success: true,
+          messageId,
+          message: 'OTP sent successfully'
+        });
+      } catch (error) {
+        const smsError = handleSMSError(error);
+        res.status(500).json({
+          success: false,
+          code: smsError.code,
+          message: smsError.userMessage
+        });
+      }
+    }
+  ];
+
+  // Send OTP via Email
+  static sendEmailOTP = async (req: Request, res: Response) => {
+    try {
+      const { email, otp } = req.body;
+      
+      if (!email || !otp) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email and OTP are required'
+        });
+      }
+
+      const messageId = await emailService.sendOTPEmail(email, otp);
+      
+      res.json({
+        success: true,
+        messageId,
+        message: 'OTP email sent successfully'
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send OTP email'
+      });
+    }
+  };
+
+  // Send transaction alert via SMS
+  static sendTransactionSMS = [
+    smsRateLimit,
+    async (req: Request, res: Response) => {
+      try {
+        const { phoneNumber, amount, transactionType } = req.body;
+        
+        const messageId = await smsService.sendTransactionAlert(
+          phoneNumber, 
+          amount, 
+          transactionType
+        );
+        
+        res.json({
+          success: true,
+          messageId,
+          message: 'Transaction alert sent'
+        });
+      } catch (error) {
+        const smsError = handleSMSError(error);
+        res.status(500).json({
+          success: false,
+          message: smsError.userMessage
+        });
+      }
+    }
+  ];
+
+  // Send Chama notification
+  static sendChamaNotification = async (req: Request, res: Response) => {
+    try {
+      const { members, message, type } = req.body;
+      
+      const smsPromises = members
+        .filter(member => member.phoneNumber)
+        .map(member => smsService.sendSMS({
+          to: member.phoneNumber,
+          body: `AWO Chama: ${message}`
+        }));
+
+      const emailPromises = members
+        .filter(member => member.email)
+        .map(member => emailService.sendEmail({
+          to: member.email,
+          subject: `AWO Chama Update - ${type}`,
+          html: `<p>${message}</p>`
+        }));
+
+      const [smsResults, emailResults] = await Promise.allSettled([
+        Promise.allSettled(smsPromises),
+        Promise.allSettled(emailPromises)
+      ]);
+
+      res.json({
+        success: true,
+        smsCount: smsResults.filter(r => r.status === 'fulfilled').length,
+        emailCount: emailResults.filter(r => r.status === 'fulfilled').length
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send Chama notifications'
+      });
+    }
+  };
+}
+```
+
+### Route Registration
+
+```typescript
+// routes/notifications.ts
+import { Router } from 'express';
+import { NotificationController } from '../controllers/notificationController';
+import { authMiddleware } from '../middleware/auth';
+
+const router = Router();
+
+// OTP routes
+router.post('/otp/sms', NotificationController.sendSMSOTP);
+router.post('/otp/email', NotificationController.sendEmailOTP);
+
+// Transaction alerts
+router.post('/transaction/sms', authMiddleware, NotificationController.sendTransactionSMS);
+
+// Chama notifications
+router.post('/chama/notify', authMiddleware, NotificationController.sendChamaNotification);
+
+export default router;
+```
+
+## Testing & Validation
+
+### 1. Local Testing
+
+**Test SMS Integration:**
+```bash
+# Test OTP SMS
+curl -X POST http://localhost:3000/api/notifications/otp/sms \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phoneNumber": "+27123456789",
+    "otp": "123456"
+  }'
+```
+
+**Test Email Integration:**
+```bash
+# Test welcome email
+curl -X POST http://localhost:3000/api/notifications/welcome \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "firstName": "Test User"
+  }'
+```
+
+### 2. Error Handling Tests
+
+**Test Invalid Phone Number:**
+```typescript
+// tests/sms.test.ts
+import { smsService } from '../services/smsService';
+
+describe('SMS Service Error Handling', () => {
+  test('should handle invalid phone number', async () => {
+    try {
+      await smsService.sendOTP('invalid-number', '123456');
+    } catch (error) {
+      expect(error.code).toBe('21211');
+    }
+  });
+
+  test('should handle rate limiting', async () => {
+    // Send multiple OTP requests rapidly
+    const requests = Array(6).fill(null).map(() => 
+      smsService.sendOTP('+27123456789', '123456')
+    );
+
+    const results = await Promise.allSettled(requests);
+    const failures = results.filter(r => r.status === 'rejected');
+    
+    expect(failures.length).toBeGreaterThan(0);
+  });
+});
+```
+
+## African Market Considerations
+
+### 1. Regional Compliance
+
+<CardGroup cols={2}>
+  <Card title="South Africa" icon="flag">
+    **POPIA Compliance**: Explicit consent required for SMS/email marketing  
+    **ICASA Regulations**: Anti-spam guidelines for commercial SMS  
+    **Preferred Times**: 8 AM - 6 PM local time for non-urgent messages
+  </Card>
+  <Card title="SADC Region" icon="globe">
+    **Data Residency**: Store communication preferences locally  
+    **Language Support**: English, Afrikaans, Portuguese support  
+    **Mobile Operator**: Test with major operators (Vodacom, MTN, Cell C)
+  </Card>
+</CardGroup>
+
+### 2. Message Optimization
+
+**SMS Best Practices:**
+- Keep messages under 160 characters for single SMS cost
+- Use clear, actionable language
+- Include AWO branding consistently
+- Provide opt-out instructions for marketing messages
+
+**Email Best Practices:**
+- Mobile-responsive templates (60% of users on mobile)
+- Clear subject lines (&lt;50 characters)
+- Single call-to-action per email
+- Include plain text versions for accessibility
+
+### 3. Delivery Optimization
+
+| Metric | SMS Target | Email Target | Monitoring |
+|--------|------------|--------------|------------|
+| Delivery Rate | &gt;95% | &gt;98% | Real-time dashboards |
+| Open Rate | N/A | &gt;25% | Daily reports |
+| Response Time | &lt;30 seconds | &lt;2 minutes | Automated alerts |
+| Error Rate | &lt;5% | &lt;2% | Error logging |
+
+## Monitoring & Analytics
+
+### 1. Dashboard Implementation
+
+```typescript
+// services/notificationAnalytics.ts
+export class NotificationAnalytics {
+  async getDeliveryStats(period: string) {
+    return {
+      sms: {
+        sent: await this.getSMSSent(period),
+        delivered: await this.getSMSDelivered(period),
+        failed: await this.getSMSFailed(period),
+        cost: await this.getSMSCost(period)
+      },
+      email: {
+        sent: await this.getEmailsSent(period),
+        delivered: await this.getEmailsDelivered(period),
+        opened: await this.getEmailsOpened(period),
+        clicked: await this.getEmailsClicked(period)
+      }
+    };
+  }
+
+  async getCostAnalysis(period: string) {
+    const smsCount = await this.getSMSSent(period);
+    const emailCount = await this.getEmailsSent(period);
+    
+    return {
+      sms: {
+        count: smsCount,
+        costPerMessage: 0.05, // USD
+        totalCost: smsCount * 0.05
+      },
+      email: {
+        count: emailCount,
+        costPerMessage: 0.001, // USD
+        totalCost: emailCount * 0.001
+      }
+    };
+  }
+}
+```
+
+### 2. Webhook Handlers
+
+**Twilio Status Webhooks:**
+```typescript
+// webhooks/twilioWebhook.ts
+import { Request, Response } from 'express';
+
+export const handleTwilioWebhook = (req: Request, res: Response) => {
+  const { MessageSid, MessageStatus, To, ErrorCode } = req.body;
+  
+  // Log delivery status
+  logger.info('SMS Status Update', {
+    messageId: MessageSid,
+    status: MessageStatus,
+    to: To,
+    errorCode: ErrorCode
+  });
+
+  // Update database with delivery status
+  // Send to analytics service
+  // Handle failed deliveries
+
+  res.status(200).send('OK');
+};
+```
+
+**SendGrid Event Webhooks:**
+```typescript
+// webhooks/sendgridWebhook.ts
+export const handleSendGridWebhook = (req: Request, res: Response) => {
+  const events = req.body;
+  
+  events.forEach(event => {
+    logger.info('Email Event', {
+      messageId: event.sg_message_id,
+      event: event.event,
+      email: event.email,
+      timestamp: event.timestamp
+    });
+
+    // Process bounces, opens, clicks
+    // Update user preferences for unsubscribes
+    // Send to analytics
+  });
+
+  res.status(200).send('OK');
+};
+```
+
+## Security Best Practices
+
+### 1. API Key Management
+
+```typescript
+// config/secrets.ts
+export const getSecrets = () => {
+  const requiredSecrets = [
+    'TWILIO_ACCOUNT_SID',
+    'TWILIO_AUTH_TOKEN', 
+    'SENDGRID_API_KEY'
+  ];
+
+  requiredSecrets.forEach(secret => {
+    if (!process.env[secret]) {
+      throw new Error(`Missing required environment variable: ${secret}`);
+    }
+  });
+
+  return {
+    twilio: {
+      accountSid: process.env.TWILIO_ACCOUNT_SID!,
+      authToken: process.env.TWILIO_AUTH_TOKEN!,
+      phoneNumber: process.env.TWILIO_PHONE_NUMBER!
+    },
+    sendgrid: {
+      apiKey: process.env.SENDGRID_API_KEY!,
+      fromEmail: process.env.SENDGRID_FROM_EMAIL!
+    }
+  };
+};
+```
+
+### 2. Input Validation
+
+```typescript
+// validators/notificationValidators.ts
+import { body } from 'express-validator';
+
+export const validateSMSRequest = [
+  body('phoneNumber')
+    .matches(/^\+[1-9]\d{1,14}$/)
+    .withMessage('Valid international phone number required'),
+  body('message')
+    .isLength({ min: 1, max: 1600 })
+    .withMessage('Message must be between 1 and 1600 characters')
+];
+
+export const validateEmailRequest = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid email address required'),
+  body('subject')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Subject must be between 1 and 255 characters')
+];
+```
 
 ## Troubleshooting
 
-<Accordion title="Common Integration Issues">
-Common problems and solutions will be provided here.
+### Common Issues
+
+<Accordion title="SMS Delivery Failures">
+**Symptoms**: SMS messages not delivering to certain numbers
+
+**Possible Causes**:
+- Invalid phone number format
+- Blocked/inactive numbers  
+- Network operator issues
+- Rate limiting
+
+**Solutions**:
+1. Validate phone numbers using international format (+country code)
+2. Implement retry logic with exponential backoff
+3. Use Twilio's Lookup API for number validation
+4. Monitor delivery receipts via webhooks
 </Accordion>
+
+<Accordion title="Email Deliverability Issues">
+**Symptoms**: Emails going to spam or not delivering
+
+**Possible Causes**:
+- Missing SPF/DKIM authentication
+- High spam score content
+- Reputation issues
+- Blacklisted IP/domain
+
+**Solutions**:
+1. Complete domain authentication in SendGrid
+2. Monitor sender reputation scores
+3. Use SendGrid's spam testing tools
+4. Implement proper unsubscribe handling
+</Accordion>
+
+<Accordion title="High API Costs">
+**Symptoms**: Unexpected high costs for SMS/email services
+
+**Possible Causes**:
+- Inefficient message batching
+- Sending to invalid numbers/emails
+- No rate limiting
+- Duplicate message sending
+
+**Solutions**:
+1. Implement message batching for bulk operations
+2. Validate recipients before sending
+3. Add proper rate limiting
+4. Use message deduplication
+</Accordion>
+
+## Performance Optimization
+
+### 1. Message Queuing
+
+```typescript
+// services/messageQueue.ts
+import Queue from 'bull';
+import { smsService } from './smsService';
+import { emailService } from './emailService';
+
+const smsQueue = new Queue('SMS Queue', {
+  redis: { port: 6379, host: 'localhost' }
+});
+
+const emailQueue = new Queue('Email Queue', {
+  redis: { port: 6379, host: 'localhost' }
+});
+
+// Process SMS messages
+smsQueue.process(async (job) => {
+  const { phoneNumber, message, type } = job.data;
+  
+  try {
+    const messageId = await smsService.sendSMS({
+      to: phoneNumber,
+      body: message
+    });
+    
+    return { success: true, messageId };
+  } catch (error) {
+    throw new Error(`SMS failed: ${error.message}`);
+  }
+});
+
+// Process email messages
+emailQueue.process(async (job) => {
+  const { email, subject, content, templateId } = job.data;
+  
+  try {
+    const messageId = await emailService.sendEmail({
+      to: email,
+      subject,
+      html: content,
+      templateId
+    });
+    
+    return { success: true, messageId };
+  } catch (error) {
+    throw new Error(`Email failed: ${error.message}`);
+  }
+});
+
+export { smsQueue, emailQueue };
+```
+
+### 2. Caching Strategy
+
+```typescript
+// services/notificationCache.ts
+import Redis from 'ioredis';
+
+const redis = new Redis(process.env.REDIS_URL);
+
+export class NotificationCache {
+  // Cache user notification preferences
+  async cacheUserPreferences(userId: string, preferences: any) {
+    await redis.setex(`user:${userId}:notifications`, 3600, JSON.stringify(preferences));
+  }
+
+  async getUserPreferences(userId: string) {
+    const cached = await redis.get(`user:${userId}:notifications`);
+    return cached ? JSON.parse(cached) : null;
+  }
+
+  // Rate limiting cache
+  async checkRateLimit(key: string, limit: number, window: number): Promise<boolean> {
+    const current = await redis.incr(key);
+    if (current === 1) {
+      await redis.expire(key, window);
+    }
+    return current <= limit;
+  }
+}
+```
+
+---
+
+*This SMS and Email setup enables AWO Platform to deliver reliable, compliant communication services across African markets while maintaining cost efficiency and user engagement.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*

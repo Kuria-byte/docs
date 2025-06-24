@@ -1,52 +1,1939 @@
----
-title: "Push Notifications"
-description: "AWO Platform push notifications integration guide"
----
-
 # Push Notifications
+
+Implement real-time push notifications for AWO Platform using Expo's notification service to engage users with transaction alerts, DIVA score updates, and Chama activity notifications across iOS and Android devices.
+
+<Info>
+This guide covers the complete implementation of push notifications using Expo's notification system, providing real-time engagement capabilities for AWO Platform users across the SADC region.
+</Info>
 
 ## Overview
 
-<Info>
-This guide covers push notifications integration with the AWO Platform.
-</Info>
+AWO Platform's push notification system delivers real-time updates to users, ensuring they stay informed about their financial activities and opportunities:
+
+<CardGroup cols={2}>
+  <Card title="Real-Time Engagement" icon="bell">
+    **Immediate Notifications**  
+    • Transaction confirmations  
+    • DIVA score updates  
+    • Chama activity alerts  
+    • Investment opportunities
+  </Card>
+  <Card title="User Experience" icon="smartphone">
+    **Cross-Platform Support**  
+    • iOS and Android compatibility  
+    • Background notification handling  
+    • Rich notification content  
+    • Deep linking to app features
+  </Card>
+</CardGroup>
+
+### Notification Types in AWO
+
+| Category | Examples | Priority | Frequency |
+|----------|----------|----------|-----------|
+| **Security** | Login alerts, password changes | High | Immediate |
+| **Transactions** | Payment confirmations, transfers | High | Immediate |
+| **DIVA Score** | Score updates, tier changes | Medium | Monthly |
+| **Chama** | Contributions due, voting reminders | Medium | Weekly |
+| **Investment** | Market opportunities, performance | Low | Daily |
+| **Educational** | Learning reminders, tips | Low | Weekly |
 
 ## Prerequisites
 
-Integration requirements will be listed here.
-
-## Setup Instructions
+Before implementing push notifications, ensure you have:
 
 <Steps>
-  <Step title="API Configuration">
-    Configure API credentials and endpoints
+  <Step title="Development Environment">
+    • Expo CLI installed and configured  
+    • React Native development environment  
+    • iOS/Android testing devices or simulators  
+    • AWO mobile app repository access
   </Step>
-  <Step title="Webhook Setup">
-    Set up webhooks for real-time updates
+  <Step title="Platform Accounts">
+    • Apple Developer account (for iOS)  
+    • Google Firebase project (for Android)  
+    • Expo account for push notification service  
+    • AWO backend with notification service setup
   </Step>
-  <Step title="Testing">
-    Test the integration in sandbox environment
+  <Step title="Certificates & Keys">
+    • iOS Push Notification certificates  
+    • Android FCM server key  
+    • Expo push notification credentials  
+    • Environment variables configured
   </Step>
 </Steps>
 
-## Code Examples
+## Mobile App Setup (React Native + Expo)
+
+### 1. Install Dependencies
+
+```bash
+# Install Expo notifications
+npm install expo-notifications expo-device expo-constants
+
+# Install additional dependencies for device info
+npm install @react-native-async-storage/async-storage
+```
+
+### 2. Configure app.json
+
+```json
+{
+  "expo": {
+    "name": "AWO Platform",
+    "slug": "awo-platform",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#bc9b25"
+    },
+    "notifications": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#bc9b25",
+      "sounds": ["./assets/notification-sound.wav"]
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.awo.platform",
+      "infoPlist": {
+        "UIBackgroundModes": ["background-fetch", "remote-notification"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#bc9b25"
+      },
+      "package": "com.awo.platform",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ],
+      "notification": {
+        "icon": "./assets/notification-icon.png",
+        "color": "#bc9b25",
+        "defaultChannel": "default"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#bc9b25",
+          "defaultChannel": "default"
+        }
+      ]
+    ]
+  }
+}
+```
+
+### 3. Notification Service Implementation
 
 ```typescript
-// Integration example
-import { PushNotificationsClient } from '@awo-platform/integrations';
+// services/NotificationService.ts
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
-const client = new PushNotificationsClient({
-  apiKey: process.env.API_KEY,
-  environment: 'sandbox'
+export interface NotificationData {
+  type: 'transaction' | 'diva_score' | 'chama' | 'security' | 'investment';
+  title: string;
+  body: string;
+  data?: Record<string, any>;
+  priority?: 'high' | 'normal' | 'low';
+  sound?: boolean;
+  badge?: number;
+}
+
+export class NotificationService {
+  private static instance: NotificationService;
+  private expoPushToken: string | null = null;
+  private notificationListener: any;
+  private responseListener: any;
+
+  private constructor() {
+    this.setupNotificationHandler();
+  }
+
+  static getInstance(): NotificationService {
+    if (!NotificationService.instance) {
+      NotificationService.instance = new NotificationService();
+    }
+    return NotificationService.instance;
+  }
+
+  private setupNotificationHandler() {
+    // Configure how notifications are handled when app is in foreground
+    Notifications.setNotificationHandler({
+      handleNotification: async (notification) => {
+        const { type } = notification.request.content.data as any;
+        
+        return {
+          shouldShowAlert: true,
+          shouldPlaySound: this.shouldPlaySound(type),
+          shouldSetBadge: true,
+        };
+      },
+    });
+  }
+
+  private shouldPlaySound(type: string): boolean {
+    const highPriorityTypes = ['security', 'transaction'];
+    return highPriorityTypes.includes(type);
+  }
+
+  async initializeNotifications(): Promise<string | null> {
+    try {
+      // Check if device supports push notifications
+      if (!Device.isDevice) {
+        console.warn('Push notifications only work on physical devices');
+        return null;
+      }
+
+      // Get existing permission status
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      // Request permission if not granted
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        console.warn('Push notification permission denied');
+        return null;
+      }
+
+      // Get push token
+      const token = await this.getExpoPushToken();
+      
+      if (token) {
+        await this.registerTokenWithBackend(token);
+        await this.storeTokenLocally(token);
+      }
+
+      this.setupNotificationListeners();
+      return token;
+    } catch (error) {
+      console.error('Error initializing notifications:', error);
+      return null;
+    }
+  }
+
+  private async getExpoPushToken(): Promise<string | null> {
+    try {
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      
+      if (!projectId) {
+        throw new Error('Expo project ID not found');
+      }
+
+      const tokenResponse = await Notifications.getExpoPushTokenAsync({
+        projectId,
+      });
+
+      this.expoPushToken = tokenResponse.data;
+      return tokenResponse.data;
+    } catch (error) {
+      console.error('Error getting Expo push token:', error);
+      return null;
+    }
+  }
+
+  private async registerTokenWithBackend(token: string): Promise<void> {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) return;
+
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/notifications/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await AsyncStorage.getItem('accessToken')}`,
+        },
+        body: JSON.stringify({
+          userId,
+          expoPushToken: token,
+          platform: Platform.OS,
+          deviceInfo: {
+            deviceId: Constants.deviceId,
+            deviceName: Constants.deviceName,
+            osVersion: Platform.Version,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to register push token');
+      }
+
+      console.log('Push token registered successfully');
+    } catch (error) {
+      console.error('Error registering push token:', error);
+    }
+  }
+
+  private async storeTokenLocally(token: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem('expoPushToken', token);
+    } catch (error) {
+      console.error('Error storing push token locally:', error);
+    }
+  }
+
+  private setupNotificationListeners(): void {
+    // Listen for notifications while app is running
+    this.notificationListener = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        console.log('Notification received:', notification);
+        this.handleNotificationReceived(notification);
+      }
+    );
+
+    // Listen for user interactions with notifications
+    this.responseListener = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        console.log('Notification response:', response);
+        this.handleNotificationResponse(response);
+      }
+    );
+  }
+
+  private handleNotificationReceived(notification: Notifications.Notification): void {
+    const { type, title, body, data } = notification.request.content.data as any;
+    
+    // Update badge count for certain notification types
+    if (['transaction', 'security'].includes(type)) {
+      this.updateBadgeCount();
+    }
+
+    // Store notification for in-app notification center
+    this.storeNotificationLocally(notification);
+  }
+
+  private handleNotificationResponse(response: Notifications.NotificationResponse): void {
+    const { type, deepLink } = response.notification.request.content.data as any;
+    
+    // Handle deep linking based on notification type
+    this.handleDeepLink(type, deepLink);
+    
+    // Clear badge when user interacts with notification
+    this.clearBadgeCount();
+  }
+
+  private async updateBadgeCount(): Promise<void> {
+    try {
+      const currentCount = await Notifications.getBadgeCountAsync();
+      await Notifications.setBadgeCountAsync(currentCount + 1);
+    } catch (error) {
+      console.error('Error updating badge count:', error);
+    }
+  }
+
+  private async clearBadgeCount(): Promise<void> {
+    try {
+      await Notifications.setBadgeCountAsync(0);
+    } catch (error) {
+      console.error('Error clearing badge count:', error);
+    }
+  }
+
+  private async storeNotificationLocally(notification: Notifications.Notification): Promise<void> {
+    try {
+      const existingNotifications = await AsyncStorage.getItem('localNotifications');
+      const notifications = existingNotifications ? JSON.parse(existingNotifications) : [];
+      
+      notifications.unshift({
+        id: notification.request.identifier,
+        title: notification.request.content.title,
+        body: notification.request.content.body,
+        data: notification.request.content.data,
+        timestamp: Date.now(),
+        read: false,
+      });
+
+      // Keep only last 50 notifications
+      const trimmedNotifications = notifications.slice(0, 50);
+      
+      await AsyncStorage.setItem('localNotifications', JSON.stringify(trimmedNotifications));
+    } catch (error) {
+      console.error('Error storing notification locally:', error);
+    }
+  }
+
+  private handleDeepLink(type: string, deepLink?: string): void {
+    // Implementation depends on your navigation structure
+    // Example deep linking logic:
+    switch (type) {
+      case 'transaction':
+        // Navigate to transaction details
+        break;
+      case 'diva_score':
+        // Navigate to DIVA dashboard
+        break;
+      case 'chama':
+        // Navigate to Chama details
+        break;
+      case 'investment':
+        // Navigate to investment opportunities
+        break;
+      default:
+        // Navigate to home
+        break;
+    }
+  }
+
+  // Schedule local notification
+  async scheduleLocalNotification(notificationData: NotificationData): Promise<string> {
+    try {
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: notificationData.title,
+          body: notificationData.body,
+          data: {
+            type: notificationData.type,
+            ...notificationData.data,
+          },
+          sound: notificationData.sound ? 'default' : undefined,
+          badge: notificationData.badge,
+        },
+        trigger: null, // Send immediately
+      });
+
+      return id;
+    } catch (error) {
+      console.error('Error scheduling local notification:', error);
+      throw error;
+    }
+  }
+
+  // Get stored push token
+  async getStoredPushToken(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem('expoPushToken');
+    } catch (error) {
+      console.error('Error getting stored push token:', error);
+      return null;
+    }
+  }
+
+  // Clean up listeners
+  removeNotificationListeners(): void {
+    if (this.notificationListener) {
+      Notifications.removeNotificationSubscription(this.notificationListener);
+    }
+    if (this.responseListener) {
+      Notifications.removeNotificationSubscription(this.responseListener);
+    }
+  }
+}
+
+// Export singleton instance
+export const notificationService = NotificationService.getInstance();
+```
+
+### 4. React Hook for Notifications
+
+```typescript
+// hooks/useNotifications.ts
+import { useState, useEffect } from 'react';
+import { notificationService } from '../services/NotificationService';
+import * as Notifications from 'expo-notifications';
+
+export interface NotificationPermissionStatus {
+  granted: boolean;
+  canAskAgain: boolean;
+  status: Notifications.PermissionStatus;
+}
+
+export const useNotifications = () => {
+  const [pushToken, setPushToken] = useState<string | null>(null);
+  const [permissionStatus, setPermissionStatus] = useState<NotificationPermissionStatus | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  useEffect(() => {
+    initializeNotifications();
+    
+    return () => {
+      notificationService.removeNotificationListeners();
+    };
+  }, []);
+
+  const initializeNotifications = async () => {
+    try {
+      setIsInitializing(true);
+      
+      // Check permission status
+      const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+      setPermissionStatus({
+        granted: status === 'granted',
+        canAskAgain,
+        status,
+      });
+
+      // Initialize notification service
+      const token = await notificationService.initializeNotifications();
+      setPushToken(token);
+    } catch (error) {
+      console.error('Error initializing notifications:', error);
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
+  const requestPermission = async (): Promise<boolean> => {
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      const granted = status === 'granted';
+      
+      setPermissionStatus({
+        granted,
+        canAskAgain: status !== 'denied',
+        status,
+      });
+
+      if (granted) {
+        const token = await notificationService.initializeNotifications();
+        setPushToken(token);
+      }
+
+      return granted;
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+      return false;
+    }
+  };
+
+  const scheduleLocalNotification = async (title: string, body: string, data?: any) => {
+    try {
+      return await notificationService.scheduleLocalNotification({
+        type: 'security',
+        title,
+        body,
+        data,
+        sound: true,
+      });
+    } catch (error) {
+      console.error('Error scheduling local notification:', error);
+      throw error;
+    }
+  };
+
+  return {
+    pushToken,
+    permissionStatus,
+    isInitializing,
+    requestPermission,
+    scheduleLocalNotification,
+    refreshToken: initializeNotifications,
+  };
+};
+```
+
+### 5. Notification Permission Component
+
+```typescript
+// components/NotificationPermissionModal.tsx
+import React from 'react';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { useNotifications } from '../hooks/useNotifications';
+
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+}
+
+export const NotificationPermissionModal: React.FC<Props> = ({ visible, onClose }) => {
+  const { permissionStatus, requestPermission } = useNotifications();
+
+  const handleRequestPermission = async () => {
+    const granted = await requestPermission();
+    
+    if (granted) {
+      Alert.alert(
+        'Notifications Enabled',
+        'You will now receive important updates about your AWO account.',
+        [{ text: 'Great!', onPress: onClose }]
+      );
+    } else {
+      Alert.alert(
+        'Permission Denied',
+        'You can enable notifications later in your device settings.',
+        [{ text: 'OK', onPress: onClose }]
+      );
+    }
+  };
+
+  if (!permissionStatus || permissionStatus.granted) {
+    return null;
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.overlay}>
+        <View style={styles.modal}>
+          <View style={styles.iconContainer}>
+            <Text style={styles.icon}>🔔</Text>
+          </View>
+          
+          <Text style={styles.title}>Stay Connected with AWO</Text>
+          
+          <Text style={styles.description}>
+            Enable notifications to receive important updates about:
+          </Text>
+          
+          <View style={styles.benefitsList}>
+            <Text style={styles.benefit}>• Transaction confirmations</Text>
+            <Text style={styles.benefit}>• DIVA score updates</Text>
+            <Text style={styles.benefit}>• Chama activity alerts</Text>
+            <Text style={styles.benefit}>• Investment opportunities</Text>
+          </View>
+          
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.button, styles.enableButton]}
+              onPress={handleRequestPermission}
+            >
+              <Text style={styles.enableButtonText}>Enable Notifications</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.button, styles.skipButton]}
+              onPress={onClose}
+            >
+              <Text style={styles.skipButtonText}>Maybe Later</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modal: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  iconContainer: {
+    width: 60,
+    height: 60,
+    backgroundColor: '#bc9b25',
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  icon: {
+    fontSize: 24,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 12,
+    color: '#010101',
+  },
+  description: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+    color: '#666',
+  },
+  benefitsList: {
+    alignSelf: 'stretch',
+    marginBottom: 24,
+  },
+  benefit: {
+    fontSize: 14,
+    marginBottom: 8,
+    color: '#333',
+  },
+  buttonContainer: {
+    width: '100%',
+    gap: 12,
+  },
+  button: {
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  enableButton: {
+    backgroundColor: '#bc9b25',
+  },
+  enableButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  skipButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  skipButtonText: {
+    color: '#666',
+    fontSize: 16,
+  },
 });
 ```
 
-## Webhooks
+## Backend Implementation (Node.js + Express)
 
-Webhook configuration and handling will be documented here.
+### 1. Environment Configuration
+
+```bash
+# Expo Push Notification Configuration
+EXPO_ACCESS_TOKEN=your_expo_access_token_here
+
+# Database Configuration
+DATABASE_URL=your_database_connection_string
+REDIS_URL=your_redis_connection_string
+
+# Notification Settings
+NOTIFICATION_RATE_LIMIT=1000
+NOTIFICATION_BATCH_SIZE=100
+```
+
+### 2. Database Models
+
+```typescript
+// models/PushToken.ts
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
+
+@Entity('push_tokens')
+@Index(['userId'], { unique: false })
+@Index(['expoPushToken'], { unique: true })
+export class PushToken {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  userId: string;
+
+  @Column({ name: 'expo_push_token' })
+  expoPushToken: string;
+
+  @Column({ name: 'platform' })
+  platform: 'ios' | 'android';
+
+  @Column({ name: 'device_info', type: 'jsonb', nullable: true })
+  deviceInfo: {
+    deviceId?: string;
+    deviceName?: string;
+    osVersion?: string | number;
+  };
+
+  @Column({ name: 'is_active', default: true })
+  isActive: boolean;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+}
+
+// models/NotificationLog.ts
+@Entity('notification_logs')
+export class NotificationLog {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  userId: string;
+
+  @Column({ name: 'notification_type' })
+  notificationType: 'transaction' | 'diva_score' | 'chama' | 'security' | 'investment';
+
+  @Column()
+  title: string;
+
+  @Column()
+  body: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  data: Record<string, any>;
+
+  @Column({ name: 'expo_push_token' })
+  expoPushToken: string;
+
+  @Column({ name: 'expo_receipt_id', nullable: true })
+  expoReceiptId: string;
+
+  @Column({ name: 'status', default: 'pending' })
+  status: 'pending' | 'sent' | 'delivered' | 'failed';
+
+  @Column({ name: 'error_message', nullable: true })
+  errorMessage: string;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+}
+```
+
+### 3. Push Notification Service
+
+```typescript
+// services/PushNotificationService.ts
+import { Expo, ExpoPushMessage, ExpoPushTicket, ExpoPushReceiptId } from 'expo-server-sdk';
+import { Repository } from 'typeorm';
+import { PushToken } from '../models/PushToken';
+import { NotificationLog } from '../models/NotificationLog';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('PushNotificationService');
+
+export interface PushNotificationData {
+  userId: string;
+  type: 'transaction' | 'diva_score' | 'chama' | 'security' | 'investment';
+  title: string;
+  body: string;
+  data?: Record<string, any>;
+  sound?: boolean;
+  badge?: number;
+  priority?: 'default' | 'normal' | 'high';
+}
+
+export class PushNotificationService {
+  private expo: Expo;
+  private pushTokenRepo: Repository<PushToken>;
+  private notificationLogRepo: Repository<NotificationLog>;
+
+  constructor(
+    pushTokenRepo: Repository<PushToken>,
+    notificationLogRepo: Repository<NotificationLog>
+  ) {
+    this.expo = new Expo();
+    this.pushTokenRepo = pushTokenRepo;
+    this.notificationLogRepo = notificationLogRepo;
+  }
+
+  async registerPushToken(data: {
+    userId: string;
+    expoPushToken: string;
+    platform: 'ios' | 'android';
+    deviceInfo?: any;
+  }): Promise<void> {
+    try {
+      // Validate Expo push token
+      if (!Expo.isExpoPushToken(data.expoPushToken)) {
+        throw new Error('Invalid Expo push token');
+      }
+
+      // Check if token already exists
+      const existingToken = await this.pushTokenRepo.findOne({
+        where: { expoPushToken: data.expoPushToken },
+      });
+
+      if (existingToken) {
+        // Update existing token
+        existingToken.userId = data.userId;
+        existingToken.platform = data.platform;
+        existingToken.deviceInfo = data.deviceInfo;
+        existingToken.isActive = true;
+        await this.pushTokenRepo.save(existingToken);
+      } else {
+        // Create new token record
+        const pushToken = this.pushTokenRepo.create({
+          userId: data.userId,
+          expoPushToken: data.expoPushToken,
+          platform: data.platform,
+          deviceInfo: data.deviceInfo,
+          isActive: true,
+        });
+        await this.pushTokenRepo.save(pushToken);
+      }
+
+      logger.info('Push token registered successfully', {
+        userId: data.userId,
+        platform: data.platform,
+      });
+    } catch (error) {
+      logger.error('Error registering push token', {
+        userId: data.userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  async sendPushNotification(notificationData: PushNotificationData): Promise<void> {
+    try {
+      // Get user's push tokens
+      const pushTokens = await this.pushTokenRepo.find({
+        where: { userId: notificationData.userId, isActive: true },
+      });
+
+      if (pushTokens.length === 0) {
+        logger.warn('No active push tokens found for user', {
+          userId: notificationData.userId,
+        });
+        return;
+      }
+
+      // Create Expo push messages
+      const messages: ExpoPushMessage[] = pushTokens.map(token => ({
+        to: token.expoPushToken,
+        title: notificationData.title,
+        body: notificationData.body,
+        data: {
+          type: notificationData.type,
+          ...notificationData.data,
+        },
+        sound: notificationData.sound ? 'default' : undefined,
+        badge: notificationData.badge,
+        priority: notificationData.priority || 'default',
+        channelId: this.getChannelId(notificationData.type),
+      }));
+
+      // Send notifications in chunks
+      const chunks = this.expo.chunkPushNotifications(messages);
+      const ticketPromises = chunks.map(chunk => 
+        this.expo.sendPushNotificationsAsync(chunk)
+      );
+
+      const tickets = (await Promise.all(ticketPromises)).flat();
+
+      // Log notifications
+      await this.logNotifications(notificationData, pushTokens, tickets);
+
+      logger.info('Push notifications sent successfully', {
+        userId: notificationData.userId,
+        tokenCount: pushTokens.length,
+        type: notificationData.type,
+      });
+    } catch (error) {
+      logger.error('Error sending push notification', {
+        userId: notificationData.userId,
+        type: notificationData.type,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  async sendBulkPushNotifications(notifications: PushNotificationData[]): Promise<void> {
+    try {
+      const allMessages: ExpoPushMessage[] = [];
+      const notificationLogs: any[] = [];
+
+      // Prepare all messages
+      for (const notification of notifications) {
+        const pushTokens = await this.pushTokenRepo.find({
+          where: { userId: notification.userId, isActive: true },
+        });
+
+        for (const token of pushTokens) {
+          allMessages.push({
+            to: token.expoPushToken,
+            title: notification.title,
+            body: notification.body,
+            data: {
+              type: notification.type,
+              ...notification.data,
+            },
+            sound: notification.sound ? 'default' : undefined,
+            badge: notification.badge,
+            priority: notification.priority || 'default',
+            channelId: this.getChannelId(notification.type),
+          });
+
+          notificationLogs.push({
+            userId: notification.userId,
+            notificationType: notification.type,
+            title: notification.title,
+            body: notification.body,
+            data: notification.data,
+            expoPushToken: token.expoPushToken,
+            status: 'pending',
+          });
+        }
+      }
+
+      // Send in chunks
+      const chunks = this.expo.chunkPushNotifications(allMessages);
+      const ticketPromises = chunks.map(chunk => 
+        this.expo.sendPushNotificationsAsync(chunk)
+      );
+
+      const allTickets = (await Promise.all(ticketPromises)).flat();
+
+      // Update logs with ticket information
+      for (let i = 0; i < notificationLogs.length; i++) {
+        const ticket = allTickets[i];
+        if (ticket && ticket.status === 'ok') {
+          notificationLogs[i].expoReceiptId = ticket.id;
+          notificationLogs[i].status = 'sent';
+        } else if (ticket && ticket.status === 'error') {
+          notificationLogs[i].status = 'failed';
+          notificationLogs[i].errorMessage = ticket.message;
+        }
+      }
+
+      // Save logs
+      await this.notificationLogRepo.save(notificationLogs);
+
+      logger.info('Bulk push notifications sent successfully', {
+        notificationCount: notifications.length,
+        messageCount: allMessages.length,
+      });
+    } catch (error) {
+      logger.error('Error sending bulk push notifications', {
+        notificationCount: notifications.length,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  private getChannelId(type: string): string {
+    const channelMap = {
+      security: 'security-alerts',
+      transaction: 'transaction-updates',
+      diva_score: 'diva-updates',
+      chama: 'chama-activity',
+      investment: 'investment-opportunities',
+    };
+
+    return channelMap[type] || 'default';
+  }
+
+  private async logNotifications(
+    notificationData: PushNotificationData,
+    pushTokens: PushToken[],
+    tickets: ExpoPushTicket[]
+  ): Promise<void> {
+    try {
+      const logs = pushTokens.map((token, index) => {
+        const ticket = tickets[index];
+        return this.notificationLogRepo.create({
+          userId: notificationData.userId,
+          notificationType: notificationData.type,
+          title: notificationData.title,
+          body: notificationData.body,
+          data: notificationData.data,
+          expoPushToken: token.expoPushToken,
+          expoReceiptId: ticket && ticket.status === 'ok' ? ticket.id : null,
+          status: ticket && ticket.status === 'ok' ? 'sent' : 'failed',
+          errorMessage: ticket && ticket.status === 'error' ? ticket.message : null,
+        });
+      });
+
+      await this.notificationLogRepo.save(logs);
+    } catch (error) {
+      logger.error('Error logging notifications', {
+        userId: notificationData.userId,
+        error: error.message,
+      });
+    }
+  }
+
+  async handleDeliveryReceipts(): Promise<void> {
+    try {
+      // Get pending receipts
+      const pendingLogs = await this.notificationLogRepo.find({
+        where: { status: 'sent', expoReceiptId: Not(IsNull()) },
+        take: 1000, // Process in batches
+      });
+
+      if (pendingLogs.length === 0) {
+        return;
+      }
+
+      const receiptIds = pendingLogs
+        .map(log => log.expoReceiptId)
+        .filter(Boolean) as ExpoPushReceiptId[];
+
+      const receiptIdChunks = this.expo.chunkPushNotificationReceiptIds(receiptIds);
+      
+      for (const chunk of receiptIdChunks) {
+        const receipts = await this.expo.getPushNotificationReceiptsAsync(chunk);
+
+        for (const receiptId in receipts) {
+          const receipt = receipts[receiptId];
+          const log = pendingLogs.find(l => l.expoReceiptId === receiptId);
+          
+          if (log) {
+            if (receipt.status === 'ok') {
+              log.status = 'delivered';
+            } else if (receipt.status === 'error') {
+              log.status = 'failed';
+              log.errorMessage = receipt.message;
+
+              // Handle token invalidation
+              if (receipt.details?.error === 'DeviceNotRegistered') {
+                await this.deactivatePushToken(log.expoPushToken);
+              }
+            }
+          }
+        }
+
+        // Update logs
+        await this.notificationLogRepo.save(pendingLogs);
+      }
+
+      logger.info('Processed delivery receipts', {
+        processedCount: pendingLogs.length,
+      });
+    } catch (error) {
+      logger.error('Error handling delivery receipts', {
+        error: error.message,
+      });
+    }
+  }
+
+  private async deactivatePushToken(expoPushToken: string): Promise<void> {
+    try {
+      await this.pushTokenRepo.update(
+        { expoPushToken },
+        { isActive: false }
+      );
+
+      logger.info('Deactivated invalid push token', {
+        expoPushToken: expoPushToken.substring(0, 20) + '...',
+      });
+    } catch (error) {
+      logger.error('Error deactivating push token', {
+        error: error.message,
+      });
+    }
+  }
+
+  async getUserPushTokens(userId: string): Promise<PushToken[]> {
+    return this.pushTokenRepo.find({
+      where: { userId, isActive: true },
+    });
+  }
+
+  async deactivateUserTokens(userId: string): Promise<void> {
+    await this.pushTokenRepo.update(
+      { userId },
+      { isActive: false }
+    );
+  }
+}
+```
+
+### 4. Notification Templates
+
+```typescript
+// services/NotificationTemplateService.ts
+export class NotificationTemplateService {
+  static getTransactionNotification(type: string, amount: number, currency = 'ZAR'): {
+    title: string;
+    body: string;
+  } {
+    const templates = {
+      deposit: {
+        title: 'Deposit Successful',
+        body: `Your deposit of ${currency} ${amount.toFixed(2)} has been processed successfully.`,
+      },
+      withdrawal: {
+        title: 'Withdrawal Processed',
+        body: `Your withdrawal of ${currency} ${amount.toFixed(2)} is being processed.`,
+      },
+      transfer: {
+        title: 'Transfer Complete',
+        body: `You've successfully transferred ${currency} ${amount.toFixed(2)}.`,
+      },
+      investment: {
+        title: 'Investment Confirmed',
+        body: `Your investment of ${currency} ${amount.toFixed(2)} has been confirmed.`,
+      },
+    };
+
+    return templates[type] || {
+      title: 'Transaction Update',
+      body: `Transaction of ${currency} ${amount.toFixed(2)} processed.`,
+    };
+  }
+
+  static getDIVAScoreNotification(newScore: number, oldScore: number, tier: string): {
+    title: string;
+    body: string;
+  } {
+    const scoreDiff = newScore - oldScore;
+    const isImprovement = scoreDiff > 0;
+
+    if (isImprovement) {
+      return {
+        title: 'DIVA Score Improved! 🎉',
+        body: `Your score increased by ${scoreDiff} points to ${newScore}. You're now in the ${tier} tier!`,
+      };
+    } else {
+      return {
+        title: 'DIVA Score Updated',
+        body: `Your score has been updated to ${newScore}. Check your dashboard for personalized improvement tips.`,
+      };
+    }
+  }
+
+  static getChamaNotification(type: string, chamaName: string, data?: any): {
+    title: string;
+    body: string;
+  } {
+    const templates = {
+      contribution_due: {
+        title: 'Chama Contribution Due',
+        body: `Your contribution to ${chamaName} is due in 2 days. Don't miss out!`,
+      },
+      contribution_received: {
+        title: 'Contribution Received',
+        body: `Your contribution to ${chamaName} has been received. Thank you!`,
+      },
+      payout_ready: {
+        title: 'Chama Payout Ready',
+        body: `Your payout from ${chamaName} is ready for collection.`,
+      },
+      voting_reminder: {
+        title: 'Vote Required',
+        body: `${chamaName} has a proposal that needs your vote. Participate in the decision!`,
+      },
+      new_member: {
+        title: 'New Member Joined',
+        body: `${data?.memberName} has joined ${chamaName}. Welcome them to the group!`,
+      },
+    };
+
+    return templates[type] || {
+      title: 'Chama Update',
+      body: `There's an update in your Chama: ${chamaName}`,
+    };
+  }
+
+  static getSecurityNotification(type: string, data?: any): {
+    title: string;
+    body: string;
+  } {
+    const templates = {
+      login_success: {
+        title: 'Successful Login',
+        body: `Login successful from ${data?.location || 'new device'}. If this wasn't you, secure your account immediately.`,
+      },
+      login_failed: {
+        title: 'Failed Login Attempt',
+        body: `Someone tried to access your account. If this wasn't you, check your account security.`,
+      },
+      password_changed: {
+        title: 'Password Changed',
+        body: 'Your account password has been successfully changed.',
+      },
+      suspicious_activity: {
+        title: 'Suspicious Activity Detected',
+        body: 'We detected unusual activity on your account. Please review your recent transactions.',
+      },
+    };
+
+    return templates[type] || {
+      title: 'Security Alert',
+      body: 'There has been a security-related update to your account.',
+    };
+  }
+
+  static getInvestmentNotification(type: string, data?: any): {
+    title: string;
+    body: string;
+  } {
+    const templates = {
+      opportunity: {
+        title: 'New Investment Opportunity',
+        body: `A new ${data?.riskLevel || 'investment'} opportunity is available. Expected return: ${data?.expectedReturn || 'TBD'}.`,
+      },
+      performance_update: {
+        title: 'Portfolio Performance',
+        body: `Your portfolio ${data?.change > 0 ? 'gained' : 'lost'} ${Math.abs(data?.change || 0)}% this month.`,
+      },
+      maturity: {
+        title: 'Investment Matured',
+        body: `Your investment in ${data?.investmentName} has matured. Returns are available in your wallet.`,
+      },
+      rebalance_suggestion: {
+        title: 'Portfolio Rebalance Suggested',
+        body: 'Based on your DIVA score update, we suggest rebalancing your portfolio.',
+      },
+    };
+
+    return templates[type] || {
+      title: 'Investment Update',
+      body: 'There\'s an update about your investments.',
+    };
+  }
+}
+```
+
+### 5. Express Routes
+
+```typescript
+// routes/notifications.ts
+import { Router } from 'express';
+import { body, validationResult } from 'express-validator';
+import { PushNotificationService } from '../services/PushNotificationService';
+import { NotificationTemplateService } from '../services/NotificationTemplateService';
+import { authMiddleware } from '../middleware/auth';
+import { rateLimitMiddleware } from '../middleware/rateLimit';
+
+const router = Router();
+
+// Register push token
+router.post('/register', 
+  authMiddleware,
+  [
+    body('expoPushToken').notEmpty().withMessage('Expo push token is required'),
+    body('platform').isIn(['ios', 'android']).withMessage('Platform must be ios or android'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { expoPushToken, platform, deviceInfo } = req.body;
+      const userId = req.user.id;
+
+      await pushNotificationService.registerPushToken({
+        userId,
+        expoPushToken,
+        platform,
+        deviceInfo,
+      });
+
+      res.json({ 
+        success: true, 
+        message: 'Push token registered successfully' 
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        message: error.message 
+      });
+    }
+  }
+);
+
+// Send transaction notification
+router.post('/transaction',
+  authMiddleware,
+  rateLimitMiddleware(10, 60), // 10 requests per minute
+  [
+    body('type').isIn(['deposit', 'withdrawal', 'transfer', 'investment']),
+    body('amount').isNumeric().withMessage('Amount must be a number'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { type, amount, currency = 'ZAR' } = req.body;
+      const userId = req.user.id;
+
+      const { title, body } = NotificationTemplateService.getTransactionNotification(
+        type, 
+        amount, 
+        currency
+      );
+
+      await pushNotificationService.sendPushNotification({
+        userId,
+        type: 'transaction',
+        title,
+        body,
+        data: { type, amount, currency },
+        sound: true,
+        priority: 'high',
+      });
+
+      res.json({ 
+        success: true, 
+        message: 'Transaction notification sent' 
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        message: error.message 
+      });
+    }
+  }
+);
+
+// Send DIVA score update
+router.post('/diva-score',
+  authMiddleware,
+  [
+    body('newScore').isNumeric().withMessage('New score must be a number'),
+    body('oldScore').isNumeric().withMessage('Old score must be a number'),
+    body('tier').notEmpty().withMessage('Tier is required'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { newScore, oldScore, tier } = req.body;
+      const userId = req.user.id;
+
+      const { title, body } = NotificationTemplateService.getDIVAScoreNotification(
+        newScore, 
+        oldScore, 
+        tier
+      );
+
+      await pushNotificationService.sendPushNotification({
+        userId,
+        type: 'diva_score',
+        title,
+        body,
+        data: { newScore, oldScore, tier },
+        sound: true,
+        priority: 'normal',
+      });
+
+      res.json({ 
+        success: true, 
+        message: 'DIVA score notification sent' 
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        message: error.message 
+      });
+    }
+  }
+);
+
+// Send Chama notification
+router.post('/chama',
+  authMiddleware,
+  [
+    body('type').notEmpty().withMessage('Notification type is required'),
+    body('chamaName').notEmpty().withMessage('Chama name is required'),
+    body('memberIds').isArray().withMessage('Member IDs must be an array'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { type, chamaName, memberIds, data } = req.body;
+
+      const { title, body } = NotificationTemplateService.getChamaNotification(
+        type, 
+        chamaName, 
+        data
+      );
+
+      const notifications = memberIds.map(userId => ({
+        userId,
+        type: 'chama' as const,
+        title,
+        body,
+        data: { type, chamaName, ...data },
+        sound: true,
+        priority: 'normal' as const,
+      }));
+
+      await pushNotificationService.sendBulkPushNotifications(notifications);
+
+      res.json({ 
+        success: true, 
+        message: 'Chama notifications sent',
+        sentCount: notifications.length,
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        message: error.message 
+      });
+    }
+  }
+);
+
+// Get user's notification history
+router.get('/history',
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { page = 1, limit = 20 } = req.query;
+
+      // Implementation depends on your database setup
+      // This would typically fetch from NotificationLog table
+      
+      res.json({
+        success: true,
+        notifications: [], // Array of notification history
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: 0,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        message: error.message 
+      });
+    }
+  }
+);
+
+export default router;
+```
+
+## Testing & Validation
+
+### 1. Local Testing
+
+**Test Push Token Registration:**
+```bash
+curl -X POST http://localhost:3000/api/notifications/register \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "expoPushToken": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+    "platform": "ios",
+    "deviceInfo": {
+      "deviceId": "test-device-id",
+      "deviceName": "Test iPhone",
+      "osVersion": "15.0"
+    }
+  }'
+```
+
+**Test Transaction Notification:**
+```bash
+curl -X POST http://localhost:3000/api/notifications/transaction \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "type": "deposit",
+    "amount": 1000,
+    "currency": "ZAR"
+  }'
+```
+
+### 2. Automated Testing
+
+```typescript
+// tests/pushNotifications.test.ts
+import { PushNotificationService } from '../services/PushNotificationService';
+import { Expo } from 'expo-server-sdk';
+
+describe('Push Notification Service', () => {
+  let pushNotificationService: PushNotificationService;
+  let mockExpo: jest.Mocked<Expo>;
+
+  beforeEach(() => {
+    mockExpo = {
+      sendPushNotificationsAsync: jest.fn(),
+      chunkPushNotifications: jest.fn(),
+      isExpoPushToken: jest.fn(),
+    } as any;
+
+    pushNotificationService = new PushNotificationService(
+      mockPushTokenRepo,
+      mockNotificationLogRepo
+    );
+  });
+
+  test('should send transaction notification successfully', async () => {
+    const mockTokens = [
+      { expoPushToken: 'ExponentPushToken[test]', userId: 'user1' }
+    ];
+
+    mockPushTokenRepo.find.mockResolvedValue(mockTokens);
+    mockExpo.chunkPushNotifications.mockReturnValue([mockTokens]);
+    mockExpo.sendPushNotificationsAsync.mockResolvedValue([
+      { status: 'ok', id: 'receipt-id' }
+    ]);
+
+    await pushNotificationService.sendPushNotification({
+      userId: 'user1',
+      type: 'transaction',
+      title: 'Test Transaction',
+      body: 'Test body',
+      sound: true,
+    });
+
+    expect(mockExpo.sendPushNotificationsAsync).toHaveBeenCalledTimes(1);
+    expect(mockNotificationLogRepo.save).toHaveBeenCalled();
+  });
+
+  test('should handle invalid push tokens', async () => {
+    mockExpo.isExpoPushToken.mockReturnValue(false);
+
+    await expect(
+      pushNotificationService.registerPushToken({
+        userId: 'user1',
+        expoPushToken: 'invalid-token',
+        platform: 'ios',
+      })
+    ).rejects.toThrow('Invalid Expo push token');
+  });
+});
+```
+
+### 3. Performance Testing
+
+```typescript
+// tests/notificationPerformance.test.ts
+describe('Notification Performance', () => {
+  test('should handle bulk notifications efficiently', async () => {
+    const startTime = Date.now();
+    
+    const notifications = Array(1000).fill(null).map((_, i) => ({
+      userId: `user${i}`,
+      type: 'chama' as const,
+      title: 'Test Notification',
+      body: 'Test body',
+    }));
+
+    await pushNotificationService.sendBulkPushNotifications(notifications);
+    
+    const duration = Date.now() - startTime;
+    
+    // Should complete within 30 seconds for 1000 notifications
+    expect(duration).toBeLessThan(30000);
+  });
+});
+```
+
+## Monitoring & Analytics
+
+### 1. Notification Dashboard
+
+```typescript
+// services/NotificationAnalyticsService.ts
+export class NotificationAnalyticsService {
+  async getNotificationStats(period: string = '7d') {
+    const endDate = new Date();
+    const startDate = new Date();
+    
+    switch (period) {
+      case '24h':
+        startDate.setHours(startDate.getHours() - 24);
+        break;
+      case '7d':
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case '30d':
+        startDate.setDate(startDate.getDate() - 30);
+        break;
+    }
+
+    const stats = await this.notificationLogRepo
+      .createQueryBuilder('log')
+      .select([
+        'log.notification_type as type',
+        'log.status',
+        'COUNT(*) as count',
+      ])
+      .where('log.created_at BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      })
+      .groupBy('log.notification_type, log.status')
+      .getRawMany();
+
+    return this.formatStatsResponse(stats);
+  }
+
+  async getDeliveryRates() {
+    const totalSent = await this.notificationLogRepo.count({
+      where: { status: In(['sent', 'delivered', 'failed']) },
+    });
+
+    const delivered = await this.notificationLogRepo.count({
+      where: { status: 'delivered' },
+    });
+
+    const failed = await this.notificationLogRepo.count({
+      where: { status: 'failed' },
+    });
+
+    return {
+      totalSent,
+      delivered,
+      failed,
+      deliveryRate: totalSent > 0 ? (delivered / totalSent) * 100 : 0,
+      failureRate: totalSent > 0 ? (failed / totalSent) * 100 : 0,
+    };
+  }
+
+  private formatStatsResponse(stats: any[]) {
+    const result = {
+      byType: {},
+      byStatus: {},
+      total: 0,
+    };
+
+    stats.forEach(stat => {
+      const count = parseInt(stat.count);
+      result.total += count;
+
+      if (!result.byType[stat.type]) {
+        result.byType[stat.type] = { total: 0, byStatus: {} };
+      }
+      
+      result.byType[stat.type].total += count;
+      result.byType[stat.type].byStatus[stat.status] = count;
+
+      if (!result.byStatus[stat.status]) {
+        result.byStatus[stat.status] = 0;
+      }
+      
+      result.byStatus[stat.status] += count;
+    });
+
+    return result;
+  }
+}
+```
+
+### 2. Scheduled Jobs
+
+```typescript
+// jobs/notificationJobs.ts
+import cron from 'node-cron';
+import { PushNotificationService } from '../services/PushNotificationService';
+
+// Process delivery receipts every 15 minutes
+cron.schedule('*/15 * * * *', async () => {
+  try {
+    await pushNotificationService.handleDeliveryReceipts();
+    console.log('Delivery receipts processed successfully');
+  } catch (error) {
+    console.error('Error processing delivery receipts:', error);
+  }
+});
+
+// Clean up old notification logs (older than 90 days)
+cron.schedule('0 2 * * *', async () => {
+  try {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 90);
+
+    await notificationLogRepo
+      .createQueryBuilder()
+      .delete()
+      .where('created_at < :cutoffDate', { cutoffDate })
+      .execute();
+
+    console.log('Old notification logs cleaned up');
+  } catch (error) {
+    console.error('Error cleaning up notification logs:', error);
+  }
+});
+
+// Send daily investment opportunity notifications
+cron.schedule('0 9 * * *', async () => {
+  try {
+    // Get users eligible for investment notifications
+    const eligibleUsers = await getUsersForInvestmentNotifications();
+    
+    const notifications = eligibleUsers.map(user => ({
+      userId: user.id,
+      type: 'investment' as const,
+      title: 'New Investment Opportunities',
+      body: 'Check out today\'s curated investment opportunities.',
+      priority: 'normal' as const,
+    }));
+
+    await pushNotificationService.sendBulkPushNotifications(notifications);
+    console.log(`Sent investment notifications to ${notifications.length} users`);
+  } catch (error) {
+    console.error('Error sending investment notifications:', error);
+  }
+});
+```
 
 ## Troubleshooting
 
-<Accordion title="Common Integration Issues">
-Common problems and solutions will be provided here.
+### Common Issues
+
+<Accordion title="Push Notifications Not Delivering">
+**Symptoms**: Notifications sent but not received on device
+
+**Possible Causes**:
+- Invalid Expo push token
+- App not installed or uninstalled
+- Device offline or poor network
+- Notification permissions denied
+
+**Solutions**:
+1. Validate Expo push tokens before sending
+2. Handle delivery receipt errors properly
+3. Implement token refresh mechanism
+4. Check device notification settings
 </Accordion>
+
+<Accordion title="High Notification Failure Rate">
+**Symptoms**: Many notifications showing as failed
+
+**Possible Causes**:
+- Expired or invalid push tokens
+- Malformed notification payload
+- Rate limiting by Expo service
+- Network connectivity issues
+
+**Solutions**:
+1. Implement regular token validation
+2. Monitor and clean invalid tokens
+3. Add retry logic with exponential backoff
+4. Use proper notification chunking
+</Accordion>
+
+<Accordion title="App Not Responding to Notifications">
+**Symptoms**: Notifications received but app doesn't respond
+
+**Possible Causes**:
+- Missing notification listeners
+- Incorrect deep linking setup
+- App state management issues
+- Background app restrictions
+
+**Solutions**:
+1. Verify notification listeners are registered
+2. Test deep linking in different app states
+3. Handle app state transitions properly
+4. Request background app refresh permissions
+</Accordion>
+
+## Performance Optimization
+
+### 1. Notification Batching
+
+```typescript
+// utils/notificationBatcher.ts
+export class NotificationBatcher {
+  private batches: Map<string, PushNotificationData[]> = new Map();
+  private batchSize = 100;
+  private flushInterval = 5000; // 5 seconds
+
+  constructor() {
+    // Auto-flush batches periodically
+    setInterval(() => this.flushAllBatches(), this.flushInterval);
+  }
+
+  addNotification(notification: PushNotificationData): void {
+    const key = `${notification.type}_${notification.priority || 'normal'}`;
+    
+    if (!this.batches.has(key)) {
+      this.batches.set(key, []);
+    }
+
+    const batch = this.batches.get(key)!;
+    batch.push(notification);
+
+    // Flush if batch is full
+    if (batch.length >= this.batchSize) {
+      this.flushBatch(key);
+    }
+  }
+
+  private async flushBatch(key: string): Promise<void> {
+    const batch = this.batches.get(key);
+    if (!batch || batch.length === 0) return;
+
+    try {
+      await pushNotificationService.sendBulkPushNotifications(batch);
+      this.batches.set(key, []); // Clear batch
+    } catch (error) {
+      console.error(`Error flushing notification batch ${key}:`, error);
+      // Could implement retry logic here
+    }
+  }
+
+  private async flushAllBatches(): Promise<void> {
+    const promises = Array.from(this.batches.keys()).map(key => 
+      this.flushBatch(key)
+    );
+    
+    await Promise.allSettled(promises);
+  }
+}
+```
+
+### 2. Redis Queue Integration
+
+```typescript
+// services/NotificationQueueService.ts
+import Queue from 'bull';
+import { PushNotificationData } from './PushNotificationService';
+
+const notificationQueue = new Queue('notification processing', {
+  redis: {
+    port: parseInt(process.env.REDIS_PORT || '6379'),
+    host: process.env.REDIS_HOST || 'localhost',
+  },
+});
+
+// Process individual notifications
+notificationQueue.process('single', async (job) => {
+  const notification: PushNotificationData = job.data;
+  await pushNotificationService.sendPushNotification(notification);
+});
+
+// Process bulk notifications
+notificationQueue.process('bulk', async (job) => {
+  const notifications: PushNotificationData[] = job.data.notifications;
+  await pushNotificationService.sendBulkPushNotifications(notifications);
+});
+
+export const queueNotification = (notification: PushNotificationData) => {
+  return notificationQueue.add('single', notification, {
+    attempts: 3,
+    backoff: 'exponential',
+    delay: 1000,
+  });
+};
+
+export const queueBulkNotifications = (notifications: PushNotificationData[]) => {
+  return notificationQueue.add('bulk', { notifications }, {
+    attempts: 2,
+    backoff: 'exponential',
+    delay: 2000,
+  });
+};
+```
+
+---
+
+*This push notification implementation provides AWO Platform with a robust, scalable notification system that ensures users stay engaged with real-time updates about their financial activities and opportunities.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*
