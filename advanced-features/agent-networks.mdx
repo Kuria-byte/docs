@@ -1,41 +1,1096 @@
----
-title: "Agent Networks"
-description: "AWO Platform agent networks advanced functionality"
----
-
 # Agent Networks
 
-## Overview
+AWO Platform's Agent Network provides physical cash-in/cash-out (CICO) services through a distributed network of trained agents, enabling financial inclusion for users who need to bridge the gap between digital and physical money.
 
 <Info>
-Agent Networks is an advanced feature of the AWO Platform, providing sophisticated financial services for experienced users.
+With **90% of transactions in Africa still cash-based**, agent networks are essential infrastructure for financial inclusion. AWO's agent network serves as the bridge between digital financial services and cash-dependent communities across the SADC region.
 </Info>
 
-## Advanced Capabilities
+## Market Context & Importance
 
-Advanced functionality will be documented here.
+### Cash Economy Reality in Africa
+- **90%** of transactions in Africa are still cash-based
+- **60%** of adults in SADC region remain unbanked
+- **500 million** new mobile money accounts registered in 2023
+- **$1.2 billion** in agent commissions across Africa annually
 
-## Configuration
-
-<Accordion title="Advanced Configuration Options">
-Configuration details for agent networks will be provided here.
-</Accordion>
-
-## Implementation Guide
-
-Detailed implementation steps will be included here.
-
-## Performance Considerations
-
-Performance optimization tips will be documented here.
-
-## Enterprise Features
-
+### Why Agent Networks for AWO
 <CardGroup cols={2}>
-  <Card title="SME Marketplace" href="/advanced-features/sme-marketplace">
-    Business investment opportunities
+  <Card title="Last-Mile Access" icon="location-dot">
+    Bring financial services to remote areas where banks and ATMs don't exist
   </Card>
-  <Card title="Wealth Coaching" href="/advanced-features/wealth-coaching">
-    Professional financial advisory
+  <Card title="Trust Building" icon="handshake">
+    Local agents provide familiar, human touchpoint for digital financial services
   </Card>
 </CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Cash Bridge" icon="exchange-alt">
+    Enable seamless conversion between digital wallet funds and physical cash
+  </Card>
+  <Card title="Community Integration" icon="users">
+    Leverage existing community networks and social structures for financial inclusion
+  </Card>
+</CardGroup>
+
+## Agent Network Architecture
+
+### Agent Hierarchy & Structure
+
+```
+┌─────────────────────────────────────────────────────┐
+│                AWO HEADQUARTERS                     │
+├─────────────────────────────────────────────────────┤
+│           Regional Managers (Country)               │
+├─────────────────────────────────────────────────────┤
+│         Area Managers (Province/State)              │
+├─────────────────────────────────────────────────────┤
+│        Super Agents (District/Municipality)         │
+├─────────────────────────────────────────────────────┤
+│           Master Agents (Cluster)                   │
+├─────────────────────────────────────────────────────┤
+│              Active Agents                          │
+│    ┌─────────────┬─────────────┬─────────────┐     │
+│    │   Retail    │   Mobile    │  Kiosk/ATM  │     │
+│    │   Agents    │   Agents    │   Agents    │     │
+│    └─────────────┴─────────────┴─────────────┘     │
+└─────────────────────────────────────────────────────┘
+```
+
+### Agent Types & Capabilities
+
+#### 1. Retail Agents (Fixed Location)
+```typescript
+interface RetailAgent {
+  type: 'retail';
+  location: {
+    address: string;
+    coordinates: { lat: number; lng: number };
+    openingHours: OperatingHours;
+    landmarks: string[];
+  };
+  services: AgentService[];
+  dailyLimits: {
+    cashIn: number;
+    cashOut: number;
+    totalTransactions: number;
+  };
+  floatBalance: {
+    cash: number;
+    digital: number;
+    lastUpdate: Date;
+  };
+  equipment: AgentEquipment[];
+}
+
+// Typical retail agent setup
+const retailAgentExample = {
+  businessName: "Mama Sarah's Shop",
+  location: "Shop 15, Soweto Market, Johannesburg",
+  services: ['cash_in', 'cash_out', 'bill_payments', 'airtime'],
+  dailyLimits: {
+    cashIn: 50000,      // R50,000 per day
+    cashOut: 30000,     // R30,000 per day
+    totalTransactions: 200
+  },
+  operatingHours: "06:00 - 20:00 Mon-Sat, 08:00 - 16:00 Sun"
+};
+```
+
+#### 2. Mobile Agents (Roaming Service)
+```typescript
+interface MobileAgent {
+  type: 'mobile';
+  coverage: {
+    areas: string[];
+    radius: number; // km
+    routes: RouteSchedule[];
+  };
+  mobility: {
+    transportType: 'motorcycle' | 'bicycle' | 'walking' | 'vehicle';
+    schedule: MobilitySchedule;
+  };
+  services: AgentService[];
+  equipment: MobileEquipment[];
+}
+
+// Mobile agent for rural areas
+const mobileAgentExample = {
+  coverage: ["Limpopo Rural District 3", "Villages: Mokopane, Makhado"],
+  schedule: [
+    { day: 'Monday', locations: ['Mokopane Market'], times: '09:00-15:00' },
+    { day: 'Tuesday', locations: ['Makhado Community Center'], times: '10:00-16:00' },
+    { day: 'Wednesday', locations: ['Rural Route 1'], times: '08:00-17:00' }
+  ],
+  services: ['cash_in', 'cash_out', 'account_opening', 'education']
+};
+```
+
+#### 3. Digital Kiosks & Self-Service
+```typescript
+interface KioskAgent {
+  type: 'kiosk';
+  location: GeographicLocation;
+  capabilities: {
+    cashDispensing: boolean;
+    cashAccepting: boolean;
+    documentScanning: boolean;
+    biometricVerification: boolean;
+    videoSupport: boolean;
+  };
+  maintenance: {
+    lastService: Date;
+    nextService: Date;
+    issues: MaintenanceIssue[];
+  };
+}
+```
+
+## Agent Management System
+
+### Agent Onboarding Process
+
+<Steps>
+  <Step title="Application & Screening">
+    KYC verification, business registration check, location assessment, and background verification
+  </Step>
+  <Step title="Training & Certification">
+    5-day training program covering AWO services, compliance, customer service, and technology
+  </Step>
+  <Step title="Equipment Provisioning">
+    Issue POS devices, cash management tools, security equipment, and marketing materials
+  </Step>
+  <Step title="Float Management Setup">
+    Initial float allocation, cash management training, and reconciliation procedures
+  </Step>
+  <Step title="Go-Live & Monitoring">
+    Soft launch with supervision, performance monitoring, and ongoing support
+  </Step>
+</Steps>
+
+### Agent Requirements & Eligibility
+
+#### Basic Requirements
+<CardGroup cols={2}>
+  <Card title="Legal Requirements" icon="gavel">
+    - Valid business registration
+    - Tax compliance certificate
+    - Clean criminal background check
+    - Financial conduct verification
+  </Card>
+  <Card title="Business Criteria" icon="store">
+    - Established business (6+ months)
+    - High foot traffic location
+    - Operating hours: minimum 8 hours/day
+    - Basic infrastructure (electricity, security)
+  </Card>
+</CardGroup>
+
+#### Financial Requirements
+```typescript
+interface AgentFinancialRequirements {
+  minimumFloat: {
+    tier1: 5000;   // Rural/low-volume areas
+    tier2: 15000;  // Semi-urban areas
+    tier3: 50000;  // Urban/high-volume areas
+  };
+  securityDeposit: {
+    percentage: 0.1; // 10% of daily limit
+    minimum: 1000;
+    maximum: 10000;
+  };
+  insurance: {
+    required: true;
+    coverage: ['theft', 'fraud', 'equipment'];
+    minimumAmount: 100000;
+  };
+}
+```
+
+### Agent Training Program
+
+#### Core Training Modules
+```
+Module 1: AWO Platform Overview (4 hours)
+├── AWO services and products
+├── Customer value proposition
+├── Market opportunity in SADC
+└── Agent role and responsibilities
+
+Module 2: Technical Training (8 hours)
+├── POS device operation
+├── Transaction processing
+├── Troubleshooting common issues
+└── Security protocols
+
+Module 3: Customer Service (4 hours)
+├── Professional customer interaction
+├── Complaint handling
+├── Cross-selling opportunities
+└── Cultural sensitivity
+
+Module 4: Compliance & Risk (6 hours)
+├── KYC/AML requirements
+├── Transaction limits and monitoring
+├── Fraud prevention
+└── Regulatory compliance
+
+Module 5: Cash Management (4 hours)
+├── Float management
+├── Reconciliation procedures
+├── Security protocols
+└── Emergency procedures
+```
+
+#### Certification Process
+```typescript
+class AgentCertification {
+  async conductCertificationExam(agentId: string): Promise<CertificationResult> {
+    const exam = {
+      practical: await this.practicalAssessment(agentId),  // 70%
+      written: await this.writtenTest(agentId),            // 20%
+      customer: await this.customerServiceTest(agentId)    // 10%
+    };
+
+    const totalScore = (exam.practical * 0.7) + (exam.written * 0.2) + (exam.customer * 0.1);
+    
+    return {
+      passed: totalScore >= 80,
+      score: totalScore,
+      certification: totalScore >= 80 ? await this.issueCertificate(agentId) : null,
+      retakeRequired: totalScore < 80,
+      weakAreas: this.identifyWeakAreas(exam)
+    };
+  }
+
+  private async practicalAssessment(agentId: string): Promise<number> {
+    const tasks = [
+      'process_cash_in_transaction',
+      'process_cash_out_transaction',
+      'handle_failed_transaction',
+      'perform_daily_reconciliation',
+      'handle_customer_complaint'
+    ];
+
+    let score = 0;
+    for (const task of tasks) {
+      const taskScore = await this.evaluateTask(agentId, task);
+      score += taskScore;
+    }
+
+    return score / tasks.length;
+  }
+}
+```
+
+## Agent Operations Management
+
+### Daily Operations Flow
+
+#### Morning Routine
+```typescript
+interface AgentDailyRoutine {
+  openingProcedures: [
+    'verify_float_balance',
+    'check_equipment_status',
+    'review_daily_limits',
+    'confirm_connectivity',
+    'update_operating_status'
+  ];
+  
+  operationalTasks: [
+    'serve_customers',
+    'process_transactions',
+    'manage_float_levels',
+    'monitor_transaction_limits',
+    'handle_customer_inquiries'
+  ];
+  
+  closingProcedures: [
+    'reconcile_transactions',
+    'secure_cash_float',
+    'submit_daily_report',
+    'update_operating_status',
+    'prepare_next_day_float'
+  ];
+}
+
+// Daily opening checklist
+async function performOpeningChecklist(agentId: string): Promise<OpeningStatus> {
+  const checks = await Promise.all([
+    this.verifyFloatBalance(agentId),
+    this.testEquipmentConnectivity(agentId),
+    this.confirmDailyLimits(agentId),
+    this.checkSecuritySystems(agentId),
+    this.validateCertificationStatus(agentId)
+  ]);
+
+  const allPassed = checks.every(check => check.status === 'passed');
+  
+  if (allPassed) {
+    await this.activateAgent(agentId);
+    return { status: 'operational', message: 'Agent ready for business' };
+  } else {
+    const failures = checks.filter(check => check.status === 'failed');
+    return { 
+      status: 'issues_detected', 
+      message: 'Resolve issues before opening',
+      issues: failures 
+    };
+  }
+}
+```
+
+### Transaction Processing
+
+#### Cash-In Transaction Flow
+```typescript
+async function processCashInTransaction(
+  agentId: string, 
+  customerPhone: string, 
+  amount: number, 
+  cash: number
+): Promise<TransactionResult> {
+  
+  // Validation checks
+  const validations = await Promise.all([
+    this.validateAgent(agentId),
+    this.validateCustomer(customerPhone),
+    this.validateAmount(amount),
+    this.checkFloatAvailability(agentId, amount),
+    this.verifyDailyLimits(agentId, amount)
+  ]);
+
+  if (validations.some(v => !v.valid)) {
+    return { 
+      success: false, 
+      error: validations.find(v => !v.valid).message 
+    };
+  }
+
+  try {
+    // Process transaction atomically
+    const transaction = await db.transaction(async (trx) => {
+      // 1. Credit customer digital wallet
+      await WalletService.credit(customerPhone, amount, trx);
+      
+      // 2. Debit agent digital float
+      await AgentFloatService.debitDigital(agentId, amount, trx);
+      
+      // 3. Credit agent cash float
+      await AgentFloatService.creditCash(agentId, cash, trx);
+      
+      // 4. Record transaction
+      const txRecord = await TransactionService.create({
+        type: 'cash_in',
+        agentId,
+        customerPhone,
+        amount,
+        fee: calculateFee(amount),
+        reference: generateReference(),
+        timestamp: new Date()
+      }, trx);
+
+      return txRecord;
+    });
+
+    // Send confirmations
+    await Promise.all([
+      this.sendCustomerSMS(customerPhone, transaction),
+      this.updateAgentDashboard(agentId, transaction),
+      this.recordAnalytics(transaction)
+    ]);
+
+    return {
+      success: true,
+      transaction,
+      receipt: await this.generateReceipt(transaction)
+    };
+
+  } catch (error) {
+    await this.logTransactionError(agentId, customerPhone, amount, error);
+    return {
+      success: false,
+      error: 'Transaction failed. Please try again.'
+    };
+  }
+}
+```
+
+#### Cash-Out Transaction Flow
+```typescript
+async function processCashOutTransaction(
+  agentId: string,
+  customerPhone: string,
+  amount: number,
+  customerPIN: string
+): Promise<TransactionResult> {
+
+  // Additional security for cash-out
+  const securityChecks = await Promise.all([
+    this.validateCustomerPIN(customerPhone, customerPIN),
+    this.checkCustomerBalance(customerPhone, amount),
+    this.validateAgentCashFloat(agentId, amount),
+    this.checkVelocityLimits(customerPhone, amount),
+    this.screenForFraud(customerPhone, agentId, amount)
+  ]);
+
+  if (securityChecks.some(check => !check.valid)) {
+    await this.logSecurityEvent(agentId, customerPhone, 'cash_out_validation_failed');
+    return { 
+      success: false, 
+      error: 'Transaction cannot be processed. Please contact support.' 
+    };
+  }
+
+  // Process cash-out with additional verification
+  try {
+    const transaction = await db.transaction(async (trx) => {
+      // 1. Debit customer digital wallet
+      await WalletService.debit(customerPhone, amount, trx);
+      
+      // 2. Credit agent digital float
+      await AgentFloatService.creditDigital(agentId, amount, trx);
+      
+      // 3. Debit agent cash float
+      await AgentFloatService.debitCash(agentId, amount, trx);
+      
+      // 4. Record transaction with enhanced details
+      return await TransactionService.create({
+        type: 'cash_out',
+        agentId,
+        customerPhone,
+        amount,
+        fee: calculateFee(amount),
+        reference: generateReference(),
+        securityLevel: 'enhanced',
+        timestamp: new Date()
+      }, trx);
+    });
+
+    // Multi-channel confirmation
+    await Promise.all([
+      this.sendCustomerSMS(customerPhone, transaction),
+      this.updateAgentDashboard(agentId, transaction),
+      this.notifySupervision(transaction), // For high-value transactions
+      this.recordAnalytics(transaction)
+    ]);
+
+    return {
+      success: true,
+      transaction,
+      receipt: await this.generateReceipt(transaction),
+      instructCashDispense: amount
+    };
+
+  } catch (error) {
+    await this.logTransactionError(agentId, customerPhone, amount, error);
+    return {
+      success: false,
+      error: 'Cash-out failed. Please try again or contact support.'
+    };
+  }
+}
+```
+
+## Float Management System
+
+### Multi-Currency Float Management
+```typescript
+interface AgentFloat {
+  agentId: string;
+  currency: Currency;
+  balances: {
+    cash: {
+      current: number;
+      target: number;
+      minimum: number;
+      maximum: number;
+    };
+    digital: {
+      current: number;
+      target: number;
+      minimum: number;
+      maximum: number;
+    };
+  };
+  lastRebalance: Date;
+  nextRebalance: Date;
+  rebalanceThresholds: {
+    cashLow: number;     // Trigger cash delivery
+    digitalLow: number;  // Trigger digital top-up
+    cashHigh: number;    // Trigger cash collection
+    digitalHigh: number; // Trigger digital withdrawal
+  };
+}
+
+class FloatManagementService {
+  async monitorFloatLevels(agentId: string): Promise<FloatAction[]> {
+    const float = await this.getAgentFloat(agentId);
+    const actions: FloatAction[] = [];
+
+    // Check cash levels
+    if (float.balances.cash.current < float.rebalanceThresholds.cashLow) {
+      actions.push({
+        type: 'cash_delivery',
+        priority: 'high',
+        amount: float.balances.cash.target - float.balances.cash.current,
+        estimatedTime: this.estimateCashDeliveryTime(agentId)
+      });
+    }
+
+    // Check digital levels
+    if (float.balances.digital.current < float.rebalanceThresholds.digitalLow) {
+      actions.push({
+        type: 'digital_topup',
+        priority: 'medium',
+        amount: float.balances.digital.target - float.balances.digital.current,
+        estimatedTime: '5 minutes' // Instant digital transfer
+      });
+    }
+
+    // Excess cash handling
+    if (float.balances.cash.current > float.rebalanceThresholds.cashHigh) {
+      actions.push({
+        type: 'cash_collection',
+        priority: 'medium',
+        amount: float.balances.cash.current - float.balances.cash.target,
+        estimatedTime: this.estimateCashCollectionTime(agentId)
+      });
+    }
+
+    return actions;
+  }
+
+  async executeFloatRebalancing(agentId: string, actions: FloatAction[]): Promise<void> {
+    for (const action of actions) {
+      switch (action.type) {
+        case 'digital_topup':
+          await this.processDigitalTopup(agentId, action.amount);
+          break;
+        case 'cash_delivery':
+          await this.scheduleCashDelivery(agentId, action.amount);
+          break;
+        case 'cash_collection':
+          await this.scheduleCashCollection(agentId, action.amount);
+          break;
+      }
+    }
+  }
+}
+```
+
+### Predictive Float Optimization
+```typescript
+class PredictiveFloatOptimization {
+  async predictFloatNeeds(agentId: string, horizon: number = 7): Promise<FloatPrediction> {
+    const historicalData = await this.getAgentTransactionHistory(agentId, 30);
+    const seasonalPatterns = await this.analyzeSeasonalPatterns(agentId);
+    const localEvents = await this.getLocalEvents(agentId, horizon);
+
+    // ML-based prediction model
+    const prediction = await this.mlModel.predict({
+      features: {
+        historical_volume: historicalData.dailyVolume,
+        day_of_week_patterns: seasonalPatterns.weekday,
+        monthly_patterns: seasonalPatterns.monthly,
+        local_events: localEvents,
+        agent_performance: await this.getAgentPerformanceMetrics(agentId),
+        regional_trends: await this.getRegionalTrends(agentId)
+      },
+      horizon_days: horizon
+    });
+
+    return {
+      agentId,
+      horizon,
+      predictions: prediction.daily_forecasts,
+      recommendations: await this.generateFloatRecommendations(prediction),
+      confidence: prediction.confidence,
+      generated: new Date()
+    };
+  }
+
+  private async generateFloatRecommendations(prediction: MLPrediction): Promise<FloatRecommendation[]> {
+    const recommendations = [];
+
+    // High-demand days
+    const highDemandDays = prediction.daily_forecasts.filter(day => day.volume > day.average * 1.5);
+    if (highDemandDays.length > 0) {
+      recommendations.push({
+        type: 'increase_float',
+        reason: 'High demand predicted',
+        days: highDemandDays.map(d => d.date),
+        suggestedIncrease: highDemandDays.reduce((sum, d) => sum + d.additional_float_needed, 0)
+      });
+    }
+
+    // Cash-out heavy periods
+    const cashOutPeriods = prediction.daily_forecasts.filter(day => day.cash_out_ratio > 0.7);
+    if (cashOutPeriods.length > 0) {
+      recommendations.push({
+        type: 'increase_cash_float',
+        reason: 'High cash-out demand predicted',
+        days: cashOutPeriods.map(d => d.date),
+        suggestedCashIncrease: cashOutPeriods.reduce((sum, d) => sum + d.cash_float_needed, 0)
+      });
+    }
+
+    return recommendations;
+  }
+}
+```
+
+## Agent Performance Management
+
+### Performance Metrics & KPIs
+<CardGroup cols={2}>
+  <Card title="Transaction Metrics" icon="chart-line">
+    - Daily transaction volume and value
+    - Transaction success rate (&gt;98% target)
+    - Average transaction time (&lt;3 minutes)
+    - Customer satisfaction scores
+  </Card>
+  <Card title="Operational Metrics" icon="cog">
+    - Float availability uptime (&gt;95%)
+    - Reconciliation accuracy (100%)
+    - Training compliance (100%)
+    - Customer complaint resolution
+  </Card>
+</CardGroup>
+
+### Performance Monitoring System
+```typescript
+class AgentPerformanceMonitor {
+  async generatePerformanceReport(agentId: string, period: 'daily' | 'weekly' | 'monthly'): Promise<PerformanceReport> {
+    const metrics = await Promise.all([
+      this.getTransactionMetrics(agentId, period),
+      this.getOperationalMetrics(agentId, period),
+      this.getCustomerFeedback(agentId, period),
+      this.getComplianceMetrics(agentId, period),
+      this.getFloatManagementMetrics(agentId, period)
+    ]);
+
+    const overallScore = this.calculateOverallScore(metrics);
+    const rating = this.determineRating(overallScore);
+    const recommendations = await this.generateRecommendations(agentId, metrics);
+
+    return {
+      agentId,
+      period,
+      overallScore,
+      rating,
+      metrics: {
+        transactions: metrics[0],
+        operations: metrics[1],
+        customer: metrics[2],
+        compliance: metrics[3],
+        float: metrics[4]
+      },
+      recommendations,
+      generatedAt: new Date()
+    };
+  }
+
+  private calculateOverallScore(metrics: any[]): number {
+    const weights = {
+      transactions: 0.3,    // 30% - Core business
+      operations: 0.25,     // 25% - Operational excellence
+      customer: 0.2,        // 20% - Customer satisfaction
+      compliance: 0.15,     // 15% - Regulatory compliance
+      float: 0.1            // 10% - Float management
+    };
+
+    return (
+      metrics[0].score * weights.transactions +
+      metrics[1].score * weights.operations +
+      metrics[2].score * weights.customer +
+      metrics[3].score * weights.compliance +
+      metrics[4].score * weights.float
+    );
+  }
+
+  private determineRating(score: number): AgentRating {
+    if (score >= 90) return { level: 'platinum', benefits: ['Higher limits', 'Premium support', 'Bonus commission'] };
+    if (score >= 80) return { level: 'gold', benefits: ['Higher limits', 'Priority support'] };
+    if (score >= 70) return { level: 'silver', benefits: ['Standard limits'] };
+    if (score >= 60) return { level: 'bronze', benefits: ['Basic limits', 'Additional training'] };
+    return { level: 'improvement_required', benefits: ['Training mandatory', 'Supervision required'] };
+  }
+}
+```
+
+### Agent Incentive System
+```typescript
+interface AgentIncentiveProgram {
+  commissionStructure: {
+    base: {
+      cashIn: 0.5;     // 0.5% of transaction value
+      cashOut: 0.5;    // 0.5% of transaction value
+      billPayment: 2.0; // R2 per transaction
+      accountOpening: 10.0; // R10 per new account
+    };
+    performance: {
+      platinum: { multiplier: 1.5, bonus: 500 }; // Monthly bonus
+      gold: { multiplier: 1.3, bonus: 300 };
+      silver: { multiplier: 1.1, bonus: 100 };
+      bronze: { multiplier: 1.0, bonus: 0 };
+    };
+  };
+  
+  achievementBonuses: {
+    monthlyVolume: {
+      threshold: 1000000; // R1M monthly volume
+      bonus: 1000;        // R1000 bonus
+    };
+    customerSatisfaction: {
+      threshold: 4.5;     // 4.5/5 rating
+      bonus: 500;         // R500 bonus
+    };
+    zeroComplaints: {
+      bonus: 300;         // R300 for zero complaints month
+    };
+  };
+}
+
+async function calculateAgentCommission(agentId: string, month: string): Promise<CommissionCalculation> {
+  const agent = await Agent.findById(agentId);
+  const transactions = await this.getAgentTransactions(agentId, month);
+  const performance = await this.getAgentPerformance(agentId, month);
+  
+  // Base commission calculation
+  const baseCommission = transactions.reduce((total, tx) => {
+    const rate = this.getCommissionRate(tx.type, agent.rating);
+    return total + (tx.amount * rate / 100);
+  }, 0);
+
+  // Performance multiplier
+  const performanceMultiplier = this.getPerformanceMultiplier(agent.rating);
+  const adjustedCommission = baseCommission * performanceMultiplier;
+
+  // Achievement bonuses
+  const bonuses = await this.calculateBonuses(agentId, month, performance);
+
+  return {
+    agentId,
+    month,
+    baseCommission,
+    performanceMultiplier,
+    adjustedCommission,
+    bonuses,
+    totalCommission: adjustedCommission + bonuses.total,
+    paymentDate: this.getNextPaymentDate(),
+    breakdown: this.generateCommissionBreakdown(transactions, bonuses)
+  };
+}
+```
+
+## Technology Infrastructure
+
+### Agent Mobile Application
+```typescript
+// Agent mobile app features
+interface AgentMobileApp {
+  authentication: {
+    biometric: boolean;
+    twoFactor: boolean;
+    sessionTimeout: number;
+  };
+  
+  coreFeatures: [
+    'transaction_processing',
+    'float_management',
+    'customer_lookup',
+    'daily_reconciliation',
+    'performance_dashboard'
+  ];
+  
+  supportFeatures: [
+    'help_center',
+    'training_materials',
+    'live_chat_support',
+    'incident_reporting',
+    'feedback_system'
+  ];
+  
+  offlineCapabilities: {
+    transactionQueue: boolean;
+    customerData: boolean;
+    criticalAlerts: boolean;
+    basicFunctionality: boolean;
+  };
+}
+
+// Agent app main dashboard
+class AgentDashboard {
+  async getDashboardData(agentId: string): Promise<AgentDashboardData> {
+    const [floatStatus, todayStats, alerts, performance] = await Promise.all([
+      this.getFloatStatus(agentId),
+      this.getTodayStatistics(agentId),
+      this.getActiveAlerts(agentId),
+      this.getWeeklyPerformance(agentId)
+    ]);
+
+    return {
+      agent: await this.getAgentProfile(agentId),
+      floatStatus,
+      todayStats: {
+        transactionCount: todayStats.count,
+        transactionValue: todayStats.value,
+        commission: todayStats.commission,
+        customersSserved: todayStats.uniqueCustomers
+      },
+      alerts: {
+        critical: alerts.filter(a => a.priority === 'critical'),
+        warnings: alerts.filter(a => a.priority === 'warning'),
+        info: alerts.filter(a => a.priority === 'info')
+      },
+      performance: {
+        weeklyScore: performance.score,
+        ranking: performance.ranking,
+        trends: performance.trends
+      },
+      quickActions: [
+        { action: 'process_transaction', label: 'New Transaction' },
+        { action: 'check_balance', label: 'Check Float' },
+        { action: 'customer_support', label: 'Help Customer' },
+        { action: 'report_issue', label: 'Report Issue' }
+      ]
+    };
+  }
+}
+```
+
+### Real-Time Monitoring System
+```typescript
+class AgentNetworkMonitoring {
+  async monitorNetworkHealth(): Promise<NetworkHealthStatus> {
+    const allAgents = await Agent.find({ status: 'active' });
+    const healthChecks = await Promise.all(
+      allAgents.map(agent => this.checkAgentHealth(agent.id))
+    );
+
+    const summary = {
+      totalAgents: allAgents.length,
+      onlineAgents: healthChecks.filter(h => h.status === 'online').length,
+      offlineAgents: healthChecks.filter(h => h.status === 'offline').length,
+      warningAgents: healthChecks.filter(h => h.status === 'warning').length,
+      criticalAgents: healthChecks.filter(h => h.status === 'critical').length,
+      networkUptime: this.calculateNetworkUptime(healthChecks),
+      averageResponseTime: this.calculateAverageResponseTime(healthChecks)
+    };
+
+    // Alert on critical issues
+    if (summary.criticalAgents > 0) {
+      await this.sendCriticalAlert(summary);
+    }
+
+    return {
+      summary,
+      agentStatuses: healthChecks,
+      lastUpdated: new Date()
+    };
+  }
+
+  private async checkAgentHealth(agentId: string): Promise<AgentHealthCheck> {
+    const checks = await Promise.all([
+      this.checkConnectivity(agentId),
+      this.checkFloatLevels(agentId),
+      this.checkTransactionVolume(agentId),
+      this.checkLastActivity(agentId),
+      this.checkEquipmentStatus(agentId)
+    ]);
+
+    const overallStatus = this.determineOverallStatus(checks);
+    
+    return {
+      agentId,
+      status: overallStatus,
+      checks,
+      lastChecked: new Date(),
+      nextCheck: new Date(Date.now() + 5 * 60000) // Next check in 5 minutes
+    };
+  }
+}
+```
+
+## Compliance & Risk Management
+
+### Regulatory Compliance Framework
+<CardGroup cols={2}>
+  <Card title="KYC/AML Compliance" icon="shield-alt">
+    - Agent due diligence and ongoing monitoring
+    - Customer verification procedures
+    - Suspicious transaction reporting
+    - Regular compliance audits
+  </Card>
+  <Card title="Financial Compliance" icon="gavel">
+    - Transaction limits and monitoring
+    - Record keeping requirements
+    - Regulatory reporting
+    - Cross-border compliance
+  </Card>
+</CardGroup>
+
+### Risk Management System
+```typescript
+class AgentRiskManagement {
+  async assessAgentRisk(agentId: string): Promise<RiskAssessment> {
+    const riskFactors = await Promise.all([
+      this.assessLocationRisk(agentId),
+      this.assessTransactionPatterns(agentId),
+      this.assessComplianceHistory(agentId),
+      this.assessFinancialStability(agentId),
+      this.assessOperationalRisk(agentId)
+    ]);
+
+    const overallRisk = this.calculateOverallRisk(riskFactors);
+    const mitigationPlan = await this.generateMitigationPlan(agentId, riskFactors);
+
+    return {
+      agentId,
+      overallRisk: {
+        level: overallRisk.level, // 'low', 'medium', 'high', 'critical'
+        score: overallRisk.score, // 0-100
+        confidence: overallRisk.confidence
+      },
+      riskFactors,
+      mitigationPlan,
+      recommendations: await this.generateRiskRecommendations(overallRisk, riskFactors),
+      nextReview: this.calculateNextReviewDate(overallRisk.level),
+      assessmentDate: new Date()
+    };
+  }
+
+  private async assessTransactionPatterns(agentId: string): Promise<RiskFactor> {
+    const transactions = await this.getAgentTransactions(agentId, 30);
+    const patterns = this.analyzePatterns(transactions);
+
+    // Risk indicators
+    const riskIndicators = {
+      unusualVolume: patterns.dailyVolume.some(v => v > patterns.averageDaily * 3),
+      suspiciousTimings: patterns.nightTimeTransactions > 0.1, // >10% at night
+      roundAmountFrequency: patterns.roundAmounts > 0.5, // >50% round amounts
+      velocitySpikes: patterns.velocitySpikes > 2,
+      structuredTransactions: patterns.justUnderLimits > 0.2 // >20% just under limits
+    };
+
+    const riskScore = Object.values(riskIndicators).filter(Boolean).length * 20;
+
+    return {
+      category: 'transaction_patterns',
+      score: riskScore,
+      level: this.categorizeRisk(riskScore),
+      indicators: riskIndicators,
+      details: patterns
+    };
+  }
+}
+```
+
+### Fraud Detection & Prevention
+```typescript
+class AgentFraudDetection {
+  async monitorForFraud(agentId: string): Promise<FraudAlert[]> {
+    const alerts: FraudAlert[] = [];
+    
+    // Real-time fraud checks
+    const fraudChecks = await Promise.all([
+      this.checkVelocityFraud(agentId),
+      this.checkPatternFraud(agentId),
+      this.checkCollaborativeFraud(agentId),
+      this.checkFloatManipulation(agentId),
+      this.checkCustomerComplaints(agentId)
+    ]);
+
+    fraudChecks.forEach(check => {
+      if (check.riskLevel === 'high' || check.riskLevel === 'critical') {
+        alerts.push({
+          type: check.type,
+          riskLevel: check.riskLevel,
+          description: check.description,
+          evidence: check.evidence,
+          recommendedAction: check.recommendedAction,
+          timestamp: new Date()
+        });
+      }
+    });
+
+    // Auto-execute critical actions
+    for (const alert of alerts.filter(a => a.riskLevel === 'critical')) {
+      await this.executeFraudResponse(agentId, alert);
+    }
+
+    return alerts;
+  }
+
+  private async executeFraudResponse(agentId: string, alert: FraudAlert): Promise<void> {
+    switch (alert.recommendedAction) {
+      case 'suspend_agent':
+        await this.suspendAgent(agentId, alert.description);
+        await this.notifySupervision(agentId, alert);
+        break;
+      case 'limit_transactions':
+        await this.imposeTempLimits(agentId, alert.evidence);
+        break;
+      case 'enhanced_monitoring':
+        await this.enableEnhancedMonitoring(agentId);
+        break;
+      case 'investigate':
+        await this.createInvestigationCase(agentId, alert);
+        break;
+    }
+  }
+}
+```
+
+## Future Enhancements
+
+### Planned Technology Improvements
+<Steps>
+  <Step title="Biometric Authentication">
+    Fingerprint and facial recognition for enhanced agent and customer security
+  </Step>
+  <Step title="AI-Powered Optimization">
+    Machine learning for float optimization, fraud detection, and performance prediction
+  </Step>
+  <Step title="Blockchain Integration">
+    Immutable transaction records and smart contracts for automated agent management
+  </Step>
+  <Step title="IoT Integration">
+    Smart safes, environmental monitoring, and automated equipment management
+  </Step>
+</Steps>
+
+### Expansion Roadmap
+- **Q2 2025**: 1,000 agents across South Africa
+- **Q3 2025**: Expansion to Botswana and Namibia (500 agents)
+- **Q4 2025**: Zambia and regional integration (1,000 additional agents)
+- **Q1 2026**: AI-powered optimization and predictive management
+- **Q2 2026**: Cross-border agent network with 5,000+ agents
+
+### Innovation Pipeline
+<CardGroup cols={2}>
+  <Card title="Solar-Powered Kiosks" icon="sun">
+    Environmentally sustainable agent locations for rural areas with reliable power
+  </Card>
+  <Card title="Drone Delivery" icon="helicopter">
+    Automated cash delivery for remote agents using drone technology
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Virtual Reality Training" icon="vr-cardboard">
+    Immersive training experiences for agent onboarding and skill development
+  </Card>
+  <Card title="Satellite Connectivity" icon="satellite">
+    Backup connectivity for agents in areas with poor internet infrastructure
+  </Card>
+</CardGroup>
+
+---
+
+*AWO's Agent Network serves as the critical bridge between digital financial services and cash-dependent communities, ensuring that every African woman can access financial services regardless of location or connectivity.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*
