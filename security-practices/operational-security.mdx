@@ -1,41 +1,1453 @@
----
-title: "Operational Security"
-description: "AWO Platform operational security security documentation"
----
+# Operational Security - Security Best Practices
 
-# Operational Security
+This guide establishes operational security procedures for AWO Platform, covering incident response, access management, security operations, and day-to-day security practices for maintaining a secure fintech environment.
 
-## Overview
+## Security Operations Center (SOC) Framework
 
 <Info>
-This section covers operational security for the AWO Platform financial services.
+AWO Platform operates a virtual Security Operations Center (SOC) to monitor, detect, and respond to security threats across our infrastructure. Our SOC framework is designed for 24/7 monitoring with automated response capabilities and escalation procedures.
 </Info>
 
-## Security Measures
+### SOC Structure and Responsibilities
 
-Security implementation details will be documented here.
+**Tier 1: Security Monitoring**
+- **24/7 Monitoring**: Continuous monitoring of security alerts and events
+- **Initial Triage**: First-level analysis of security incidents
+- **Alert Response**: Automated and manual response to low-severity alerts
+- **Escalation**: Escalation of complex incidents to Tier 2
 
-## Compliance
+**Tier 2: Security Analysis**
+- **Incident Investigation**: Deep analysis of security incidents
+- **Threat Hunting**: Proactive searching for security threats
+- **Forensic Analysis**: Digital forensics for security breaches
+- **Response Coordination**: Coordination of incident response activities
+
+**Tier 3: Security Engineering**
+- **Architecture Review**: Security architecture design and review
+- **Tool Development**: Development of custom security tools
+- **Advanced Analysis**: Complex threat analysis and attribution
+- **Policy Development**: Security policy and procedure development
+
+### Security Monitoring Implementation
+
+**Real-Time Security Monitoring System:**
+```javascript
+// Security Operations Center monitoring system
+class SOCMonitoringSystem {
+  private static alertQueues: Map<string, SecurityAlert[]> = new Map();
+  private static escalationRules: EscalationRule[] = [];
+  private static responseTeam: Map<string, ResponseTeamMember[]> = new Map();
+  
+  static async initializeSOC(): Promise<void> {
+    // Initialize monitoring queues
+    this.alertQueues.set('critical', []);
+    this.alertQueues.set('high', []);
+    this.alertQueues.set('medium', []);
+    this.alertQueues.set('low', []);
+    
+    // Load escalation rules
+    await this.loadEscalationRules();
+    
+    // Start monitoring processes
+    this.startAlertProcessing();
+    this.startHealthMonitoring();
+    this.startThreatHunting();
+    
+    console.log('SOC Monitoring System initialized');
+  }
+  
+  static async processSecurityAlert(alert: SecurityAlert): Promise<void> {
+    try {
+      // Enrich alert with additional context
+      const enrichedAlert = await this.enrichAlert(alert);
+      
+      // Determine severity and priority
+      const severity = this.calculateSeverity(enrichedAlert);
+      const priority = this.calculatePriority(enrichedAlert, severity);
+      
+      // Add to appropriate queue
+      const queue = this.alertQueues.get(severity);
+      if (queue) {
+        queue.push({
+          ...enrichedAlert,
+          severity,
+          priority,
+          timestamp: new Date(),
+          status: 'NEW',
+          assignedTo: null
+        });
+      }
+      
+      // Check for immediate escalation
+      if (severity === 'critical') {
+        await this.immediateEscalation(enrichedAlert);
+      }
+      
+      // Execute automated response if applicable
+      await this.executeAutomatedResponse(enrichedAlert);
+      
+    } catch (error) {
+      console.error('Failed to process security alert:', error);
+      // Fail-safe: escalate to human review
+      await this.escalateToHuman(alert, error);
+    }
+  }
+  
+  private static async enrichAlert(alert: SecurityAlert): Promise<EnrichedSecurityAlert> {
+    const enrichment: any = {
+      ...alert,
+      enrichment: {
+        timestamp: new Date(),
+        geoLocation: await this.getGeoLocation(alert.ipAddress),
+        threatIntel: await this.checkThreatIntelligence(alert.ipAddress),
+        userContext: await this.getUserContext(alert.userId),
+        assetContext: await this.getAssetContext(alert.resource),
+        historicalActivity: await this.getHistoricalActivity(alert.ipAddress, alert.userId)
+      }
+    };
+    
+    return enrichment;
+  }
+  
+  private static calculateSeverity(alert: EnrichedSecurityAlert): string {
+    let severityScore = 0;
+    
+    // Base severity from alert type
+    const baseSeverity = {
+      'data_breach': 100,
+      'unauthorized_access': 90,
+      'malware_detected': 85,
+      'sql_injection': 80,
+      'failed_login': 30,
+      'suspicious_transaction': 70
+    };
+    
+    severityScore += baseSeverity[alert.type] || 50;
+    
+    // Adjust based on threat intelligence
+    if (alert.enrichment.threatIntel.isKnownMalicious) {
+      severityScore += 30;
+    }
+    
+    // Adjust based on asset criticality
+    if (alert.enrichment.assetContext.criticality === 'high') {
+      severityScore += 20;
+    }
+    
+    // Adjust based on user tier (higher tier = higher impact)
+    const userTier = alert.enrichment.userContext?.tier;
+    if (['gold', 'platinum'].includes(userTier)) {
+      severityScore += 15;
+    }
+    
+    // Return severity level
+    if (severityScore >= 90) return 'critical';
+    if (severityScore >= 70) return 'high';
+    if (severityScore >= 50) return 'medium';
+    return 'low';
+  }
+  
+  private static async executeAutomatedResponse(alert: EnrichedSecurityAlert): Promise<void> {
+    const responses = {
+      'sql_injection': [
+        () => this.blockIPAddress(alert.ipAddress, 24), // 24 hour block
+        () => this.alertDevelopmentTeam(alert),
+        () => this.scanForSimilarAttempts(alert.ipAddress)
+      ],
+      
+      'unauthorized_access': [
+        () => this.lockUserAccount(alert.userId),
+        () => this.invalidateUserSessions(alert.userId),
+        () => this.notifyUser(alert.userId, 'unauthorized_access_attempt')
+      ],
+      
+      'suspicious_transaction': [
+        () => this.holdTransaction(alert.metadata.transactionId),
+        () => this.requireAdditionalVerification(alert.userId),
+        () => this.notifyComplianceTeam(alert)
+      ],
+      
+      'data_breach': [
+        () => this.isolateAffectedSystems(alert.resource),
+        () => this.preserveForensicEvidence(alert),
+        () => this.notifyIncidentResponseTeam(alert),
+        () => this.initiateContainmentProcedures(alert)
+      ]
+    };
+    
+    const alertResponses = responses[alert.type];
+    if (alertResponses) {
+      await Promise.all(alertResponses.map(response => response()));
+    }
+  }
+  
+  // Automated threat hunting
+  private static startThreatHunting(): void {
+    setInterval(async () => {
+      await this.huntForAnomalousLogins();
+      await this.huntForDataExfiltration();
+      await this.huntForLateralMovement();
+      await this.huntForPrivilegeEscalation();
+    }, 15 * 60 * 1000); // Every 15 minutes
+  }
+  
+  private static async huntForAnomalousLogins(): Promise<void> {
+    // Query for unusual login patterns
+    const anomalousLogins = await prisma.$queryRaw`
+      SELECT 
+        user_id,
+        ip_address,
+        user_agent,
+        COUNT(*) as login_count,
+        COUNT(DISTINCT ip_address) as unique_ips,
+        COUNT(DISTINCT user_agent) as unique_agents
+      FROM audit_logs 
+      WHERE 
+        action = 'LOGIN_SUCCESS'
+        AND timestamp > NOW() - INTERVAL '1 hour'
+      GROUP BY user_id, ip_address, user_agent
+      HAVING 
+        login_count > 10 
+        OR unique_ips > 5 
+        OR unique_agents > 3
+    `;
+    
+    for (const anomaly of anomalousLogins) {
+      await this.processSecurityAlert({
+        type: 'anomalous_login_pattern',
+        severity: 'medium',
+        userId: anomaly.user_id,
+        ipAddress: anomaly.ip_address,
+        metadata: {
+          loginCount: anomaly.login_count,
+          uniqueIPs: anomaly.unique_ips,
+          uniqueAgents: anomaly.unique_agents
+        }
+      });
+    }
+  }
+  
+  private static async huntForDataExfiltration(): Promise<void> {
+    // Look for unusual data access patterns
+    const suspiciousDataAccess = await prisma.$queryRaw`
+      SELECT 
+        user_id,
+        COUNT(*) as access_count,
+        COUNT(DISTINCT resource_id) as unique_resources,
+        SUM(CASE WHEN action = 'READ' THEN 1 ELSE 0 END) as read_count
+      FROM audit_logs 
+      WHERE 
+        event_type = 'DATA_ACCESS'
+        AND timestamp > NOW() - INTERVAL '1 hour'
+        AND action IN ('READ', 'export', 'download')
+      GROUP BY user_id
+      HAVING 
+        access_count > 100
+        OR unique_resources > 50
+        OR read_count > 80
+    `;
+    
+    for (const suspicion of suspiciousDataAccess) {
+      await this.processSecurityAlert({
+        type: 'potential_data_exfiltration',
+        severity: 'high',
+        userId: suspicion.user_id,
+        metadata: {
+          accessCount: suspicion.access_count,
+          uniqueResources: suspicion.unique_resources,
+          readCount: suspicion.read_count
+        }
+      });
+    }
+  }
+}
+```
+
+### Incident Response Procedures
+
+**Structured Incident Response Framework:**
+```javascript
+// Incident Response Management System
+class IncidentResponseManager {
+  private static activeIncidents: Map<string, SecurityIncident> = new Map();
+  private static responseTeams: Map<string, ResponseTeam> = new Map();
+  
+  static async declareSecurityIncident(
+    alert: SecurityAlert,
+    severity: 'P1' | 'P2' | 'P3' | 'P4'
+  ): Promise<string> {
+    const incidentId = `INC-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    
+    const incident: SecurityIncident = {
+      id: incidentId,
+      severity,
+      status: 'DECLARED',
+      type: alert.type,
+      declaredAt: new Date(),
+      declaredBy: 'SOC_SYSTEM',
+      alerts: [alert],
+      timeline: [],
+      affectedSystems: [],
+      affectedUsers: [],
+      responseActions: [],
+      containmentStatus: 'NOT_STARTED',
+      recoveryStatus: 'NOT_STARTED'
+    };
+    
+    this.activeIncidents.set(incidentId, incident);
+    
+    // Log incident declaration
+    this.logIncidentEvent(incidentId, 'INCIDENT_DECLARED', {
+      severity,
+      type: alert.type,
+      triggeredBy: alert
+    });
+    
+    // Initiate response based on severity
+    await this.initiateResponse(incident);
+    
+    // Send notifications
+    await this.sendIncidentNotifications(incident);
+    
+    return incidentId;
+  }
+  
+  private static async initiateResponse(incident: SecurityIncident): Promise<void> {
+    switch (incident.severity) {
+      case 'P1': // Critical - Immediate response required
+        await this.executeP1Response(incident);
+        break;
+      case 'P2': // High - Response within 30 minutes
+        await this.executeP2Response(incident);
+        break;
+      case 'P3': // Medium - Response within 2 hours
+        await this.executeP3Response(incident);
+        break;
+      case 'P4': // Low - Response within 24 hours
+        await this.executeP4Response(incident);
+        break;
+    }
+  }
+  
+  private static async executeP1Response(incident: SecurityIncident): Promise<void> {
+    // P1: Critical incidents affecting core business operations
+    
+    // 1. Immediate containment
+    await this.executeImmediateContainment(incident);
+    
+    // 2. Activate incident commander
+    const commander = await this.activateIncidentCommander('P1');
+    incident.incidentCommander = commander;
+    
+    // 3. Establish war room
+    const warRoom = await this.establishWarRoom(incident.id);
+    incident.warRoom = warRoom;
+    
+    // 4. Notify executives
+    await this.notifyExecutives(incident);
+    
+    // 5. Prepare external communications
+    await this.prepareExternalCommunications(incident);
+    
+    // 6. Activate full response team
+    const responseTeam = await this.activateFullResponseTeam();
+    this.responseTeams.set(incident.id, responseTeam);
+    
+    this.logIncidentEvent(incident.id, 'P1_RESPONSE_INITIATED', {
+      commander: commander.id,
+      warRoom: warRoom.url,
+      responseTeam: responseTeam.members.map(m => m.id)
+    });
+  }
+  
+  private static async executeImmediateContainment(incident: SecurityIncident): Promise<void> {
+    const containmentActions = {
+      'data_breach': [
+        () => this.isolateAffectedSystems(incident),
+        () => this.preserveForensicEvidence(incident),
+        () => this.disableCompromisedAccounts(incident)
+      ],
+      
+      'malware_infection': [
+        () => this.quarantineInfectedSystems(incident),
+        () => this.blockMaliciousIPs(incident),
+        () => this.updateAntivirusSignatures()
+      ],
+      
+      'ddos_attack': [
+        () => this.activateDDoSMitigation(incident),
+        () => this.scaleInfrastructure(incident),
+        () => this.blockAttackingIPs(incident)
+      ],
+      
+      'insider_threat': [
+        () => this.disableInsiderAccess(incident),
+        () => this.preserveDigitalEvidence(incident),
+        () => this.notifyHumanResources(incident)
+      ]
+    };
+    
+    const actions = containmentActions[incident.type];
+    if (actions) {
+      await Promise.all(actions.map(action => action()));
+      incident.containmentStatus = 'IN_PROGRESS';
+    }
+  }
+  
+  // Incident communication management
+  private static async sendIncidentNotifications(incident: SecurityIncident): Promise<void> {
+    const notifications = [];
+    
+    // Internal notifications
+    if (['P1', 'P2'].includes(incident.severity)) {
+      notifications.push(this.notifySOCTeam(incident));
+      notifications.push(this.notifySecurityTeam(incident));
+      notifications.push(this.notifyDevOpsTeam(incident));
+    }
+    
+    if (incident.severity === 'P1') {
+      notifications.push(this.notifyExecutiveTeam(incident));
+      notifications.push(this.notifyLegalTeam(incident));
+      notifications.push(this.notifyComplianceTeam(incident));
+    }
+    
+    // External notifications (if required)
+    if (this.requiresRegulatoryNotification(incident)) {
+      notifications.push(this.notifyRegulators(incident));
+    }
+    
+    if (this.requiresCustomerNotification(incident)) {
+      notifications.push(this.notifyAffectedCustomers(incident));
+    }
+    
+    await Promise.allSettled(notifications);
+  }
+  
+  // Post-incident activities
+  static async closeIncident(incidentId: string, resolution: string): Promise<void> {
+    const incident = this.activeIncidents.get(incidentId);
+    if (!incident) {
+      throw new Error(`Incident ${incidentId} not found`);
+    }
+    
+    // Update incident status
+    incident.status = 'CLOSED';
+    incident.closedAt = new Date();
+    incident.resolution = resolution;
+    
+    // Generate post-incident report
+    const report = await this.generatePostIncidentReport(incident);
+    
+    // Schedule lessons learned session
+    await this.scheduleLessonsLearnedSession(incident);
+    
+    // Update security measures if needed
+    await this.implementSecurityImprovements(incident);
+    
+    // Archive incident
+    await this.archiveIncident(incident);
+    
+    this.activeIncidents.delete(incidentId);
+    
+    this.logIncidentEvent(incidentId, 'INCIDENT_CLOSED', {
+      resolution,
+      duration: incident.closedAt.getTime() - incident.declaredAt.getTime(),
+      reportGenerated: true
+    });
+  }
+}
+```
+
+## Access Management and Identity Security
+
+### Privileged Access Management (PAM)
+
+**Zero Trust Access Control Implementation:**
+```javascript
+// Privileged Access Management System
+class PrivilegedAccessManager {
+  private static privilegedSessions: Map<string, PrivilegedSession> = new Map();
+  private static accessRequests: Map<string, AccessRequest> = new Map();
+  
+  static async requestPrivilegedAccess(request: AccessRequest): Promise<string> {
+    const requestId = `PAM-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    
+    // Validate request
+    await this.validateAccessRequest(request);
+    
+    // Store request
+    this.accessRequests.set(requestId, {
+      ...request,
+      id: requestId,
+      status: 'PENDING_APPROVAL',
+      requestedAt: new Date(),
+      approvers: await this.getRequiredApprovers(request)
+    });
+    
+    // Send approval notifications
+    await this.sendApprovalNotifications(requestId);
+    
+    // Log access request
+    AuditLogger.logSystemEvent({
+      component: 'PAM',
+      action: 'PRIVILEGED_ACCESS_REQUESTED',
+      resource: request.resource,
+      metadata: {
+        requestId,
+        userId: request.userId,
+        accessLevel: request.accessLevel,
+        justification: request.justification,
+        duration: request.duration
+      }
+    });
+    
+    return requestId;
+  }
+  
+  private static async validateAccessRequest(request: AccessRequest): Promise<void> {
+    // Validate user eligibility
+    const user = await prisma.user.findUnique({
+      where: { id: request.userId },
+      include: { role: true, department: true }
+    });
+    
+    if (!user) {
+      throw new Error('User not found');
+    }
+    
+    // Check if user is authorized for this access level
+    const authorizedRoles = this.getAuthorizedRoles(request.accessLevel);
+    if (!authorizedRoles.includes(user.role.name)) {
+      throw new Error('User not authorized for requested access level');
+    }
+    
+    // Validate business justification
+    if (!request.justification || request.justification.length < 50) {
+      throw new Error('Insufficient business justification');
+    }
+    
+    // Validate duration (max 24 hours)
+    if (request.duration > 24 * 60 * 60 * 1000) {
+      throw new Error('Access duration cannot exceed 24 hours');
+    }
+    
+    // Check for conflicting access (segregation of duties)
+    await this.checkSegregationOfDuties(request);
+  }
+  
+  static async approveAccessRequest(
+    requestId: string, 
+    approverId: string,
+    comments?: string
+  ): Promise<void> {
+    const request = this.accessRequests.get(requestId);
+    if (!request) {
+      throw new Error('Access request not found');
+    }
+    
+    // Validate approver authority
+    await this.validateApproverAuthority(approverId, request);
+    
+    // Record approval
+    request.approvals = request.approvals || [];
+    request.approvals.push({
+      approverId,
+      approvedAt: new Date(),
+      comments
+    });
+    
+    // Check if all required approvals received
+    const requiredApprovals = this.getRequiredApprovalsCount(request.accessLevel);
+    if (request.approvals.length >= requiredApprovals) {
+      await this.grantPrivilegedAccess(request);
+    }
+    
+    // Log approval
+    AuditLogger.logUserAction({
+      userId: approverId,
+      action: 'PRIVILEGED_ACCESS_APPROVED',
+      resource: 'access_request',
+      resourceId: requestId,
+      result: 'SUCCESS',
+      metadata: { comments }
+    });
+  }
+  
+  private static async grantPrivilegedAccess(request: AccessRequest): Promise<void> {
+    const sessionId = `PSESS-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`;
+    
+    // Create privileged session
+    const session: PrivilegedSession = {
+      id: sessionId,
+      userId: request.userId,
+      accessLevel: request.accessLevel,
+      resource: request.resource,
+      grantedAt: new Date(),
+      expiresAt: new Date(Date.now() + request.duration),
+      status: 'ACTIVE',
+      activities: [],
+      justification: request.justification,
+      approvals: request.approvals
+    };
+    
+    this.privilegedSessions.set(sessionId, session);
+    
+    // Generate temporary elevated credentials
+    const credentials = await this.generateElevatedCredentials(session);
+    
+    // Send access details to user
+    await this.sendAccessDetails(request.userId, sessionId, credentials);
+    
+    // Start session monitoring
+    this.startSessionMonitoring(sessionId);
+    
+    // Update request status
+    request.status = 'APPROVED';
+    request.approvedAt = new Date();
+    request.sessionId = sessionId;
+    
+    // Log access grant
+    AuditLogger.logSystemEvent({
+      component: 'PAM',
+      action: 'PRIVILEGED_ACCESS_GRANTED',
+      resource: request.resource,
+      metadata: {
+        sessionId,
+        userId: request.userId,
+        accessLevel: request.accessLevel,
+        duration: request.duration
+      }
+    });
+  }
+  
+  // Session monitoring and control
+  private static startSessionMonitoring(sessionId: string): void {
+    const monitoringInterval = setInterval(async () => {
+      const session = this.privilegedSessions.get(sessionId);
+      if (!session || session.status !== 'ACTIVE') {
+        clearInterval(monitoringInterval);
+        return;
+      }
+      
+      // Check session expiry
+      if (new Date() > session.expiresAt) {
+        await this.terminateSession(sessionId, 'EXPIRED');
+        clearInterval(monitoringInterval);
+        return;
+      }
+      
+      // Monitor for suspicious activities
+      await this.monitorSessionActivity(session);
+      
+    }, 60 * 1000); // Monitor every minute
+  }
+  
+  private static async monitorSessionActivity(session: PrivilegedSession): Promise<void> {
+    // Get recent activities for this session
+    const recentActivities = await prisma.auditLog.findMany({
+      where: {
+        userId: session.userId,
+        timestamp: {
+          gte: new Date(Date.now() - 60 * 1000) // Last minute
+        }
+      },
+      orderBy: { timestamp: 'desc' }
+    });
+    
+    // Analyze for suspicious patterns
+    const suspiciousIndicators = [
+      this.checkUnusualDataAccess(recentActivities),
+      this.checkRapidFireQueries(recentActivities),
+      this.checkOffHoursActivity(recentActivities),
+      this.checkGeographicAnomalies(recentActivities)
+    ];
+    
+    const suspiciousActivity = suspiciousIndicators.some(indicator => indicator);
+    
+    if (suspiciousActivity) {
+      await this.flagSuspiciousSession(session, recentActivities);
+    }
+  }
+  
+  static async terminateSession(sessionId: string, reason: string): Promise<void> {
+    const session = this.privilegedSessions.get(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+    
+    // Update session status
+    session.status = 'TERMINATED';
+    session.terminatedAt = new Date();
+    session.terminationReason = reason;
+    
+    // Revoke elevated credentials
+    await this.revokeElevatedCredentials(session);
+    
+    // Notify user
+    await this.notifySessionTermination(session.userId, sessionId, reason);
+    
+    // Log session termination
+    AuditLogger.logSystemEvent({
+      component: 'PAM',
+      action: 'PRIVILEGED_SESSION_TERMINATED',
+      resource: session.resource,
+      metadata: {
+        sessionId,
+        userId: session.userId,
+        reason,
+        duration: session.terminatedAt.getTime() - session.grantedAt.getTime()
+      }
+    });
+    
+    // Remove from active sessions
+    this.privilegedSessions.delete(sessionId);
+  }
+}
+```
+
+### Multi-Factor Authentication (MFA) Enforcement
+
+**Adaptive MFA Implementation:**
+```javascript
+// Adaptive Multi-Factor Authentication System
+class AdaptiveMFAManager {
+  private static riskFactors = {
+    newDevice: 30,
+    newLocation: 25,
+    offHours: 15,
+    foreignCountry: 40,
+    vpnUsage: 10,
+    failedAttempts: 20,
+    highValueTransaction: 35,
+    privilegedOperation: 50
+  };
+  
+  static async evaluateMFARequirement(context: AuthenticationContext): Promise<MFARequirement> {
+    // Calculate risk score
+    const riskScore = await this.calculateRiskScore(context);
+    
+    // Determine MFA requirement based on risk
+    const mfaRequirement = this.determineMFARequirement(riskScore, context);
+    
+    // Log MFA evaluation
+    AuditLogger.logSecurityEvent({
+      type: 'mfa_evaluation',
+      severity: 'LOW',
+      userId: context.userId,
+      ipAddress: context.ipAddress,
+      metadata: {
+        riskScore,
+        mfaRequired: mfaRequirement.required,
+        mfaMethods: mfaRequirement.methods
+      }
+    });
+    
+    return mfaRequirement;
+  }
+  
+  private static async calculateRiskScore(context: AuthenticationContext): Promise<number> {
+    let riskScore = 0;
+    
+    // Check device trust
+    const deviceTrust = await this.checkDeviceTrust(context.deviceId);
+    if (!deviceTrust.trusted) {
+      riskScore += this.riskFactors.newDevice;
+    }
+    
+    // Check geographic location
+    const geoLocation = await this.getGeoLocation(context.ipAddress);
+    const userProfile = await this.getUserProfile(context.userId);
+    
+    if (this.isNewLocation(geoLocation, userProfile.previousLocations)) {
+      riskScore += this.riskFactors.newLocation;
+    }
+    
+    if (this.isForeignCountry(geoLocation, userProfile.homeCountry)) {
+      riskScore += this.riskFactors.foreignCountry;
+    }
+    
+    // Check time-based factors
+    if (this.isOffHours(context.timestamp, userProfile.timezone)) {
+      riskScore += this.riskFactors.offHours;
+    }
+    
+    // Check for VPN usage
+    if (await this.isVPNConnection(context.ipAddress)) {
+      riskScore += this.riskFactors.vpnUsage;
+    }
+    
+    // Check recent failed attempts
+    const failedAttempts = await this.getRecentFailedAttempts(context.userId);
+    if (failedAttempts > 2) {
+      riskScore += this.riskFactors.failedAttempts;
+    }
+    
+    // Check operation type
+    if (context.operation === 'high_value_transaction') {
+      riskScore += this.riskFactors.highValueTransaction;
+    }
+    
+    if (context.operation === 'privileged_operation') {
+      riskScore += this.riskFactors.privilegedOperation;
+    }
+    
+    return Math.min(riskScore, 100); // Cap at 100
+  }
+  
+  private static determineMFARequirement(riskScore: number, context: AuthenticationContext): MFARequirement {
+    // Base MFA requirements by user tier
+    const tierRequirements = {
+      'bronze': { threshold: 30, methods: ['sms', 'email'] },
+      'silver': { threshold: 25, methods: ['sms', 'email', 'authenticator'] },
+      'gold': { threshold: 20, methods: ['authenticator', 'biometric'] },
+      'platinum': { threshold: 15, methods: ['authenticator', 'biometric', 'hardware_key'] }
+    };
+    
+    const userTier = context.userTier || 'bronze';
+    const requirement = tierRequirements[userTier];
+    
+    // Force MFA for certain operations
+    const forceMFAOperations = [
+      'account_linking',
+      'password_change',
+      'large_transaction',
+      'investment_order',
+      'chama_creation'
+    ];
+    
+    if (forceMFAOperations.includes(context.operation) || riskScore >= requirement.threshold) {
+      return {
+        required: true,
+        methods: requirement.methods,
+        riskScore,
+        reason: riskScore >= requirement.threshold ? 'high_risk' : 'operation_required'
+      };
+    }
+    
+    return {
+      required: false,
+      methods: [],
+      riskScore,
+      reason: 'low_risk'
+    };
+  }
+  
+  static async initiateFirstFactorAuth(credentials: LoginCredentials): Promise<FirstFactorResult> {
+    try {
+      // Validate credentials
+      const user = await this.validateCredentials(credentials);
+      
+      // Check account status
+      if (user.accountLocked) {
+        throw new Error('Account is locked due to security concerns');
+      }
+      
+      // Evaluate MFA requirement
+      const context: AuthenticationContext = {
+        userId: user.id,
+        userTier: user.divaProfile?.tier,
+        ipAddress: credentials.ipAddress,
+        deviceId: credentials.deviceId,
+        timestamp: new Date(),
+        operation: 'login'
+      };
+      
+      const mfaRequirement = await this.evaluateMFARequirement(context);
+      
+      if (mfaRequirement.required) {
+        // Generate MFA challenge
+        const challengeId = await this.generateMFAChallenge(user.id, mfaRequirement.methods);
+        
+        return {
+          success: true,
+          requiresMFA: true,
+          challengeId,
+          availableMethods: mfaRequirement.methods,
+          user: this.sanitizeUserData(user)
+        };
+      } else {
+        // Complete authentication without MFA
+        const tokens = await AWOAuthService.generateTokens(user);
+        
+        // Log successful authentication
+        AuditLogger.logUserAction({
+          userId: user.id,
+          action: 'LOGIN_SUCCESS',
+          result: 'SUCCESS',
+          ipAddress: credentials.ipAddress,
+          metadata: { mfaSkipped: true, riskScore: mfaRequirement.riskScore }
+        });
+        
+        return {
+          success: true,
+          requiresMFA: false,
+          tokens,
+          user: this.sanitizeUserData(user)
+        };
+      }
+      
+    } catch (error) {
+      // Log failed authentication
+      AuditLogger.logSecurityEvent({
+        type: 'failed_login',
+        severity: 'MEDIUM',
+        userId: credentials.email,
+        ipAddress: credentials.ipAddress,
+        metadata: { error: error.message }
+      });
+      
+      throw error;
+    }
+  }
+  
+  static async verifyMFAChallenge(
+    challengeId: string,
+    method: string,
+    response: string
+  ): Promise<MFAVerificationResult> {
+    const challenge = await this.getMFAChallenge(challengeId);
+    if (!challenge || challenge.expiresAt < new Date()) {
+      throw new Error('Invalid or expired MFA challenge');
+    }
+    
+    let verified = false;
+    
+    switch (method) {
+      case 'sms':
+        verified = await this.verifySMSCode(challenge.userId, response);
+        break;
+      case 'email':
+        verified = await this.verifyEmailCode(challenge.userId, response);
+        break;
+      case 'authenticator':
+        verified = await this.verifyTOTPCode(challenge.userId, response);
+        break;
+      case 'biometric':
+        verified = await this.verifyBiometric(challenge.userId, response);
+        break;
+      case 'hardware_key':
+        verified = await this.verifyHardwareKey(challenge.userId, response);
+        break;
+    }
+    
+    if (verified) {
+      // Complete authentication
+      const user = await prisma.user.findUnique({ where: { id: challenge.userId } });
+      const tokens = await AWOAuthService.generateTokens(user);
+      
+      // Invalidate challenge
+      await this.invalidateMFAChallenge(challengeId);
+      
+      // Log successful MFA verification
+      AuditLogger.logUserAction({
+        userId: challenge.userId,
+        action: 'MFA_VERIFICATION_SUCCESS',
+        result: 'SUCCESS',
+        metadata: { method, challengeId }
+      });
+      
+      return {
+        success: true,
+        tokens,
+        user: this.sanitizeUserData(user)
+      };
+    } else {
+      // Log failed MFA verification
+      AuditLogger.logSecurityEvent({
+        type: 'mfa_verification_failed',
+        severity: 'MEDIUM',
+        userId: challenge.userId,
+        metadata: { method, challengeId }
+      });
+      
+      throw new Error('Invalid MFA code');
+    }
+  }
+}
+```
+
+## Employee Security Training and Awareness
+
+### Security Training Program
+
+**Comprehensive Security Awareness Framework:**
+```javascript
+// Security Training Management System
+class SecurityTrainingManager {
+  private static trainingModules = {
+    'phishing_awareness': {
+      title: 'Phishing and Social Engineering Awareness',
+      duration: 30, // minutes
+      frequency: 'quarterly',
+      mandatory: true,
+      topics: [
+        'Identifying phishing emails',
+        'Social engineering tactics',
+        'Reporting procedures',
+        'Safe browsing practices'
+      ]
+    },
+    
+    'data_protection': {
+      title: 'Data Protection and Privacy (POPIA Compliance)',
+      duration: 45,
+      frequency: 'annually',
+      mandatory: true,
+      topics: [
+        'POPIA requirements',
+        'Data classification',
+        'Data handling procedures',
+        'Breach notification requirements'
+      ]
+    },
+    
+    'incident_response': {
+      title: 'Security Incident Response',
+      duration: 60,
+      frequency: 'bi-annually',
+      mandatory: ['security_team', 'devops_team'],
+      topics: [
+        'Incident identification',
+        'Response procedures',
+        'Escalation protocols',
+        'Communication guidelines'
+      ]
+    },
+    
+    'secure_development': {
+      title: 'Secure Development Practices',
+      duration: 90,
+      frequency: 'bi-annually',
+      mandatory: ['developers', 'devops_team'],
+      topics: [
+        'Secure coding practices',
+        'Vulnerability assessment',
+        'Code review procedures',
+        'Security testing'
+      ]
+    }
+  };
+  
+  static async assignTraining(employeeId: string, role: string): Promise<string[]> {
+    const assignments = [];
+    
+    for (const [moduleId, module] of Object.entries(this.trainingModules)) {
+      // Check if training is mandatory for this role
+      if (module.mandatory === true || 
+          (Array.isArray(module.mandatory) && module.mandatory.includes(role))) {
+        
+        // Check if employee needs this training
+        const needsTraining = await this.checkTrainingNeeded(employeeId, moduleId);
+        
+        if (needsTraining) {
+          const assignmentId = await this.createTrainingAssignment(employeeId, moduleId);
+          assignments.push(assignmentId);
+        }
+      }
+    }
+    
+    return assignments;
+  }
+  
+  private static async checkTrainingNeeded(
+    employeeId: string, 
+    moduleId: string
+  ): Promise<boolean> {
+    const module = this.trainingModules[moduleId];
+    const lastCompletion = await prisma.trainingRecord.findFirst({
+      where: {
+        employeeId,
+        moduleId,
+        status: 'COMPLETED'
+      },
+      orderBy: { completedAt: 'desc' }
+    });
+    
+    if (!lastCompletion) {
+      return true; // Never completed
+    }
+    
+    // Check if training is expired based on frequency
+    const expiryDate = this.calculateExpiryDate(lastCompletion.completedAt, module.frequency);
+    return new Date() >= expiryDate;
+  }
+  
+  static async conductPhishingSimulation(): Promise<PhishingSimulationResult> {
+    // Get all active employees
+    const employees = await prisma.user.findMany({
+      where: { 
+        role: { name: { in: ['employee', 'developer', 'manager'] } },
+        status: 'ACTIVE'
+      }
+    });
+    
+    const simulationId = `PHISH-SIM-${Date.now()}`;
+    const results: PhishingSimulationResult = {
+      simulationId,
+      startedAt: new Date(),
+      totalTargets: employees.length,
+      emailsSent: 0,
+      clickedLinks: 0,
+      enteredCredentials: 0,
+      reported: 0,
+      participants: []
+    };
+    
+    // Send simulated phishing emails
+    for (const employee of employees) {
+      try {
+        await this.sendSimulatedPhishingEmail(employee, simulationId);
+        results.emailsSent++;
+      } catch (error) {
+        console.error(`Failed to send phishing simulation to ${employee.email}:`, error);
+      }
+    }
+    
+    // Store simulation for tracking
+    await prisma.phishingSimulation.create({
+      data: {
+        id: simulationId,
+        startedAt: results.startedAt,
+        totalTargets: results.totalTargets,
+        emailsSent: results.emailsSent
+      }
+    });
+    
+    return results;
+  }
+  
+  private static async sendSimulatedPhishingEmail(
+    employee: any, 
+    simulationId: string
+  ): Promise<void> {
+    const trackingId = `${simulationId}-${employee.id}`;
+    
+    // Generate realistic phishing email content
+    const emailTemplate = this.generatePhishingEmailTemplate();
+    const phishingURL = `https://phishing-sim.awo-platform.com/click/${trackingId}`;
+    
+    const emailContent = emailTemplate.content.replace('{{PHISHING_URL}}', phishingURL);
+    
+    // Send email via secure internal system
+    await this.sendTrainingEmail(employee.email, emailTemplate.subject, emailContent);
+    
+    // Track the simulation
+    await prisma.phishingSimulationParticipant.create({
+      data: {
+        simulationId,
+        employeeId: employee.id,
+        trackingId,
+        emailSentAt: new Date(),
+        status: 'SENT'
+      }
+    });
+  }
+  
+  static async recordPhishingSimulationEvent(
+    trackingId: string,
+    eventType: 'CLICKED' | 'CREDENTIALS_ENTERED' | 'REPORTED'
+  ): Promise<void> {
+    const participant = await prisma.phishingSimulationParticipant.findUnique({
+      where: { trackingId }
+    });
+    
+    if (!participant) {
+      console.error('Invalid phishing simulation tracking ID');
+      return;
+    }
+    
+    // Update participant record
+    const updateData: any = {};
+    switch (eventType) {
+      case 'CLICKED':
+        updateData.clickedAt = new Date();
+        updateData.status = 'CLICKED';
+        break;
+      case 'CREDENTIALS_ENTERED':
+        updateData.credentialsEnteredAt = new Date();
+        updateData.status = 'CREDENTIALS_ENTERED';
+        break;
+      case 'REPORTED':
+        updateData.reportedAt = new Date();
+        updateData.status = 'REPORTED';
+        break;
+    }
+    
+    await prisma.phishingSimulationParticipant.update({
+      where: { trackingId },
+      data: updateData
+    });
+    
+    // If employee failed the simulation, assign remedial training
+    if (eventType === 'CLICKED' || eventType === 'CREDENTIALS_ENTERED') {
+      await this.assignRemedialTraining(participant.employeeId, 'phishing_awareness');
+    }
+    
+    // If employee reported the email, give positive feedback
+    if (eventType === 'REPORTED') {
+      await this.sendPositiveFeedback(participant.employeeId);
+    }
+  }
+  
+  private static async assignRemedialTraining(
+    employeeId: string, 
+    moduleId: string
+  ): Promise<void> {
+    await this.createTrainingAssignment(employeeId, moduleId, true); // isRemedial = true
+    
+    // Send notification
+    const employee = await prisma.user.findUnique({ where: { id: employeeId } });
+    await this.sendTrainingNotification(employee.email, 
+      'Security Training Required', 
+      'You have been assigned additional security training. Please complete it within 7 days.');
+  }
+}
+```
+
+### Security Policy Management
+
+**Automated Policy Distribution and Tracking:**
+```javascript
+// Security Policy Management System
+class SecurityPolicyManager {
+  private static policies = {
+    'acceptable_use': {
+      title: 'Acceptable Use Policy',
+      version: '2.1',
+      effectiveDate: new Date('2025-01-01'),
+      reviewFrequency: 'annually',
+      acknowledgmentRequired: true,
+      applicableTo: ['all_employees']
+    },
+    
+    'data_classification': {
+      title: 'Data Classification and Handling Policy',
+      version: '1.3',
+      effectiveDate: new Date('2024-12-01'),
+      reviewFrequency: 'annually',
+      acknowledgmentRequired: true,
+      applicableTo: ['all_employees']
+    },
+    
+    'incident_response': {
+      title: 'Security Incident Response Policy',
+      version: '1.8',
+      effectiveDate: new Date('2025-01-15'),
+      reviewFrequency: 'bi-annually',
+      acknowledgmentRequired: true,
+      applicableTo: ['security_team', 'devops_team', 'management']
+    },
+    
+    'third_party_risk': {
+      title: 'Third-Party Risk Management Policy',
+      version: '1.2',
+      effectiveDate: new Date('2024-11-01'),
+      reviewFrequency: 'annually',
+      acknowledgmentRequired: true,
+      applicableTo: ['procurement_team', 'management', 'security_team']
+    }
+  };
+  
+  static async distributePolicy(policyId: string, targetGroups?: string[]): Promise<string[]> {
+    const policy = this.policies[policyId];
+    if (!policy) {
+      throw new Error('Policy not found');
+    }
+    
+    // Determine target audience
+    const targets = targetGroups || policy.applicableTo;
+    const employees = await this.getEmployeesByGroups(targets);
+    
+    const distributionId = `DIST-${Date.now()}-${policyId}`;
+    const acknowledgments = [];
+    
+    // Create policy distribution record
+    await prisma.policyDistribution.create({
+      data: {
+        id: distributionId,
+        policyId,
+        version: policy.version,
+        distributedAt: new Date(),
+        targetCount: employees.length,
+        acknowledgmentRequired: policy.acknowledgmentRequired
+      }
+    });
+    
+    // Send to each employee
+    for (const employee of employees) {
+      const acknowledgmentId = await this.sendPolicyToEmployee(
+        employee,
+        policy,
+        distributionId
+      );
+      acknowledgments.push(acknowledgmentId);
+    }
+    
+    return acknowledgments;
+  }
+  
+  private static async sendPolicyToEmployee(
+    employee: any,
+    policy: any,
+    distributionId: string
+  ): Promise<string> {
+    const acknowledgmentId = `ACK-${Date.now()}-${employee.id}`;
+    
+    // Create acknowledgment record
+    await prisma.policyAcknowledgment.create({
+      data: {
+        id: acknowledgmentId,
+        distributionId,
+        employeeId: employee.id,
+        policyId: policy.id,
+        version: policy.version,
+        sentAt: new Date(),
+        status: 'SENT',
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 days
+      }
+    });
+    
+    // Send policy document
+    await this.sendPolicyEmail(employee.email, policy, acknowledgmentId);
+    
+    return acknowledgmentId;
+  }
+  
+  static async recordPolicyAcknowledgment(
+    acknowledgmentId: string,
+    employeeId: string,
+    ipAddress: string
+  ): Promise<void> {
+    const acknowledgment = await prisma.policyAcknowledgment.findUnique({
+      where: { id: acknowledgmentId }
+    });
+    
+    if (!acknowledgment || acknowledgment.employeeId !== employeeId) {
+      throw new Error('Invalid acknowledgment request');
+    }
+    
+    // Update acknowledgment record
+    await prisma.policyAcknowledgment.update({
+      where: { id: acknowledgmentId },
+      data: {
+        status: 'ACKNOWLEDGED',
+        acknowledgedAt: new Date(),
+        acknowledgedFromIP: ipAddress
+      }
+    });
+    
+    // Log the acknowledgment
+    AuditLogger.logUserAction({
+      userId: employeeId,
+      action: 'POLICY_ACKNOWLEDGED',
+      resource: 'policy',
+      resourceId: acknowledgment.policyId,
+      ipAddress,
+      result: 'SUCCESS',
+      metadata: {
+        acknowledgmentId,
+        policyVersion: acknowledgment.version
+      }
+    });
+  }
+  
+  // Policy compliance monitoring
+  static async generateComplianceReport(): Promise<PolicyComplianceReport> {
+    const policies = Object.keys(this.policies);
+    const report: PolicyComplianceReport = {
+      generatedAt: new Date(),
+      policies: []
+    };
+    
+    for (const policyId of policies) {
+      const policyReport = await this.generatePolicyComplianceReport(policyId);
+      report.policies.push(policyReport);
+    }
+    
+    return report;
+  }
+  
+  private static async generatePolicyComplianceReport(policyId: string): Promise<any> {
+    const policy = this.policies[policyId];
+    
+    // Get latest distribution
+    const latestDistribution = await prisma.policyDistribution.findFirst({
+      where: { policyId },
+      orderBy: { distributedAt: 'desc' }
+    });
+    
+    if (!latestDistribution) {
+      return {
+        policyId,
+        title: policy.title,
+        version: policy.version,
+        status: 'NOT_DISTRIBUTED',
+        complianceRate: 0
+      };
+    }
+    
+    // Get acknowledgment statistics
+    const acknowledgments = await prisma.policyAcknowledgment.findMany({
+      where: { distributionId: latestDistribution.id }
+    });
+    
+    const totalSent = acknowledgments.length;
+    const acknowledged = acknowledgments.filter(ack => ack.status === 'ACKNOWLEDGED').length;
+    const overdue = acknowledgments.filter(ack => 
+      ack.status === 'SENT' && new Date() > ack.dueDate
+    ).length;
+    
+    return {
+      policyId,
+      title: policy.title,
+      version: policy.version,
+      distributedAt: latestDistribution.distributedAt,
+      totalSent,
+      acknowledged,
+      overdue,
+      complianceRate: totalSent > 0 ? (acknowledged / totalSent) * 100 : 0,
+      status: overdue > 0 ? 'NON_COMPLIANT' : 'COMPLIANT'
+    };
+  }
+}
+```
+
+---
+
+**Operational Security Summary:**
 
 <CardGroup cols={2}>
-  <Card title="GDPR Compliance" icon="shield">
-    European data protection compliance
+  <Card title="SOC Operations" icon="monitor">
+    **24/7 security monitoring and response**
+    - Real-time threat detection
+    - Automated incident response
+    - Structured escalation procedures
+    - Comprehensive alert management
   </Card>
-  <Card title="POPIA Compliance" icon="lock">
-    South African data protection compliance
+  <Card title="Incident Response" icon="alert-triangle">
+    **Structured incident handling process**
+    - P1-P4 severity classification
+    - Automated containment procedures
+    - Executive notification protocols
+    - Post-incident analysis and improvements
   </Card>
 </CardGroup>
 
-## Best Practices
+<CardGroup cols={2}>
+  <Card title="Access Management" icon="key">
+    **Zero-trust privileged access control**
+    - Just-in-time access provisioning
+    - Multi-approval workflows
+    - Session monitoring and recording
+    - Automated access revocation
+  </Card>
+  <Card title="Security Training" icon="graduation-cap">
+    **Comprehensive security awareness program**
+    - Role-based training modules
+    - Phishing simulation campaigns
+    - Policy distribution and tracking
+    - Continuous security education
+  </Card>
+</CardGroup>
 
-Security best practices will be provided here.
-
-## Incident Response
-
-Security incident procedures will be documented here.
-
-## Related Security Topics
-
-<Card title="Security Overview" href="/security/overview">
-  Complete security documentation
-</Card>
+*This operational security framework ensures AWO Platform maintains robust security operations while protecting sensitive financial data and meeting regulatory requirements across the SADC region.*

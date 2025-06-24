@@ -1,41 +1,997 @@
----
-title: "Code Review"
-description: "AWO Platform code review security documentation"
----
+# Code Review - Security Best Practices
 
-# Code Review
+This guide establishes comprehensive security-focused code review practices for AWO Platform, covering manual review procedures, automated security scanning, and specialized financial application security requirements.
 
-## Overview
+## Security-First Code Review Framework
 
 <Info>
-This section covers code review for the AWO Platform financial services.
+Code review is the primary defense against security vulnerabilities in AWO Platform. Every line of code that handles financial data, user authentication, or sensitive operations must undergo thorough security review before deployment.
 </Info>
 
-## Security Measures
+### Security Review Levels
 
-Security implementation details will be documented here.
+**Level 1: Automated Security Scanning**
+- **Static Application Security Testing (SAST)**: Automated code vulnerability scanning
+- **Dependency Scanning**: Third-party library vulnerability assessment
+- **Secret Detection**: Scanning for exposed credentials and API keys
+- **Code Quality**: Security-focused linting and code quality checks
 
-## Compliance
+**Level 2: Peer Security Review**
+- **Developer Review**: Code review by another developer with security focus
+- **Security Checklist**: Mandatory security checklist completion
+- **Test Coverage**: Security test coverage verification
+- **Documentation Review**: Security implications documentation
+
+**Level 3: Security Team Review**
+- **Critical Path Review**: Security team review of authentication, payment, and data handling code
+- **Architecture Review**: Security architecture impact assessment
+- **Compliance Review**: Regulatory compliance verification
+- **Penetration Testing**: Security testing of new features
+
+### Mandatory Security Review Triggers
+
+**Automatic Security Review Required:**
+```javascript
+// Code patterns that automatically trigger security review
+const SECURITY_REVIEW_TRIGGERS = {
+  // Authentication and authorization
+  authentication: [
+    /jwt\.sign/i,
+    /passport\./i,
+    /bcrypt\./i,
+    /crypto\./i,
+    /password/i,
+    /token/i
+  ],
+  
+  // Data handling
+  dataHandling: [
+    /encrypt/i,
+    /decrypt/i,
+    /serialize/i,
+    /JSON\.parse/i,
+    /eval\(/i,
+    /innerHTML/i,
+    /dangerouslySetInnerHTML/i
+  ],
+  
+  // Financial operations
+  financial: [
+    /amount/i,
+    /balance/i,
+    /transaction/i,
+    /payment/i,
+    /transfer/i,
+    /withdraw/i,
+    /deposit/i
+  ],
+  
+  // Database operations
+  database: [
+    /\$queryRaw/i,
+    /\.query\(/i,
+    /SELECT.*FROM/i,
+    /INSERT.*INTO/i,
+    /UPDATE.*SET/i,
+    /DELETE.*FROM/i
+  ],
+  
+  // External integrations
+  external: [
+    /fetch\(/i,
+    /axios\./i,
+    /request\(/i,
+    /\.post\(/i,
+    /\.get\(/i,
+    /webhook/i
+  ],
+  
+  // File operations
+  fileOps: [
+    /fs\./i,
+    /readFile/i,
+    /writeFile/i,
+    /upload/i,
+    /download/i,
+    /multer/i
+  ]
+};
+
+// Function to check if code changes require security review
+function requiresSecurityReview(diff: string): boolean {
+  const allPatterns = Object.values(SECURITY_REVIEW_TRIGGERS).flat();
+  return allPatterns.some(pattern => pattern.test(diff));
+}
+```
+
+## Automated Security Scanning Integration
+
+### SAST Integration with GitHub Actions
+
+**Comprehensive Security Scanning Pipeline:**
+```yaml
+# .github/workflows/security-scan.yml
+name: Security Scan Pipeline
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+
+jobs:
+  security-scan:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    # SAST Scanning with CodeQL
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: javascript, typescript
+        queries: +security-and-quality
+    
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:javascript"
+    
+    # Secret Detection
+    - name: Secret Detection
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
+    
+    # Dependency Vulnerability Scanning
+    - name: Dependency Scan
+      run: |
+        npm audit --audit-level=moderate
+        npm audit fix --dry-run
+    
+    # OWASP Dependency Check
+    - name: OWASP Dependency Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: 'AWO Platform'
+        path: '.'
+        format: 'ALL'
+        args: >
+          --enableRetired
+          --enableExperimental
+          --failOnCVSS 7
+    
+    # Fintech-specific security checks
+    - name: Financial Security Scan
+      run: |
+        # Custom script for financial application security
+        ./scripts/fintech-security-scan.sh
+    
+    # Semgrep for custom security rules
+    - name: Semgrep Security Scan
+      uses: returntocorp/semgrep-action@v1
+      with:
+        config: >-
+          p/security-audit
+          p/secrets
+          p/owasp-top-ten
+          .semgrep/fintech-rules.yml
+    
+    # SonarCloud analysis
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    
+    # License compliance check
+    - name: License Compliance
+      run: |
+        npx license-checker --production --onlyAllow 'MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC'
+    
+    # Generate security report
+    - name: Generate Security Report
+      run: |
+        ./scripts/generate-security-report.sh
+    
+    - name: Upload Security Reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: security-reports/
+```
+
+**Custom Fintech Security Rules (Semgrep):**
+```yaml
+# .semgrep/fintech-rules.yml
+rules:
+  - id: hardcoded-crypto-key
+    pattern: |
+      const $KEY = "$VALUE"
+    pattern-where:
+      - metavariable: $KEY
+        regex: .*(?i)(key|secret|token|password).*
+      - metavariable: $VALUE
+        regex: .{16,}
+    message: Potential hardcoded cryptographic key or secret
+    severity: ERROR
+    languages: [javascript, typescript]
+    
+  - id: sql-injection-risk
+    patterns:
+      - pattern: |
+          $QUERY = "..." + $INPUT + "..."
+      - pattern-inside: |
+          $DB.query($QUERY)
+    message: Potential SQL injection vulnerability
+    severity: ERROR
+    languages: [javascript, typescript]
+    
+  - id: financial-amount-validation
+    pattern: |
+      parseFloat($AMOUNT)
+    pattern-not-inside: |
+      if (isNaN($AMOUNT) || $AMOUNT <= 0) { ... }
+    message: Financial amount parsing without proper validation
+    severity: WARNING
+    languages: [javascript, typescript]
+    
+  - id: unencrypted-sensitive-data
+    patterns:
+      - pattern: |
+          localStorage.setItem($KEY, $VALUE)
+      - metavariable-pattern:
+          metavariable: $KEY
+          patterns:
+            - pattern-regex: .*(?i)(token|password|key|account|bank).*
+    message: Storing sensitive data in unencrypted localStorage
+    severity: ERROR
+    languages: [javascript, typescript]
+    
+  - id: missing-rate-limiting
+    patterns:
+      - pattern: |
+          app.post($ROUTE, $HANDLER)
+      - metavariable-pattern:
+          metavariable: $ROUTE
+          patterns:
+            - pattern-regex: .*/auth/.*
+            - pattern-regex: .*/api/.*
+      - pattern-not-inside: |
+          app.use($ROUTE, rateLimit(...))
+    message: Authentication/API route missing rate limiting
+    severity: WARNING
+    languages: [javascript, typescript]
+```
+
+### Automated Security Report Generation
+
+**Security Assessment Script:**
+```bash
+#!/bin/bash
+# scripts/fintech-security-scan.sh
+
+set -e
+
+REPORT_DIR="security-reports"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+
+# Create report directory
+mkdir -p "${REPORT_DIR}"
+
+echo "🔒 AWO Platform Fintech Security Scan - ${TIMESTAMP}"
+echo "=================================================="
+
+# 1. Check for financial data exposure
+echo "📊 Checking for financial data exposure..."
+grep -r -n -i \
+  --include="*.js" --include="*.ts" --include="*.jsx" --include="*.tsx" \
+  -E "(accountNumber|routingNumber|bankAccount|creditCard|socialSecurity)" \
+  . > "${REPORT_DIR}/financial-data-exposure.txt" || true
+
+# 2. Validate API endpoint security
+echo "🔐 Validating API endpoint security..."
+find . -name "*.js" -o -name "*.ts" | xargs grep -l "app\.\(get\|post\|put\|delete\)" | \
+while read file; do
+  echo "Checking: $file"
+  # Check for missing authentication middleware
+  if ! grep -q "authenticateToken\|requireAuth" "$file"; then
+    echo "WARNING: $file may have unauthenticated endpoints" >> "${REPORT_DIR}/api-security-issues.txt"
+  fi
+  
+  # Check for missing input validation
+  if ! grep -q "validate\|joi\|zod" "$file"; then
+    echo "WARNING: $file may have unvalidated inputs" >> "${REPORT_DIR}/api-security-issues.txt"
+  fi
+done
+
+# 3. Check password and secret handling
+echo "🔑 Checking password and secret handling..."
+grep -r -n -i \
+  --include="*.js" --include="*.ts" \
+  -E "(password.*=|secret.*=|key.*=)" \
+  . | grep -v "process.env" > "${REPORT_DIR}/secret-handling.txt" || true
+
+# 4. Validate database query security
+echo "💾 Validating database query security..."
+grep -r -n \
+  --include="*.js" --include="*.ts" \
+  -E "(\$queryRaw|\\.query\()" \
+  . > "${REPORT_DIR}/raw-queries.txt" || true
+
+# 5. Check for proper error handling
+echo "⚠️ Checking error handling..."
+find . -name "*.js" -o -name "*.ts" | xargs grep -l "catch" | \
+while read file; do
+  # Check if errors are properly sanitized
+  if grep -q "error\.message\|error\.stack" "$file"; then
+    echo "WARNING: $file may expose error details" >> "${REPORT_DIR}/error-handling-issues.txt"
+  fi
+done
+
+# 6. Validate CORS configuration
+echo "🌐 Validating CORS configuration..."
+grep -r -n "cors" . --include="*.js" --include="*.ts" > "${REPORT_DIR}/cors-config.txt" || true
+
+# 7. Check for proper session management
+echo "🔗 Checking session management..."
+grep -r -n -i \
+  --include="*.js" --include="*.ts" \
+  -E "(session|cookie)" \
+  . > "${REPORT_DIR}/session-management.txt" || true
+
+# 8. Generate summary report
+echo "📋 Generating summary report..."
+cat > "${REPORT_DIR}/security-summary.txt" << EOF
+AWO Platform Security Scan Summary
+Generated: ${TIMESTAMP}
+
+Files Scanned:
+- JavaScript/TypeScript: $(find . -name "*.js" -o -name "*.ts" -o -name "*.jsx" -o -name "*.tsx" | wc -l)
+
+Issues Found:
+- Financial data exposure: $(wc -l < "${REPORT_DIR}/financial-data-exposure.txt" 2>/dev/null || echo "0")
+- API security issues: $(wc -l < "${REPORT_DIR}/api-security-issues.txt" 2>/dev/null || echo "0")
+- Secret handling issues: $(wc -l < "${REPORT_DIR}/secret-handling.txt" 2>/dev/null || echo "0")
+- Raw SQL queries: $(wc -l < "${REPORT_DIR}/raw-queries.txt" 2>/dev/null || echo "0")
+- Error handling issues: $(wc -l < "${REPORT_DIR}/error-handling-issues.txt" 2>/dev/null || echo "0")
+
+Review these files for potential security issues.
+EOF
+
+echo "✅ Security scan completed. Reports generated in ${REPORT_DIR}/"
+```
+
+## Manual Security Review Process
+
+### Security Review Checklist
+
+**Comprehensive Security Review Template:**
+```markdown
+# AWO Platform Security Review Checklist
+
+## Pull Request Information
+- **PR Number**: #____
+- **Author**: ________________
+- **Reviewer**: _______________
+- **Review Date**: ____________
+- **Component**: ______________
+
+## 1. Authentication & Authorization ✅
+- [ ] New authentication mechanisms follow AWO security standards
+- [ ] Authorization checks are present for all protected resources
+- [ ] JWT tokens are handled securely (no exposure in logs)
+- [ ] Session management follows security best practices
+- [ ] Multi-factor authentication is implemented where required
+- [ ] Password policies are enforced (if applicable)
+- [ ] Account lockout mechanisms are in place
+
+**Notes**: ________________________________
+
+## 2. Input Validation & Sanitization ✅
+- [ ] All user inputs are validated using Zod schemas or similar
+- [ ] SQL injection prevention measures are in place
+- [ ] XSS prevention measures are implemented
+- [ ] File upload validation is comprehensive
+- [ ] Command injection prevention is implemented
+- [ ] Data type validation is enforced
+- [ ] Input length limits are appropriate
+
+**Notes**: ________________________________
+
+## 3. Financial Data Security ✅
+- [ ] Financial amounts are validated and properly formatted
+- [ ] Currency handling is consistent and secure
+- [ ] Transaction integrity is maintained
+- [ ] Audit trails are comprehensive
+- [ ] DIVA score calculations are secure
+- [ ] Investment data is properly protected
+- [ ] Chama financial operations are secure
+
+**Financial-Specific Checks**:
+- [ ] No hardcoded financial limits or thresholds
+- [ ] Proper decimal handling for monetary values
+- [ ] Currency conversion is secure
+- [ ] Transaction rollback mechanisms exist
+
+**Notes**: ________________________________
+
+## 4. Data Protection & Privacy ✅
+- [ ] Sensitive data encryption is implemented
+- [ ] POPIA compliance requirements are met
+- [ ] Data minimization principles are followed
+- [ ] Personal data handling follows privacy policies
+- [ ] Data retention policies are enforced
+- [ ] Cross-border data transfer compliance
+- [ ] User consent management is proper
+
+**POPIA-Specific Checks**:
+- [ ] Data subject rights are supported
+- [ ] Consent is properly recorded and managed
+- [ ] Data breach notification procedures exist
+- [ ] Data protection impact assessments completed
+
+**Notes**: ________________________________
+
+## 5. API Security ✅
+- [ ] Rate limiting is implemented
+- [ ] API versioning is handled securely
+- [ ] CORS configuration is appropriate
+- [ ] API documentation doesn't expose sensitive info
+- [ ] Request/response validation is comprehensive
+- [ ] Error handling doesn't leak information
+- [ ] Proper HTTP methods are used
+
+**API-Specific Checks**:
+- [ ] No API keys or secrets in code
+- [ ] Proper HTTP status codes used
+- [ ] Request size limits enforced
+- [ ] API endpoints follow RESTful security practices
+
+**Notes**: ________________________________
+
+## 6. Database Security ✅
+- [ ] Parameterized queries are used
+- [ ] Database connections are secure
+- [ ] Sensitive data fields are encrypted
+- [ ] Database permissions follow least privilege
+- [ ] Audit logging is implemented
+- [ ] Data integrity constraints exist
+- [ ] Backup security is maintained
+
+**Database-Specific Checks**:
+- [ ] No raw SQL concatenation
+- [ ] Proper indexing for security queries
+- [ ] Database schema changes are reviewed
+- [ ] Migration scripts are secure
+
+**Notes**: ________________________________
+
+## 7. External Integrations ✅
+- [ ] Third-party API calls are secure
+- [ ] SSL/TLS validation is enforced
+- [ ] API credentials are properly managed
+- [ ] Timeout and retry logic is implemented
+- [ ] Response validation is comprehensive
+- [ ] Error handling for external failures
+- [ ] Dependency security is verified
+
+**Integration-Specific Checks**:
+- [ ] Banking API integration follows security standards
+- [ ] Payment gateway integration is secure
+- [ ] KYC provider integration protects user data
+- [ ] SMS/Email service integration is secure
+
+**Notes**: ________________________________
+
+## 8. Error Handling & Logging ✅
+- [ ] Errors don't expose sensitive information
+- [ ] Security events are properly logged
+- [ ] Log data doesn't contain sensitive info
+- [ ] Audit trails are comprehensive
+- [ ] Monitoring and alerting is configured
+- [ ] Exception handling is consistent
+- [ ] Debug information is not exposed in production
+
+**Logging-Specific Checks**:
+- [ ] Financial transactions are audited
+- [ ] Security events trigger alerts
+- [ ] Log retention follows compliance requirements
+- [ ] Log integrity is maintained
+
+**Notes**: ________________________________
+
+## 9. Configuration & Deployment ✅
+- [ ] No hardcoded secrets or credentials
+- [ ] Environment-specific configurations are secure
+- [ ] Security headers are properly configured
+- [ ] SSL/TLS configuration is secure
+- [ ] Container security is maintained
+- [ ] Infrastructure as Code is reviewed
+- [ ] Deployment scripts are secure
+
+**Configuration-Specific Checks**:
+- [ ] Production configurations are secure
+- [ ] Development configurations don't leak to production
+- [ ] Secret management follows best practices
+- [ ] Network security configurations are proper
+
+**Notes**: ________________________________
+
+## 10. Testing & Quality Assurance ✅
+- [ ] Security tests are included
+- [ ] Test data doesn't contain real sensitive information
+- [ ] Code coverage includes security paths
+- [ ] Integration tests cover security scenarios
+- [ ] Performance tests include security load testing
+- [ ] Regression tests for security fixes exist
+
+**Testing-Specific Checks**:
+- [ ] Authentication tests are comprehensive
+- [ ] Authorization tests cover edge cases
+- [ ] Input validation tests are thorough
+- [ ] Financial calculation tests are accurate
+
+**Notes**: ________________________________
+
+## Overall Security Assessment
+
+### Security Risk Level
+- [ ] **Low Risk**: Minor changes, no security implications
+- [ ] **Medium Risk**: Some security considerations, standard review adequate
+- [ ] **High Risk**: Significant security implications, requires security team review
+- [ ] **Critical Risk**: Major security changes, requires architecture review
+
+### Recommendations
+```
+Detailed recommendations for improving security:
+
+1. ________________________________
+2. ________________________________
+3. ________________________________
+```
+
+### Approval Status
+- [ ] **APPROVED**: Code meets security standards
+- [ ] **APPROVED WITH CONDITIONS**: Minor fixes required before merge
+- [ ] **REJECTED**: Significant security issues must be addressed
+- [ ] **ESCALATED**: Requires security team review
+
+**Reviewer Signature**: ___________________
+**Date**: _______________
+
+## Post-Review Actions
+- [ ] Security issues documented and tracked
+- [ ] Follow-up reviews scheduled if needed
+- [ ] Security improvements added to backlog
+- [ ] Team learning opportunities identified
+```
+
+### Financial Application Specific Reviews
+
+**Banking Integration Security Review:**
+```javascript
+// Security review checklist for banking integrations
+const BANKING_INTEGRATION_CHECKLIST = {
+  // Stitch/Mono integration security
+  openBanking: {
+    requirements: [
+      'OAuth 2.0 implementation follows FAPI security profile',
+      'PKCE (Proof Key for Code Exchange) is implemented',
+      'State parameter validation prevents CSRF attacks',
+      'Token storage is secure (encrypted, secure storage)',
+      'Token refresh mechanism is secure',
+      'API rate limiting respects bank guidelines',
+      'Error handling doesn\'t expose bank credentials',
+      'Consent management follows Open Banking standards'
+    ],
+    
+    codePatterns: [
+      {
+        pattern: /client_secret.*=.*["']/i,
+        issue: 'Banking client secret hardcoded in code',
+        severity: 'CRITICAL'
+      },
+      {
+        pattern: /access_token.*=.*["']/i,
+        issue: 'Access token hardcoded in code',
+        severity: 'CRITICAL'
+      },
+      {
+        pattern: /\.post\(.*\/oauth\/token/i,
+        requirement: 'Verify PKCE implementation',
+        severity: 'HIGH'
+      }
+    ]
+  },
+  
+  // Payment processing security
+  payments: {
+    requirements: [
+      'PCI DSS compliance for card data handling',
+      'Payment tokenization is implemented',
+      'Amount validation prevents manipulation',
+      'Currency conversion is accurate and secure',
+      'Idempotency keys prevent duplicate payments',
+      'Webhook signature verification is implemented',
+      'Payment status validation is comprehensive',
+      'Refund and reversal mechanisms are secure'
+    ],
+    
+    codePatterns: [
+      {
+        pattern: /amount.*parseFloat/i,
+        requirement: 'Verify proper amount validation',
+        severity: 'HIGH'
+      },
+      {
+        pattern: /webhook.*signature/i,
+        requirement: 'Verify webhook signature validation',
+        severity: 'HIGH'
+      }
+    ]
+  },
+  
+  // KYC integration security
+  kyc: {
+    requirements: [
+      'Document encryption in transit and at rest',
+      'Biometric data protection follows regulations',
+      'Identity verification results are tamper-proof',
+      'PII minimization principles are applied',
+      'Consent management for data processing',
+      'Data retention follows legal requirements',
+      'Cross-border data transfer compliance',
+      'Audit trails for identity verification'
+    ],
+    
+    codePatterns: [
+      {
+        pattern: /upload.*document/i,
+        requirement: 'Verify document encryption and validation',
+        severity: 'HIGH'
+      },
+      {
+        pattern: /biometric.*data/i,
+        requirement: 'Verify biometric data protection',
+        severity: 'CRITICAL'
+      }
+    ]
+  }
+};
+
+// Automated financial security review function
+function conductFinancialSecurityReview(codeChanges: string[]): SecurityReviewResult {
+  const issues: SecurityIssue[] = [];
+  const requirements: string[] = [];
+  
+  for (const change of codeChanges) {
+    // Check each financial integration category
+    for (const [category, config] of Object.entries(BANKING_INTEGRATION_CHECKLIST)) {
+      // Check for code patterns
+      for (const patternCheck of config.codePatterns) {
+        if (patternCheck.pattern.test(change)) {
+          if (patternCheck.issue) {
+            issues.push({
+              type: 'PATTERN_MATCH',
+              category,
+              severity: patternCheck.severity,
+              description: patternCheck.issue,
+              location: change,
+              recommendation: 'Review and fix the identified security issue'
+            });
+          }
+          
+          if (patternCheck.requirement) {
+            requirements.push(patternCheck.requirement);
+          }
+        }
+      }
+    }
+  }
+  
+  return {
+    requiresSecurityReview: issues.length > 0 || requirements.length > 0,
+    securityIssues: issues,
+    additionalRequirements: requirements,
+    riskLevel: calculateRiskLevel(issues)
+  };
+}
+```
+
+### Secure Code Review Training
+
+**Security-Focused Code Review Training Program:**
+```javascript
+// Security code review training system
+class SecurityCodeReviewTraining {
+  private static trainingModules = {
+    'basic_security_review': {
+      title: 'Basic Security Code Review',
+      duration: 120, // minutes
+      topics: [
+        'Common vulnerability patterns',
+        'Security review checklist usage',
+        'OWASP Top 10 in code review',
+        'Secure coding standards'
+      ],
+      practicalExercises: [
+        'Review sample vulnerable code',
+        'Identify security issues in pull requests',
+        'Complete security review checklist'
+      ],
+      requiredFor: ['all_developers']
+    },
+    
+    'fintech_security_review': {
+      title: 'Fintech-Specific Security Review',
+      duration: 180,
+      topics: [
+        'Financial data protection',
+        'Payment security requirements',
+        'Banking integration security',
+        'Regulatory compliance in code'
+      ],
+      practicalExercises: [
+        'Review banking integration code',
+        'Assess payment processing security',
+        'Validate DIVA scoring security'
+      ],
+      requiredFor: ['senior_developers', 'security_team']
+    },
+    
+    'advanced_threat_modeling': {
+      title: 'Advanced Threat Modeling in Code Review',
+      duration: 240,
+      topics: [
+        'Threat modeling methodologies',
+        'Attack surface analysis',
+        'Security architecture review',
+        'Risk assessment techniques'
+      ],
+      practicalExercises: [
+        'Conduct threat modeling session',
+        'Perform security architecture review',
+        'Create security requirements'
+      ],
+      requiredFor: ['architects', 'security_team', 'tech_leads']
+    }
+  };
+  
+  static async createTrainingScenario(
+    vulnerabilityType: string
+  ): Promise<CodeReviewScenario> {
+    const scenarios = {
+      'sql_injection': {
+        title: 'SQL Injection Vulnerability Review',
+        description: 'Review code for SQL injection vulnerabilities',
+        code: `
+// Vulnerable code example
+app.post('/api/users/search', async (req, res) => {
+  const { query } = req.body;
+  
+  // VULNERABILITY: SQL injection risk
+  const sql = \`SELECT * FROM users WHERE name LIKE '%\${query}%'\`;
+  const results = await db.query(sql);
+  
+  res.json(results);
+});`,
+        
+        expectedFindings: [
+          'SQL injection vulnerability in query construction',
+          'Missing input validation',
+          'No parameterized queries used',
+          'Potential data exposure in error handling'
+        ],
+        
+        secureVersion: `
+// Secure implementation
+app.post('/api/users/search', [
+  body('query').isLength({ min: 1, max: 100 }).trim().escape(),
+  validate,
+  authenticateToken
+], async (req, res) => {
+  try {
+    const { query } = req.body;
+    
+    // Secure parameterized query
+    const results = await prisma.user.findMany({
+      where: {
+        name: {
+          contains: query,
+          mode: 'insensitive'
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true
+        // Don't expose sensitive fields
+      }
+    });
+    
+    res.json(results);
+  } catch (error) {
+    logger.error('User search failed', { error: error.message });
+    res.status(500).json({ error: 'Search failed' });
+  }
+});`
+      },
+      
+      'financial_validation': {
+        title: 'Financial Amount Validation Review',
+        description: 'Review financial calculation and validation code',
+        code: `
+// Potentially vulnerable financial code
+app.post('/api/transactions', async (req, res) => {
+  const { amount, currency, fromAccount, toAccount } = req.body;
+  
+  // ISSUES: No validation, potential precision errors
+  const fee = amount * 0.01; // 1% fee
+  const total = amount + fee;
+  
+  await db.transaction.create({
+    data: {
+      amount: total,
+      currency,
+      fromAccountId: fromAccount,
+      toAccountId: toAccount
+    }
+  });
+  
+  res.json({ success: true });
+});`,
+        
+        expectedFindings: [
+          'Missing financial amount validation',
+          'Floating-point precision issues with monetary calculations',
+          'No currency validation',
+          'Missing authentication and authorization',
+          'No transaction limits enforcement',
+          'Insufficient audit logging'
+        ],
+        
+        secureVersion: `
+// Secure financial transaction implementation
+app.post('/api/transactions', [
+  authenticateToken,
+  body('amount').isFloat({ min: 0.01, max: 1000000 }),
+  body('currency').isIn(['ZAR', 'BWP', 'NAD', 'ZMW']),
+  body('fromAccount').isUUID(),
+  body('toAccount').isUUID(),
+  validate
+], async (req, res) => {
+  try {
+    const { amount, currency, fromAccount, toAccount } = req.body;
+    
+    // Use Decimal.js for precise monetary calculations
+    const amountDecimal = new Decimal(amount);
+    const feeDecimal = amountDecimal.mul(0.01);
+    const totalDecimal = amountDecimal.add(feeDecimal);
+    
+    // Validate accounts ownership and limits
+    await validateAccountOwnership(req.user.id, fromAccount);
+    await enforceTransactionLimits(req.user.id, totalDecimal, currency);
+    
+    const transaction = await prisma.$transaction(async (tx) => {
+      // Create transaction with audit trail
+      const newTransaction = await tx.transaction.create({
+        data: {
+          amount: totalDecimal.toNumber(),
+          fee: feeDecimal.toNumber(),
+          currency,
+          fromAccountId: fromAccount,
+          toAccountId: toAccount,
+          userId: req.user.id,
+          status: 'PENDING'
+        }
+      });
+      
+      // Log financial transaction
+      await AuditLogger.logFinancialTransaction({
+        userId: req.user.id,
+        transactionId: newTransaction.id,
+        amount: totalDecimal.toNumber(),
+        currency,
+        type: 'TRANSFER'
+      });
+      
+      return newTransaction;
+    });
+    
+    res.json({ 
+      success: true, 
+      transactionId: transaction.id,
+      status: transaction.status 
+    });
+    
+  } catch (error) {
+    logger.error('Transaction failed', {
+      userId: req.user.id,
+      error: error.message
+    });
+    res.status(400).json({ error: 'Transaction failed' });
+  }
+});`
+      }
+    };
+    
+    return scenarios[vulnerabilityType] || null;
+  }
+  
+  static async conductCodeReviewAssessment(
+    developerId: string,
+    scenario: CodeReviewScenario
+  ): Promise<AssessmentResult> {
+    // Present scenario to developer
+    const assessment = await this.presentScenario(developerId, scenario);
+    
+    // Evaluate findings
+    const score = this.evaluateFindings(assessment.findings, scenario.expectedFindings);
+    
+    // Provide feedback
+    const feedback = this.generateFeedback(assessment, scenario, score);
+    
+    // Record training completion
+    await this.recordTrainingResult(developerId, scenario.title, score, feedback);
+    
+    return {
+      score,
+      feedback,
+      passed: score >= 80,
+      recommendations: this.getRecommendations(score, assessment.findings)
+    };
+  }
+}
+```
+
+---
+
+**Code Review Security Summary:**
 
 <CardGroup cols={2}>
-  <Card title="GDPR Compliance" icon="shield">
-    European data protection compliance
+  <Card title="Automated Scanning" icon="scan-line">
+    **Multi-layered security analysis**
+    - SAST with CodeQL and Semgrep
+    - Secret detection and dependency scanning
+    - Financial-specific security rules
+    - Compliance and license checking
   </Card>
-  <Card title="POPIA Compliance" icon="lock">
-    South African data protection compliance
+  <Card title="Manual Review Process" icon="user-check">
+    **Human-driven security assessment**
+    - Comprehensive security checklists
+    - Financial application specific reviews
+    - Risk-based review requirements
+    - Security training and certification
   </Card>
 </CardGroup>
 
-## Best Practices
+<CardGroup cols={2}>
+  <Card title="Integration Security" icon="link">
+    **Third-party integration focus**
+    - Banking API security validation
+    - Payment processing review
+    - KYC integration assessment
+    - External service security checks
+  </Card>
+  <Card title="Training & Education" icon="graduation-cap">
+    **Security review competency**
+    - Role-based training modules
+    - Practical vulnerability scenarios
+    - Assessment and certification
+    - Continuous skill development
+  </Card>
+</CardGroup>
 
-Security best practices will be provided here.
-
-## Incident Response
-
-Security incident procedures will be documented here.
-
-## Related Security Topics
-
-<Card title="Security Overview" href="/security/overview">
-  Complete security documentation
-</Card>
+*This code review security framework ensures every line of code in AWO Platform undergoes appropriate security scrutiny, with special attention to financial data handling and regulatory compliance requirements.*

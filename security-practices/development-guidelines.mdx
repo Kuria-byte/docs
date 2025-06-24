@@ -1,41 +1,1377 @@
----
-title: "Development Guidelines"
-description: "AWO Platform development guidelines security documentation"
----
+# Development Guidelines - Security Best Practices
 
-# Development Guidelines
+This guide outlines security-first development practices for AWO Platform, covering secure coding standards, authentication implementation, and technology-specific security measures for our React Native and Express.js stack.
 
-## Overview
+## Security-First Development Philosophy
 
 <Info>
-This section covers development guidelines for the AWO Platform financial services.
+AWO Platform handles sensitive financial data for African women across the SADC region. Security considerations must be integrated into every development decision, from initial design through deployment and maintenance.
 </Info>
 
-## Security Measures
+### Core Security Principles
 
-Security implementation details will be documented here.
+**1. Security by Design**
+- Security requirements defined during feature planning
+- Threat modeling conducted for new features
+- Security reviews integrated into development workflow
+- Privacy by design for POPIA compliance
 
-## Compliance
+**2. Defense in Depth**
+- Multiple layers of security controls
+- No single point of failure for security
+- Redundant security measures across the stack
+- Fail-secure design patterns
+
+**3. Principle of Least Privilege**
+- Minimal access permissions for all components
+- Role-based access control (RBAC) implementation
+- Time-limited access tokens
+- Regular permission audits
+
+## React Native Security Guidelines
+
+### Secure Data Storage
+
+**Never Store Sensitive Data in Plain Text:**
+```javascript
+// ❌ NEVER - Insecure storage
+import AsyncStorage from '@react-native-async-storage/async-storage';
+await AsyncStorage.setItem('bankAccount', JSON.stringify(accountData));
+await AsyncStorage.setItem('userPassword', password);
+
+// ✅ CORRECT - Secure storage for sensitive data
+import * as SecureStore from 'expo-secure-store';
+
+// Store authentication tokens securely
+await SecureStore.setItemAsync('accessToken', token, {
+  keychainService: 'awo-keychain',
+  requireAuthentication: true
+});
+
+// Store encryption keys securely
+await SecureStore.setItemAsync('encryptionKey', encryptionKey, {
+  keychainService: 'awo-keys',
+  requireAuthentication: true
+});
+```
+
+**Data Classification and Storage Rules:**
 
 <CardGroup cols={2}>
-  <Card title="GDPR Compliance" icon="shield">
-    European data protection compliance
+  <Card title="High Sensitivity - SecureStore" icon="shield">
+    **Authentication tokens, encryption keys, biometric data**
+    - Use Expo SecureStore with biometric authentication
+    - Enable requireAuthentication flag
+    - Use custom keychain service names
   </Card>
-  <Card title="POPIA Compliance" icon="lock">
-    South African data protection compliance
+  <Card title="Medium Sensitivity - Encrypted AsyncStorage" icon="lock">
+    **DIVA scores, financial data, account balances**
+    - Encrypt before storing in AsyncStorage
+    - Use AES-256 encryption with secure key management
+    - Implement data integrity checks
   </Card>
 </CardGroup>
 
-## Best Practices
+<CardGroup cols={2}>
+  <Card title="Low Sensitivity - AsyncStorage" icon="database">
+    **User preferences, app settings, cached UI data**
+    - Safe for plain AsyncStorage
+    - No financial or personal information
+    - Clear on app uninstall
+  </Card>
+  <Card title="No Local Storage - API Only" icon="cloud">
+    **Banking credentials, KYC documents, transaction history**
+    - Never store locally
+    - Fetch from API as needed
+    - Implement proper caching strategies
+  </Card>
+</CardGroup>
 
-Security best practices will be provided here.
+**Secure Storage Implementation:**
+```javascript
+// Secure storage utility for AWO Platform
+import * as SecureStore from 'expo-secure-store';
+import CryptoJS from 'crypto-js';
 
-## Incident Response
+class AWOSecureStorage {
+  private static KEYCHAIN_SERVICE = 'awo-platform';
+  
+  // Store highly sensitive data (tokens, keys)
+  static async storeSecure(key: string, value: string): Promise&lt;void&gt; {
+    try {
+      await SecureStore.setItemAsync(key, value, {
+        keychainService: this.KEYCHAIN_SERVICE,
+        requireAuthentication: true,
+        authenticationPrompt: 'Authenticate to access your AWO account'
+      });
+    } catch (error) {
+      throw new Error(`Failed to store secure data: ${error.message}`);
+    }
+  }
+  
+  // Store medium sensitivity data (encrypted in AsyncStorage)
+  static async storeEncrypted(key: string, data: any): Promise&lt;void&gt; {
+    try {
+      const encryptionKey = await this.getEncryptionKey();
+      const encrypted = CryptoJS.AES.encrypt(
+        JSON.stringify(data), 
+        encryptionKey
+      ).toString();
+      
+      await AsyncStorage.setItem(`encrypted_${key}`, encrypted);
+    } catch (error) {
+      throw new Error(`Failed to store encrypted data: ${error.message}`);
+    }
+  }
+  
+  private static async getEncryptionKey(): Promise&lt;string&gt; {
+    let key = await SecureStore.getItemAsync('app_encryption_key');
+    if (!key) {
+      key = CryptoJS.lib.WordArray.random(256/8).toString();
+      await this.storeSecure('app_encryption_key', key);
+    }
+    return key;
+  }
+}
+```
 
-Security incident procedures will be documented here.
+### Authentication Security
 
-## Related Security Topics
+**JWT Token Management:**
+```javascript
+// Secure JWT implementation for AWO
+class AWOAuthManager {
+  private static ACCESS_TOKEN_KEY = 'access_token';
+  private static REFRESH_TOKEN_KEY = 'refresh_token';
+  
+  static async storeTokens(accessToken: string, refreshToken: string): Promise&lt;void&gt; {
+    // Store access token in memory for short-term use
+    this.accessToken = accessToken;
+    
+    // Store refresh token securely for persistence
+    await AWOSecureStorage.storeSecure(this.REFRESH_TOKEN_KEY, refreshToken);
+  }
+  
+  static async getValidToken(): Promise&lt;string | null&gt; {
+    // Check if current token is valid
+    if (this.accessToken && !this.isTokenExpired(this.accessToken)) {
+      return this.accessToken;
+    }
+    
+    // Attempt to refresh token
+    return await this.refreshAccessToken();
+  }
+  
+  private static isTokenExpired(token: string): boolean {
+    try {
+      const decoded = this.decodeJWT(token);
+      return decoded.exp * 1000 &lt; Date.now();
+    } catch {
+      return true;
+    }
+  }
+  
+  static async logout(): Promise&lt;void&gt; {
+    // Clear in-memory token
+    this.accessToken = null;
+    
+    // Remove stored refresh token
+    await SecureStore.deleteItemAsync(this.REFRESH_TOKEN_KEY);
+    
+    // Clear encrypted local data
+    await this.clearUserData();
+  }
+}
+```
 
-<Card title="Security Overview" href="/security/overview">
-  Complete security documentation
-</Card>
+**Biometric Authentication Integration:**
+```javascript
+import * as LocalAuthentication from 'expo-local-authentication';
+
+class BiometricAuth {
+  static async isAvailable(): Promise&lt;boolean&gt; {
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+    return hasHardware && isEnrolled;
+  }
+  
+  static async authenticate(reason: string): Promise&lt;boolean&gt; {
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: reason,
+        fallbackLabel: 'Use PIN',
+        disableDeviceFallback: false,
+        requireConfirmation: true
+      });
+      
+      return result.success;
+    } catch (error) {
+      console.error('Biometric authentication failed:', error);
+      return false;
+    }
+  }
+  
+  // Require biometric auth for sensitive operations
+  static async protectedOperation&lt;T&gt;(
+    operation: () =&gt; Promise&lt;T&gt;,
+    reason: string
+  ): Promise&lt;T&gt; {
+    const authenticated = await this.authenticate(reason);
+    if (!authenticated) {
+      throw new Error('Authentication required');
+    }
+    
+    return await operation();
+  }
+}
+```
+
+### Input Validation and Sanitization
+
+**Financial Data Validation:**
+```javascript
+import { z } from 'zod';
+
+// Zod schemas for financial data validation
+const DivaScoreSchema = z.object({
+  discipline: z.number().min(0).max(1000),
+  income: z.number().min(0).max(1000), 
+  velocity: z.number().min(0).max(1000),
+  assets: z.number().min(0).max(1000),
+  overallScore: z.number().min(0).max(1000),
+  calculatedAt: z.date(),
+  nextUpdateDue: z.date()
+});
+
+const TransactionSchema = z.object({
+  id: z.string().uuid(),
+  amount: z.number().positive(),
+  currency: z.enum(['ZAR', 'BWP', 'NAD', 'ZMW']),
+  type: z.enum(['deposit', 'withdrawal', 'transfer', 'investment']),
+  description: z.string().max(255).regex(/^[a-zA-Z0-9\s\-\.]+$/),
+  timestamp: z.date(),
+  accountId: z.string().uuid()
+});
+
+const ChamaContributionSchema = z.object({
+  chamaId: z.string().uuid(),
+  memberId: z.string().uuid(),
+  amount: z.number().positive().max(100000), // Max R100,000 per contribution
+  contributionType: z.enum(['regular', 'emergency', 'bonus']),
+  paymentMethod: z.enum(['wallet', 'bank_transfer', 'mobile_money']),
+  scheduledDate: z.date().optional(),
+  notes: z.string().max(500).optional()
+});
+
+// Input validation utility
+class AWOValidator {
+  static validateFinancialData&lt;T&gt;(data: unknown, schema: z.ZodSchema&lt;T&gt;): T {
+    try {
+      return schema.parse(data);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        throw new ValidationError('Invalid financial data', error.errors);
+      }
+      throw error;
+    }
+  }
+  
+  static sanitizeUserInput(input: string): string {
+    return input
+      .trim()
+      .replace(/[&lt;&gt;"']/g, '') // Remove potential XSS characters
+      .substring(0, 1000); // Limit length
+  }
+  
+  static validateAmount(amount: number, currency: string): boolean {
+    const limits = {
+      ZAR: { min: 1, max: 1000000 },
+      BWP: { min: 1, max: 100000 },
+      NAD: { min: 1, max: 1000000 },
+      ZMW: { min: 10, max: 10000000 }
+    };
+    
+    const limit = limits[currency as keyof typeof limits];
+    return amount &gt;= limit.min && amount &lt;= limit.max;
+  }
+}
+```
+
+### API Security Implementation
+
+**Secure API Client:**
+```javascript
+class AWOAPIClient {
+  private baseURL: string;
+  private defaultHeaders: Record&lt;string, string&gt;;
+  
+  constructor() {
+    this.baseURL = __DEV__ 
+      ? 'https://api-dev.awo-platform.com'
+      : 'https://api.awo-platform.com';
+      
+    this.defaultHeaders = {
+      'Content-Type': 'application/json',
+      'X-App-Version': '1.0.0',
+      'X-Platform': 'react-native'
+    };
+  }
+  
+  async secureRequest&lt;T&gt;(
+    endpoint: string,
+    options: RequestOptions = {}
+  ): Promise&lt;T&gt; {
+    try {
+      // Get valid authentication token
+      const token = await AWOAuthManager.getValidToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+      
+      // Prepare secure request
+      const url = `${this.baseURL}${endpoint}`;
+      const headers = {
+        ...this.defaultHeaders,
+        'Authorization': `Bearer ${token}`,
+        'X-Request-ID': this.generateRequestId(),
+        ...options.headers
+      };
+      
+      // Add request timestamp for replay attack prevention
+      if (options.method === 'POST' || options.method === 'PUT') {
+        headers['X-Timestamp'] = Date.now().toString();
+      }
+      
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        // Certificate pinning in production
+        ...(this.shouldPinCertificate() && {
+          // Implementation depends on certificate pinning library
+        })
+      });
+      
+      return await this.handleResponse&lt;T&gt;(response);
+      
+    } catch (error) {
+      throw new APIError('Request failed', error);
+    }
+  }
+  
+  private async handleResponse&lt;T&gt;(response: Response): Promise&lt;T&gt; {
+    // Check for security headers
+    this.validateSecurityHeaders(response);
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        await AWOAuthManager.logout();
+        throw new AuthenticationError('Session expired');
+      }
+      
+      const errorData = await response.json();
+      throw new APIError(errorData.message, errorData);
+    }
+    
+    return await response.json();
+  }
+  
+  private validateSecurityHeaders(response: Response): void {
+    const requiredHeaders = [
+      'X-Content-Type-Options',
+      'X-Frame-Options', 
+      'Strict-Transport-Security'
+    ];
+    
+    for (const header of requiredHeaders) {
+      if (!response.headers.get(header)) {
+        console.warn(`Missing security header: ${header}`);
+      }
+    }
+  }
+  
+  private generateRequestId(): string {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+}
+```
+
+### URL and Deep Link Security
+
+**Secure Deep Link Handling:**
+```javascript
+import { Linking } from 'react-native';
+
+class AWODeepLinkHandler {
+  private static ALLOWED_SCHEMES = ['awo', 'https'];
+  private static ALLOWED_HOSTS = [
+    'awo-platform.com',
+    'app.awo-platform.com',
+    'api.awo-platform.com'
+  ];
+  
+  static async handleDeepLink(url: string): Promise&lt;void&gt; {
+    try {
+      // Validate URL security
+      if (!this.isSecureURL(url)) {
+        throw new Error('Insecure URL detected');
+      }
+      
+      const parsedURL = new URL(url);
+      
+      // Handle different deep link types
+      switch (parsedURL.pathname) {
+        case '/auth/callback':
+          await this.handleAuthCallback(parsedURL);
+          break;
+        case '/payment/callback':
+          await this.handlePaymentCallback(parsedURL);
+          break;
+        case '/share/chama':
+          await this.handleChamaInvite(parsedURL);
+          break;
+        default:
+          throw new Error('Unknown deep link path');
+      }
+      
+    } catch (error) {
+      console.error('Deep link handling failed:', error);
+      // Show user-friendly error message
+      Alert.alert('Invalid Link', 'This link is not valid or has expired.');
+    }
+  }
+  
+  private static isSecureURL(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      
+      // Check scheme
+      if (!this.ALLOWED_SCHEMES.includes(parsed.protocol.replace(':', ''))) {
+        return false;
+      }
+      
+      // Check host for https URLs
+      if (parsed.protocol === 'https:' && 
+          !this.ALLOWED_HOSTS.includes(parsed.hostname)) {
+        return false;
+      }
+      
+      // Prevent javascript: URLs
+      if (parsed.protocol === 'javascript:') {
+        return false;
+      }
+      
+      return true;
+      
+    } catch {
+      return false;
+    }
+  }
+  
+  private static async handleAuthCallback(url: URL): Promise&lt;void&gt; {
+    const authCode = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
+    
+    if (!authCode || !state) {
+      throw new Error('Missing authentication parameters');
+    }
+    
+    // Verify state parameter to prevent CSRF
+    const storedState = await AWOSecureStorage.getSecure('auth_state');
+    if (state !== storedState) {
+      throw new Error('Invalid state parameter - possible CSRF attack');
+    }
+    
+    // Exchange code for tokens
+    await AWOAuthManager.exchangeCodeForTokens(authCode);
+  }
+}
+```
+
+## Express.js Backend Security Guidelines
+
+### Secure Middleware Stack
+
+**Production Security Middleware:**
+```javascript
+import express from 'express';
+import helmet from 'helmet';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+import { body, validationResult } from 'express-validator';
+
+const app = express();
+
+// Security headers middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.awo-platform.com"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  }
+}));
+
+// CORS configuration for AWO mobile app
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) =&gt; {
+    const allowedOrigins = [
+      'awo://app',
+      'https://app.awo-platform.com',
+      process.env.NODE_ENV === 'development' ? 'http://localhost:19006' : null
+    ].filter(Boolean);
+    
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Timestamp']
+};
+
+app.use(cors(corsOptions));
+
+// Rate limiting by endpoint type
+const createRateLimit = (windowMs: number, max: number) =&gt; 
+  rateLimit({
+    windowMs,
+    max,
+    message: { error: 'Too many requests, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) =&gt; {
+      // Rate limit by user ID if authenticated, otherwise by IP
+      return req.user?.id || req.ip;
+    }
+  });
+
+// Different rate limits for different endpoints
+app.use('/auth/login', createRateLimit(15 * 60 * 1000, 5)); // 5 per 15min
+app.use('/auth/register', createRateLimit(60 * 60 * 1000, 3)); // 3 per hour
+app.use('/api/financial', createRateLimit(60 * 1000, 100)); // 100 per minute
+app.use('/api/chama', createRateLimit(60 * 1000, 200)); // 200 per minute
+app.use('/api/', createRateLimit(60 * 1000, 1000)); // 1000 per minute general
+```
+
+### Authentication and Authorization
+
+**JWT Implementation with Security Controls:**
+```javascript
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import { promisify } from 'util';
+
+interface JWTPayload {
+  userId: string;
+  email: string;
+  role: 'user' | 'admin' | 'coach';
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  iat: number;
+  exp: number;
+  jti: string; // JWT ID for token revocation
+}
+
+class AWOAuthService {
+  private static JWT_SECRET = process.env.JWT_SECRET!;
+  private static JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!;
+  private static ACCESS_TOKEN_EXPIRY = '15m';
+  private static REFRESH_TOKEN_EXPIRY = '30d';
+  
+  static async generateTokens(user: User): Promise&lt;{
+    accessToken: string;
+    refreshToken: string;
+  }&gt; {
+    const payload: Omit&lt;JWTPayload, 'iat' | 'exp' | 'jti'&gt; = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      tier: user.divaProfile?.tier || 'bronze'
+    };
+    
+    const jti = await this.generateJTI();
+    
+    const accessToken = jwt.sign(
+      { ...payload, jti },
+      this.JWT_SECRET,
+      { 
+        expiresIn: this.ACCESS_TOKEN_EXPIRY,
+        issuer: 'awo-platform',
+        audience: 'awo-mobile-app'
+      }
+    );
+    
+    const refreshToken = jwt.sign(
+      { userId: user.id, jti },
+      this.JWT_REFRESH_SECRET,
+      { 
+        expiresIn: this.REFRESH_TOKEN_EXPIRY,
+        issuer: 'awo-platform',
+        audience: 'awo-mobile-app'
+      }
+    );
+    
+    // Store refresh token hash in database for revocation
+    await this.storeRefreshToken(user.id, jti, refreshToken);
+    
+    return { accessToken, refreshToken };
+  }
+  
+  static async verifyAccessToken(token: string): Promise&lt;JWTPayload&gt; {
+    try {
+      const payload = jwt.verify(token, this.JWT_SECRET, {
+        issuer: 'awo-platform',
+        audience: 'awo-mobile-app'
+      }) as JWTPayload;
+      
+      // Check if token is revoked
+      const isRevoked = await this.isTokenRevoked(payload.jti);
+      if (isRevoked) {
+        throw new Error('Token has been revoked');
+      }
+      
+      return payload;
+      
+    } catch (error) {
+      throw new AuthenticationError('Invalid or expired token');
+    }
+  }
+  
+  private static async generateJTI(): Promise&lt;string&gt; {
+    const crypto = await import('crypto');
+    return crypto.randomBytes(16).toString('hex');
+  }
+  
+  private static async storeRefreshToken(
+    userId: string, 
+    jti: string, 
+    token: string
+  ): Promise&lt;void&gt; {
+    const hashedToken = await bcrypt.hash(token, 12);
+    await db.refreshToken.create({
+      data: {
+        id: jti,
+        userId,
+        tokenHash: hashedToken,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+      }
+    });
+  }
+  
+  static async revokeToken(jti: string): Promise&lt;void&gt; {
+    await db.refreshToken.update({
+      where: { id: jti },
+      data: { revokedAt: new Date() }
+    });
+  }
+}
+
+// Authentication middleware
+export const authenticateToken = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise&lt;void&gt; =&gt; {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') 
+      ? authHeader.slice(7) 
+      : null;
+      
+    if (!token) {
+      return res.status(401).json({ error: 'Access token required' });
+    }
+    
+    const payload = await AWOAuthService.verifyAccessToken(token);
+    
+    // Attach user info to request
+    req.user = {
+      id: payload.userId,
+      email: payload.email,
+      role: payload.role,
+      tier: payload.tier
+    };
+    
+    next();
+    
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid authentication token' });
+  }
+};
+
+// Role-based authorization middleware
+export const requireRole = (...roles: string[]) =&gt; {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) =&gt; {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    next();
+  };
+};
+
+// Tier-based authorization for investment features
+export const requireTier = (...tiers: string[]) =&gt; {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) =&gt; {
+    if (!req.user || !tiers.includes(req.user.tier)) {
+      return res.status(403).json({ 
+        error: 'Investment tier requirement not met',
+        requiredTiers: tiers,
+        currentTier: req.user.tier
+      });
+    }
+    next();
+  };
+};
+```
+
+### Input Validation and Sanitization
+
+**Comprehensive Input Validation:**
+```javascript
+import { body, param, query, validationResult } from 'express-validator';
+import DOMPurify from 'isomorphic-dompurify';
+import { z } from 'zod';
+
+// Custom validation middleware
+export const validate = (validations: any[]) =&gt; {
+  return async (req: Request, res: Response, next: NextFunction) =&gt; {
+    // Run all validations
+    await Promise.all(validations.map(validation =&gt; validation.run(req)));
+    
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+    
+    next();
+  };
+};
+
+// Financial data validation rules
+export const validateFinancialAmount = [
+  body('amount')
+    .isFloat({ min: 0.01, max: 1000000 })
+    .withMessage('Amount must be between 0.01 and 1,000,000')
+    .custom((value, { req }) =&gt; {
+      // Currency-specific validation
+      const currency = req.body.currency;
+      const limits = {
+        ZAR: { min: 1, max: 1000000 },
+        BWP: { min: 1, max: 100000 },
+        NAD: { min: 1, max: 1000000 },
+        ZMW: { min: 10, max: 10000000 }
+      };
+      
+      const limit = limits[currency];
+      if (!limit || value &lt; limit.min || value &gt; limit.max) {
+        throw new Error(`Amount outside allowed range for ${currency}`);
+      }
+      
+      return true;
+    }),
+    
+  body('currency')
+    .isIn(['ZAR', 'BWP', 'NAD', 'ZMW'])
+    .withMessage('Invalid currency code'),
+    
+  body('description')
+    .optional()
+    .isLength({ max: 255 })
+    .customSanitizer(DOMPurify.sanitize)
+    .matches(/^[a-zA-Z0-9\s\-\.]+$/)
+    .withMessage('Description contains invalid characters')
+];
+
+// User input validation for POPIA compliance
+export const validateUserProfile = [
+  body('firstName')
+    .isLength({ min: 2, max: 50 })
+    .matches(/^[a-zA-Z\s]+$/)
+    .withMessage('First name must contain only letters and spaces'),
+    
+  body('lastName')
+    .isLength({ min: 2, max: 50 })
+    .matches(/^[a-zA-Z\s]+$/)
+    .withMessage('Last name must contain only letters and spaces'),
+    
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .custom(async (email) =&gt; {
+      const user = await db.user.findUnique({ where: { email } });
+      if (user) {
+        throw new Error('Email already in use');
+      }
+      return true;
+    }),
+    
+  body('phoneNumber')
+    .isMobilePhone('any', { strictMode: false })
+    .customSanitizer((value) =&gt; {
+      // Normalize phone number format for SADC region
+      return value.replace(/\D/g, '');
+    }),
+    
+  body('identityNumber')
+    .isLength({ min: 10, max: 15 })
+    .matches(/^[a-zA-Z0-9]+$/)
+    .withMessage('Identity number format invalid'),
+    
+  body('dateOfBirth')
+    .isISO8601()
+    .custom((value) =&gt; {
+      const age = new Date().getFullYear() - new Date(value).getFullYear();
+      if (age &lt; 16 || age &gt; 120) {
+        throw new Error('Age must be between 16 and 120');
+      }
+      return true;
+    })
+];
+
+// Chama validation
+export const validateChamaCreation = [
+  body('name')
+    .isLength({ min: 3, max: 100 })
+    .customSanitizer(DOMPurify.sanitize)
+    .matches(/^[a-zA-Z0-9\s\-\.]+$/)
+    .withMessage('Chama name contains invalid characters'),
+    
+  body('description')
+    .optional()
+    .isLength({ max: 500 })
+    .customSanitizer(DOMPurify.sanitize),
+    
+  body('contributionAmount')
+    .isFloat({ min: 10, max: 50000 })
+    .withMessage('Contribution amount must be between 10 and 50,000'),
+    
+  body('contributionFrequency')
+    .isIn(['weekly', 'monthly', 'quarterly'])
+    .withMessage('Invalid contribution frequency'),
+    
+  body('memberLimit')
+    .isInt({ min: 3, max: 50 })
+    .withMessage('Member limit must be between 3 and 50'),
+    
+  body('rules')
+    .optional()
+    .isLength({ max: 2000 })
+    .customSanitizer(DOMPurify.sanitize)
+];
+
+// SQL injection prevention
+export const sanitizeQuery = (req: Request, res: Response, next: NextFunction) =&gt; {
+  // Sanitize query parameters
+  for (const key in req.query) {
+    if (typeof req.query[key] === 'string') {
+      req.query[key] = DOMPurify.sanitize(req.query[key] as string);
+    }
+  }
+  
+  // Sanitize route parameters  
+  for (const key in req.params) {
+    req.params[key] = DOMPurify.sanitize(req.params[key]);
+  }
+  
+  next();
+};
+```
+
+## Database Security Guidelines
+
+### Query Security and ORM Usage
+
+**Secure Database Operations with Prisma:**
+```javascript
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient({
+  log: ['query', 'info', 'warn', 'error'],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL
+    }
+  }
+});
+
+// Secure user operations with input validation
+class SecureUserService {
+  static async createUser(userData: CreateUserData): Promise&lt;User&gt; {
+    try {
+      // Validate input using Zod schema
+      const validatedData = CreateUserSchema.parse(userData);
+      
+      // Hash password with high cost factor
+      const hashedPassword = await bcrypt.hash(validatedData.password, 14);
+      
+      // Create user with transaction for atomicity
+      const user = await prisma.$transaction(async (tx) =&gt; {
+        const newUser = await tx.user.create({
+          data: {
+            ...validatedData,
+            password: hashedPassword,
+            createdAt: new Date(),
+            lastLoginAt: null,
+            failedLoginAttempts: 0,
+            accountLocked: false
+          },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phoneNumber: true,
+            createdAt: true,
+            // Never select password or sensitive fields
+          }
+        });
+        
+        // Create audit log entry
+        await tx.auditLog.create({
+          data: {
+            userId: newUser.id,
+            action: 'USER_CREATED',
+            resource: 'user',
+            resourceId: newUser.id,
+            metadata: {
+              registrationSource: 'mobile_app',
+              ipAddress: userData.ipAddress
+            }
+          }
+        });
+        
+        return newUser;
+      });
+      
+      return user;
+      
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        throw new ValidationError('Invalid user data', error.errors);
+      }
+      throw error;
+    }
+  }
+  
+  static async findUserForLogin(email: string): Promise&lt;User | null&gt; {
+    // Use parameterized query to prevent SQL injection
+    return await prisma.user.findUnique({
+      where: { 
+        email: email.toLowerCase().trim(),
+        // Only allow non-deleted, non-locked accounts
+        deletedAt: null,
+        accountLocked: false
+      },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        failedLoginAttempts: true,
+        lastLoginAt: true,
+        divaProfile: {
+          select: {
+            tier: true,
+            score: true,
+            lastUpdated: true
+          }
+        }
+      }
+    });
+  }
+  
+  // Secure financial data retrieval with user authorization
+  static async getUserFinancialSummary(
+    userId: string, 
+    requestingUserId: string
+  ): Promise&lt;FinancialSummary&gt; {
+    // Ensure user can only access their own data
+    if (userId !== requestingUserId) {
+      throw new AuthorizationError('Cannot access other user financial data');
+    }
+    
+    return await prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        id: true,
+        wallet: {
+          select: {
+            balance: true,
+            currency: true,
+            lastTransactionAt: true
+          }
+        },
+        divaProfile: {
+          select: {
+            score: true,
+            tier: true,
+            components: true,
+            lastUpdated: true,
+            nextUpdateDue: true
+          }
+        },
+        investments: {
+          select: {
+            totalValue: true,
+            totalInvested: true,
+            totalReturns: true,
+            portfolioType: true
+          }
+        },
+        chamas: {
+          select: {
+            id: true,
+            name: true,
+            memberRole: true,
+            totalContributed: true,
+            nextContributionDue: true
+          }
+        }
+      }
+    });
+  }
+}
+```
+
+### Data Encryption Implementation
+
+**Field-Level Encryption for Sensitive Data:**
+```javascript
+import crypto from 'crypto';
+
+class DataEncryption {
+  private static ALGORITHM = 'aes-256-gcm';
+  private static KEY_LENGTH = 32;
+  private static IV_LENGTH = 16;
+  private static TAG_LENGTH = 16;
+  
+  private static getEncryptionKey(): Buffer {
+    const key = process.env.DATA_ENCRYPTION_KEY;
+    if (!key) {
+      throw new Error('DATA_ENCRYPTION_KEY environment variable not set');
+    }
+    return Buffer.from(key, 'hex');
+  }
+  
+  static encrypt(plaintext: string): string {
+    try {
+      const key = this.getEncryptionKey();
+      const iv = crypto.randomBytes(this.IV_LENGTH);
+      
+      const cipher = crypto.createCipher(this.ALGORITHM, key);
+      cipher.setAAD(Buffer.from('awo-platform', 'utf8'));
+      
+      let encrypted = cipher.update(plaintext, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      
+      const tag = cipher.getAuthTag();
+      
+      // Combine IV + tag + encrypted data
+      return iv.toString('hex') + tag.toString('hex') + encrypted;
+      
+    } catch (error) {
+      throw new Error(`Encryption failed: ${error.message}`);
+    }
+  }
+  
+  static decrypt(encryptedData: string): string {
+    try {
+      const key = this.getEncryptionKey();
+      
+      // Extract IV, tag, and encrypted data
+      const iv = Buffer.from(encryptedData.slice(0, this.IV_LENGTH * 2), 'hex');
+      const tag = Buffer.from(
+        encryptedData.slice(this.IV_LENGTH * 2, (this.IV_LENGTH + this.TAG_LENGTH) * 2), 
+        'hex'
+      );
+      const encrypted = encryptedData.slice((this.IV_LENGTH + this.TAG_LENGTH) * 2);
+      
+      const decipher = crypto.createDecipher(this.ALGORITHM, key);
+      decipher.setAAD(Buffer.from('awo-platform', 'utf8'));
+      decipher.setAuthTag(tag);
+      
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      
+      return decrypted;
+      
+    } catch (error) {
+      throw new Error(`Decryption failed: ${error.message}`);
+    }
+  }
+}
+
+// Prisma middleware for automatic encryption/decryption
+prisma.$use(async (params, next) =&gt; {
+  const encryptedFields = {
+    user: ['identityNumber', 'bankAccount'],
+    transaction: ['accountNumber'],
+    kycDocument: ['documentData']
+  };
+  
+  const modelFields = encryptedFields[params.model];
+  if (!modelFields) {
+    return next(params);
+  }
+  
+  // Encrypt on create/update
+  if (params.action === 'create' || params.action === 'update') {
+    for (const field of modelFields) {
+      if (params.args.data[field]) {
+        params.args.data[field] = DataEncryption.encrypt(params.args.data[field]);
+      }
+    }
+  }
+  
+  const result = await next(params);
+  
+  // Decrypt on read operations
+  if (params.action === 'findUnique' || params.action === 'findMany' || params.action === 'findFirst') {
+    const decryptRecord = (record: any) =&gt; {
+      for (const field of modelFields) {
+        if (record[field]) {
+          try {
+            record[field] = DataEncryption.decrypt(record[field]);
+          } catch (error) {
+            console.error(`Failed to decrypt ${field}:`, error);
+            record[field] = null;
+          }
+        }
+      }
+      return record;
+    };
+    
+    if (Array.isArray(result)) {
+      return result.map(decryptRecord);
+    } else if (result) {
+      return decryptRecord(result);
+    }
+  }
+  
+  return result;
+});
+```
+
+## Security Testing Guidelines
+
+### Automated Security Testing
+
+**Security Test Implementation:**
+```javascript
+// Jest security test suite
+describe('AWO Security Tests', () =&gt; {
+  describe('Input Validation', () =&gt; {
+    test('should reject malicious SQL injection attempts', async () =&gt; {
+      const maliciousInputs = [
+        "'; DROP TABLE users; --",
+        "1' OR '1'='1",
+        "' UNION SELECT * FROM users --"
+      ];
+      
+      for (const input of maliciousInputs) {
+        const response = await request(app)
+          .post('/api/users/search')
+          .send({ query: input })
+          .expect(400);
+          
+        expect(response.body.error).toContain('Validation failed');
+      }
+    });
+    
+    test('should sanitize XSS attempts', async () =&gt; {
+      const xssPayloads = [
+        '&lt;script&gt;alert("xss")&lt;/script&gt;',
+        '&lt;img src=x onerror=alert("xss")&gt;',
+        'javascript:alert("xss")'
+      ];
+      
+      for (const payload of xssPayloads) {
+        const response = await request(app)
+          .post('/api/chamas')
+          .set('Authorization', `Bearer ${validToken}`)
+          .send({ name: payload })
+          .expect(400);
+          
+        expect(response.body.error).toContain('invalid characters');
+      }
+    });
+    
+    test('should validate financial amounts properly', async () =&gt; {
+      const invalidAmounts = [-100, 0, 1000001, NaN, 'invalid'];
+      
+      for (const amount of invalidAmounts) {
+        const response = await request(app)
+          .post('/api/transactions')
+          .set('Authorization', `Bearer ${validToken}`)
+          .send({ 
+            amount, 
+            currency: 'ZAR',
+            type: 'deposit'
+          })
+          .expect(400);
+          
+        expect(response.body.error).toContain('amount');
+      }
+    });
+  });
+  
+  describe('Authentication Security', () =&gt; {
+    test('should reject expired tokens', async () =&gt; {
+      const expiredToken = jwt.sign(
+        { userId: 'test-user' },
+        process.env.JWT_SECRET,
+        { expiresIn: '-1h' }
+      );
+      
+      const response = await request(app)
+        .get('/api/profile')
+        .set('Authorization', `Bearer ${expiredToken}`)
+        .expect(401);
+        
+      expect(response.body.error).toContain('expired');
+    });
+    
+    test('should enforce rate limiting on login attempts', async () =&gt; {
+      const promises = Array(10).fill(null).map(() =&gt;
+        request(app)
+          .post('/auth/login')
+          .send({ email: 'test@example.com', password: 'wrong' })
+      );
+      
+      const responses = await Promise.all(promises);
+      const lastResponse = responses[responses.length - 1];
+      
+      expect(lastResponse.status).toBe(429);
+      expect(lastResponse.body.error).toContain('Too many requests');
+    });
+    
+    test('should require strong passwords', async () =&gt; {
+      const weakPasswords = ['123456', 'password', 'qwerty', 'abc123'];
+      
+      for (const password of weakPasswords) {
+        const response = await request(app)
+          .post('/auth/register')
+          .send({
+            email: 'test@example.com',
+            password,
+            firstName: 'Test',
+            lastName: 'User'
+          })
+          .expect(400);
+          
+        expect(response.body.error).toContain('password');
+      }
+    });
+  });
+  
+  describe('Authorization Checks', () =&gt; {
+    test('should prevent access to other users data', async () =&gt; {
+      const user1Token = await generateTestToken('user1');
+      const user2Token = await generateTestToken('user2');
+      
+      // Try to access user2's data with user1's token
+      const response = await request(app)
+        .get('/api/users/user2/financial-summary')
+        .set('Authorization', `Bearer ${user1Token}`)
+        .expect(403);
+        
+      expect(response.body.error).toContain('Cannot access other user');
+    });
+    
+    test('should enforce tier-based investment restrictions', async () =&gt; {
+      const bronzeUserToken = await generateTestToken('bronze-user', 'bronze');
+      
+      // Try to access platinum-only SME investments
+      const response = await request(app)
+        .get('/api/investments/sme/premium')
+        .set('Authorization', `Bearer ${bronzeUserToken}`)
+        .expect(403);
+        
+      expect(response.body.error).toContain('tier requirement not met');
+    });
+  });
+  
+  describe('Data Encryption', () =&gt; {
+    test('should encrypt sensitive data in database', async () =&gt; {
+      const testUser = await createTestUser({
+        identityNumber: '1234567890123'
+      });
+      
+      // Check that data is encrypted in database
+      const rawUser = await prisma.$queryRaw`
+        SELECT identity_number FROM users WHERE id = ${testUser.id}
+      `;
+      
+      expect(rawUser[0].identity_number).not.toBe('1234567890123');
+      expect(rawUser[0].identity_number).toMatch(/^[a-f0-9]+$/); // Hex string
+    });
+    
+    test('should decrypt data when retrieved through service', async () =&gt; {
+      const testUser = await createTestUser({
+        identityNumber: '1234567890123'
+      });
+      
+      const user = await SecureUserService.findById(testUser.id);
+      expect(user.identityNumber).toBe('1234567890123');
+    });
+  });
+});
+```
+
+---
+
+**Key Security Guidelines Summary:**
+
+<CardGroup cols={2}>
+  <Card title="Mobile Security Priorities" icon="mobile">
+    **Secure storage, biometric auth, certificate pinning, input validation**
+    - Use SecureStore for sensitive data
+    - Implement biometric authentication
+    - Validate all user inputs
+    - Secure deep link handling
+  </Card>
+  <Card title="Backend Security Priorities" icon="server">
+    **Authentication, authorization, input validation, data encryption**
+    - JWT with refresh tokens
+    - Role and tier-based access control
+    - Comprehensive input validation
+    - Field-level data encryption
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Database Security Priorities" icon="database">
+    **Encryption, parameterized queries, access control, audit logging**
+    - Encrypt sensitive fields
+    - Use ORM for query safety
+    - Implement audit trails
+    - Principle of least privilege
+  </Card>
+  <Card title="Testing Security Priorities" icon="test-tube">
+    **Automated security tests, penetration testing, code analysis**
+    - Security-focused unit tests
+    - Input validation testing
+    - Authentication/authorization tests
+    - Automated vulnerability scanning
+  </Card>
+</CardGroup>
+
+*This development guidelines document provides the foundation for secure development practices at AWO Platform. All developers must follow these guidelines and receive security training before contributing to the codebase.*

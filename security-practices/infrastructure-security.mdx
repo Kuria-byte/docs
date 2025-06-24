@@ -1,41 +1,1474 @@
----
-title: "Infrastructure Security"
-description: "AWO Platform infrastructure security security documentation"
----
+# Infrastructure Security - Security Best Practices
 
-# Infrastructure Security
+This guide outlines comprehensive infrastructure security measures for AWO Platform, covering cloud security, network protection, deployment security, and monitoring systems across our technology stack.
 
-## Overview
+## Cloud Infrastructure Security
 
 <Info>
-This section covers infrastructure security for the AWO Platform financial services.
+AWO Platform operates across multiple cloud providers with a focus on the SADC region. Our infrastructure security strategy emphasizes defense in depth, automated security controls, and compliance with financial services regulations.
 </Info>
 
-## Security Measures
+### Multi-Cloud Security Architecture
 
-Security implementation details will be documented here.
-
-## Compliance
+**Primary Infrastructure Components:**
 
 <CardGroup cols={2}>
-  <Card title="GDPR Compliance" icon="shield">
-    European data protection compliance
+  <Card title="Application Hosting" icon="server">
+    **Railway/Render for Backend Services**
+    - Containerized Express.js applications
+    - Auto-scaling based on demand
+    - Integrated CI/CD pipelines
+    - Built-in DDoS protection
   </Card>
-  <Card title="POPIA Compliance" icon="lock">
-    South African data protection compliance
+  <Card title="Database Infrastructure" icon="database">
+    **Neon PostgreSQL with Global Edge**
+    - Serverless auto-scaling database
+    - Automatic backups and point-in-time recovery
+    - Global edge locations for SADC region
+    - Built-in connection pooling
   </Card>
 </CardGroup>
 
-## Best Practices
+<CardGroup cols={2}>
+  <Card title="Content Delivery" icon="globe">
+    **Cloudflare CDN and Security**
+    - Global CDN with African edge locations
+    - Web Application Firewall (WAF)
+    - DDoS protection and rate limiting
+    - SSL/TLS termination
+  </Card>
+  <Card title="Mobile Services" icon="mobile">
+    **Expo Application Services (EAS)**
+    - Secure mobile app builds and distribution
+    - Over-the-air (OTA) updates
+    - Push notification services
+    - Analytics and crash reporting
+  </Card>
+</CardGroup>
 
-Security best practices will be provided here.
+### Environment Segregation Strategy
 
-## Incident Response
+**Production Environment Security:**
+```yaml
+# Infrastructure as Code (Terraform) for Production
+resource "railway_project" "awo_production" {
+  name = "awo-platform-prod"
+  
+  # Environment variables with secrets management
+  environment_variables = {
+    NODE_ENV = "production"
+    DATABASE_URL = var.production_database_url
+    JWT_SECRET = var.jwt_secret_production
+    DATA_ENCRYPTION_KEY = var.encryption_key_production
+    
+    # Security headers
+    HELMET_ENABLED = "true"
+    HTTPS_ONLY = "true"
+    SECURE_COOKIES = "true"
+    
+    # Rate limiting
+    RATE_LIMIT_ENABLED = "true"
+    RATE_LIMIT_WINDOW_MS = "900000"  # 15 minutes
+    RATE_LIMIT_MAX_REQUESTS = "100"
+    
+    # Monitoring
+    SENTRY_DSN = var.sentry_dsn_production
+    LOG_LEVEL = "warn"
+    AUDIT_LOGGING = "true"
+  }
+  
+  # Network security
+  network_security = {
+    allowed_ips = var.production_allowed_ips
+    firewall_enabled = true
+    ddos_protection = true
+  }
+  
+  # Backup configuration
+  backup_policy = {
+    automated_backups = true
+    backup_retention_days = 30
+    point_in_time_recovery = true
+  }
+}
 
-Security incident procedures will be documented here.
+# Staging environment with similar security but separate credentials
+resource "railway_project" "awo_staging" {
+  name = "awo-platform-staging"
+  
+  environment_variables = {
+    NODE_ENV = "staging"
+    DATABASE_URL = var.staging_database_url
+    JWT_SECRET = var.jwt_secret_staging
+    # ... staging-specific configurations
+  }
+}
 
-## Related Security Topics
+# Development environment with relaxed security for testing
+resource "railway_project" "awo_development" {
+  name = "awo-platform-dev"
+  
+  environment_variables = {
+    NODE_ENV = "development"
+    DATABASE_URL = var.development_database_url
+    # ... development configurations
+  }
+}
+```
 
-<Card title="Security Overview" href="/security/overview">
-  Complete security documentation
-</Card>
+**Neon Database Security Configuration:**
+```javascript
+// Database security configuration
+const productionDatabaseConfig = {
+  // Connection security
+  ssl: {
+    rejectUnauthorized: true,
+    ca: process.env.DATABASE_CA_CERT,
+    cert: process.env.DATABASE_CLIENT_CERT,
+    key: process.env.DATABASE_CLIENT_KEY
+  },
+  
+  // Connection pooling for security and performance
+  pool: {
+    min: 5,
+    max: 20,
+    acquireTimeoutMillis: 60000,
+    createTimeoutMillis: 30000,
+    destroyTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
+    reapIntervalMillis: 1000,
+    createRetryIntervalMillis: 200
+  },
+  
+  // Query timeout to prevent long-running queries
+  statement_timeout: 30000,
+  
+  // Enable audit logging
+  log_statement: 'all',
+  log_min_duration_statement: 100,
+  
+  // Security settings
+  shared_preload_libraries: 'pg_stat_statements,auto_explain',
+  log_line_prefix: '%m [%p] %q%u@%d ',
+  log_checkpoints: 'on',
+  log_connections: 'on',
+  log_disconnections: 'on'
+};
+
+// Prisma client with security configurations
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL
+    }
+  },
+  
+  // Enable query logging in production for security monitoring
+  log: [
+    { level: 'query', emit: 'event' },
+    { level: 'error', emit: 'event' },
+    { level: 'warn', emit: 'event' }
+  ],
+  
+  // Error formatting to prevent information disclosure
+  errorFormat: process.env.NODE_ENV === 'production' ? 'minimal' : 'pretty'
+});
+
+// Security event logging
+prisma.$on('query', (e) => {
+  // Log slow queries for security monitoring
+  if (e.duration > 2000) {
+    logger.warn('Slow query detected', {
+      query: e.query,
+      duration: e.duration,
+      params: '[REDACTED]' // Never log parameters in production
+    });
+  }
+});
+```
+
+### Network Security Implementation
+
+**Cloudflare Security Configuration:**
+```javascript
+// Cloudflare security rules via API
+const cloudflareSecurityRules = {
+  // WAF rules for AWO Platform
+  wafRules: [
+    {
+      name: "Block SQL Injection Attempts",
+      expression: '(http.request.uri.query contains "union select") or (http.request.uri.query contains "drop table")',
+      action: "block"
+    },
+    {
+      name: "Block XSS Attempts", 
+      expression: '(http.request.uri.query contains "&lt;script") or (http.request.body contains "&lt;script")',
+      action: "block"
+    },
+    {
+      name: "Rate Limit API Endpoints",
+      expression: '(http.request.uri.path eq "/api/auth/login")',
+      action: "challenge",
+      rateLimit: {
+        threshold: 5,
+        period: 900 // 15 minutes
+      }
+    },
+    {
+      name: "Geographic Restrictions",
+      expression: 'not (ip.geoip.country in {"ZA" "BW" "NA" "ZM" "MW" "MZ" "SZ" "LS"})',
+      action: "challenge" // Challenge non-SADC traffic
+    },
+    {
+      name: "Known Bot Protection",
+      expression: '(cf.threat_score gt 30)',
+      action: "block"
+    }
+  ],
+  
+  // SSL/TLS settings
+  sslSettings: {
+    ssl: "full_strict", // Strict SSL between Cloudflare and origin
+    minTlsVersion: "1.2",
+    tls13: "on",
+    ciphers: [
+      "ECDHE-ECDSA-AES128-GCM-SHA256",
+      "ECDHE-ECDSA-AES256-GCM-SHA384",
+      "ECDHE-RSA-AES128-GCM-SHA256",
+      "ECDHE-RSA-AES256-GCM-SHA384"
+    ],
+    hsts: {
+      enabled: true,
+      maxAge: 31536000, // 1 year
+      includeSubdomains: true,
+      preload: true
+    }
+  },
+  
+  // Security headers
+  securityHeaders: {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "1; mode=block",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.awo-platform.com; font-src 'self'"
+  },
+  
+  // DDoS protection
+  ddosProtection: {
+    enabled: true,
+    sensitivityLevel: "medium",
+    httpDdosAttackProtection: true,
+    rateLimit: {
+      threshold: 1000,
+      period: 60
+    }
+  }
+};
+```
+
+**Network Access Control:**
+```bash
+#!/bin/bash
+# Network security configuration script
+
+# Configure firewall rules for Railway/Render deployment
+echo "Configuring network security rules..."
+
+# Allow only necessary ports
+ufw --force reset
+ufw default deny incoming
+ufw default allow outgoing
+
+# Allow SSH (only from specific IPs)
+ufw allow from 197.189.0.0/16 to any port 22  # Example SA IP range
+ufw allow from 168.167.0.0/16 to any port 22  # Example BW IP range
+
+# Allow HTTP/HTTPS
+ufw allow 80/tcp
+ufw allow 443/tcp
+
+# Allow application port (with rate limiting)
+ufw limit 3000/tcp
+
+# Database access (only from application servers)
+ufw allow from 10.0.0.0/8 to any port 5432
+
+# Enable firewall
+ufw --force enable
+
+echo "Firewall configured successfully"
+
+# Configure fail2ban for intrusion detection
+cat > /etc/fail2ban/jail.local << EOF
+[DEFAULT]
+bantime = 3600
+findtime = 600
+maxretry = 3
+backend = systemd
+
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+bantime = 3600
+
+[nginx-http-auth]
+enabled = true
+filter = nginx-http-auth
+port = http,https
+logpath = /var/log/nginx/error.log
+maxretry = 3
+bantime = 1800
+
+[awo-api-auth]
+enabled = true
+filter = awo-api-auth
+port = 3000
+logpath = /var/log/awo/security.log
+maxretry = 5
+bantime = 1800
+EOF
+
+# Custom fail2ban filter for AWO API
+cat > /etc/fail2ban/filter.d/awo-api-auth.conf << EOF
+[Definition]
+failregex = ^.*"level":"warn".*"message":"Authentication failed".*"ip":"<HOST>".*$
+ignoreregex =
+EOF
+
+systemctl restart fail2ban
+echo "Intrusion detection configured"
+```
+
+## Secrets Management
+
+### Environment Variable Security
+
+**Secure Secrets Management Strategy:**
+```javascript
+// Secrets management utility for AWO Platform
+class AWOSecretsManager {
+  private static secrets: Map<string, string> = new Map();
+  private static initialized = false;
+  
+  static async initialize(): Promise<void> {
+    if (this.initialized) return;
+    
+    try {
+      // Load secrets based on environment
+      if (process.env.NODE_ENV === 'production') {
+        await this.loadProductionSecrets();
+      } else if (process.env.NODE_ENV === 'staging') {
+        await this.loadStagingSecrets();
+      } else {
+        await this.loadDevelopmentSecrets();
+      }
+      
+      this.initialized = true;
+      console.log('Secrets manager initialized successfully');
+      
+    } catch (error) {
+      console.error('Failed to initialize secrets manager:', error);
+      process.exit(1);
+    }
+  }
+  
+  private static async loadProductionSecrets(): Promise<void> {
+    // In production, secrets come from environment variables
+    // set by the hosting platform (Railway/Render)
+    const requiredSecrets = [
+      'DATABASE_URL',
+      'JWT_SECRET', 
+      'JWT_REFRESH_SECRET',
+      'DATA_ENCRYPTION_KEY',
+      'STITCH_CLIENT_ID',
+      'STITCH_CLIENT_SECRET',
+      'FLUTTERWAVE_PUBLIC_KEY',
+      'FLUTTERWAVE_SECRET_KEY',
+      'SMILE_ID_PARTNER_ID',
+      'SMILE_ID_API_KEY',
+      'TWILIO_ACCOUNT_SID',
+      'TWILIO_AUTH_TOKEN',
+      'SENDGRID_API_KEY',
+      'SENTRY_DSN'
+    ];
+    
+    for (const secret of requiredSecrets) {
+      const value = process.env[secret];
+      if (!value) {
+        throw new Error(`Required secret ${secret} not found in environment`);
+      }
+      this.secrets.set(secret, value);
+    }
+    
+    // Validate secret formats
+    this.validateSecrets();
+  }
+  
+  private static validateSecrets(): void {
+    // Validate JWT secrets have sufficient entropy
+    const jwtSecret = this.secrets.get('JWT_SECRET');
+    if (jwtSecret && jwtSecret.length < 32) {
+      throw new Error('JWT_SECRET must be at least 32 characters long');
+    }
+    
+    // Validate encryption key format
+    const encryptionKey = this.secrets.get('DATA_ENCRYPTION_KEY');
+    if (encryptionKey && !this.isValidHexString(encryptionKey, 64)) {
+      throw new Error('DATA_ENCRYPTION_KEY must be a 64-character hex string');
+    }
+    
+    // Validate database URL format
+    const dbUrl = this.secrets.get('DATABASE_URL');
+    if (dbUrl && !dbUrl.startsWith('postgresql://')) {
+      throw new Error('DATABASE_URL must be a valid PostgreSQL connection string');
+    }
+  }
+  
+  private static isValidHexString(str: string, length: number): boolean {
+    return /^[a-f0-9]+$/i.test(str) && str.length === length;
+  }
+  
+  static getSecret(key: string): string {
+    if (!this.initialized) {
+      throw new Error('Secrets manager not initialized');
+    }
+    
+    const secret = this.secrets.get(key);
+    if (!secret) {
+      throw new Error(`Secret ${key} not found`);
+    }
+    
+    return secret;
+  }
+  
+  // Secure method to check if secret exists without exposing value
+  static hasSecret(key: string): boolean {
+    return this.secrets.has(key);
+  }
+  
+  // Generate secure random secrets for development
+  private static generateSecureSecret(length: number = 32): string {
+    const crypto = require('crypto');
+    return crypto.randomBytes(length).toString('hex');
+  }
+}
+
+// Initialize secrets manager on application startup
+AWOSecretsManager.initialize();
+```
+
+**Development Environment Setup:**
+```bash
+#!/bin/bash
+# Development environment setup script
+
+# Create .env file with secure defaults for development
+cat > .env.development << EOF
+# AWO Platform Development Environment Configuration
+NODE_ENV=development
+
+# Database Configuration
+DATABASE_URL=postgresql://postgres:password@localhost:5432/awo_development
+
+# JWT Secrets (Generated for development)
+JWT_SECRET=$(openssl rand -hex 32)
+JWT_REFRESH_SECRET=$(openssl rand -hex 32)
+
+# Data Encryption Key (Generated for development)
+DATA_ENCRYPTION_KEY=$(openssl rand -hex 32)
+
+# Third-party Service Keys (Use sandbox/test keys)
+STITCH_CLIENT_ID=test_client_id
+STITCH_CLIENT_SECRET=test_client_secret
+STITCH_BASE_URL=https://api.sandbox.stitch.money
+
+FLUTTERWAVE_PUBLIC_KEY=FLWPUBK_TEST-your-public-key
+FLUTTERWAVE_SECRET_KEY=FLWSECK_TEST-your-secret-key
+FLUTTERWAVE_BASE_URL=https://api.flutterwave.com/v3
+
+SMILE_ID_PARTNER_ID=test_partner_id
+SMILE_ID_API_KEY=test_api_key
+SMILE_ID_BASE_URL=https://testapi.smileidentity.com
+
+# Communication Services (Test credentials)
+TWILIO_ACCOUNT_SID=test_account_sid
+TWILIO_AUTH_TOKEN=test_auth_token
+SENDGRID_API_KEY=test_sendgrid_key
+
+# Monitoring (Optional for development)
+SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
+
+# Security Settings
+HELMET_ENABLED=true
+HTTPS_ONLY=false
+SECURE_COOKIES=false
+RATE_LIMIT_ENABLED=false
+
+# Logging
+LOG_LEVEL=debug
+AUDIT_LOGGING=true
+EOF
+
+echo "Development environment configuration created"
+echo "⚠️  Remember to:"
+echo "   1. Never commit .env files to version control"
+echo "   2. Use test/sandbox credentials only"
+echo "   3. Rotate secrets regularly"
+echo "   4. Use different secrets for each environment"
+```
+
+### SSL/TLS Certificate Management
+
+**Automated Certificate Management:**
+```javascript
+// SSL certificate management for AWO Platform
+class SSLManager {
+  private static certificatePaths = {
+    production: {
+      cert: '/etc/ssl/certs/awo-platform.pem',
+      key: '/etc/ssl/private/awo-platform.key',
+      ca: '/etc/ssl/certs/ca-bundle.pem'
+    },
+    staging: {
+      cert: '/etc/ssl/certs/awo-staging.pem', 
+      key: '/etc/ssl/private/awo-staging.key',
+      ca: '/etc/ssl/certs/ca-bundle.pem'
+    }
+  };
+  
+  static getSSLOptions(): {
+    cert: string;
+    key: string;
+    ca: string;
+    secureOptions: number;
+    ciphers: string;
+  } | null {
+    const env = process.env.NODE_ENV as keyof typeof this.certificatePaths;
+    const paths = this.certificatePaths[env];
+    
+    if (!paths || !this.certificatesExist(paths)) {
+      console.warn('SSL certificates not found, running without HTTPS');
+      return null;
+    }
+    
+    return {
+      cert: fs.readFileSync(paths.cert, 'utf8'),
+      key: fs.readFileSync(paths.key, 'utf8'),
+      ca: fs.readFileSync(paths.ca, 'utf8'),
+      
+      // SSL security options
+      secureOptions: crypto.constants.SSL_OP_NO_SSLv2 | 
+                    crypto.constants.SSL_OP_NO_SSLv3 |
+                    crypto.constants.SSL_OP_NO_TLSv1 |
+                    crypto.constants.SSL_OP_NO_TLSv1_1,
+      
+      // Secure cipher suites only
+      ciphers: [
+        'ECDHE-ECDSA-AES128-GCM-SHA256',
+        'ECDHE-ECDSA-AES256-GCM-SHA384', 
+        'ECDHE-RSA-AES128-GCM-SHA256',
+        'ECDHE-RSA-AES256-GCM-SHA384',
+        'ECDHE-ECDSA-CHACHA20-POLY1305',
+        'ECDHE-RSA-CHACHA20-POLY1305'
+      ].join(':')
+    };
+  }
+  
+  private static certificatesExist(paths: any): boolean {
+    return fs.existsSync(paths.cert) && 
+           fs.existsSync(paths.key) && 
+           fs.existsSync(paths.ca);
+  }
+  
+  static async validateCertificate(): Promise<{
+    valid: boolean;
+    expiresAt: Date;
+    daysUntilExpiry: number;
+    issuer: string;
+  }> {
+    const sslOptions = this.getSSLOptions();
+    if (!sslOptions) {
+      throw new Error('No SSL certificate available');
+    }
+    
+    const cert = new crypto.X509Certificate(sslOptions.cert);
+    const expiresAt = new Date(cert.validTo);
+    const daysUntilExpiry = Math.ceil(
+      (expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    );
+    
+    return {
+      valid: daysUntilExpiry > 0,
+      expiresAt,
+      daysUntilExpiry,
+      issuer: cert.issuer
+    };
+  }
+  
+  // Certificate renewal monitoring
+  static startCertificateMonitoring(): void {
+    setInterval(async () => {
+      try {
+        const certInfo = await this.validateCertificate();
+        
+        if (certInfo.daysUntilExpiry <= 30) {
+          logger.warn('SSL certificate expiring soon', {
+            daysUntilExpiry: certInfo.daysUntilExpiry,
+            expiresAt: certInfo.expiresAt
+          });
+          
+          // Send alert to operations team
+          await this.sendCertificateAlert(certInfo);
+        }
+        
+      } catch (error) {
+        logger.error('Certificate validation failed', error);
+      }
+    }, 24 * 60 * 60 * 1000); // Check daily
+  }
+  
+  private static async sendCertificateAlert(certInfo: any): Promise<void> {
+    // Implementation would send alert via email/Slack/etc.
+    console.log('Certificate alert sent:', certInfo);
+  }
+}
+```
+
+## Monitoring and Logging Security
+
+### Security Information and Event Management (SIEM)
+
+**Security Monitoring Implementation:**
+```javascript
+// Security monitoring and alerting system
+class SecurityMonitor {
+  private static suspiciousEvents: Map<string, number> = new Map();
+  private static alertThresholds = {
+    failedLogins: 5,
+    suspiciousTransactions: 3,
+    unauthorizedAccess: 1,
+    dataExfiltration: 1,
+    sqlInjectionAttempts: 3
+  };
+  
+  static logSecurityEvent(event: SecurityEvent): void {
+    // Structure security event logging
+    const securityLog = {
+      timestamp: new Date().toISOString(),
+      eventType: event.type,
+      severity: event.severity,
+      userId: event.userId || 'anonymous',
+      ipAddress: event.ipAddress,
+      userAgent: event.userAgent,
+      resource: event.resource,
+      action: event.action,
+      result: event.result,
+      metadata: event.metadata,
+      requestId: event.requestId
+    };
+    
+    // Log to structured security log
+    logger.security('SECURITY_EVENT', securityLog);
+    
+    // Check for suspicious patterns
+    this.analyzeSecurityEvent(event);
+    
+    // Send to SIEM system if configured
+    if (process.env.SIEM_ENDPOINT) {
+      this.sendToSIEM(securityLog);
+    }
+  }
+  
+  private static analyzeSecurityEvent(event: SecurityEvent): void {
+    const key = `${event.type}:${event.ipAddress}`;
+    const currentCount = this.suspiciousEvents.get(key) || 0;
+    const newCount = currentCount + 1;
+    
+    this.suspiciousEvents.set(key, newCount);
+    
+    // Check thresholds
+    const threshold = this.alertThresholds[event.type as keyof typeof this.alertThresholds];
+    if (threshold && newCount >= threshold) {
+      this.triggerSecurityAlert(event, newCount);
+    }
+    
+    // Clean up old entries (prevent memory leak)
+    setTimeout(() => {
+      const count = this.suspiciousEvents.get(key) || 0;
+      if (count > 0) {
+        this.suspiciousEvents.set(key, count - 1);
+      }
+    }, 60 * 60 * 1000); // 1 hour sliding window
+  }
+  
+  private static triggerSecurityAlert(event: SecurityEvent, count: number): void {
+    const alert = {
+      alertId: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      severity: 'HIGH',
+      type: 'SUSPICIOUS_ACTIVITY_DETECTED',
+      description: `${event.type} threshold exceeded`,
+      details: {
+        eventType: event.type,
+        ipAddress: event.ipAddress,
+        occurrenceCount: count,
+        timeWindow: '1 hour',
+        userId: event.userId
+      },
+      automated_response: this.getAutomatedResponse(event.type)
+    };
+    
+    // Log high-priority alert
+    logger.alert('SECURITY_ALERT', alert);
+    
+    // Execute automated response
+    this.executeAutomatedResponse(event, alert);
+    
+    // Send notifications
+    this.sendSecurityNotifications(alert);
+  }
+  
+  private static getAutomatedResponse(eventType: string): string {
+    const responses = {
+      'failedLogins': 'temporary_ip_block',
+      'sqlInjectionAttempts': 'permanent_ip_block',
+      'unauthorizedAccess': 'account_lock',
+      'suspiciousTransactions': 'transaction_review_hold',
+      'dataExfiltration': 'immediate_investigation'
+    };
+    
+    return responses[eventType as keyof typeof responses] || 'monitor';
+  }
+  
+  private static async executeAutomatedResponse(
+    event: SecurityEvent, 
+    alert: any
+  ): Promise<void> {
+    switch (alert.automated_response) {
+      case 'temporary_ip_block':
+        await this.blockIPTemporarily(event.ipAddress, 24); // 24 hours
+        break;
+        
+      case 'permanent_ip_block':
+        await this.blockIPPermanently(event.ipAddress);
+        break;
+        
+      case 'account_lock':
+        if (event.userId) {
+          await this.lockUserAccount(event.userId);
+        }
+        break;
+        
+      case 'transaction_review_hold':
+        if (event.metadata?.transactionId) {
+          await this.holdTransactionForReview(event.metadata.transactionId);
+        }
+        break;
+        
+      case 'immediate_investigation':
+        await this.triggerImmediateInvestigation(event, alert);
+        break;
+    }
+  }
+  
+  private static async sendSecurityNotifications(alert: any): Promise<void> {
+    // Send to security team via multiple channels
+    const notifications = [
+      this.sendEmailAlert(alert),
+      this.sendSlackAlert(alert),
+      this.sendSMSAlert(alert) // For critical alerts only
+    ];
+    
+    await Promise.allSettled(notifications);
+  }
+}
+
+// Security event middleware for Express.js
+export const securityEventLogger = (
+  req: Request, 
+  res: Response, 
+  next: NextFunction
+): void => {
+  const originalSend = res.send;
+  
+  res.send = function(data) {
+    // Log security-relevant events
+    if (res.statusCode === 401) {
+      SecurityMonitor.logSecurityEvent({
+        type: 'failedLogins',
+        severity: 'MEDIUM',
+        userId: req.body?.email || req.user?.id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+        resource: req.path,
+        action: req.method,
+        result: 'DENIED',
+        requestId: req.headers['x-request-id'] as string
+      });
+    }
+    
+    if (res.statusCode === 403) {
+      SecurityMonitor.logSecurityEvent({
+        type: 'unauthorizedAccess',
+        severity: 'HIGH',
+        userId: req.user?.id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+        resource: req.path,
+        action: req.method,
+        result: 'DENIED',
+        requestId: req.headers['x-request-id'] as string
+      });
+    }
+    
+    return originalSend.call(this, data);
+  };
+  
+  next();
+};
+```
+
+### Audit Logging Implementation
+
+**Comprehensive Audit Trail System:**
+```javascript
+// Audit logging system for compliance and security
+class AuditLogger {
+  private static auditLog = winston.createLogger({
+    level: 'info',
+    format: winston.format.combine(
+      winston.format.timestamp(),
+      winston.format.errors({ stack: true }),
+      winston.format.json()
+    ),
+    defaultMeta: { service: 'awo-platform' },
+    transports: [
+      // File transport for local storage
+      new winston.transports.File({
+        filename: '/var/log/awo/audit.log',
+        maxsize: 10485760, // 10MB
+        maxFiles: 10,
+        tailable: true
+      }),
+      
+      // Console transport for development
+      ...(process.env.NODE_ENV === 'development' ? [
+        new winston.transports.Console({
+          format: winston.format.simple()
+        })
+      ] : [])
+    ]
+  });
+  
+  static logUserAction(action: UserAuditAction): void {
+    const auditEntry = {
+      eventType: 'USER_ACTION',
+      timestamp: new Date().toISOString(),
+      userId: action.userId,
+      userEmail: action.userEmail,
+      action: action.action,
+      resource: action.resource,
+      resourceId: action.resourceId,
+      ipAddress: action.ipAddress,
+      userAgent: action.userAgent,
+      sessionId: action.sessionId,
+      requestId: action.requestId,
+      result: action.result,
+      metadata: action.metadata
+    };
+    
+    this.auditLog.info('USER_ACTION', auditEntry);
+    
+    // Store in database for queryability
+    this.storeAuditRecord(auditEntry);
+  }
+  
+  static logSystemEvent(event: SystemAuditEvent): void {
+    const auditEntry = {
+      eventType: 'SYSTEM_EVENT',
+      timestamp: new Date().toISOString(),
+      component: event.component,
+      action: event.action,
+      resource: event.resource,
+      result: event.result,
+      metadata: event.metadata,
+      severity: event.severity
+    };
+    
+    this.auditLog.info('SYSTEM_EVENT', auditEntry);
+    this.storeAuditRecord(auditEntry);
+  }
+  
+  static logDataAccess(access: DataAccessAuditEvent): void {
+    const auditEntry = {
+      eventType: 'DATA_ACCESS',
+      timestamp: new Date().toISOString(),
+      userId: access.userId,
+      dataType: access.dataType,
+      action: access.action, // READ, CREATE, UPDATE, DELETE
+      recordId: access.recordId,
+      fieldAccessed: access.fieldAccessed,
+      ipAddress: access.ipAddress,
+      result: access.result,
+      metadata: access.metadata
+    };
+    
+    this.auditLog.info('DATA_ACCESS', auditEntry);
+    this.storeAuditRecord(auditEntry);
+  }
+  
+  private static async storeAuditRecord(record: any): Promise<void> {
+    try {
+      await prisma.auditLog.create({
+        data: {
+          eventType: record.eventType,
+          timestamp: new Date(record.timestamp),
+          userId: record.userId || null,
+          action: record.action,
+          resource: record.resource,
+          resourceId: record.resourceId || null,
+          ipAddress: record.ipAddress || null,
+          result: record.result,
+          metadata: record.metadata || {}
+        }
+      });
+    } catch (error) {
+      // Audit logging should never fail the main operation
+      console.error('Failed to store audit record:', error);
+    }
+  }
+  
+  // Compliance reporting queries
+  static async generateComplianceReport(
+    startDate: Date,
+    endDate: Date,
+    eventTypes?: string[]
+  ): Promise<any[]> {
+    const whereClause: any = {
+      timestamp: {
+        gte: startDate,
+        lte: endDate
+      }
+    };
+    
+    if (eventTypes && eventTypes.length > 0) {
+      whereClause.eventType = {
+        in: eventTypes
+      };
+    }
+    
+    return await prisma.auditLog.findMany({
+      where: whereClause,
+      orderBy: {
+        timestamp: 'desc'
+      },
+      include: {
+        user: {
+          select: {
+            email: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+  }
+}
+
+// Audit middleware for automatic logging
+export const auditMiddleware = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  const originalSend = res.send;
+  
+  res.send = function(data) {
+    // Log all state-changing operations
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+      AuditLogger.logUserAction({
+        userId: req.user?.id,
+        userEmail: req.user?.email,
+        action: `${req.method} ${req.path}`,
+        resource: req.path.split('/')[2], // Extract resource type
+        resourceId: req.params.id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+        sessionId: req.sessionId,
+        requestId: req.headers['x-request-id'] as string,
+        result: res.statusCode < 400 ? 'SUCCESS' : 'FAILURE',
+        metadata: {
+          statusCode: res.statusCode,
+          requestBody: req.body,
+          responseSize: data?.length || 0
+        }
+      });
+    }
+    
+    return originalSend.call(this, data);
+  };
+  
+  next();
+};
+```
+
+## Backup and Disaster Recovery
+
+### Automated Backup Strategy
+
+**Multi-Tier Backup Implementation:**
+```bash
+#!/bin/bash
+# AWO Platform Backup Strategy Implementation
+
+# Configuration
+BACKUP_RETENTION_DAYS=90
+BACKUP_ENCRYPTION_KEY="${DATA_ENCRYPTION_KEY}"
+BACKUP_LOCATION="/backups/awo-platform"
+S3_BACKUP_BUCKET="awo-platform-backups"
+
+# Database backup function
+backup_database() {
+    local timestamp=$(date +"%Y%m%d_%H%M%S")
+    local backup_file="${BACKUP_LOCATION}/database/awo_db_backup_${timestamp}.sql"
+    
+    echo "Starting database backup: ${backup_file}"
+    
+    # Create compressed and encrypted database dump
+    pg_dump "${DATABASE_URL}" \
+        --verbose \
+        --no-password \
+        --format=custom \
+        --compress=9 \
+        --file="${backup_file}.dump"
+    
+    # Encrypt the backup
+    gpg --cipher-algo AES256 \
+        --compress-algo 1 \
+        --s2k-digest-algo SHA512 \
+        --cert-digest-algo SHA512 \
+        --symmetric \
+        --passphrase "${BACKUP_ENCRYPTION_KEY}" \
+        --output "${backup_file}.dump.gpg" \
+        "${backup_file}.dump"
+    
+    # Remove unencrypted backup
+    rm "${backup_file}.dump"
+    
+    # Upload to cloud storage
+    aws s3 cp "${backup_file}.dump.gpg" \
+        "s3://${S3_BACKUP_BUCKET}/database/" \
+        --storage-class STANDARD_IA \
+        --server-side-encryption AES256
+    
+    echo "Database backup completed: ${backup_file}.dump.gpg"
+}
+
+# Application code backup
+backup_application() {
+    local timestamp=$(date +"%Y%m%d_%H%M%S")
+    local backup_file="${BACKUP_LOCATION}/application/awo_app_backup_${timestamp}.tar.gz"
+    
+    echo "Starting application backup: ${backup_file}"
+    
+    # Create application backup (excluding node_modules, logs, temp files)
+    tar -czf "${backup_file}" \
+        --exclude="node_modules" \
+        --exclude="*.log" \
+        --exclude="tmp" \
+        --exclude=".git" \
+        /app/awo-platform/
+    
+    # Encrypt the backup
+    gpg --cipher-algo AES256 \
+        --symmetric \
+        --passphrase "${BACKUP_ENCRYPTION_KEY}" \
+        --output "${backup_file}.gpg" \
+        "${backup_file}"
+    
+    # Remove unencrypted backup
+    rm "${backup_file}"
+    
+    # Upload to cloud storage
+    aws s3 cp "${backup_file}.gpg" \
+        "s3://${S3_BACKUP_BUCKET}/application/" \
+        --storage-class STANDARD_IA
+    
+    echo "Application backup completed: ${backup_file}.gpg"
+}
+
+# Configuration backup
+backup_configuration() {
+    local timestamp=$(date +"%Y%m%d_%H%M%S")
+    local backup_file="${BACKUP_LOCATION}/config/awo_config_backup_${timestamp}.tar.gz"
+    
+    echo "Starting configuration backup: ${backup_file}"
+    
+    # Backup configuration files (excluding secrets)
+    tar -czf "${backup_file}" \
+        /etc/nginx/sites-available/awo-platform \
+        /etc/ssl/certs/awo-platform.pem \
+        /etc/systemd/system/awo-platform.service \
+        /etc/fail2ban/jail.d/awo-platform.conf
+    
+    # Upload to cloud storage
+    aws s3 cp "${backup_file}" \
+        "s3://${S3_BACKUP_BUCKET}/configuration/" \
+        --storage-class STANDARD_IA
+    
+    echo "Configuration backup completed: ${backup_file}"
+}
+
+# Cleanup old backups
+cleanup_old_backups() {
+    echo "Cleaning up backups older than ${BACKUP_RETENTION_DAYS} days"
+    
+    # Local cleanup
+    find "${BACKUP_LOCATION}" -type f -mtime +${BACKUP_RETENTION_DAYS} -delete
+    
+    # S3 cleanup (configured via lifecycle policy)
+    aws s3api put-bucket-lifecycle-configuration \
+        --bucket "${S3_BACKUP_BUCKET}" \
+        --lifecycle-configuration file://s3-lifecycle-policy.json
+}
+
+# Verify backup integrity
+verify_backup_integrity() {
+    local backup_file="$1"
+    
+    echo "Verifying backup integrity: ${backup_file}"
+    
+    # Test GPG decryption
+    gpg --quiet \
+        --passphrase "${BACKUP_ENCRYPTION_KEY}" \
+        --decrypt "${backup_file}" > /dev/null
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ Backup integrity verified: ${backup_file}"
+        return 0
+    else
+        echo "❌ Backup integrity check failed: ${backup_file}"
+        return 1
+    fi
+}
+
+# Main backup execution
+main() {
+    echo "Starting AWO Platform backup process at $(date)"
+    
+    # Create backup directories
+    mkdir -p "${BACKUP_LOCATION}"/{database,application,config}
+    
+    # Perform backups
+    backup_database
+    backup_application  
+    backup_configuration
+    
+    # Cleanup old backups
+    cleanup_old_backups
+    
+    # Verify latest backups
+    latest_db_backup=$(ls -t ${BACKUP_LOCATION}/database/*.gpg | head -1)
+    latest_app_backup=$(ls -t ${BACKUP_LOCATION}/application/*.gpg | head -1)
+    
+    verify_backup_integrity "${latest_db_backup}"
+    verify_backup_integrity "${latest_app_backup}"
+    
+    echo "AWO Platform backup process completed at $(date)"
+}
+
+# Execute main function
+main "$@"
+```
+
+### Disaster Recovery Procedures
+
+**Disaster Recovery Playbook:**
+```bash
+#!/bin/bash
+# AWO Platform Disaster Recovery Procedures
+
+# Recovery Time Objective (RTO): 4 hours
+# Recovery Point Objective (RPO): 1 hour
+
+# Configuration
+RECOVERY_ENVIRONMENT="production"
+BACKUP_LOCATION="/recovery/awo-platform"
+S3_BACKUP_BUCKET="awo-platform-backups"
+
+# Emergency contact information
+EMERGENCY_CONTACTS=(
+    "ops-team@awo-platform.com"
+    "security@awo-platform.com"
+    "cto@awo-platform.com"
+)
+
+# Disaster recovery execution
+execute_disaster_recovery() {
+    echo "🚨 INITIATING DISASTER RECOVERY FOR AWO PLATFORM"
+    echo "Recovery Environment: ${RECOVERY_ENVIRONMENT}"
+    echo "Timestamp: $(date)"
+    
+    # Send emergency notifications
+    send_emergency_notifications "DISASTER_RECOVERY_INITIATED"
+    
+    # Step 1: Assess the situation
+    assess_damage
+    
+    # Step 2: Restore database from latest backup
+    restore_database
+    
+    # Step 3: Restore application
+    restore_application
+    
+    # Step 4: Restore configuration
+    restore_configuration
+    
+    # Step 5: Verify system integrity
+    verify_system_integrity
+    
+    # Step 6: Switch traffic to recovery environment
+    switch_traffic
+    
+    # Step 7: Monitor and validate
+    monitor_recovery
+    
+    echo "✅ DISASTER RECOVERY COMPLETED"
+    send_emergency_notifications "DISASTER_RECOVERY_COMPLETED"
+}
+
+# Database restoration
+restore_database() {
+    echo "📊 Restoring database from backup..."
+    
+    # Download latest database backup
+    latest_backup=$(aws s3 ls "s3://${S3_BACKUP_BUCKET}/database/" \
+        --recursive | sort | tail -1 | awk '{print $4}')
+    
+    if [ -z "${latest_backup}" ]; then
+        echo "❌ No database backup found"
+        exit 1
+    fi
+    
+    aws s3 cp "s3://${S3_BACKUP_BUCKET}/${latest_backup}" \
+        "${BACKUP_LOCATION}/database/"
+    
+    # Decrypt backup
+    backup_file="${BACKUP_LOCATION}/database/$(basename ${latest_backup})"
+    decrypted_file="${backup_file%.gpg}"
+    
+    gpg --quiet \
+        --passphrase "${BACKUP_ENCRYPTION_KEY}" \
+        --decrypt "${backup_file}" > "${decrypted_file}"
+    
+    # Restore to new database instance
+    createdb awo_platform_recovery
+    pg_restore --verbose \
+        --no-owner \
+        --no-privileges \
+        --database=awo_platform_recovery \
+        "${decrypted_file}"
+    
+    echo "✅ Database restoration completed"
+}
+
+# Application restoration
+restore_application() {
+    echo "🚀 Restoring application from backup..."
+    
+    # Download latest application backup
+    latest_app_backup=$(aws s3 ls "s3://${S3_BACKUP_BUCKET}/application/" \
+        --recursive | sort | tail -1 | awk '{print $4}')
+    
+    aws s3 cp "s3://${S3_BACKUP_BUCKET}/${latest_app_backup}" \
+        "${BACKUP_LOCATION}/application/"
+    
+    # Decrypt and extract
+    backup_file="${BACKUP_LOCATION}/application/$(basename ${latest_app_backup})"
+    decrypted_file="${backup_file%.gpg}"
+    
+    gpg --quiet \
+        --passphrase "${BACKUP_ENCRYPTION_KEY}" \
+        --decrypt "${backup_file}" > "${decrypted_file}"
+    
+    # Extract to recovery location
+    mkdir -p /recovery/app
+    tar -xzf "${decrypted_file}" -C /recovery/app
+    
+    # Install dependencies and build
+    cd /recovery/app/awo-platform
+    npm ci --production
+    npm run build
+    
+    echo "✅ Application restoration completed"
+}
+
+# System integrity verification
+verify_system_integrity() {
+    echo "🔍 Verifying system integrity..."
+    
+    # Database connectivity test
+    if ! pg_isready -h localhost -p 5432; then
+        echo "❌ Database connectivity failed"
+        return 1
+    fi
+    
+    # Application health check
+    cd /recovery/app/awo-platform
+    npm start &
+    APP_PID=$!
+    
+    sleep 30
+    
+    # Test API endpoints
+    health_check=$(curl -s -o /dev/null -w "%{http_code}" \
+        http://localhost:3000/health)
+    
+    if [ "${health_check}" != "200" ]; then
+        echo "❌ Application health check failed"
+        kill ${APP_PID}
+        return 1
+    fi
+    
+    # Test database operations
+    api_test=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Content-Type: application/json" \
+        http://localhost:3000/api/health/database)
+    
+    if [ "${api_test}" != "200" ]; then
+        echo "❌ Database operations test failed"
+        kill ${APP_PID}
+        return 1
+    fi
+    
+    kill ${APP_PID}
+    echo "✅ System integrity verification completed"
+}
+
+# Traffic switching
+switch_traffic() {
+    echo "🔄 Switching traffic to recovery environment..."
+    
+    # Update DNS records via Cloudflare API
+    update_dns_records
+    
+    # Update load balancer configuration
+    update_load_balancer
+    
+    # Verify traffic is flowing
+    monitor_traffic_switch
+    
+    echo "✅ Traffic switch completed"
+}
+
+# Continuous monitoring during recovery
+monitor_recovery() {
+    echo "📊 Monitoring recovery environment..."
+    
+    # Monitor for 30 minutes
+    for i in {1..30}; do
+        # Check application health
+        health_status=$(curl -s http://api.awo-platform.com/health | jq -r '.status')
+        
+        if [ "${health_status}" != "healthy" ]; then
+            echo "⚠️  Health check warning at minute ${i}"
+            send_emergency_notifications "RECOVERY_HEALTH_WARNING"
+        fi
+        
+        # Check response times
+        response_time=$(curl -o /dev/null -s -w '%{time_total}' \
+            http://api.awo-platform.com/api/health)
+        
+        if (( $(echo "${response_time} > 2.0" | bc -l) )); then
+            echo "⚠️  Slow response time: ${response_time}s at minute ${i}"
+        fi
+        
+        sleep 60
+    done
+    
+    echo "✅ Recovery monitoring completed"
+}
+
+# Emergency notification system
+send_emergency_notifications() {
+    local event_type="$1"
+    local message="AWO Platform Disaster Recovery Event: ${event_type} at $(date)"
+    
+    # Send emails
+    for contact in "${EMERGENCY_CONTACTS[@]}"; do
+        echo "${message}" | mail -s "🚨 AWO Platform Emergency: ${event_type}" "${contact}"
+    done
+    
+    # Send Slack notification (if configured)
+    if [ -n "${SLACK_WEBHOOK_URL}" ]; then
+        curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"${message}\"}" \
+            "${SLACK_WEBHOOK_URL}"
+    fi
+    
+    # Log to security system
+    logger -p local0.crit "AWO_DISASTER_RECOVERY: ${event_type}"
+}
+
+# Main execution
+if [ "$1" == "execute" ]; then
+    execute_disaster_recovery
+else
+    echo "AWO Platform Disaster Recovery Script"
+    echo "Usage: $0 execute"
+    echo ""
+    echo "This script will:"
+    echo "1. Restore database from latest encrypted backup"
+    echo "2. Restore application from backup"
+    echo "3. Verify system integrity"
+    echo "4. Switch traffic to recovery environment"
+    echo "5. Monitor recovery for 30 minutes"
+    echo ""
+    echo "RTO: 4 hours | RPO: 1 hour"
+fi
+```
+
+---
+
+**Infrastructure Security Summary:**
+
+<CardGroup cols={2}>
+  <Card title="Cloud Security" icon="cloud">
+    **Multi-cloud strategy with SADC focus**
+    - Railway/Render for applications
+    - Neon PostgreSQL with global edge
+    - Cloudflare for CDN and WAF
+    - Expo services for mobile deployment
+  </Card>
+  <Card title="Network Security" icon="shield">
+    **Defense in depth approach**
+    - WAF and DDoS protection
+    - Geographic access controls
+    - SSL/TLS with strong ciphers
+    - Network segmentation and firewalls
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Monitoring & Logging" icon="monitor">
+    **Comprehensive security monitoring**
+    - Real-time security event monitoring
+    - Automated threat detection and response
+    - Comprehensive audit logging
+    - SIEM integration capabilities
+  </Card>
+  <Card title="Backup & Recovery" icon="database">
+    **Automated backup and disaster recovery**
+    - Encrypted daily backups
+    - Multi-tier backup strategy
+    - 4-hour RTO, 1-hour RPO
+    - Automated recovery procedures
+  </Card>
+</CardGroup>
+
+*This infrastructure security guide ensures AWO Platform maintains robust security controls across all infrastructure components while meeting SADC regional requirements and financial services regulations.*
