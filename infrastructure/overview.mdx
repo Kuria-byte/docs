@@ -1,35 +1,487 @@
----
-title: "Overview"
-description: "AWO Platform overview infrastructure documentation"
----
+# Infrastructure Overview
 
-# Overview
+AWO Platform's infrastructure is designed to deliver reliable, scalable, and secure financial services across the SADC region while addressing the unique challenges of African markets including variable connectivity, regulatory requirements, and cost optimization.
 
-## Overview
+## Infrastructure Philosophy
 
 <Info>
-This section covers overview for the AWO Platform infrastructure.
+AWO's infrastructure strategy prioritizes **African-first design**, balancing modern cloud-native architecture with practical considerations for SADC market realities including data sovereignty, connectivity patterns, and cost management.
 </Info>
 
-## Infrastructure Components
+### Core Infrastructure Principles
 
-Infrastructure details will be documented here.
+**1. SADC-Optimized Performance**
+- Edge locations strategically placed across African cities
+- Intelligent caching for variable connectivity patterns  
+- Offline-first mobile architecture with sync capabilities
+- Multi-currency and regional compliance support
 
-## Scaling Strategy
+**2. Financial-Grade Security**
+- Multi-layered security with encryption at rest and in transit
+- Zero-trust network architecture with microsegmentation
+- Continuous compliance monitoring for POPIA, GDPR, and local regulations
+- Real-time fraud detection with AI-powered analytics
 
-Scaling approach and implementation will be covered here.
+**3. Cost-Conscious Scaling**
+- Serverless-first approach to minimize fixed costs
+- Pay-per-use database and compute resources
+- Intelligent resource optimization for African market economics
+- Currency hedging considerations for cloud provider costs
 
-## Performance Optimization
+**4. Regulatory Compliance by Design**
+- Data localization for SADC countries
+- Automated compliance reporting and audit trails
+- RegTech integration for AML/KYC requirements
+- Cross-border payment compliance automation
+
+## High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    USER LAYER                           │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐ │
+│  │   Mobile    │ │     Web     │ │   Alternative       │ │
+│  │    Apps     │ │   Portal    │ │   Channels          │ │
+│  │ (React      │ │   (React)   │ │ (USSD/WhatsApp)     │ │
+│  │  Native)    │ │             │ │                     │ │
+│  └─────────────┘ └─────────────┘ └─────────────────────┘ │
+└─────────────────┬───────────────────────────────────────┘
+                  │ HTTPS/WSS + Offline Sync
+┌─────────────────▼───────────────────────────────────────┐
+│                   CDN LAYER                             │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │             Cloudflare Global CDN                   │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │  Lagos  │ │Cape Town│ │ Nairobi │ │Johannesburg ││ │
+│  │  │  Edge   │ │  Edge   │ │  Edge   │ │    Edge     ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────────────────────────────────────────────┐│ │
+│  │  │    DDoS Protection + WAF + Bot Management       ││ │
+│  │  └─────────────────────────────────────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────┬───────────────────────────────────────┘
+                  │ Regional Traffic Routing
+┌─────────────────▼───────────────────────────────────────┐
+│                 API GATEWAY LAYER                       │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              Load Balancers                         │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐               │ │
+│  │  │   SA    │ │ Nigeria │ │  Kenya  │               │ │
+│  │  │Region   │ │ Region  │ │ Region  │               │ │
+│  │  └─────────┘ └─────────┘ └─────────┘               │ │
+│  └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │           API Gateway (Express.js)                  │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │  Auth   │ │Rate     │ │Request  │ │  Response   ││ │
+│  │  │Gateway  │ │Limiting │ │Validate │ │  Transform  ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────┬───────────────────────────────────────┘
+                  │ Authenticated Requests
+┌─────────────────▼───────────────────────────────────────┐
+│               APPLICATION LAYER                         │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │            Containerized Services                   │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │  User   │ │  DIVA   │ │  Chama  │ │  Payment    ││ │
+│  │  │Service  │ │ Engine  │ │ Service │ │  Service    ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐│ │
+│  │  │Investment│ │ Coaching│ │Compliance│ │Notification ││ │
+│  │  │ Service │ │ Service │ │ Service │ │  Service    ││ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘│ │
+│  │                                                     │ │
+│  │  ┌─────────────────────────────────────────────────┐│ │
+│  │  │           Event-Driven Communication            ││ │
+│  │  │               (Redis Streams)                   ││ │
+│  │  └─────────────────────────────────────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────┬───────────────────────────────────────┘
+                  │ Data Operations
+┌─────────────────▼───────────────────────────────────────┐
+│                 DATA LAYER                              │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │           Primary Database Cluster                  │ │
+│  │              (Neon PostgreSQL)                      │ │
+│  │                                                     │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐               │ │
+│  │  │   SA    │ │ Nigeria │ │  Kenya  │               │ │
+│  │  │Primary  │ │ Replica │ │ Replica │               │ │
+│  │  └─────────┘ └─────────┘ └─────────┘               │ │
+│  │                                                     │ │
+│  │  ┌─────────────────────────────────────────────────┐│ │
+│  │  │         Automated Backup & Recovery             ││ │
+│  │  │        Point-in-Time Recovery (30 days)        ││ │
+│  │  └─────────────────────────────────────────────────┘│ │
+│  └─────────────────────────────────────────────────────┘ │
+│                                                         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              Caching Layer                          │ │
+│  │                (Redis Cluster)                      │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐               │ │
+│  │  │Session  │ │ DIVA    │ │Real-time│               │ │
+│  │  │ Cache   │ │ Scores  │ │ Events  │               │ │
+│  │  └─────────┘ └─────────┘ └─────────┘               │ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────┬───────────────────────────────────────┘
+                  │ External Integrations
+┌─────────────────▼───────────────────────────────────────┐
+│             INTEGRATION LAYER                           │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐ │
+│  │   Banking   │ │Mobile Money │ │    Identity         │ │
+│  │     APIs    │ │   Gateway   │ │  Verification       │ │
+│  │             │ │             │ │                     │ │
+│  │ ┌─────────┐ │ │ ┌─────────┐ │ │ ┌─────────────────┐ │ │
+│  │ │ Stitch  │ │ │ │Flutter  │ │ │ │   Smile ID      │ │ │
+│  │ │  API    │ │ │ │  wave   │ │ │ │  Verification   │ │ │
+│  │ └─────────┘ │ │ └─────────┘ │ │ └─────────────────┘ │ │
+│  │ ┌─────────┐ │ │ ┌─────────┐ │ │                     │ │
+│  │ │  Mono   │ │ │ │ M-Pesa  │ │ │                     │ │
+│  │ │  API    │ │ │ │  APIs   │ │ │                     │ │
+│  │ └─────────┘ │ │ └─────────┘ │ │                     │ │
+│  └─────────────┘ └─────────────┘ └─────────────────────┘ │
+│                                                         │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐ │
+│  │   Messaging │ │   Email     │ │   Push Notifications│ │
+│  │   Services  │ │   Services  │ │      Services       │ │
+│  │             │ │             │ │                     │ │
+│  │ ┌─────────┐ │ │ ┌─────────┐ │ │ ┌─────────────────┐ │ │
+│  │ │ Twilio  │ │ │ │SendGrid │ │ │ │  Expo Push      │ │ │
+│  │ │   SMS   │ │ │ │ Email   │ │ │ │  Notifications  │ │ │
+│  │ └─────────┘ │ │ └─────────┘ │ │ └─────────────────┘ │ │
+│  │ ┌─────────┐ │ │             │ │                     │ │
+│  │ │WhatsApp │ │ │             │ │                     │ │
+│  │ │Business │ │ │             │ │                     │ │
+│  │ └─────────┘ │ │             │ │                     │ │
+│  └─────────────┘ └─────────────┘ └─────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Regional Infrastructure Strategy
+
+### SADC Data Sovereignty Approach
 
 <CardGroup cols={2}>
-  <Card title="Database Optimization" icon="database">
-    PostgreSQL performance tuning
+  <Card title="Primary Region: South Africa" icon="database">
+    **Location**: Cape Town & Johannesburg  
+    **Role**: Primary database and core services  
+    **Compliance**: POPIA primary compliance  
+    **Users**: South African users + regional backup
   </Card>
-  <Card title="API Optimization" icon="zap">
-    Express.js performance optimization
+  <Card title="Replica Regions" icon="globe">
+    **Nigeria**: Lagos data center for West African users  
+    **Kenya**: Nairobi for East African coverage  
+    **Data**: Read replicas with local compliance  
+    **Latency**: &lt;100ms for regional users
   </Card>
 </CardGroup>
 
-## Monitoring & Alerts
+### African Infrastructure Optimizations
 
-Monitoring setup and alerting will be documented here.
+**Connectivity Resilience**
+- Multiple internet service provider (ISP) connections per region
+- Intelligent failover between connectivity providers
+- CDN caching for static assets and API responses
+- Progressive web app capabilities for low-bandwidth areas
+
+**Power Infrastructure Considerations**
+- Uninterruptible Power Supply (UPS) requirements for data centers
+- Generator backup systems for extended outages  
+- Green energy initiatives where available
+- Cost optimization during peak electricity pricing
+
+**Currency and Cost Management**
+- Multi-currency billing and cost allocation
+- Hedging strategies for cloud provider USD pricing
+- Reserved instance planning for predictable workloads
+- Spot instance utilization for batch processing
+
+## Technology Stack Overview
+
+### Cloud-Native Foundation
+
+<CardGroup cols={3}>
+  <Card title="Compute Platform" icon="server">
+    **Primary**: Railway/Render for simplicity  
+    **Backup**: AWS/Azure for enterprise scale  
+    **Architecture**: Containerized microservices  
+    **Scaling**: Horizontal auto-scaling
+  </Card>
+  <Card title="Database Layer" icon="database">
+    **Primary**: Neon PostgreSQL serverless  
+    **Caching**: Redis cluster for performance  
+    **Search**: PostgreSQL full-text search  
+    **Analytics**: Time-series data in PostgreSQL
+  </Card>
+  <Card title="Security Layer" icon="shield">
+    **Encryption**: AES-256 at rest, TLS 1.3 in transit  
+    **Authentication**: JWT with refresh tokens  
+    **Authorization**: Role-based access control  
+    **Monitoring**: Real-time security event tracking
+  </Card>
+</CardGroup>
+
+### Mobile-First Architecture
+
+**React Native with Offline Support**
+- AsyncStorage for offline data persistence
+- Intelligent sync when connectivity restored
+- Progressive data loading for slow connections
+- Adaptive UI for varying screen sizes and qualities
+
+**Alternative Access Channels**
+- USSD gateway for feature phones (*120*AWO#)
+- WhatsApp Business API for messaging-based banking
+- Progressive Web App for web browser access
+- Agent networks for cash-in/cash-out services
+
+## Infrastructure Scaling Strategy
+
+### Performance Targets
+
+<CardGroup cols={2}>
+  <Card title="Response Time Targets" icon="zap">
+    **API Endpoints**: &lt;300ms (95th percentile)  
+    **Mobile App Startup**: &lt;3 seconds  
+    **Database Queries**: &lt;100ms average  
+    **Real-time Updates**: &lt;1 second delivery
+  </Card>
+  <Card title="Availability Targets" icon="clock">
+    **Core Services**: 99.9% uptime (8.77 hours/year)  
+    **Payment Processing**: 99.95% uptime  
+    **Data Replication**: &lt;5 minutes lag  
+    **Disaster Recovery**: &lt;4 hours RTO
+  </Card>
+</CardGroup>
+
+### Capacity Planning
+
+**User Growth Projections**
+- **Year 1**: 50K users, 100K transactions/month
+- **Year 2**: 200K users, 500K transactions/month  
+- **Year 3**: 500K users, 2M transactions/month
+- **Year 5**: 2M users, 10M transactions/month
+
+**Resource Scaling Timeline**
+
+<Steps>
+  <Step title="Phase 1: MVP Launch (0-50K users)">
+    Single region deployment with basic redundancy and monitoring setup
+  </Step>
+  <Step title="Phase 2: Regional Expansion (50K-200K users)">
+    Multi-region replicas and enhanced security monitoring implementation
+  </Step>
+  <Step title="Phase 3: Scale Optimization (200K-500K users)">
+    Advanced caching, database sharding, and performance optimization
+  </Step>
+  <Step title="Phase 4: Enterprise Scale (500K+ users)">
+    Multi-cloud strategy, advanced analytics, and AI-powered operations
+  </Step>
+</Steps>
+
+## Security Infrastructure Overview
+
+### Zero-Trust Network Architecture
+
+**Network Segmentation**
+- Application-level microsegmentation
+- Database network isolation with private subnets
+- API gateway as single point of entry
+- Internal service-to-service authentication
+
+**Identity and Access Management**
+- Multi-factor authentication for all admin access
+- Role-based access control with least privilege
+- Regular access reviews and deprovisioning
+- Audit logging for all administrative actions
+
+### Compliance and Regulatory Infrastructure
+
+**Data Protection Framework**
+- Field-level encryption for sensitive data (PII, financial)
+- Automated data retention and deletion policies  
+- Consent management and user data rights
+- Cross-border data transfer controls
+
+**Audit and Reporting Infrastructure**
+- Immutable audit logs for all financial transactions
+- Automated compliance reporting for regulators
+- Real-time monitoring for suspicious activities
+- Incident response automation and notification
+
+## Cost Optimization Strategy
+
+### SADC-Specific Cost Considerations
+
+**Currency Risk Management**
+- Multi-currency cost tracking and allocation
+- Forward contracts for USD cloud provider costs
+- Regional pricing optimization where available
+- Cost pass-through strategies for currency fluctuations
+
+**Resource Optimization**
+- Serverless-first approach to minimize fixed costs
+- Intelligent auto-scaling based on African usage patterns
+- Reserved instance purchases for predictable workloads
+- Development environment cost controls
+
+### Operational Cost Management
+
+<CardGroup cols={2}>
+  <Card title="Infrastructure Costs" icon="calculator">
+    **Target**: &lt;15% of revenue for infrastructure  
+    **Optimization**: Automated resource scaling  
+    **Monitoring**: Real-time cost alerting  
+    **Planning**: Quarterly cost review and optimization
+  </Card>
+  <Card title="Third-Party Services" icon="credit-card">
+    **Banking APIs**: Volume-based pricing optimization  
+    **Payment Processing**: Competitive rate negotiation  
+    **Compliance Services**: Shared service model  
+    **Monitoring Tools**: Consolidated observability platform
+  </Card>
+</CardGroup>
+
+## Disaster Recovery and Business Continuity
+
+### Recovery Objectives
+
+**Recovery Time Objectives (RTO)**
+- Critical services: &lt;1 hour
+- Payment processing: &lt;30 minutes  
+- User authentication: &lt;15 minutes
+- DIVA scoring: &lt;2 hours
+
+**Recovery Point Objectives (RPO)**
+- Financial transactions: &lt;5 minutes
+- User data: &lt;15 minutes
+- Configuration data: &lt;1 hour
+- Analytics data: &lt;4 hours
+
+### Multi-Region Failover Strategy
+
+**Automated Failover Capabilities**
+- Health check-based traffic routing
+- Database automatic failover to read replicas
+- Session state replication across regions
+- Real-time backup verification and testing
+
+**Manual Failover Procedures**
+- Documented runbooks for each service
+- Regular disaster recovery testing quarterly
+- Cross-trained operations team across time zones
+- External communication templates for outages
+
+## Infrastructure Monitoring and Observability
+
+### Three Pillars of Observability
+
+<CardGroup cols={3}>
+  <Card title="Metrics" icon="chart-bar">
+    **System Metrics**: CPU, memory, disk, network  
+    **Application Metrics**: Request rates, latency, errors  
+    **Business Metrics**: Transaction volume, user activity  
+    **Custom Metrics**: DIVA scores, Chama activity
+  </Card>
+  <Card title="Logging" icon="file-text">
+    **Application Logs**: Structured JSON logging  
+    **Audit Logs**: Financial transaction tracking  
+    **Security Logs**: Authentication and authorization  
+    **Performance Logs**: Query and API performance
+  </Card>
+  <Card title="Tracing" icon="route">
+    **Distributed Tracing**: Request flow across services  
+    **Database Tracing**: Query performance analysis  
+    **External API Tracing**: Third-party integration monitoring  
+    **User Journey Tracing**: End-to-end transaction flows
+  </Card>
+</CardGroup>
+
+### Real-Time Alerting Strategy
+
+**Alert Severity Levels**
+- **Critical**: Payment processing failures, security breaches
+- **High**: Performance degradation, API rate limit breaches  
+- **Medium**: Resource utilization warnings, slow queries
+- **Low**: Maintenance notifications, optimization opportunities
+
+**Notification Channels**
+- Slack for development team alerts
+- SMS for critical production issues
+- Email for daily/weekly summary reports
+- Dashboard displays for operations center
+
+## Development and Testing Infrastructure
+
+### Environment Strategy
+
+**Environment Hierarchy**
+- **Development**: Individual developer environments with branch databases
+- **Testing**: Automated testing with synthetic data
+- **Staging**: Production-like environment for final validation
+- **Production**: Live environment with full monitoring and backup
+
+**Database Branching Strategy**
+- Feature branches for development work
+- Testing branches with anonymized production data
+- Staging branch mirroring production schema
+- Production with automated backup and point-in-time recovery
+
+### CI/CD Infrastructure
+
+**Continuous Integration Pipeline**
+- Automated testing on every commit
+- Code quality and security scanning
+- Performance regression testing
+- Automated dependency updates
+
+**Continuous Deployment Pipeline**
+- Automated deployment to development and testing
+- Manual approval gates for staging and production
+- Blue-green deployments for zero-downtime updates
+- Automated rollback capabilities
+
+## Infrastructure Evolution Roadmap
+
+### Phase 1: Foundation (Months 0-6)
+- Basic multi-region deployment
+- Core security and monitoring setup
+- Initial compliance framework
+- Development and testing infrastructure
+
+### Phase 2: Optimization (Months 6-18)  
+- Advanced caching and performance optimization
+- Enhanced security monitoring and threat detection
+- Automated scaling and cost optimization
+- Regional regulatory compliance
+
+### Phase 3: Scale (Months 18-36)
+- Multi-cloud strategy implementation
+- Advanced analytics and machine learning infrastructure
+- IoT and edge computing for rural areas
+- Advanced disaster recovery and business continuity
+
+### Phase 4: Innovation (Months 36+)
+- AI-powered operations and optimization
+- Blockchain infrastructure for immutable audit trails
+- Quantum-ready cryptography preparation
+- Advanced edge computing and offline capabilities
+
+---
+
+*This infrastructure overview provides the foundation for AWO Platform's technical architecture, designed specifically for the unique challenges and opportunities of serving financial services across the SADC region.*
+
+*Last updated: June 2025*  
+*Next review: Dec 2025*
